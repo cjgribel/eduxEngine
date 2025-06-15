@@ -27,6 +27,7 @@
 #include "Handle.h"
 #include "Guid.h"
 #include "PoolAllocatorTFH.h"
+#include "Log.hpp"
 // #include "Texture.hpp"
 
 namespace eeng
@@ -154,8 +155,9 @@ namespace eeng
         {
         public:
             virtual ~IPool() = default;
-            virtual MetaHandle add(const Guid& guid, entt::meta_any data) = 0;
-            // virtual std::optional<entt::meta_any> get(const Handle& handle) const = 0;
+            virtual MetaHandle add(const Guid& guid, const entt::meta_any& data) = 0;
+            virtual MetaHandle add(const Guid& guid, entt::meta_any&& data) = 0;
+            virtual std::optional<entt::meta_any> get(const MetaHandle& handle) const = 0;
             // virtual bool valid(const Handle& handle) const = 0;
             // virtual void remove(const Handle& handle) = 0;
         };
@@ -166,19 +168,43 @@ namespace eeng
         public:
             using Handle = Handle<T>;
 
-            MetaHandle add(const Guid& guid, entt::meta_any data)
+            MetaHandle add(const Guid& guid, const entt::meta_any& data)
             {
                 std::lock_guard lock(m_mutex); // ??? Do locking in Storage?
-
                 assert(guid != Guid::invalid());
                 assert(!map_contains(m_guid_to_handle, guid));
-                //assert(m_guid_to_handle.find(guid) == m_guid_to_handle.end());
 
-                auto handle = m_pool.create(data.cast<T>());
+                // deep-copy here, since user passed an lvalue
+                auto any_copy = data;
+                auto& obj = any_copy.cast<T&>();
+                auto handle = m_pool.create(std::move(obj));
+
                 m_guid_to_handle[guid] = handle;
                 m_handle_to_guid[handle] = guid;
-
+                // ensure_metadata(h);
+                // m_versions.versionify(h);
+                // m_ref_counts[h.ofs / sizeof(T)] = 1;
                 return handle;
+            }
+
+            MetaHandle add(const Guid& guid, entt::meta_any&& data)
+            {
+                std::lock_guard lock(m_mutex);
+                assert(guid != Guid::invalid());
+                assert(!map_contains(m_guid_to_handle, guid));
+
+                // data has been moved-in, so its internal buffer is ours
+                auto& obj = data.cast<T&>();  // get reference to the stored T
+                auto handle = m_pool.create(std::move(obj));
+
+                m_guid_to_handle[guid] = handle;
+                m_handle_to_guid[handle] = guid;
+                return handle;
+            }
+
+            std::optional<entt::meta_any> get(const MetaHandle& handle) const
+            {
+                return std::nullopt;
             }
 
         private:
@@ -189,12 +215,22 @@ namespace eeng
             std::unordered_map<Guid, Handle> m_guid_to_handle;
             std::unordered_map<Handle, Guid> m_handle_to_guid;
 
+            mutable std::mutex m_mutex;
+
+            // inline void ensure_metadata(Handle handle)
+            // {
+            //     size_t i = handle.ofs / sizeof(T);
+            //     if (i >= m_ref_counts.size())
+            //     {
+            //         m_ref_counts.resize(i + 1, 0);
+            //         m_versions.resize((i + 1) * sizeof(T));
+            //     }
+            // }
+
             inline bool map_contains(const auto& map, const auto& key)
             {
                 return map.find(key) != map.end();
             }
-
-            mutable std::mutex m_mutex;
         };
 
     public:
@@ -219,36 +255,22 @@ namespace eeng
             auto id = type.id();
 
             if (pools.find(id) == pools.end())
+            {
                 pools[id] = std::make_unique<Pool<T>>();
+
+                // Debug log
+                std::string type_name(type.info().name());
+                eeng::Log("Created storage for type %s", type_name.c_str());
+            }
         }
 
-        // NOT TEMPLATED
-        // Return untyped handle
-        // Takes an instance probably, not ... (Resource created elsewhere / by AssetIndex)
-        // add(meta_type, meta_any, const Guid& guid = Guid::invalid())
         MetaHandle add(
-            //entt::meta_type type,
             entt::meta_any data,
             const Guid& guid)
         {
             auto& pool = get_or_create_pool(data.type());
             return pool.add(guid, std::move(data));
-
-            // auto id = type.id();
-            // auto it = pools.find(id);
-            // if (it == pools.end())
-            // {
-                //     type.func("assure_storage"_hs).invoke({}, entt::forward_as_meta(*this));
-                //     it = pools.find(id);
-                //     if (it == pools.end())
-                //         throw std::runtime_error("Pool creation failed");
-            // }
-
-            // auto& pool = static_cast<Pool<void>&>(*it->second);
-            // pool.add(guid, data);
-            return MetaHandle{};
         }
-
 
     private:
 
@@ -268,17 +290,14 @@ namespace eeng
             assert(res);
         }
 
-        IPool& get_or_create_pool(entt::meta_type type)
+        IPool& get_or_create_pool(entt::meta_type meta_type)
         {
-            auto id = type.id();
+            auto id = meta_type.id();
             auto it = pools.find(id);
             if (it == pools.end())
             {
-                assure_storage(type);
-                // auto meta_func = type.func(assure_storage_hs);
-                // assert(meta_func);
-                // meta_func.invoke({}, entt::forward_as_meta(*this));
-                //type.func("assure_storage"_hs).invoke({}, entt::forward_as_meta(*this));
+                assure_storage(meta_type);
+
                 it = pools.find(id);
                 if (it == pools.end())
                     throw std::runtime_error("Pool creation failed");
@@ -549,10 +568,10 @@ namespace eeng
                 auto* raw_ptr = pool.get();
                 pools[type] = std::move(pool);
                 return raw_ptr;
-}
+            }
             return static_cast<ResourcePool<T>*>(it->second.get());
-        }
-    };
+    }
+};
 #endif
 
 } // namespace eeng

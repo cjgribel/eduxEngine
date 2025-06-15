@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "AssimpImporter.hpp"
-#include "ResourceRegistry.hpp"
+#include "Storage.hpp"
 #include "ThreadPool.hpp"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -36,7 +36,7 @@ AssimpImporter::~AssimpImporter() = default;
 
 ModelImportResult AssimpImporter::import_model(const std::string& file_path,
                                                const ModelImportOptions& options,
-                                               ResourceRegistry& registry,
+                                               Storage& registry,
                                                ThreadPool* thread_pool)
 {
     ModelImportResult result;

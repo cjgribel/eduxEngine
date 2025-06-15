@@ -11,7 +11,7 @@
 #include <optional>
 #include "Handle.h"
 #include "ThreadPool.hpp"
-#include "ResourceRegistry.hpp"
+#include "Storage.hpp"
 #include "Texture.hpp"
 
 // Placeholder resources
@@ -46,7 +46,7 @@ namespace eeng
 
 namespace eeng
 {
-    class ResourceRegistry;
+    class Storage;
     class ThreadPool;
 
     enum class ImportFlags : unsigned int
@@ -89,7 +89,7 @@ namespace eeng
          */
         ModelImportResult import_model(const std::string& file_path,
             const ModelImportOptions& options,
-            ResourceRegistry& registry,
+            Storage& registry,
             ThreadPool* thread_pool = nullptr);
 
     private:

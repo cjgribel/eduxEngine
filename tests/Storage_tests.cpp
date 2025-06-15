@@ -2,7 +2,7 @@
 #include "Guid.h"
 #include "Handle.h"
 //#include "resource_pool.hpp"
-#include "ResourceRegistry.hpp"
+#include "Storage.hpp"
 
 using namespace eeng;
 

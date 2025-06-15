@@ -8,17 +8,8 @@
 #include "MetaReg.hpp"
 #include "ResourceTypes.h"
 #include "MetaLiterals.h"
-#include "ResourceRegistry.hpp" // Storage
+#include "Storage.hpp"
 #include "MetaInfo.h"
-
-// namespace entt {
-//   template<typename T>
-//   struct is_meta_pointer_like<T*> : std::true_type {};
-// }
-// namespace entt {
-//     template<>
-//     struct is_meta_pointer_like<eeng::Storage*> : std::true_type {};
-// }
 
 namespace eeng {
 
@@ -146,8 +137,8 @@ namespace eeng {
     {
         // === HANDLES ===
 
-        // register_handle<MockResource1>("Handle<MockResource1>");
-        // register_handle<MockResource2>("Handle<MockResource2>");
+        register_handle<MockResource1>("Handle<MockResource1>");
+        register_handle<MockResource2>("Handle<MockResource2>");
 
         // === RESOURCES ===
 
