@@ -51,8 +51,12 @@ bool Game::init()
         // ...
         entt::meta_any resource1 = mockResource1;
         eeng::Guid guid1 = eeng::Guid::generate(); // Fake guid (from AssetIndex)
+        eeng::Guid guid2 = eeng::Guid::generate(); // Fake guid (from AssetIndex)
+        eeng::Guid guid3 = eeng::Guid::generate(); // Fake guid (from AssetIndex)
         // 2. meta_any resource -> ResourceRegistry/Storage:
-        storage.add(resource1, guid1);
+        storage.add(resource1, guid1); // copy
+        storage.add(resource1, guid2); // copy
+        storage.add(std::move(resource1), guid3); // move
 
         // Get & "use" resource
         // Cast meta_any to resource type
