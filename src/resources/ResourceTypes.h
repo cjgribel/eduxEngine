@@ -16,13 +16,53 @@ namespace eeng
         int x{};
         float y{};
 
-        MockResource1()
-        {
-            eeng::Log("MockResource1 created");
+        // Default constructor
+        MockResource1() {
+            eeng::Log("MockResource1 default-constructed");
         }
 
-        ~MockResource1()
+        // Copy constructor
+        MockResource1(const MockResource1& other)
+            : x(other.x), y(other.y)
         {
+            eeng::Log("MockResource1 copy-constructed");
+        }
+
+        // Copy assignment
+        MockResource1& operator=(const MockResource1& other)
+        {
+            if (this != &other) {
+                x = other.x;
+                y = other.y;
+                eeng::Log("MockResource1 copy-assigned");
+            }
+            return *this;
+        }
+
+        // Move constructor
+        MockResource1(MockResource1&& other) noexcept
+            : x(other.x), y(other.y)
+        {
+            other.x = 0;
+            other.y = 0;
+            eeng::Log("MockResource1 move-constructed");
+        }
+
+        // Move assignment
+        MockResource1& operator=(MockResource1&& other) noexcept
+        {
+            if (this != &other) {
+                x = other.x;
+                y = other.y;
+                other.x = 0;
+                other.y = 0;
+                eeng::Log("MockResource1 move-assigned");
+            }
+            return *this;
+        }
+
+        // Destructor
+        ~MockResource1() {
             eeng::Log("MockResource1 destroyed");
         }
     };
