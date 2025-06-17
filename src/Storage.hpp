@@ -89,26 +89,6 @@ namespace std {
 
 namespace eeng
 {
-    /*
-    VersionMap<MyType>   version_map;
-    RefCountMap<MyType>  refcount_map;
-
-    // When you hand out a new handle:
-    Handle<MyType> h = pool.allocate();
-    version_map.assign_version(h);
-    refcount_map.add_ref(h);    // initial ref
-
-    // When a client grabs another reference to the same handle:
-    refcount_map.add_ref(h);
-
-    // When they release:
-    if (refcount_map.release(h) == 0) {
-        // no more users → you can safely remove/reset
-        version_map.remove(h);
-        pool.deallocate(h);
-    }
-    */
-
     class VersionMap
     {
         std::vector<handle_ver_type> versions;
@@ -169,6 +149,16 @@ namespace eeng
     {
         std::vector<size_t> refs;
 
+        template<typename T>
+        size_t& ref_slot(const Handle<T>& handle) {
+            if (!handle)
+                throw std::invalid_argument{ "Null handle in RefCountMap" };
+            auto idx = handle.idx;
+            if (idx >= refs.size())
+                throw std::out_of_range{ "Handle index out of range in RefCountMap" };
+            return refs[idx];
+        }
+
     public:
 
         // Increment refcount for this handle (auto-resizing)
@@ -177,20 +167,26 @@ namespace eeng
         {
             assert(handle);
             auto idx = handle.idx;
-            if (idx >= refs.size())
-                refs.resize(idx + 1, 0);
+            if (idx >= refs.size()) refs.resize(idx + 1, 0);
             return ++refs[idx];
         }
 
-        // Decrement; return new count
+        // Decrement refcount
         template<typename T>
-        size_t release(const Handle<T>& handle)
-        {
-            if (!handle) throw std::invalid_argument{ "Null handle in release" };
-            auto idx = handle.idx;
-            if (idx >= refs.size()) throw std::out_of_range{ "Handle index out of range in release" };
-            if (refs[idx] == 0) throw std::logic_error{ "Reference count underflow in release" };
-            return --refs[idx];
+        size_t release(const Handle<T>& handle) {
+            size_t& cnt = ref_slot(handle);
+            if (cnt == 0)
+                throw std::logic_error{ "Reference count underflow in release" };
+            return --cnt;
+        }
+
+        // Reset counter to zero
+        template<typename T>
+        void reset(const Handle<T>& handle) {
+            size_t& cnt = ref_slot(handle);
+            // if (cnt == 0)
+            //     throw std::logic_error{ "Reference count underflow in reset" };
+            cnt = 0;
         }
 
         template<typename T>
@@ -227,20 +223,18 @@ namespace eeng
             virtual MetaHandle add(const Guid& guid, const entt::meta_any& data) = 0;
             virtual MetaHandle add(const Guid& guid, entt::meta_any&& data) = 0;
 
-            // virtual std::optional<entt::meta_any> get(const MetaHandle& handle) const = 0;
-            // virtual entt::meta_any get(const MetaHandle& handle) const = 0;
-            // virtual entt::meta_any get(const MetaHandle& meta_handle) = 0;
-
-            // 1) Non-const get() forwards to the const impl
             virtual entt::meta_any get(const MetaHandle& meta_handle) = 0;
             virtual entt::meta_any get(const MetaHandle& meta_handle) const = 0;
 
-            // non-const try_get
             virtual std::optional<entt::meta_any> try_get(const MetaHandle& mh) noexcept = 0;
             virtual std::optional<entt::meta_any> try_get(const MetaHandle& mh) const noexcept = 0;
 
-            // virtual bool valid(const Handle& handle) const = 0;
-            // virtual void remove(const Handle& handle) = 0;
+            virtual void remove_now(const MetaHandle& handle) = 0;
+            virtual size_t retain(const MetaHandle& mh) = 0;
+            virtual size_t release(const MetaHandle& mh) = 0;
+
+            /// @return true if `mh` is a well-formed handle whose version still matches
+            virtual bool valid(const MetaHandle& mh) const noexcept = 0;
         };
 
         template<typename T>
@@ -257,8 +251,6 @@ namespace eeng
             std::unordered_map<Handle, Guid> m_handle_to_guid;
 
             mutable std::mutex m_mutex;
-
-
 
         public:
 
@@ -305,83 +297,82 @@ namespace eeng
                 return handle;
             }
 
-            // get const
-
-            // entt::meta_any get(const MetaHandle& meta_handle) override
-            // {
-            //     auto maybe_handle = meta_handle.cast<T>();
-            //     if (!maybe_handle) throw std::runtime_error{ "Invalid handle type" };
-            //     auto handle = *maybe_handle;
-            //     if (!m_versions.validate(handle)) throw std::runtime_error("Invalid handle (version mismatch)");
-
-            //     std::lock_guard lock(m_mutex);
-            //     T& obj = m_pool.get(handle);
-
-            //     return entt::forward_as_meta(obj);
-            // }
-
-    // 1) Non-const get() forwards to the const impl
             entt::meta_any get(const MetaHandle& meta_handle) override
             {
                 return get_impl(*this, meta_handle);
             }
 
-            // 2) Const get() also forwards to the same impl
             entt::meta_any get(const MetaHandle& meta_handle) const override
             {
                 return get_impl(*this, meta_handle);
             }
 
-            // non-const try_get
             std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) noexcept override
             {
                 return try_get_impl(*this, meta_handle);
             }
 
-            // const try_get
             std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) const noexcept override
             {
                 return try_get_impl(*this, meta_handle);
             }
 
-#if 0
-            // 3) RETAIN (someone else wants to share ownership)
-            void retain()
+            void remove_now(const MetaHandle& mh) override
             {
-                assert(versions.validate(h));
-                refcounts.add_ref(h);
+                std::lock_guard lock{ m_mutex };
+
+                auto opt = validate_handle(mh);
+                if (!opt) throw ValidationError{ "Invalid or not‐ready MetaHandle" };
+                auto handle = *opt;
+
+                auto gid = m_handle_to_guid[handle];
+                m_handle_to_guid.erase(handle);
+                m_guid_to_handle.erase(gid);
+
+                m_versions.remove(handle);
+                m_ref_counts.reset(handle);
+                m_pool.destroy(handle);
             }
 
-            // RELEASE (drop one ref; if zero, fully remove)
-            void release()
+            size_t retain(const MetaHandle& mh) override
             {
-                assert(versions.validate(h));
-                auto cnt = refcounts.release(h);
-                // if (cnt == 0) {
-                    //     // no more references → bingo, time to reclaim
-                    //     versions.remove(h);          // bump version to invalidate any lingering handles
-                    //     free_list.push_back(h.idx);  // recycle the slot
-                    //     // (you could also overwrite or destruct storage[h.idx] here)
-                    // }
+                if (auto opt = validate_handle(mh)) {
+                    std::lock_guard lock{ m_mutex };
+                    return m_ref_counts.add_ref(*opt);
+                }
+                throw ValidationError{ "Invalid or not-ready MetaHandle" };
             }
 
-            // 2) REMOVE (explicit “kill this slot” regardless of refcount)
-            void remove_now()
+            size_t release(const MetaHandle& mh) override
             {
-                assert(versions.validate(h));
-                versions.remove(h);              // bump version, so all existing handles fail validation
-                // clear any existing refs so future release() calls won't underflow:
-                while (refcounts.count(h) > 0)
-                    refcounts.release(h);
-                free_list.push_back(h.idx);
+                if (auto opt = validate_handle(mh)) {
+                    std::lock_guard lock{ m_mutex };
+                    auto count = m_ref_counts.release(*opt);
+                    return count;
+                }
+                throw ValidationError{ "Invalid or not-ready MetaHandle" };
             }
-#endif
+
+            bool valid(const MetaHandle& mh) const noexcept override
+            {
+                return static_cast<bool>(validate_handle(mh));
+            }
 
         private:
 
             inline bool map_contains(const auto& map, const auto& key)
             {
                 return map.find(key) != map.end();
+            }
+
+            // Validation without locking or throwing
+            std::optional<Handle> validate_handle(
+                const MetaHandle& meta_handle) const noexcept
+            {
+                if (!meta_handle.valid()) return {};
+                if (auto h = meta_handle.template cast<T>(); h && *h && m_versions.validate(*h))
+                    return *h;
+                return {};
             }
 
             template<typename PoolType>
@@ -414,35 +405,10 @@ namespace eeng
                 }
                 return std::nullopt;
             }
-
-            // Validation without locking or throwing
-            std::optional<Handle> validate_handle(
-                const MetaHandle& meta_handle) const noexcept
-            {
-                if (!meta_handle.valid()) return {};
-                if (auto h = meta_handle.template cast<T>(); h && *h && m_versions.validate(*h))
-                    return *h;
-                return {};
-            }
         };
-
-        // template<class StorageType>
-        // static auto& get_pool(StorageType& storage, entt::meta_type meta_type)
-        // {
-        //     std::cout << __PRETTY_FUNCTION__ << std::endl; 
-
-        //     auto id = meta_type.id();
-        //     auto it = storage.pools.find(id);
-        //     if (it == storage.pools.end()) throw std::runtime_error("Resource type not registered");
-        //     return *it->second;
-        // }
 
     public:
         Storage() = default;
-        // Storage(const Storage&) = delete;
-        // Storage& operator=(const Storage&) = delete;
-        // Storage(Storage&&) = delete;
-        // Storage& operator=(Storage&&) = delete;
         Storage(Storage const&) = delete;
         Storage& operator=(Storage const&) = delete;
         Storage(Storage&&) noexcept = default;
@@ -463,32 +429,25 @@ namespace eeng
                 pools[id] = std::make_unique<Pool<T>>();
 
                 // Debug log
-                std::string type_name(type.info().name());
-                eeng::Log("Created storage for type %s", type_name.c_str());
+                // std::string type_name(type.info().name());
+                // eeng::Log("Created storage for type %s", type_name.c_str());
             }
         }
 
-        MetaHandle add(
-            entt::meta_any data,
-            const Guid& guid)
+        MetaHandle add(entt::meta_any data, const Guid& guid)
         {
             auto& pool = get_or_create_pool(data.type());
             return pool.add(guid, std::move(data));
         }
 
-        // get const
-
-
         entt::meta_any get(const MetaHandle& meta_handle) const
         {
             return get_pool(meta_handle.type).get(meta_handle);
-            //return get_pool(*this, meta_handle.type).get(meta_handle);
         }
 
         entt::meta_any get(const MetaHandle& meta_handle)
         {
             return get_pool(meta_handle.type).get(meta_handle);
-            //return get_pool(*this, meta_handle.type).get(meta_handle);
         }
 
         std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) const noexcept
@@ -509,20 +468,35 @@ namespace eeng
             return pool.try_get(meta_handle);
         }
 
-        // // non-const try_get
-        // std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) noexcept override
-        // {
-        //     return try_get_impl(*this, meta_handle);
-        // }
+        /// Increase the ref-count for a resource.
+        /// @returns the new ref-count.
+        size_t retain(const MetaHandle& mh)
+        {
+            auto& pool = get_pool(mh.type);
+            return pool.retain(mh);
+        }
 
-        // // const try_get
-        // std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) const noexcept override
-        // {
-        //     return try_get_impl(*this, meta_handle);
-        // }
+        /// Decrease the ref-count for a resource, and if it hits zero
+        /// automatically destroy it.
+        /// @returns the new ref-count (0 if destroyed).
+        size_t release(const MetaHandle& mh)
+        {
+            auto& pool = get_pool(mh.type);
+            size_t count = pool.release(mh);
+            if (count == 0) {
+                // now that nobody holds it, force-remove
+                pool.remove_now(mh);
+            }
+            return count;
+        }
 
-
-    private:
+        /// @return true if there's a pool for `mh.type` and the handle’s version is still valid.
+        bool validate(const MetaHandle& mh) const noexcept 
+        {
+            auto it = pools.find(mh.type.id());
+            if (it == pools.end()) return false;
+            return it->second->valid(mh);
+        }
 
         // -> registry.storage() -> [entt::id_type, entt::meta_type]
         // pool()
@@ -531,6 +505,8 @@ namespace eeng
         // pool()
 
         // pool(entt::id_type id) 
+
+    private:
 
         void assure_storage(entt::meta_type meta_type)
         {
@@ -579,270 +555,4 @@ namespace eeng
     static_assert(std::is_move_constructible_v<Storage>);
     static_assert(std::is_move_assignable_v<Storage>);
 
-#if 0
-#define version_null 0
-
-
-    class IResourcePool
-    {
-    public:
-        virtual ~IResourcePool() = default;
-    };
-
-    template<typename T>
-    class ResourcePool : public IResourcePool
-    {
-    public:
-        using Handle = Handle<T>;
-
-        ResourcePool()
-            : m_pool(TypeInfo::create<T>())
-        {
-        }
-
-        template<typename... Args>
-        Handle add(const Guid& guid, Args&&... args)
-        {
-            std::lock_guard lock(m_mutex);
-
-            if (guid == Guid::invalid())
-                throw std::runtime_error("Cannot add resource with invalid GUID");
-            if (m_guid_map.find(guid) != m_guid_map.end())
-                throw std::runtime_error("Resource with this GUID already exists");
-
-            Handle h = m_pool.create<T>(std::forward<Args>(args)...);
-            ensure_metadata(h);
-            m_versions.versionify(h);
-            m_ref_counts[h.ofs / sizeof(T)] = 1;
-
-            m_guid_map[guid] = h;
-            m_handle_to_guid[h] = guid;
-
-            return h;
-        }
-
-        T& get(Handle h)
-        {
-            std::lock_guard lock(m_mutex);
-            if (!m_versions.validate(h))
-                throw std::runtime_error("Invalid handle (version mismatch)");
-            return m_pool.get<T>(h);
-        }
-
-        const T& get(Handle h) const
-        {
-            std::lock_guard lock(m_mutex);
-            if (!m_versions.validate(h))
-                throw std::runtime_error("Invalid handle (version mismatch)");
-            return m_pool.get<T>(h);
-        }
-
-        void remove(Handle h)
-        {
-            std::lock_guard lock(m_mutex);
-            remove_unlocked(h);
-        }
-
-        template<typename F>
-        void for_each(F&& f)
-        {
-            std::lock_guard lock(m_mutex);
-
-            m_pool.template used_visitor<T>([&](T& obj)
-                {
-                    f(obj);
-                });
-        }
-
-        void retain(Handle h)
-        {
-            std::lock_guard lock(m_mutex);
-            if (!m_versions.validate(h)) return;
-            ++m_ref_counts[h.ofs / sizeof(T)];
-        }
-
-        void release(Handle h)
-        {
-            std::lock_guard lock(m_mutex);
-            if (!m_versions.validate(h)) return;
-
-            auto& count = m_ref_counts[h.ofs / sizeof(T)];
-            if (--count == 0)
-            {
-                remove_unlocked(h); // safe: avoids re-locking
-            }
-        }
-
-        uint32_t use_count(Handle h) const
-        {
-            std::lock_guard lock(m_mutex);
-            if (!m_versions.validate(h)) return 0;
-            return m_ref_counts[h.ofs / sizeof(T)];
-        }
-
-        bool valid(Handle h) const
-        {
-            std::lock_guard lock(m_mutex);
-            return m_versions.validate(h);
-        }
-
-        Guid guid_of(Handle h) const
-        {
-            std::lock_guard lock(m_mutex);
-            auto it = m_handle_to_guid.find(h);
-            if (it != m_handle_to_guid.end()) return it->second;
-            return Guid::invalid();
-        }
-
-        // void bind_guid(Handle h, Guid guid)
-        // {
-        //     std::lock_guard lock(m_mutex);
-        //     m_guid_map[guid] = h;
-        //     m_handle_to_guid[h] = guid;
-        // }
-
-        Handle find_by_guid(Guid guid) const
-        {
-            std::lock_guard lock(m_mutex);
-            auto it = m_guid_map.find(guid);
-            return (it != m_guid_map.end()) ? it->second : Handle{};
-        }
-
-    private:
-        void remove_unlocked(Handle h)
-        {
-            if (!m_versions.validate(h)) return;
-
-            m_pool.destroy<T>(h);
-            m_versions.remove(h);
-            m_ref_counts[h.ofs / sizeof(T)] = 0;
-        }
-
-        void ensure_metadata(Handle h)
-        {
-            size_t i = h.ofs / sizeof(T);
-            if (i >= m_ref_counts.size())
-            {
-                m_ref_counts.resize(i + 1, 0);
-                m_versions.resize((i + 1) * sizeof(T));
-            }
-        }
-
-        PoolAllocatorFH m_pool;
-        VersionMap<T> m_versions;
-        std::vector<uint32_t> m_ref_counts;
-
-        std::unordered_map<Guid, Handle> m_guid_map;
-        std::unordered_map<Handle, Guid> m_handle_to_guid;
-
-        mutable std::mutex m_mutex;
-    };
-
-
-    class ResourceRegistry
-    {
-    public:
-        template<typename T, typename... Args>
-        Handle<T> add(const Guid& guid, Args&&... args)
-        {
-            return get_or_create_pool<T>()->add(guid, std::forward<Args>(args)...);
-        }
-
-        template<typename T>
-        T& get(Handle<T> h)
-        {
-            return get_pool<T>()->get(h);
-        }
-
-        template<typename T>
-        void remove(Handle<T> h)
-        {
-            get_pool<T>()->remove(h);
-        }
-
-        template<typename T>
-        void retain(Handle<T> h)
-        {
-            get_pool<T>()->retain(h);
-        }
-
-        template<typename T>
-        void release(Handle<T> h)
-        {
-            get_pool<T>()->release(h);
-        }
-
-        template<typename T>
-        uint32_t use_count(Handle<T> h) const
-        {
-            return get_pool<T>()->use_count(h);
-        }
-
-        template<typename T>
-        bool valid(Handle<T> h) const
-        {
-            return get_pool<T>()->valid(h);
-        }
-
-        template<typename T, typename F>
-        void for_all(F&& f)
-        {
-            get_pool<T>()->for_each(std::forward<F>(f));
-        }
-
-        template<typename T>
-        Handle<T> find_by_guid(Guid guid) const
-        {
-            return get_pool<T>()->find_by_guid(guid);
-        }
-
-        // template<typename T>
-        // void bind_guid(Handle<T> h, Guid g)
-        // {
-        //     get_pool<T>()->bind_guid(h, g);
-        // }
-
-    private:
-        std::unordered_map<std::type_index, std::unique_ptr<IResourcePool>> pools;
-
-        template<typename T>
-        ResourcePool<T>* get_pool()
-        {
-            auto it = pools.find(std::type_index(typeid(T)));
-            if (it == pools.end())
-                throw std::runtime_error("Resource type not registered");
-            return static_cast<ResourcePool<T>*>(it->second.get());
-        }
-
-        template<typename T>
-        const ResourcePool<T>* get_pool() const
-        {
-            auto it = pools.find(std::type_index(typeid(T)));
-            if (it == pools.end())
-                throw std::runtime_error("Resource type not registered");
-            return static_cast<const ResourcePool<T>*>(it->second.get());
-        }
-
-        template<typename T>
-        ResourcePool<T>* get_or_create_pool()
-        {
-            auto type = std::type_index(typeid(T));
-            auto it = pools.find(type);
-            if (it == pools.end())
-            {
-                auto pool = std::make_unique<ResourcePool<T>>();
-                auto* raw_ptr = pool.get();
-                pools[type] = std::move(pool);
-                return raw_ptr;
-            }
-            return static_cast<ResourcePool<T>*>(it->second.get());
-}
-    };
-#endif
-
 } // namespace eeng
-
-// namespace entt {
-//   template<>
-//   struct is_meta_pointer_like<eeng::Storage*> : std::true_type {};
-// }

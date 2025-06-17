@@ -115,6 +115,24 @@ bool Game::init()
         // WHO DOES THIS
         // ...
 
+        /*
+        Retaining & Releasing
+
+        auto h = storage.add(...);
+        // two independent owners grab it:
+        storage.retain(h);
+        storage.retain(h);
+
+        // first release → leaves count==2
+        assert(storage.release(h) == 2);
+
+        // next two releases → will hit zero and automatically destroy
+        assert(storage.release(h) == 1);
+        assert(storage.release(h) == 0);
+        // by now the pool has removed the entry altogether
+
+        */
+
         eeng::Log("Storage test ends");
     }
 #endif
@@ -253,7 +271,7 @@ bool Game::init()
         { 0.01f, 0.01f, 0.01f });
 
     return true;
-}
+    }
 
 void Game::update(
     float time,
@@ -424,7 +442,7 @@ void Game::render(
     // Draw shape batches
     shapeRenderer->render(matrices.P * matrices.V);
     shapeRenderer->post_render();
-}
+    }
 
 void Game::renderUI()
 {
