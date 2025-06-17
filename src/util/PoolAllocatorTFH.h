@@ -145,8 +145,8 @@ namespace eeng {
             // Resize if free-list is empty
             if (free_first == index_null) expand();
 
-            size_t index = free_first;
-            void* ptr = (void*)((char*)m_pool + index);
+            size_t offset = free_first;
+            void* ptr = (void*)((char*)m_pool + offset);
 
             // Unlink first_free
             if (free_first == free_last)
@@ -160,27 +160,28 @@ namespace eeng {
             else
                 ::new(ptr) value_type(std::forward<Args>(args)...);
 
-            return Handle<value_type> { index };
+            return Handle<value_type> { offset / sizeof(T) };
         }
 
         void destroy(Handle<value_type> handle)
         {
-            assert(handle);
             std::lock_guard lock(m_mutex);
+            assert(handle);
+            auto elem_offset = handle.idx * sizeof(T);
 
             if constexpr (!std::is_trivially_destructible_v<T>)
-                ptr_at<value_type>(m_pool, handle.ofs)->~value_type();
+                ptr_at<value_type>(m_pool, elem_offset)->~value_type();
 
             if (free_first == index_null)
             {
                 // Free-list is empty
-                *ptr_at<index_type>(m_pool, handle.ofs) = index_null;
-                free_first = free_last = handle.ofs;
+                *ptr_at<index_type>(m_pool, elem_offset) = index_null;
+                free_first = free_last = elem_offset;
             }
             else
             {
-                *ptr_at<index_type>(m_pool, handle.ofs) = free_first;
-                free_first = handle.ofs;
+                *ptr_at<index_type>(m_pool, elem_offset) = free_first;
+                free_first = elem_offset;
             }
         }
 
@@ -188,14 +189,14 @@ namespace eeng {
         {
             std::lock_guard lock(m_mutex);
 
-            return *ptr_at<value_type>(m_pool, handle.ofs);
+            return *ptr_at<value_type>(m_pool, handle.idx * sizeof(T));
         }
 
         cvalue_type& get(Handle<value_type> handle) const
         {
             std::lock_guard lock(m_mutex);
 
-            return *ptr_at<value_type>(m_pool, handle.ofs);
+            return *ptr_at<value_type>(m_pool, handle.idx * sizeof(T));
         }
 
         index_type count_free() const

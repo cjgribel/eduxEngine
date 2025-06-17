@@ -10,9 +10,9 @@
 
 namespace eeng
 {
-    using handle_ofs_type = size_t;
+    using handle_idx_type = size_t;
     using handle_ver_type = uint16_t;
-    constexpr handle_ofs_type  handle_ofs_null = std::numeric_limits<handle_ofs_type>::max();
+    constexpr handle_idx_type  handle_idx_null = std::numeric_limits<handle_idx_type>::max();
     constexpr handle_ver_type  handle_ver_null = std::numeric_limits<handle_ver_type>::max();
 
 
@@ -22,22 +22,22 @@ namespace eeng
         using value_type = T;
         using ptr_type = T*;
 
-        handle_ofs_type ofs;
+        handle_idx_type idx;
         handle_ver_type ver;
 
-        Handle() : ofs(handle_ofs_null), ver(handle_ver_null) {}
-        Handle(handle_ofs_type ofs) : ofs(ofs), ver(handle_ver_null) {}
-        Handle(handle_ofs_type ofs, handle_ver_type ver) : ofs(ofs), ver(ver) {}
+        Handle() : idx(handle_idx_null), ver(handle_ver_null) {}
+        Handle(handle_idx_type ofs) : idx(ofs), ver(handle_ver_null) {}
+        Handle(handle_idx_type ofs, handle_ver_type ver) : idx(ofs), ver(ver) {}
 
         void reset()
         {
-            ofs = handle_ofs_null;
+            idx = handle_idx_null;
             ver = handle_ver_null;
         }
 
         bool operator== (const Handle<T> rhs) const
         {
-            if (ofs != rhs.ofs) return false;
+            if (idx != rhs.idx) return false;
             if (ver != rhs.ver) return false;
             return true;
         }
@@ -53,7 +53,7 @@ namespace eeng
 
         operator bool() const
         {
-            return ofs != handle_ofs_null;
+            return idx != handle_idx_null;
         }
     };
 }
@@ -64,7 +64,7 @@ namespace std {
     {
         size_t operator()(const eeng::Handle<T>& h) const noexcept
         {
-            return hash_combine(h.ofs, h.ver);
+            return hash_combine(h.idx, h.ver);
         }
     };
 }

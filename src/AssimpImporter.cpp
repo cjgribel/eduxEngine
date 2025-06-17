@@ -68,13 +68,13 @@ ModelImportResult AssimpImporter::import_model(const std::string& file_path,
 
     if (options.append_animations)
     {
-        std::cout << "[Importer] Appending animations to model " << options.model.ofs << "\n";
+        std::cout << "[Importer] Appending animations to model " << options.model.idx << "\n";
 
         // TODO: extract_animation_data(scene, options.model, registry);
     }
     else
     {
-        std::cout << "[Importer] Importing full model into handle " << options.model.ofs << "\n";
+        std::cout << "[Importer] Importing full model into handle " << options.model.idx << "\n";
 
         // TODO:
         // 1. extract_meshes(scene, options.model, registry);

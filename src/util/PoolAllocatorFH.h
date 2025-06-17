@@ -126,8 +126,8 @@ namespace eeng {
                 expand<T>();
 
             // Next free element
-            size_t index = m_free_first;
-            void* ptr = ptr_at<void>(m_pool, index);
+            size_t elem_offset = m_free_first;
+            void* ptr = ptr_at<void>(m_pool, elem_offset);
 
             // Unlink next free element from free-list
             if (m_free_first == m_free_last)
@@ -141,8 +141,7 @@ namespace eeng {
             else
                 ::new(ptr) T(std::forward<Args>(args)...);
 
-            //        std::cout << "created handle " << index << std::endl;
-            return Handle<T> {index};
+            return Handle<T> { elem_offset / sizeof(T) };
         }
 
         template<class T>
@@ -151,21 +150,22 @@ namespace eeng {
             std::lock_guard lock(m_mutex);
             assert(handle);
             assert(m_type_info.index == std::type_index(typeid(T)));
+            auto elem_offset = handle.idx * sizeof(T);
 
-            T* elem_ptr = ptr_at<T>(m_pool, handle.ofs);
-            elem_ptr->~T();
+            if constexpr (!std::is_trivially_destructible_v<T>)
+                ptr_at<T>(m_pool, elem_offset)->~T();
 
             // Link element to free-list
             if (m_free_first == m_index_null)
             {
                 // Free-list is empty
-                *ptr_at<index_type>(m_pool, handle.ofs) = m_index_null;
-                m_free_first = m_free_last = handle.ofs;
+                *ptr_at<index_type>(m_pool, elem_offset) = m_index_null;
+                m_free_first = m_free_last = elem_offset;
             }
             else
             {
-                *ptr_at<index_type>(m_pool, handle.ofs) = m_free_first;
-                m_free_first = handle.ofs;
+                *ptr_at<index_type>(m_pool, elem_offset) = m_free_first;
+                m_free_first = elem_offset;
             }
         }
 
@@ -175,17 +175,16 @@ namespace eeng {
             std::lock_guard lock(m_mutex);
             assert(m_type_info.index == std::type_index(typeid(T)));
 
-            return *ptr_at<T>(m_pool, handle.ofs);
+            return *ptr_at<T>(m_pool, handle.idx * sizeof(T));
         }
 
         template<class T>
         T& get(Handle<T> handle) const
         {
             std::lock_guard lock(m_mutex);
-
             assert(m_type_info.index == std::type_index(typeid(T)));
 
-            return *ptr_at<T>(m_pool, handle.ofs);
+            return *ptr_at<T>(m_pool, handle.idx * sizeof(T));
         }
 
         index_type count_free() const

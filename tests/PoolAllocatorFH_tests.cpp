@@ -96,7 +96,7 @@ TEST_F(PoolAllocatorFHTest, FreelistReuse)
     auto handle3 = pool.create<MoveTest>(3);
 
     // handle3 should reuse handle1's slot
-    EXPECT_EQ(handle1.ofs, handle3.ofs);
+    EXPECT_EQ(handle1.idx, handle3.idx);
 }
 
 TEST_F(PoolAllocatorFHTest, MoveSemanticsOnExpansion)

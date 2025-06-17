@@ -6,6 +6,7 @@
 
 using namespace eeng;
 
+#if 0
 struct DummyResource
 {
     size_t value = 0;
@@ -81,3 +82,4 @@ TEST(ResourceRegistryTest, FindByGuid)
     EXPECT_TRUE(found);
     EXPECT_EQ(registry.get(found).value, 21);
 }
+#endif

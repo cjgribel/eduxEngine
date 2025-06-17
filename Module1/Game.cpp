@@ -54,13 +54,62 @@ bool Game::init()
         eeng::Guid guid2 = eeng::Guid::generate(); // Fake guid (from AssetIndex)
         eeng::Guid guid3 = eeng::Guid::generate(); // Fake guid (from AssetIndex)
         // 2. meta_any resource -> ResourceRegistry/Storage:
-        storage.add(resource1, guid1); // copy
-        storage.add(resource1, guid2); // copy
-        storage.add(std::move(resource1), guid3); // move
+        eeng::MetaHandle meta_handle1 = storage.add(resource1, guid1); // copy
+        eeng::MetaHandle meta_handle2 = storage.add(resource1, guid2); // copy
+        eeng::MetaHandle meta_handle3 = storage.add(std::move(resource1), guid3); // move
 
         // Get & "use" resource
         // Cast meta_any to resource type
         // ...
+        eeng::Log("get resource 1");
+        {
+            // Non-const get and mutation
+            entt::meta_any meta_any1 = storage.get(meta_handle1);
+            assert(meta_any1.base().policy() == entt::any_policy::ref);
+            auto& val = meta_any1.cast<eeng::MockResource1&>();
+            val.x = 5;
+        }
+        {
+            // get const
+            const auto& cstorage = storage;
+            entt::meta_any meta_any1 = cstorage.get(meta_handle1);
+            assert(meta_any1.base().policy() == entt::any_policy::cref);
+            const auto& cval = meta_any1.cast<const eeng::MockResource1&>();
+            assert(cval.x == 5);
+        }
+        {
+            // try_get for valid handle
+            if (auto maybe_meta_any = storage.try_get(meta_handle1)) {
+                // got a valid meta_any
+                auto& meta_any1 = *maybe_meta_any;
+                assert(meta_any1.base().policy() == entt::any_policy::ref);
+                auto& val = meta_any1.cast<eeng::MockResource1&>();
+                val.x = 10;
+                eeng::Log("Valid resource found");
+            }
+            else assert(0 && "Valid should exist");
+        }
+        {
+            // try_get const for valid handle
+            const auto& cstorage = storage;
+            if (auto maybe_meta_any = cstorage.try_get(meta_handle1)) {
+                // got a valid meta_any
+                auto& meta_any1 = *maybe_meta_any;
+                assert(meta_any1.base().policy() == entt::any_policy::cref);
+                const auto& cval = meta_any1.cast<const eeng::MockResource1&>();
+                assert(cval.x == 10);
+                eeng::Log("Valid resource found");
+            }
+            else assert(0 && "Valid should exist");
+        }
+        {
+            // try_get for invalid handle
+            eeng::MetaHandle meta_handle{};
+            if (auto maybe_meta_any = storage.try_get(meta_handle)) {
+                assert(0 && "Invalid handle found");
+            }
+            else { eeng::Log("Invalid resource not found"); };
+        }
 
         // Remove resource from ResourceRegistry/Storage
         // WHO DOES THIS
@@ -99,7 +148,7 @@ bool Game::init()
         // registry.remove(h); // 
 
         logRegisteredResourceTypes(registry);
-}
+    }
 #endif
 
     // Do some entt stuff
@@ -369,7 +418,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-}
+    }
 #endif
 
     // Draw shape batches
