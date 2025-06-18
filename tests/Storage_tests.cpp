@@ -9,7 +9,6 @@
 #include "Storage.hpp"
 #include "Guid.h"
 
-// Mock resource types: must be larger than index type (size_t) and include dynamic allocation
 struct MockResource1 {
     size_t x = 0;
     std::vector<int> data;
@@ -50,8 +49,7 @@ protected:
     eeng::Storage storage;
 };
 
-TEST_F(StorageTest, AddAndValidate)
-{
+TEST_F(StorageTest, AddAndValidate){
     // Add a resource and validate the returned handle
     MockResource1 mr; mr.x = 42;
     entt::meta_any any = mr;
@@ -67,8 +65,7 @@ TEST_F(StorageTest, AddAndValidate)
     EXPECT_FALSE(storage.validate(empty));
 }
 
-TEST_F(StorageTest, GetAndMutateNonConst)
-{
+TEST_F(StorageTest, GetAndMutateNonConst) {
     // Add and then get non-const, mutate value
     MockResource1 mr; mr.x = 1;
     entt::meta_any any = mr;
@@ -89,8 +86,7 @@ TEST_F(StorageTest, GetAndMutateNonConst)
     EXPECT_EQ(val2.data.back(), 40);
 }
 
-TEST_F(StorageTest, GetConstPolicyAndValue)
-{
+TEST_F(StorageTest, GetConstPolicyAndValue) {
     // Add and mutate, then get via const storage
     MockResource1 mr; mr.x = 7;
     entt::meta_any any = mr;
@@ -108,15 +104,13 @@ TEST_F(StorageTest, GetConstPolicyAndValue)
     EXPECT_EQ(cval.x, 9);
 }
 
-TEST_F(StorageTest, TryGetInvalid)
-{
+TEST_F(StorageTest, TryGetInvalid) {
     // try_get on invalid handle returns nullopt
     eeng::MetaHandle bad;
     EXPECT_FALSE(storage.try_get(bad).has_value());
 }
 
-TEST_F(StorageTest, RetainAndReleaseReferenceCount)
-{
+TEST_F(StorageTest, RetainAndReleaseReferenceCount) {
     // Test that retain and release update ref-count and auto-remove
     MockResource1 mr;
     entt::meta_any any = mr;
@@ -165,8 +159,7 @@ TEST_F(StorageTest, VersionInvalidAfterRemoval)
     EXPECT_FALSE(storage.validate(handle));
 }
 
-TEST_F(StorageTest, MultiTypeStorage)
-{
+TEST_F(StorageTest, MultiTypeStorage) {
     MockResource1 mr1; mr1.x = 100;
     entt::meta_any any1 = mr1;
     auto guid1 = eeng::Guid::generate();
@@ -186,14 +179,12 @@ TEST_F(StorageTest, MultiTypeStorage)
     EXPECT_EQ(val2.y, 200u);
 }
 
-TEST_F(StorageTest, RetainInvalidThrows)
-{
+TEST_F(StorageTest, RetainInvalidThrows) {
     eeng::MetaHandle bad;
     EXPECT_THROW(storage.retain(bad), std::runtime_error);
 }
 
-TEST_F(StorageTest, ReleaseInvalidThrows)
-{
+TEST_F(StorageTest, ReleaseInvalidThrows) {
     eeng::MetaHandle bad;
     EXPECT_THROW(storage.release(bad), std::runtime_error);
 }
