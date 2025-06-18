@@ -6,21 +6,10 @@
 #include <limits>
 #include <vector>
 #include <unordered_map>
-#include <type_traits> // for std::is_copy_constructible, std::is_move_constructible, etc.
+#include <type_traits> // for std::is_copy_constructible etc.
 #include <typeindex>
 #include <memory>
 #include <string>
-
-// #include <chrono>
-// #include <iostream>
-// #include <iostream>
-// #include <ostream>
-// #include <iomanip>
-// #include <mutex>
-// #include <string>
-// #include <unordered_map>
-// #include <optional>
-// #include <unordered_map>
 
 #include "entt/entt.hpp"
 #include "MetaLiterals.h"
@@ -28,7 +17,6 @@
 #include "Guid.h"
 #include "PoolAllocatorTFH.h"
 #include "Log.hpp"
-// #include "Texture.hpp"
 
 namespace eeng
 {
@@ -538,9 +526,6 @@ namespace eeng
             return it->second->valid(mh);
         }
 
-        // In Storage.hpp
-
-        // TODO: create a Handle<T> and get the right pool direclty, rather than searching
         std::optional<MetaHandle> handle_for_guid(const Guid& guid) const noexcept
         {
             std::lock_guard lock(storage_mutex);
