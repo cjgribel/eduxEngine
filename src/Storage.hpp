@@ -235,6 +235,9 @@ namespace eeng
 
             /// @return true if `mh` is a well-formed handle whose version still matches
             virtual bool valid(const MetaHandle& mh) const noexcept = 0;
+
+            virtual std::optional<MetaHandle> handle_for_guid(const Guid& guid) const noexcept = 0;
+            virtual std::optional<Guid> guid_for_handle(const MetaHandle& mh) const noexcept = 0;
         };
 
         template<typename T>
@@ -256,7 +259,7 @@ namespace eeng
 
             MetaHandle add(const Guid& guid, const entt::meta_any& data) override
             {
-                std::lock_guard lock(m_mutex); // ??? Do locking in Storage?
+                std::lock_guard lock(m_mutex);
                 assert(guid != Guid::invalid());
                 assert(!map_contains(m_guid_to_handle, guid));
 
@@ -358,6 +361,25 @@ namespace eeng
                 return static_cast<bool>(validate_handle(mh));
             }
 
+            std::optional<MetaHandle> handle_for_guid(const Guid& guid) const noexcept override
+            {
+                auto it = m_guid_to_handle.find(guid);
+                if (it != m_guid_to_handle.end() && validate_handle(MetaHandle{ it->second })) {
+                    return MetaHandle{ it->second };
+                }
+                return std::nullopt;
+            }
+
+            std::optional<Guid> guid_for_handle(const MetaHandle& mh) const noexcept override
+            {
+                if (auto opt = validate_handle(mh)) {
+                    auto it = m_handle_to_guid.find(*opt);
+                    if (it != m_handle_to_guid.end())
+                        return it->second;
+                }
+                return std::nullopt;
+            }
+
         private:
 
             inline bool map_contains(const auto& map, const auto& key)
@@ -411,10 +433,20 @@ namespace eeng
         Storage() = default;
         Storage(Storage const&) = delete;
         Storage& operator=(Storage const&) = delete;
-        Storage(Storage&&) noexcept = default;
-        Storage& operator=(Storage&& other) noexcept
-        {
-            pools.swap(other.pools);
+
+        // Explicit move-ctor: steal pools under lock, leave a fresh mutex
+        Storage(Storage&& other) noexcept {
+            std::lock_guard lock{ other.storage_mutex };
+            pools = std::move(other.pools);
+            // other.storage_mutex stays valid (default-constructed)
+        }
+
+        // Explicit move-assign: lock both, then swap
+        Storage& operator=(Storage&& other) noexcept {
+            if (this != &other) {
+                std::scoped_lock lock{ storage_mutex, other.storage_mutex };
+                pools = std::move(other.pools);
+            }
             return *this;
         }
 
@@ -436,22 +468,26 @@ namespace eeng
 
         MetaHandle add(entt::meta_any data, const Guid& guid)
         {
+            std::lock_guard lock{ storage_mutex };
             auto& pool = get_or_create_pool(data.type());
             return pool.add(guid, std::move(data));
         }
 
         entt::meta_any get(const MetaHandle& meta_handle) const
         {
+            std::lock_guard lock{ storage_mutex };
             return get_pool(meta_handle.type).get(meta_handle);
         }
 
         entt::meta_any get(const MetaHandle& meta_handle)
         {
+            std::lock_guard lock{ storage_mutex };
             return get_pool(meta_handle.type).get(meta_handle);
         }
 
         std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) const noexcept
         {
+            std::lock_guard lock{ storage_mutex };
             auto it = pools.find(meta_handle.type.id());
             if (it == pools.end()) return std::nullopt;
 
@@ -461,6 +497,7 @@ namespace eeng
 
         std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) noexcept
         {
+            std::lock_guard lock{ storage_mutex };
             auto it = pools.find(meta_handle.type.id());
             if (it == pools.end()) return std::nullopt;
 
@@ -472,6 +509,7 @@ namespace eeng
         /// @returns the new ref-count.
         size_t retain(const MetaHandle& mh)
         {
+            std::lock_guard lock{ storage_mutex };
             auto& pool = get_pool(mh.type);
             return pool.retain(mh);
         }
@@ -481,6 +519,7 @@ namespace eeng
         /// @returns the new ref-count (0 if destroyed).
         size_t release(const MetaHandle& mh)
         {
+            std::lock_guard lock{ storage_mutex };
             auto& pool = get_pool(mh.type);
             size_t count = pool.release(mh);
             if (count == 0) {
@@ -491,11 +530,34 @@ namespace eeng
         }
 
         /// @return true if there's a pool for `mh.type` and the handle’s version is still valid.
-        bool validate(const MetaHandle& mh) const noexcept 
+        bool validate(const MetaHandle& mh) const noexcept
         {
+            std::lock_guard lock{ storage_mutex };
             auto it = pools.find(mh.type.id());
             if (it == pools.end()) return false;
             return it->second->valid(mh);
+        }
+
+        // In Storage.hpp
+
+        // TODO: create a Handle<T> and get the right pool direclty, rather than searching
+        std::optional<MetaHandle> handle_for_guid(const Guid& guid) const noexcept
+        {
+            std::lock_guard lock(storage_mutex);
+            for (auto const& [_, pool] : pools) {
+                if (auto h = pool->handle_for_guid(guid))
+                    return h;
+            }
+            return std::nullopt;
+        }
+
+        std::optional<Guid> guid_for_handle(const MetaHandle& mh) const noexcept
+        {
+            std::lock_guard lock(storage_mutex);
+            auto it = pools.find(mh.type.id());
+            if (it != pools.end())
+                return it->second->guid_for_handle(mh);
+            return std::nullopt;
         }
 
         // -> registry.storage() -> [entt::id_type, entt::meta_type]
@@ -547,6 +609,7 @@ namespace eeng
             return *it->second;
         }
 
+        mutable std::mutex storage_mutex;
         std::unordered_map<entt::id_type, std::unique_ptr<IPool>> pools;
     };
 
