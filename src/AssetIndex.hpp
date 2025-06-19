@@ -29,7 +29,7 @@
 
 namespace eeng
 {
-    class AssetDatabase 
+    class AssetIndex 
     {
     public:
         // Initialization

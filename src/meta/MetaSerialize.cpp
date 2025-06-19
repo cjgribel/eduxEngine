@@ -1,9 +1,5 @@
-//
-//  MetaSerialize.cpp
-//
-//  Created by Carl Johan Gribel on 2024-08-08.
-//  Copyright © 2024 Carl Johan Gribel. All rights reserved.
-//
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
 #include <iostream>
 #include <sstream>
@@ -12,11 +8,13 @@
 #include <nlohmann/json.hpp>
 #include "config.h"
 #include "MetaSerialize.hpp"
-#include "meta_literals.h"
-#include "meta_aux.h"
+#include "MetaLiterals.h"
+#include "MetaAux.h"
+#include "EngineContext.h"
 
-namespace Meta {
-
+namespace eeng::meta  
+{
+#if 0
     /*
         NOTE
         Instead of using this meta registered function (which requires a 
@@ -54,7 +52,7 @@ namespace Meta {
             // std::cout << "Ceeated storage for " << meta_type_name(meta_type) << std::endl;
         }
     }
-
+#endif
     nlohmann::json serialize_any(const entt::meta_any& any)
     {
         assert(any);
@@ -171,7 +169,7 @@ namespace Meta {
 
         return json;
     }
-
+#if 0
     nlohmann::json serialize_entity(
         const Entity& entity,
         std::shared_ptr<entt::registry>& registry)
@@ -287,12 +285,12 @@ namespace Meta {
         return json;
 #endif
     }
-
+#endif
     void deserialize_any(
         const nlohmann::json& json,
         entt::meta_any& any,
-        const Entity& entity,
-        Editor::Context& context)
+        const Entity& entity, // SKIP THIS SOMEHOW?
+        EngineContext& context)
     {
         assert(any);
 
@@ -440,7 +438,7 @@ namespace Meta {
                 throw std::runtime_error(std::string("Unable to cast ") + meta_type_name(any.type()));
         }
     }
-
+#if 0
     // deserialize_component
 
     Entity deserialize_entity(
@@ -564,5 +562,5 @@ namespace Meta {
         }
 #endif
     }
-
-} // namespace Meta
+#endif
+} // namespace eeng::meta

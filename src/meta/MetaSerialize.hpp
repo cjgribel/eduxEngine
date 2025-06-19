@@ -1,9 +1,5 @@
-//
-//  MetaSerialize.hpp
-//
-//  Created by Carl Johan Gribel on 2024-08-08.
-//  Copyright © 2024 Carl Johan Gribel. All rights reserved.
-//
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
 #ifndef MetaSerialize_hpp
 #define MetaSerialize_hpp
@@ -12,19 +8,20 @@
 //#include <nlohmann/json_fwd.hpp> // Use nlohmann::json& as references instead
 #include <nlohmann/json.hpp>
 
-#include "Context.hpp"
+claass eeng::EngineContext;
 
-namespace Meta {
-
+namespace eeng::meta 
+{
+#if 0
     /// @brief Makes sure entt has storage for a given component.
     /// @param registry 
     /// @param component_id 
     /// If no storage exists, a component of the given type is added to a temporary entity.
     void ensure_storage(entt::registry& registry, entt::id_type component_id);
-
+#endif
     nlohmann::json serialize_any(
         const entt::meta_any& meta_any);
-
+#if 0
     // nlohmann::json serialize_entity(
     //     entt::entity,
     //     std::shared_ptr<entt::registry>& registry);
@@ -36,13 +33,13 @@ namespace Meta {
 
     nlohmann::json serialize_registry(
         std::shared_ptr<entt::registry>& registry);
-
+#endif
     void deserialize_any(
         const nlohmann::json& json,
         entt::meta_any& meta_any,
         const Entity& entity,
         Editor::Context& context);
-
+#if 0
     Entity deserialize_entity(
         const nlohmann::json& json,
         Editor::Context& context
@@ -51,7 +48,7 @@ namespace Meta {
     void deserialize_entities(
         const nlohmann::json& json,
         Editor::Context& context);
-
+#endif
 } // namespace Meta
 
 #endif /* MetaSerialize_hpp */

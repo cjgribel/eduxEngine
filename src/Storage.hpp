@@ -557,7 +557,7 @@ namespace eeng
 
         void assure_storage(entt::meta_type meta_type)
         {
-            entt::meta_func meta_func = meta_type.func(assure_storage_hs);
+            entt::meta_func meta_func = meta_type.func(eeng::literals::assure_storage_hs);
             assert(meta_func);
             entt::meta_any res = meta_func.invoke({}, entt::forward_as_meta(*this));
             assert(res);

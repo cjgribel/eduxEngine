@@ -34,6 +34,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/meta)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/resources)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/util)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi)
 
 #
 # OpenGL

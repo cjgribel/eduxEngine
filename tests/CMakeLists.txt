@@ -26,10 +26,11 @@ add_executable(tests
     PoolAllocatorFH_tests.cpp
     PoolAllocatorTFH_tests.cpp
     Meta_tests.cpp
+    #MetaSerialize_tests.cpp
     Storage_tests.cpp
     )
 
-target_link_libraries(tests PRIVATE gtest_main)
+target_link_libraries(tests PRIVATE gtest_main nlohmann_json::nlohmann_json)
 
 include(GoogleTest)
 gtest_discover_tests(tests)
