@@ -26,7 +26,7 @@ add_executable(tests
     PoolAllocatorFH_tests.cpp
     PoolAllocatorTFH_tests.cpp
     Meta_tests.cpp
-    #MetaSerialize_tests.cpp
+    MetaSerialize_tests.cpp ../src/meta/MetaSerialize.cpp
     Storage_tests.cpp
     )
 

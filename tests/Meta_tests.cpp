@@ -1,3 +1,6 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
 #include <gtest/gtest.h>
 #include "entt/entt.hpp"
 #include "MetaLiterals.h"
@@ -87,6 +90,8 @@ protected:
             .data<&MockType::y>("y"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "y", "Float member y." })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
+
+            // enum
 
             .func<&MockType::mutate_and_sum>("mutate_and_sum"_hs)
             .custom<FuncMetaInfo>(FuncMetaInfo{ "mutate_and_sum", "Mutates ref and ptr args, and sums them." })

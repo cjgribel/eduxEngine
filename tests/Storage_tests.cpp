@@ -1,5 +1,5 @@
-// storage_test.cpp
-// Google Test suite for eeng::Storage
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
 #include <gtest/gtest.h>
 #include <entt/meta/factory.hpp>

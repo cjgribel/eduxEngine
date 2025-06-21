@@ -60,7 +60,7 @@ namespace eeng::meta
 
         if (entt::meta_type meta_type = entt::resolve(any.type().id()); meta_type)
         {
-            if (entt::meta_func meta_func = meta_type.func(to_json_hs); meta_func)
+            if (entt::meta_func meta_func = meta_type.func(literals::serialize_hs); meta_func)
             {
                 // Note: invoking the meta function with json
                 // (Underlying function: void(nlohmann::json&, const void*))
@@ -73,7 +73,7 @@ namespace eeng::meta
 
 #if 1
             // Calls to_json using an alias of the json node (without copying)
-                auto res = meta_func.invoke({}, entt::forward_as_meta(json), any.data());
+                auto res = meta_func.invoke({}, entt::forward_as_meta(json), any.base().data());
                 assert(res && "Failed to invoke to_json");
 #else
             // Copies json node, calls to_json (via alias), then copies back
@@ -296,7 +296,7 @@ namespace eeng::meta
 
         if (entt::meta_type meta_type = entt::resolve(any.type().id()); meta_type)
         {
-            if (entt::meta_func meta_func = meta_type.func(from_json_hs); meta_func)
+            if (entt::meta_func meta_func = meta_type.func(literals::deserialize_hs); meta_func)
             {
                 // Function signature: void(const nlohmann::json&, void*))
                 // In this call, presumably, a meta_any is created for 'json',
@@ -307,7 +307,7 @@ namespace eeng::meta
                 auto res = meta_func.invoke(
                     {},
                     entt::forward_as_meta(json),
-                    any.data(),
+                    any.base().data(),
                     entt::forward_as_meta(entity), //entity,
                     entt::forward_as_meta(context));
 #else

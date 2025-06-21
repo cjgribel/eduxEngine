@@ -1,8 +1,11 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
 #include <gtest/gtest.h>
 #include "entt/entt.hpp"
+#include "MetaInfo.h"
 #include "MetaSerialize.hpp"
-// #include "MetaLiterals.h"
-// #include "MetaInfo.h"
+#include "MetaLiterals.h"
 // #include "MetaAux.h"
 // #include "EngineContext.h"
 
@@ -14,7 +17,7 @@ struct MockEntityRegistry : eeng::IEntityRegistry
     void destroy_entity(Entity entity) override {}
 };
 
-struct MockResourceRegistry : eeng::IRes
+struct MockResourceRegistry : eeng::IResourceRegistry
 {
 };
 
@@ -119,7 +122,7 @@ inline std::string policy_to_string(entt::any_policy policy)
 }
 
 // Test Fixture
-class MetaRegistrationTest : public ::testing::Test
+class MetaSerializationTest : public ::testing::Test
 {
 protected:
     static void SetUpTestSuite()
@@ -160,23 +163,38 @@ protected:
             .custom<DataMetaInfo>(DataMetaInfo{ "y", "Float member y." })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
 
-            .func<&MockType::mutate_and_sum>("mutate_and_sum"_hs)
-            .custom<FuncMetaInfo>(FuncMetaInfo{ "mutate_and_sum", "Mutates ref and ptr args, and sums them." })
-            .traits(MetaFlags::none);
+            .data<&MockType::an_enum>("an_enum"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "an_enum", "Enum member" })
+            .traits(MetaFlags::read_only | MetaFlags::hidden)
+
+            // .func<&MockType::mutate_and_sum>("mutate_and_sum"_hs)
+            // .custom<FuncMetaInfo>(FuncMetaInfo{ "mutate_and_sum", "Mutates ref and ptr args, and sums them." })
+            // .traits(MetaFlags::none)
+            ;
     }
 };
 
-// TEST_F(MetaSerializationTest, Deserialize_WithMockContext)
-// {
-//     MockEntityRegistry entity_registry_mock;
-//     MockScriptSystem script_system_mock;
+TEST_F(MetaSerializationTest, Serialize_WithMockContext)
+{
+    MockEntityRegistry entity_registry_mock;
+    MockResourceRegistry resource_registry_mock;
+    eeng::EngineContext ctx{ &entity_registry_mock, &resource_registry_mock };
 
-//     eeng::EngineContext ctx{ &entity_registry_mock, &script_system_mock };
+    MockType mock_type {20, 30.0f, MockType::AnEnum::Hello};
+    auto j = meta::serialize_any(mock_type);
+    std::cout << j.dump(4) << std::endl;
 
-//     entt::meta_any deserialized;
-//     Entity dummy_entity{ 123 };
+    // -- 
 
-//     deserialize_any(json_obj, deserialized, dummy_entity, ctx);
+    entt::meta_any any = MockType {};
+    meta::deserialize_any(j, any, Entity{}, ctx);
+    MockType mt = any.cast<MockType>();
+    std::cout << "Deserialized: " << mt.x << ", " << mt.y << std::endl;
 
-//     // Verify deserialization logic easily
-// }
+    //     entt::meta_any deserialized;
+    //     Entity dummy_entity{ 123 };
+
+    //     deserialize_any(json_obj, deserialized, dummy_entity, ctx);
+
+    //     // Verify deserialization logic easily
+}

@@ -7,10 +7,15 @@
 #include <entt/entt.hpp>
 //#include <nlohmann/json_fwd.hpp> // Use nlohmann::json& as references instead
 #include <nlohmann/json.hpp>
+#include "EngineContext.h"
 
-claass eeng::EngineContext;
+// namespace eeng
+// {
+//     class EngineContext;
+//     class Entity; // Todo: placeholder
+// }
 
-namespace eeng::meta 
+namespace eeng::meta
 {
 #if 0
     /// @brief Makes sure entt has storage for a given component.
@@ -38,7 +43,7 @@ namespace eeng::meta
         const nlohmann::json& json,
         entt::meta_any& meta_any,
         const Entity& entity,
-        Editor::Context& context);
+        EngineContext& context);
 #if 0
     Entity deserialize_entity(
         const nlohmann::json& json,
