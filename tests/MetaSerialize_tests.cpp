@@ -6,53 +6,85 @@
 #include "MetaInfo.h"
 #include "MetaSerialize.hpp"
 #include "MetaLiterals.h"
-// #include "MetaAux.h"
+#include "MetaAux.h"
 // #include "EngineContext.h"
 
 using namespace eeng;
 
-struct MockEntityRegistry : eeng::IEntityRegistry
+namespace
 {
-    Entity create_entity() override { return Entity{ }; }
-    void destroy_entity(Entity entity) override {}
-};
+    struct MockEntityRegistry : eeng::IEntityRegistry
+    {
+        Entity create_entity() override { return Entity{ }; }
+        void destroy_entity(Entity entity) override {}
+    };
 
-struct MockResourceRegistry : eeng::IResourceRegistry
-{
-};
+    struct MockResourceRegistry : eeng::IResourceRegistry
+    {
+    };
 
+    struct vec2
+    {
+        float x, y;
 
-// struct UVcoords
-// {
-//     float u, v;
+        bool operator==(const vec2& other) const {
+            return x == other.x && y == other.y;
+        }
 
-//     bool operator==(const UVcoords& other) const {
-//         return u == other.u && v == other.v;
-//     }
+        std::string to_string() const
+        {
+            std::ostringstream oss;
+            oss << "vec2(x = " << x << ", y = " << y << ")";
+            return oss.str();
+        }
+    };
 
-//     std::string to_string() const 
-//     {
-//         std::ostringstream oss;
-//         oss << "UVcoords(u = " << u << ", v = " << v << ")";
-//         return oss.str();
-//     }
-// };
+    struct vec3
+    {
+        vec2 xy;
+        float z;
 
-// struct debugvec3
-// {
-//     float x = 1, y = 2, z = 3;
-//     UVcoords uv_coords{ -1.0f, -2.0f };
+        bool operator==(const vec3& other) const
+        {
+            return xy == other.xy && z == other.z;
+        }
 
-//     std::string to_string() const {
-//         std::ostringstream oss;
-//         oss << "debugvec3(" << x << ", " << y << ", " << z << ")";
-//         return oss.str();
-//     }
+        std::string to_string() const {
+            std::ostringstream oss;
+            oss << "vec3(" << xy.to_string() << ", z = " << z << ")";
+            return oss.str();
+        }
+    };
 
-//     bool operator==(const debugvec3& other) const {
-//         return x == other.x && y == other.y && z == other.z;
-//     }
-// };
+    template<class T>
+    void serialize(
+        nlohmann::json& j,
+        //const void* ptr
+        const entt::meta_any& any)
+    {
+        // j = *static_cast<const T*>(ptr);
+
+        auto obj_ptr = any.try_cast<T>();
+        assert(obj_ptr && "serialize: meta_any contained wrong type");
+        j = *obj_ptr;
+    }
+
+    template<class T>
+    void deserialize(
+        const nlohmann::json& j,
+        //void* ptr,
+        entt::meta_any& any,
+        const Entity& entity,
+        eeng::EngineContext& ctx
+    )
+    {
+        // *static_cast<T*>(ptr) = j;
+
+        auto obj_ptr = any.try_cast<T>();
+        assert(obj_ptr && "deserialize: meta_any contained wrong type");
+        *obj_ptr = j;
+    }
+}
 
 // Free function test
 // inline std::string debugvec3_to_string(const void* ptr)
@@ -81,7 +113,7 @@ struct MockResourceRegistry : eeng::IResourceRegistry
 //     }
 // };
 
-struct MockType
+struct MockType2
 {
     int x{ 2 };
     float y{ 3.0f };
@@ -127,52 +159,104 @@ class MetaSerializationTest : public ::testing::Test
 protected:
     static void SetUpTestSuite()
     {
-        // Register MockType::AnEnum
+        // Register vec2
+        entt::meta_factory<vec2>()
+            .type("vec2"_hs)
+
+            .data<&vec2::x>("x"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "x", "n/a" })
+            .traits(MetaFlags::none)
+            .data<&vec2::y>("y"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "y", "n/a" })
+            .traits(MetaFlags::none)
+            ;
+
+        // Register vec3
+        entt::meta_factory<vec3>()
+            .type("vec3"_hs)
+
+            .data<&vec3::xy>("xy"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "xy", "n/a" })
+            .traits(MetaFlags::none)
+
+            .data<&vec3::z>("z"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "z", "n/a" })
+            .traits(MetaFlags::none)
+            ;
+
+        // Register MockType2::AnEnum
         auto enum_info = EnumMetaInfo{
             .display_name = "AnEnum",
             .tooltip = "AnEnum is a test enum with three values.",
-            .underlying_type = entt::resolve<std::underlying_type_t<MockType::AnEnum>>()
+            .underlying_type = entt::resolve<std::underlying_type_t<MockType2::AnEnum>>()
         };
-        entt::meta_factory<MockType::AnEnum>()
-            .type("AnEnum"_hs)
+        entt::meta_factory<MockType2::AnEnum>()
+            .type("MockType2::AnEnum"_hs)
             .custom<EnumMetaInfo>(enum_info)
 
-            .data<MockType::AnEnum::Hello>("Hello"_hs)
+            .data<MockType2::AnEnum::Hello>("Hello"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "Hello", "Greeting in English." })
             .traits(MetaFlags::none)
 
-            .data<MockType::AnEnum::Bye>("Bye"_hs)
+            .data<MockType2::AnEnum::Bye>("Bye"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "Bye", "Farewell in English." })
             .traits(MetaFlags::none)
 
-            .data<MockType::AnEnum::Hola>("Hola"_hs)
+            .data<MockType2::AnEnum::Hola>("Hola"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "Hola", "Greeting in Spanish." })
             .traits(MetaFlags::none);
 
-        // Register MockType
-        entt::meta_factory<MockType>{}
-        .type("MockType"_hs)
-            .custom<TypeMetaInfo>(TypeMetaInfo{ "MockType", "A mock resource type." })
+        // Register MockType2
+        entt::meta_factory<MockType2>{}
+        .type("MockType2"_hs)
+            .custom<TypeMetaInfo>(TypeMetaInfo{ "MockType2", "A mock resource type." })
             .traits(MetaFlags::none)
 
-            .data<&MockType::x>("x"_hs)
+            .data<&MockType2::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "Integer member x." })
             .traits(MetaFlags::read_only)
 
-            .data<&MockType::y>("y"_hs)
+            .data<&MockType2::y>("y"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "y", "Float member y." })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
 
-            .data<&MockType::an_enum>("an_enum"_hs)
+            .data<&MockType2::an_enum>("an_enum"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "an_enum", "Enum member" })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
+            ;
 
-            // .func<&MockType::mutate_and_sum>("mutate_and_sum"_hs)
-            // .custom<FuncMetaInfo>(FuncMetaInfo{ "mutate_and_sum", "Mutates ref and ptr args, and sums them." })
-            // .traits(MetaFlags::none)
+        // Register std::string
+        entt::meta_factory<std::string>()
+            .type(entt::type_hash<std::string>::value())
+
+            .template func<&serialize<std::string>, entt::as_void_t>(literals::serialize_hs)
+            .template func<&deserialize<std::string>, entt::as_void_t >(literals::deserialize_hs)
             ;
     }
 };
+
+namespace
+{
+    template<class T>
+    T test_type(const T& t, EngineContext& ctx)
+    {
+        // Serialize
+        auto j = meta::serialize_any(t);
+
+        std::cout << meta_type_name(entt::resolve<T>()) << ":" << std::endl;
+        std::cout << j.dump(4) << std::endl;
+
+        // Deserialize
+        entt::meta_any deserialized_any = T{};
+        meta::deserialize_any(j, deserialized_any, Entity{}, ctx);
+        T& deserialized_ref = deserialized_any.cast<T&>();
+
+        // Compare
+        EXPECT_EQ(t, deserialized_ref);
+
+        return deserialized_ref;
+    }
+}
 
 TEST_F(MetaSerializationTest, Serialize_WithMockContext)
 {
@@ -180,21 +264,58 @@ TEST_F(MetaSerializationTest, Serialize_WithMockContext)
     MockResourceRegistry resource_registry_mock;
     eeng::EngineContext ctx{ &entity_registry_mock, &resource_registry_mock };
 
-    MockType mock_type {20, 30.0f, MockType::AnEnum::Hello};
-    auto j = meta::serialize_any(mock_type);
-    std::cout << j.dump(4) << std::endl;
+    // basic types
+    {
+        test_type(5, ctx);                       // int
+        test_type(5u, ctx);                      // unsigned int
+        test_type(-5, ctx);                      // negative int
+        test_type(5.0f, ctx);                    // float
+        test_type(-5.0f, ctx);                   // negative float
+        test_type(5.0, ctx);                     // double
+        test_type(-5.0, ctx);                    // negative double
+        test_type(true, ctx);                    // bool (true)
+        test_type(false, ctx);                   // bool (false)
+        test_type('a', ctx);                     // char
+        test_type(std::string{ "Hello World" }, ctx); // std::string
+        // test_type(std::string_view{ "Hello" }, ctx); // std::string_view
+    }
 
-    // -- 
+    // std::vector<int>
+    {
+        std::vector<int> vec{ 0,1,2,3,4,5 };
+        auto res = test_type(vec, ctx);
+    }
 
-    entt::meta_any any = MockType {};
-    meta::deserialize_any(j, any, Entity{}, ctx);
-    MockType mt = any.cast<MockType>();
-    std::cout << "Deserialized: " << mt.x << ", " << mt.y << std::endl;
+    // enum
+    {
+        auto res = test_type(MockType2::AnEnum::Hello, ctx);
+    }
 
-    //     entt::meta_any deserialized;
-    //     Entity dummy_entity{ 123 };
+    // vec2
+    {
+        auto res = test_type(vec2{}, ctx);
+    }
 
-    //     deserialize_any(json_obj, deserialized, dummy_entity, ctx);
+    // vec3
+    {
+        auto res = test_type(vec3{ vec2{1.0f,2.0f}, 3.0f }, ctx);
+    }
 
-    //     // Verify deserialization logic easily
+    // std::vector<int>
+    {
+        std::vector<vec3> vec{ {{1.0f, 2.0f}, 3.0f}, {{10.0f, 20.0f}, 30.0f} };
+        auto res = test_type(vec, ctx);
+    }
+
+    // TODO
+// bool flag = true;
+// debugvec3 position;
+// std::string somestring = "Hello";
+// // std::vector<int> vector1 = { 1, 2, 3 };
+// std::array<int, 3> vector1 = { 1, 2, 3 };
+// std::vector<ElementType> vector2 = { {4.0f}, {5.0f}, {6.0f} };
+// std::map<int, float> map1 = { {7, 7.5f}, {8, 8.5f} };
+// std::map<int, ElementType> map2 = { {9, {9.5f}}, {10, {10.5f}} };
+// std::map<ElementType, int> map3 = { {{9.5f}, 9}, {{10.5f}, 10} };
+// std::set<int> set1 = { 11, 12 };
 }

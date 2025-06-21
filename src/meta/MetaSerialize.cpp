@@ -12,16 +12,16 @@
 #include "MetaAux.h"
 #include "EngineContext.h"
 
-namespace eeng::meta  
+namespace eeng::meta
 {
 #if 0
     /*
         NOTE
-        Instead of using this meta registered function (which requires a 
-        temporary entity): 
-        
+        Instead of using this meta registered function (which requires a
+        temporary entity):
+
             registry.get_or_emplace<Component>(entity)
-        
+
         register this function instead:
 
             template<typename T>
@@ -62,28 +62,15 @@ namespace eeng::meta
         {
             if (entt::meta_func meta_func = meta_type.func(literals::serialize_hs); meta_func)
             {
-                // Note: invoking the meta function with json
-                // (Underlying function: void(nlohmann::json&, const void*))
-                // Using 'json': invoke by value; only the copy is modified
-                // Using 'std::ref(json)': function is not called – perhaps
-                //      'invoke' does not interpret the std::reference_wrapper
-                //      returned from std::ref in a way that it matched the
-                //      json& argument.
-                // Using 'json_any.as_ref()': seems to forward correctly as json&
-
-#if 1
-            // Calls to_json using an alias of the json node (without copying)
-                auto res = meta_func.invoke({}, entt::forward_as_meta(json), any.base().data());
-                assert(res && "Failed to invoke to_json");
-#else
-            // Copies json node, calls to_json (via alias), then copies back
-                entt::meta_any json_any = json;
-                auto res = meta_func.invoke({}, json_any.as_ref(), any.data());
-                assert(res && "Failed to invoke to_json");
-                json = json_any.cast<nlohmann::json>();
-#endif
+                auto res = meta_func.invoke(
+                    {},
+                    entt::forward_as_meta(json),
+                    entt::forward_as_meta(any)
+                    // any.base().data()
+                );
+                assert(res && "Failed to invoke serialize");
 #ifdef SERIALIZATION_DEBUG_PRINTS
-                std::cout << "to_json invoked: " << json.dump() << std::endl;
+                std::cout << "serialize invoked: " << json.dump() << std::endl;
 #endif
             }
             else if (meta_type.is_enum())
@@ -302,25 +289,25 @@ namespace eeng::meta
                 // In this call, presumably, a meta_any is created for 'json',
                 //      which and will hold a copy of it.
 #if 1
-            // Call from_json using alias of json node
-                // auto res = meta_func.invoke({}, entt::forward_as_meta(json), any.data());
+                // Note: any.data() is deprecated. any.base()data() is const
                 auto res = meta_func.invoke(
                     {},
                     entt::forward_as_meta(json),
-                    any.base().data(),
-                    entt::forward_as_meta(entity), //entity,
-                    entt::forward_as_meta(context));
+                    entt::forward_as_meta(any),
+                    entt::forward_as_meta(entity),
+                    entt::forward_as_meta(context)
+                );
 #else
             // json node is possibly copied to an entt::meta_any here
                 auto res = meta_func.invoke({}, json, any.data());
 #endif
                 assert(res && "Failed to invoke from_json");
 
-                std::cout << "from_json invoked: " << json.dump() << std::endl;
+                // std::cout << "from_json invoked: " << json.dump() << std::endl;
             }
             else if (meta_type.is_enum())
             {
-                std::cout << " [is_enum]";
+                // std::cout << " [is_enum]";
 
                 assert(json.is_string());
                 auto entry_name = json.get<std::string>();

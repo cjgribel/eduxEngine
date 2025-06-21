@@ -15,7 +15,7 @@
 #include "MetaLiterals.h"
 #include "MetaInfo.h"
 
-namespace internal 
+namespace internal
 {
 
     template<typename T, typename Callable>
@@ -104,7 +104,7 @@ inline auto meta_type_name(const entt::meta_type meta_type)
 /// @param data Meta data field
 /// @return Name provided as a display name property, or string generated from id
 inline auto meta_data_name(
-    const entt::id_type& id, 
+    const entt::id_type& id,
     const entt::meta_data& meta_data)
 {
     // Note: data.type().info().name() gives type name, not the field name
@@ -183,6 +183,23 @@ inline auto gather_meta_enum_entries(const entt::meta_any& enum_any)
             });
     }
     return entries;
+}
+
+inline std::string enum_value_name(const entt::meta_any& enum_any)
+{
+    entt::meta_type meta_type = enum_any.type();
+    assert(meta_type.is_enum());
+
+    // Look for entry with current value
+    auto any_conv = cast_to_underlying_type(meta_type, enum_any);
+    auto enum_entries = gather_meta_enum_entries(enum_any);
+    auto entry = std::find_if(enum_entries.begin(), enum_entries.end(), [&any_conv](auto& e)
+        {
+            return e.second == any_conv;
+        });
+    assert(entry != enum_entries.end());
+
+    return entry->first;
 }
 
 #endif /* meta_aux */
