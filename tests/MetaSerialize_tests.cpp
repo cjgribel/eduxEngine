@@ -2,7 +2,10 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include <gtest/gtest.h>
+#include <vector>
+#include <array>
 #include "entt/entt.hpp"
+#include "hash_combine.h"
 #include "MetaInfo.h"
 #include "MetaSerialize.hpp"
 #include "MetaLiterals.h"
@@ -27,9 +30,8 @@ namespace
     {
         float x, y;
 
-        bool operator==(const vec2& other) const {
-            return x == other.x && y == other.y;
-        }
+        bool operator==(const vec2& other) const { return x == other.x && y == other.y; }
+        bool operator<(const vec2& other) const { return x < other.x; }
 
         std::string to_string() const
         {
@@ -44,10 +46,8 @@ namespace
         vec2 xy;
         float z;
 
-        bool operator==(const vec3& other) const
-        {
-            return xy == other.xy && z == other.z;
-        }
+        bool operator==(const vec3& other) const { return xy == other.xy && z == other.z; }
+        bool operator<(const vec3& other) const { return xy.x < other.xy.x; }
 
         std::string to_string() const {
             std::ostringstream oss;
@@ -84,6 +84,27 @@ namespace
         assert(obj_ptr && "deserialize: meta_any contained wrong type");
         *obj_ptr = j;
     }
+}
+
+namespace std
+{
+    template<>
+    struct hash<vec2>
+    {
+        size_t operator()(vec2 const& m) const noexcept
+        {
+            return ::hash_combine(m.x, m.y);
+        }
+    };
+
+    template<>
+    struct hash<vec3>
+    {
+        size_t operator()(vec3 const& m) const noexcept
+        {
+            return ::hash_combine(m.xy, m.z);
+        }
+    };
 }
 
 // Free function test
@@ -301,21 +322,45 @@ TEST_F(MetaSerializationTest, Serialize_WithMockContext)
         auto res = test_type(vec3{ vec2{1.0f,2.0f}, 3.0f }, ctx);
     }
 
-    // std::vector<int>
+    // std::vector<vec3>
     {
-        std::vector<vec3> vec{ {{1.0f, 2.0f}, 3.0f}, {{10.0f, 20.0f}, 30.0f} };
-        auto res = test_type(vec, ctx);
+        std::vector<vec3> t{ {{1.0f, 2.0f}, 3.0f}, {{10.0f, 20.0f}, 30.0f} };
+        auto res = test_type(t, ctx);
     }
 
-    // TODO
-// bool flag = true;
-// debugvec3 position;
-// std::string somestring = "Hello";
-// // std::vector<int> vector1 = { 1, 2, 3 };
-// std::array<int, 3> vector1 = { 1, 2, 3 };
-// std::vector<ElementType> vector2 = { {4.0f}, {5.0f}, {6.0f} };
-// std::map<int, float> map1 = { {7, 7.5f}, {8, 8.5f} };
-// std::map<int, ElementType> map2 = { {9, {9.5f}}, {10, {10.5f}} };
-// std::map<ElementType, int> map3 = { {{9.5f}, 9}, {{10.5f}, 10} };
-// std::set<int> set1 = { 11, 12 };
+    // std::array<vec3, 2>
+    {
+        std::array<vec3, 2> t{ { {{1.0f, 2.0f}, 3.0f}, {{10.0f, 20.0f}, 30.0f} } };
+        auto res = test_type(t, ctx);
+    }
+
+    // std::set<int>
+    {
+        std::set<int> t{ 1, 2, 3, 4, 5 };
+        auto res = test_type(t, ctx);
+    }
+
+    // std::set<vec3>
+    {
+        std::set<vec3> t{ {{1.0f, 2.0f}, 3.0f}, {{5.0f, 6.0f}, 7.0f} };
+        auto res = test_type(t, ctx);
+    }
+
+    // std::map<int, float>
+    {
+        std::map<int, float> t{ {1, 2.0f}, {3, 4.0f} };
+        auto res = test_type(t, ctx);
+    }
+
+    // std::map<int, vec3>
+    {
+        std::map<int, vec3> t{ {1, {{2.0f, 3.0f}, 4.0f}}, {5, {{6.0f, 7.0f}, 8.0f}} };
+        auto res = test_type(t, ctx);
+    }
+
+    // std::map<vec3, int>
+    {
+        std::map<vec3, int> t{ {{{1.0f, 2.0f}, 3.0f}, 4}, {{{5.0f, 6.0f}, 7.0f}, 8} };
+        auto res = test_type(t, ctx);
+    }
 }
