@@ -107,33 +107,6 @@ namespace std
     };
 }
 
-// Free function test
-// inline std::string debugvec3_to_string(const void* ptr)
-// {
-//     return static_cast<const debugvec3*>(ptr)->to_string();
-// }
-
-// struct ElementType
-// {
-//     float m;
-
-//     std::string to_string() const {
-//         std::ostringstream oss;
-//         oss << "ElementType(" << m << ")";
-//         return oss.str();
-//     }
-
-//     // For debugging
-//     bool operator==(const ElementType& other) const {
-//         return m == other.m;
-//     }
-
-//     // For std::map
-//     bool operator<(const ElementType& other) const {
-//         return m < other.m;
-//     }
-// };
-
 struct MockType2
 {
     int x{ 2 };
@@ -178,6 +151,10 @@ inline std::string policy_to_string(entt::any_policy policy)
 class MetaSerializationTest : public ::testing::Test
 {
 protected:
+    MockEntityRegistry entity_registry_mock;
+    MockResourceRegistry resource_registry_mock;
+    eeng::EngineContext ctx{ &entity_registry_mock, &resource_registry_mock };
+
     static void SetUpTestSuite()
     {
         // Register vec2
@@ -259,14 +236,16 @@ protected:
 namespace
 {
     template<class T>
-    T test_type(const T& t, EngineContext& ctx)
+    std::pair<nlohmann::json, T> test_type(const T& t, EngineContext& ctx)
     {
         // Serialize
         auto j = meta::serialize_any(t);
 
+#if 0
+        // Debug print json
         std::cout << meta_type_name(entt::resolve<T>()) << ":" << std::endl;
         std::cout << j.dump(4) << std::endl;
-
+#endif
         // Deserialize
         entt::meta_any deserialized_any = T{};
         meta::deserialize_any(j, deserialized_any, Entity{}, ctx);
@@ -275,92 +254,101 @@ namespace
         // Compare
         EXPECT_EQ(t, deserialized_ref);
 
-        return deserialized_ref;
+        return { j, deserialized_ref };
     }
 }
 
-TEST_F(MetaSerializationTest, Serialize_WithMockContext)
+TEST_F(MetaSerializationTest, SerializePrimitiveTypes)
 {
-    MockEntityRegistry entity_registry_mock;
-    MockResourceRegistry resource_registry_mock;
-    eeng::EngineContext ctx{ &entity_registry_mock, &resource_registry_mock };
+    test_type(42, ctx);                    // int
+    test_type(-42, ctx);                   // negative int
+    test_type(42u, ctx);                   // unsigned int
+    test_type(3.14f, ctx);                 // float
+    test_type(-3.14f, ctx);                // negative float
+    test_type(2.718, ctx);                 // double
+    test_type(-2.718, ctx);                // negative double
+    test_type(true, ctx);                  // bool (true)
+    test_type(false, ctx);                 // bool (false)
+    test_type('x', ctx);                   // char
+}
 
-    // basic types
-    {
-        test_type(5, ctx);                       // int
-        test_type(5u, ctx);                      // unsigned int
-        test_type(-5, ctx);                      // negative int
-        test_type(5.0f, ctx);                    // float
-        test_type(-5.0f, ctx);                   // negative float
-        test_type(5.0, ctx);                     // double
-        test_type(-5.0, ctx);                    // negative double
-        test_type(true, ctx);                    // bool (true)
-        test_type(false, ctx);                   // bool (false)
-        test_type('a', ctx);                     // char
-        test_type(std::string{ "Hello World" }, ctx); // std::string
-        // test_type(std::string_view{ "Hello" }, ctx); // std::string_view
-    }
+TEST_F(MetaSerializationTest, SerializeString)
+{
+    test_type(std::string("hello"), ctx);
+}
 
-    // std::vector<int>
-    {
-        std::vector<int> vec{ 0,1,2,3,4,5 };
-        auto res = test_type(vec, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeVectorOfInt)
+{
+    test_type(std::vector<int>{ 0, 1, 2, 3, 4, 5 }, ctx);
+}
 
-    // enum
-    {
-        auto res = test_type(MockType2::AnEnum::Hello, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeEnum)
+{
+    test_type(MockType2::AnEnum::Hello, ctx);
+}
 
-    // vec2
-    {
-        auto res = test_type(vec2{}, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeVec2)
+{
+    test_type(vec2{ 1.0f, 2.0f }, ctx);
+}
 
-    // vec3
-    {
-        auto res = test_type(vec3{ vec2{1.0f,2.0f}, 3.0f }, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeVec3)
+{
+    test_type(vec3{ vec2{1.0f, 2.0f}, 3.0f }, ctx);
+}
 
-    // std::vector<vec3>
-    {
-        std::vector<vec3> t{ {{1.0f, 2.0f}, 3.0f}, {{10.0f, 20.0f}, 30.0f} };
-        auto res = test_type(t, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeVectorOfVec3)
+{
+    std::vector<vec3> t{
+        { {1.0f, 2.0f}, 3.0f },
+        { {10.0f, 20.0f}, 30.0f }
+    };
+    test_type(t, ctx);
+}
 
-    // std::array<vec3, 2>
-    {
-        std::array<vec3, 2> t{ { {{1.0f, 2.0f}, 3.0f}, {{10.0f, 20.0f}, 30.0f} } };
-        auto res = test_type(t, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeArrayOfVec3)
+{
+    std::array<vec3, 2> t{ {
+        { {1.0f, 2.0f}, 3.0f },
+        { {10.0f, 20.0f}, 30.0f }
+    } };
+    test_type(t, ctx);
+}
 
-    // std::set<int>
-    {
-        std::set<int> t{ 1, 2, 3, 4, 5 };
-        auto res = test_type(t, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeSetOfInt)
+{
+    test_type(std::set<int>{ 1, 2, 3, 4, 5 }, ctx);
+}
 
-    // std::set<vec3>
-    {
-        std::set<vec3> t{ {{1.0f, 2.0f}, 3.0f}, {{5.0f, 6.0f}, 7.0f} };
-        auto res = test_type(t, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeSetOfVec3)
+{
+    std::set<vec3> t{
+        { {1.0f, 2.0f}, 3.0f },
+        { {5.0f, 6.0f}, 7.0f }
+    };
+    test_type(t, ctx);
+}
 
-    // std::map<int, float>
-    {
-        std::map<int, float> t{ {1, 2.0f}, {3, 4.0f} };
-        auto res = test_type(t, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeMapOfIntToFloat)
+{
+    std::map<int, float> t{ {1, 2.0f}, {3, 4.0f} };
+    test_type(t, ctx);
+}
 
-    // std::map<int, vec3>
-    {
-        std::map<int, vec3> t{ {1, {{2.0f, 3.0f}, 4.0f}}, {5, {{6.0f, 7.0f}, 8.0f}} };
-        auto res = test_type(t, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeMapOfIntToVec3)
+{
+    std::map<int, vec3> t{
+        { 1, { {2.0f, 3.0f}, 4.0f } },
+        { 5, { {6.0f, 7.0f}, 8.0f } }
+    };
+    test_type(t, ctx);
+}
 
-    // std::map<vec3, int>
-    {
-        std::map<vec3, int> t{ {{{1.0f, 2.0f}, 3.0f}, 4}, {{{5.0f, 6.0f}, 7.0f}, 8} };
-        auto res = test_type(t, ctx);
-    }
+TEST_F(MetaSerializationTest, SerializeMapOfVec3ToInt)
+{
+    std::map<vec3, int> t{
+        { { {1.0f, 2.0f}, 3.0f }, 4 },
+        { { {5.0f, 6.0f}, 7.0f }, 8 }
+    };
+    test_type(t, ctx);
 }

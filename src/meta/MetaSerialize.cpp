@@ -5,7 +5,7 @@
 #include <sstream>
 #include <cassert>
 // #include <nlohmann/json_fwd.hpp> //
-#include <nlohmann/json.hpp>
+// #include <nlohmann/json.hpp>
 #include "config.h"
 #include "MetaSerialize.hpp"
 #include "MetaLiterals.h"
@@ -76,7 +76,7 @@ namespace eeng::meta
             else if (meta_type.is_enum())
             {
                 // std::cout << " [is_enum]";
-
+#if 0
                 // Cast to underlying meta type
                 auto any_conv = cast_to_underlying_type(meta_type, any);
 
@@ -88,6 +88,8 @@ namespace eeng::meta
                 assert(entry != enum_entries.end());
                 // Push entry name to json
                 json = entry->first;
+#endif
+                json = enum_value_name(any);
             }
             else
             {

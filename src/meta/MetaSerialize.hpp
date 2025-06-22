@@ -5,15 +5,12 @@
 #define MetaSerialize_hpp
 
 #include <entt/entt.hpp>
-//#include <nlohmann/json_fwd.hpp> // Use nlohmann::json& as references instead
 #include <nlohmann/json.hpp>
 #include "EngineContext.h"
 
-// namespace eeng
-// {
-//     class EngineContext;
-//     class Entity; // Todo: placeholder
-// }
+// Note: We're including the full nlohmann header and not just 
+// <nlohmann/json_fwd.hpp>. The expected usage of this header is on engine cpp:s
+// where <nlohmann/json.hpp> is included anyway.
 
 namespace eeng::meta
 {
