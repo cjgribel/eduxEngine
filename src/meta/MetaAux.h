@@ -69,7 +69,12 @@ namespace internal
         int, unsigned int,
         long, unsigned long,
         long long, unsigned long long,
-        float, double, long double
+        float, double, long double,
+
+        // string-like types:
+        std::string,
+        std::string_view
+        // const char*
     >;
 
 } // internal

@@ -41,6 +41,32 @@ namespace
         }
     };
 
+    void serialize_vec2(
+        nlohmann::json& j,
+        const entt::meta_any& any)
+    {
+        auto ptr = any.try_cast<vec2>();
+        assert(ptr && "serialize_vec2: could not cast meta_any to vec2");
+        j =
+        {
+            {"x", ptr->x},
+            {"y", ptr->y}
+        };
+    }
+
+    void deserialize_vec2(
+        const nlohmann::json& j,
+        entt::meta_any& any,
+        const Entity& entity,
+        eeng::EngineContext& ctx
+    )
+    {
+        auto ptr = any.try_cast<vec2>();
+        assert(ptr && "serialize_vec2: could not cast meta_any to vec2");
+        ptr->x = j["x"];
+        ptr->y = j["y"];
+    }
+
     struct vec3
     {
         vec2 xy;
@@ -55,35 +81,6 @@ namespace
             return oss.str();
         }
     };
-
-    template<class T>
-    void serialize(
-        nlohmann::json& j,
-        //const void* ptr
-        const entt::meta_any& any)
-    {
-        // j = *static_cast<const T*>(ptr);
-
-        auto obj_ptr = any.try_cast<T>();
-        assert(obj_ptr && "serialize: meta_any contained wrong type");
-        j = *obj_ptr;
-    }
-
-    template<class T>
-    void deserialize(
-        const nlohmann::json& j,
-        //void* ptr,
-        entt::meta_any& any,
-        const Entity& entity,
-        eeng::EngineContext& ctx
-    )
-    {
-        // *static_cast<T*>(ptr) = j;
-
-        auto obj_ptr = any.try_cast<T>();
-        assert(obj_ptr && "deserialize: meta_any contained wrong type");
-        *obj_ptr = j;
-    }
 }
 
 namespace std
@@ -133,6 +130,13 @@ struct MockType2
     //     *d += 2.5;        // mutate non-const pointer
     //     return a + static_cast<int>(b) + static_cast<int>(*d) + static_cast<int>(c) + static_cast<int>(*e);
     // }
+
+    bool operator==(const MockType2& other) const
+    {
+        return
+            x == other.x &&
+            y == other.y;
+    }
 };
 
 // Print policy of entt::any_policy
@@ -167,6 +171,9 @@ protected:
             .data<&vec2::y>("y"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "y", "n/a" })
             .traits(MetaFlags::none)
+
+            .template func<&serialize_vec2, entt::as_void_t>(literals::serialize_hs)
+            .template func<&deserialize_vec2, entt::as_void_t >(literals::deserialize_hs)
             ;
 
         // Register vec3
@@ -222,14 +229,6 @@ protected:
             .custom<DataMetaInfo>(DataMetaInfo{ "an_enum", "Enum member" })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
             ;
-
-        // Register std::string
-        entt::meta_factory<std::string>()
-            .type(entt::type_hash<std::string>::value())
-
-            .template func<&serialize<std::string>, entt::as_void_t>(literals::serialize_hs)
-            .template func<&deserialize<std::string>, entt::as_void_t >(literals::deserialize_hs)
-            ;
     }
 };
 
@@ -241,7 +240,7 @@ namespace
         // Serialize
         auto j = meta::serialize_any(t);
 
-#if 0
+#if 1
         // Debug print json
         std::cout << meta_type_name(entt::resolve<T>()) << ":" << std::endl;
         std::cout << j.dump(4) << std::endl;
@@ -287,7 +286,7 @@ TEST_F(MetaSerializationTest, SerializeEnum)
     test_type(MockType2::AnEnum::Hello, ctx);
 }
 
-TEST_F(MetaSerializationTest, SerializeVec2)
+TEST_F(MetaSerializationTest, SerializeVec2WithCustomFunctions)
 {
     test_type(vec2{ 1.0f, 2.0f }, ctx);
 }
@@ -350,5 +349,11 @@ TEST_F(MetaSerializationTest, SerializeMapOfVec3ToInt)
         { { {1.0f, 2.0f}, 3.0f }, 4 },
         { { {5.0f, 6.0f}, 7.0f }, 8 }
     };
+    test_type(t, ctx);
+}
+
+TEST_F(MetaSerializationTest, SerializeMockType2)
+{
+    MockType2 t;
     test_type(t, ctx);
 }

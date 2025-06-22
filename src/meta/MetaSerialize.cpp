@@ -1,16 +1,15 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-#include <iostream>
-#include <sstream>
-#include <cassert>
-// #include <nlohmann/json_fwd.hpp> //
-// #include <nlohmann/json.hpp>
-#include "config.h"
 #include "MetaSerialize.hpp"
+#include "config.h"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
 #include "EngineContext.h"
+#include <iostream>
+#include <sstream>
+#include <cassert>
+#include <nlohmann/json.hpp>
 
 namespace eeng::meta
 {
@@ -416,9 +415,11 @@ namespace eeng::meta
         else
         {
             // Try casting the meta_any to a primitive type.
-            //
             bool res = try_apply(any, [&json, &any](auto& value) {
+                
+                // Stript away any constness
                 using Type = std::decay_t<decltype(value)>;
+                
                 // Assign a new value to the stored object
                 // Note: any = json.get<Type>() *replaces* the stored object
                 any.assign(json.get<Type>());
