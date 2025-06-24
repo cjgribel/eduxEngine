@@ -5,9 +5,9 @@
 
 namespace eeng
 {
-    class IResourceRegistry
+    class IResourceManager
     {
     public:
-        virtual ~IResourceRegistry() = default;
+        virtual ~IResourceManager() = default;
     };
 } // namespace eeng

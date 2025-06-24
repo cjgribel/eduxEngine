@@ -12,10 +12,10 @@ namespace eeng
         size_t id;
     };
 
-    class IEntityRegistry
+    class IEntityManager
     {
     public:
-        virtual ~IEntityRegistry() = default;
+        virtual ~IEntityManager() = default;
         virtual Entity create_entity() = 0;
         virtual void destroy_entity(Entity entity) = 0;
     };

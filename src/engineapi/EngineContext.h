@@ -4,8 +4,8 @@
 #pragma once
 
 #include <memory>
-#include "IEntityRegistry.hpp"
-#include "IResourceRegistry.hpp"
+#include "IEntityManager.hpp"
+#include "IResourceManager.hpp"
 
 namespace eeng
 {
@@ -13,14 +13,14 @@ namespace eeng
 struct EngineContext
 {
     EngineContext(
-        IEntityRegistry* entity_registry = nullptr,
-        IResourceRegistry* resource_registry = nullptr)
-        : entity_registry(entity_registry)
-        , resource_registry(resource_registry)
+        std::unique_ptr<IEntityManager> entity_manager,
+        std::unique_ptr<IResourceManager> resource_manager)
+        : entity_manager(std::move(entity_manager))
+        , resource_manager(std::move(resource_manager))
     {}
 
-    IEntityRegistry* entity_registry;
-    IResourceRegistry* resource_registry;
+    std::unique_ptr<IEntityManager> entity_manager;
+    std::unique_ptr<IResourceManager> resource_manager;
 };
 
 } // namespace eeng

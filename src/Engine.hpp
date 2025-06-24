@@ -4,10 +4,11 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
 
-#include <iostream>
-#include <memory>
 #include "config.h"
 #include "GameBase.h"
+#include "EngineContext.h"
+#include <iostream>
+#include <memory>
 
 struct SDL_Window;              // Forward declaration
 typedef void* SDL_GLContext;    // Forward declaration
@@ -16,74 +17,108 @@ namespace eeng
 {
     class InputManager; // Forward declaration
 
-/**
- * @brief Main engine class handling SDL, OpenGL, ImGui initialization and the main loop.
- */
-class Engine
-{
-public:
-    /** Constructor */
-    Engine();
-
-    /** Destructor, calls shutdown() */
-    ~Engine();
-
     /**
-     * @brief Initialize the engine.
-     * @param title Window title
-     * @param width Window width
-     * @param height Window height
-     * @return True if successful, false otherwise
+     * @brief Main engine class handling SDL, OpenGL, ImGui initialization and the main loop.
      */
-    bool init(const char* title, int width, int height);
+    class Engine
+    {
+    public:
+        /** Constructor */
+        // Engine();
+        explicit Engine(std::shared_ptr<EngineContext> ctx);
 
-    /**
-     * @brief Start the main loop.
-     * @param game Unique pointer to the initial game game
-     */
-    void run(std::unique_ptr<GameBase> game);
+        /** Destructor, calls shutdown() */
+        ~Engine();
 
-    /** @brief Clean up and close the engine. */
-    void shutdown();
+        /**
+         * @brief Initialize the engine.
+         * @param title Window title
+         * @param width Window width
+         * @param height Window height
+         * @return True if successful, false otherwise
+         */
+        bool init(const char* title, int width, int height);
 
-    /**
-     * @brief Get SDL window pointer.
-     * @return SDL_Window pointer
-     */
-    SDL_Window* window() const { return window_; }
+        /// @brief Create a game of a given type and run main loop
+        /// @tparam TGame Game type
+        /// @tparam ...Args 
+        /// @param ...args 
+        template<typename TGame, typename... Args>
+            requires (std::is_base_of<GameBase, TGame>::value)
+        void run(Args&&... args)
+        {
+            if constexpr (requires { TGame(ctx); })
+                run(std::make_unique<TGame>(ctx, std::forward<Args>(args)...));
+            else
+                run(std::make_unique<TGame>(std::forward<Args>(args)...));
+        }
 
-private:
-    SDL_Window* window_ = nullptr;        ///< SDL Window pointer
-    SDL_GLContext gl_context_ = nullptr;  ///< OpenGL context
-    std::shared_ptr<InputManager> input;  ///< Input manager for mouse/keyboard/controller input
+        /** @brief Clean up and close the engine. */
+        void shutdown();
 
-    int window_height;    ///< Window height in pixels
-    int window_width;     ///< Window width in pixels
-    bool vsync = false;   ///< V-sync enabled state
-    bool wireframe_mode = false; ///< Wireframe rendering state
-    float min_frametime_ms = 16.67; ///< Minimum frame duration in milliseconds (default 60 FPS)
+        /**
+         * @brief Get SDL window pointer.
+         * @return SDL_Window pointer
+         */
+        SDL_Window* window() const { return window_; }
 
-    /** Initialize SDL library and window. */
-    bool init_sdl(const char* title, int width, int height);
+    private:
+        SDL_Window* window_ = nullptr;        ///< SDL Window pointer
+        SDL_GLContext gl_context_ = nullptr;  ///< OpenGL context
+        std::shared_ptr<InputManager> input;  ///< Input manager for mouse/keyboard/controller input
 
-    /** Initialize OpenGL context. */
-    bool init_opengl();
+        int window_height;    ///< Window height in pixels
+        int window_width;     ///< Window width in pixels
+        bool vsync = false;   ///< V-sync enabled state
+        bool wireframe_mode = false; ///< Wireframe rendering state
+        float min_frametime_ms = 16.67; ///< Minimum frame duration in milliseconds (default 60 FPS)
 
-    /** Initialize ImGui for GUI rendering. */
-    bool init_imgui();
+        // EngineContext ctx;
+        std::shared_ptr<EngineContext> ctx;
 
-    /** Handle SDL events. */
-    void process_events(bool& running);
+        /**
+         * @brief Start the main loop.
+         * @param game Unique pointer to the initial game game
+         */
+        void run(std::unique_ptr<GameBase> game);
 
-    /** Prepare frame rendering. */
-    void begin_frame();
+        /** Initialize SDL library and window. */
+        bool init_sdl(const char* title, int width, int height);
 
-    /** Finish frame rendering. */
-    void end_frame();
+        /** Initialize OpenGL context. */
+        bool init_opengl();
 
-    /** Render debug and information UI using ImGui. */
-    void render_info_UI();
-};
+        /** Initialize ImGui for GUI rendering. */
+        bool init_imgui();
+
+        /** Handle SDL events. */
+        void process_events(bool& running);
+
+        /** Prepare frame rendering. */
+        void begin_frame();
+
+        /** Finish frame rendering. */
+        void end_frame();
+
+        /** Render debug and information UI using ImGui. */
+        void render_info_UI();
+    };
+
+    using EnginePtr = std::unique_ptr<Engine>;
+#if 0
+    struct EngineFactory
+    {
+        static EnginePtr CreateDefaultEngine()
+        {
+            return std::make_unique<Engine>(
+                std::make_unique<EntityManager>(),
+                std::make_unique<ResourceManager>()
+                // std::make_unique<SceneManager>(),
+                // std::make_unique<EventDispatcher>(),
+                // std::make_unique<Logger>());
+        }
+    }
+#endif
 
 } // namespace eeng
 

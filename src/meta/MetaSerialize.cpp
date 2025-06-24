@@ -148,8 +148,9 @@ namespace eeng::meta
         }
         else
         {
-            bool res = try_apply(any, [&json](auto& value) {
-                json = value;
+            bool res = try_apply(any, [&json](auto& value)
+                {
+                    json = value;
                 });
             if (!res)
                 throw std::runtime_error(std::string("Unable to cast ") + meta_type_name(any.type()));
@@ -272,7 +273,7 @@ namespace eeng::meta
 
         return json;
 #endif
-    }
+}
 #endif
     void deserialize_any(
         const nlohmann::json& json,
@@ -415,14 +416,14 @@ namespace eeng::meta
         else
         {
             // Try casting the meta_any to a primitive type.
-            bool res = try_apply(any, [&json, &any](auto& value) {
-                
-                // Stript away any constness
-                using Type = std::decay_t<decltype(value)>;
-                
-                // Assign a new value to the stored object
-                // Note: any = json.get<Type>() *replaces* the stored object
-                any.assign(json.get<Type>());
+            bool res = try_apply(any, [&json, &any](auto& value)
+                {
+                    // Stript away any constness
+                    using Type = std::decay_t<decltype(value)>;
+
+                    // Assign a new value to the stored object
+                    // Note: any = json.get<Type>() *replaces* the stored object
+                    any.assign(json.get<Type>());
                 });
             if (!res)
                 throw std::runtime_error(std::string("Unable to cast ") + meta_type_name(any.type()));
@@ -551,6 +552,6 @@ namespace eeng::meta
             }
         }
 #endif
-    }
+}
 #endif
 } // namespace eeng::meta

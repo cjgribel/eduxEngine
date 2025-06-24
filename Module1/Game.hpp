@@ -2,14 +2,15 @@
 #define Game_hpp
 #pragma once
 
-#include <entt/fwd.hpp>
 #include "GameBase.h"
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
+#include <entt/fwd.hpp>
 
 // --> ENGINE API
 #include "ShapeRenderer.hpp"
 #include "Storage.hpp"
+#include "EngineContext.h"
 
 #if 0
 // #define SPONZA_PATH "assets/crytek-sponza_hansen/sponza.obj"
@@ -35,6 +36,11 @@
 class Game : public eeng::GameBase
 {
 public:
+    Game(std::shared_ptr<eeng::EngineContext> ctx)
+        : ctx(ctx)
+    {
+    }
+
     /// @brief For game resource initialization
     /// @return 
     bool init() override;
@@ -64,7 +70,9 @@ private:
     /// @brief For rendering of GUI elements
     void renderUI();
 
-    // --> ENGINE API
+    // ENGINE API
+    std::shared_ptr<eeng::EngineContext> ctx;
+    // <--
 
     // Renderer for rendering imported animated or non-animated models
     eeng::ForwardRendererPtr forwardRenderer;

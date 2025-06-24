@@ -10,19 +10,19 @@
 #include "MetaSerialize.hpp"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
-// #include "EngineContext.h"
+#include "EngineContext.h"
 
 using namespace eeng;
 
 namespace
 {
-    struct MockEntityRegistry : eeng::IEntityRegistry
+    struct MockEntityRegistry : eeng::IEntityManager
     {
         Entity create_entity() override { return Entity{ }; }
         void destroy_entity(Entity entity) override {}
     };
 
-    struct MockResourceRegistry : eeng::IResourceRegistry
+    struct MockResourceManager : eeng::IResourceManager
     {
     };
 
@@ -155,9 +155,10 @@ inline std::string policy_to_string(entt::any_policy policy)
 class MetaSerializationTest : public ::testing::Test
 {
 protected:
-    MockEntityRegistry entity_registry_mock;
-    MockResourceRegistry resource_registry_mock;
-    eeng::EngineContext ctx{ &entity_registry_mock, &resource_registry_mock };
+    eeng::EngineContext ctx{ 
+        std::make_unique<MockEntityRegistry>(), 
+        std::make_unique<MockResourceManager>() 
+    };
 
     static void SetUpTestSuite()
     {

@@ -29,7 +29,8 @@
 
 namespace eeng
 {
-    class AssetIndex 
+#if 0
+    class AssetIndex
     {
     public:
         // Initialization
@@ -53,6 +54,7 @@ namespace eeng
         template<typename T>
         std::vector<std::optional<T>> load_assets(const std::vector<Guid>& guids) const;
     };
+#endif
 
 #if 0
     class AssetDatabase {
