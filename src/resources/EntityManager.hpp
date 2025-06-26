@@ -8,7 +8,7 @@ namespace eeng
 {
     class EntityManager : public IEntityManager
     {
-        Entity create_entity() override {}
+        Entity create_entity() override { return Entity {}; }
         void destroy_entity(Entity entity) override {}
     };
 

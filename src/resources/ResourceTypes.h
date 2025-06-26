@@ -61,6 +61,12 @@ namespace eeng
             return *this;
         }
 
+        // Equality
+        bool operator==(const MockResource1& other) const
+        {
+            return x == other.x && y == other.y;
+        }
+
         // Destructor
         ~MockResource1() {
             eeng::Log("MockResource1 destroyed");
@@ -71,6 +77,11 @@ namespace eeng
     {
         size_t y = 0;
         Handle<MockResource1> ref1; // Reference to another resource
+
+        bool operator==(const MockResource2& other) const
+        {
+            return y == other.y && ref1 == other.ref1;
+        }
     };
 
 } // namespace eeng
