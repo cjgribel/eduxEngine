@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.12)
 
 #
 # Project
@@ -28,6 +28,7 @@ else()
     add_compile_definitions(GL_SILENCE_DEPRECATION=0)
     message(STATUS "Non-Apple platform detected")
 endif()
+add_compile_definitions(ENTT_USE_ATOMIC)
 
 # 'target_include_directories' if target specific
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
