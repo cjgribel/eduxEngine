@@ -16,14 +16,31 @@ struct MockResource1 {
     MockResource1() {
         data = { 10, 20, 30 };
     }
+
+    bool operator==(const MockResource1& other) const
+    {
+        return x == other.x && data == other.data;
+    }
 };
 
-struct MockResource2 {
+std::ostream& operator<<(std::ostream& os, const MockResource1& mr)
+{
+    return os << mr.x;
+}
+
+struct MockResource2
+{
     size_t y = 0;
     std::vector<double> values;
 
-    MockResource2() {
+    MockResource2()
+    {
         values = { 1.1, 2.2, 3.3 };
+    }
+
+    bool operator==(const MockResource2& other) const
+    {
+        return y == other.y && values == other.values;
     }
 };
 
@@ -34,22 +51,34 @@ void assure_storage(eeng::Storage& storage) {
 }
 
 // Static registration of MockResource1 & MockResource2 with EnTT meta using meta_factory
-static bool meta_registered = []() {
-    entt::meta_factory<MockResource1>{}
-    .type("MockResource1"_hs)
-        .template func<&assure_storage<MockResource1>>("assure_storage"_hs);
-    entt::meta_factory<MockResource2>{}
-    .type("MockResource2"_hs)
-        .template func<&assure_storage<MockResource2>>("assure_storage"_hs);
-    return true;
-    }();
+// static bool meta_registered = []() {
+//     entt::meta_factory<MockResource1>{}
+//     .type("MockResource1"_hs)
+//         .template func<&assure_storage<MockResource1>>("assure_storage"_hs);
+//     entt::meta_factory<MockResource2>{}
+//     .type("MockResource2"_hs)
+//         .template func<&assure_storage<MockResource2>>("assure_storage"_hs);
+//     return true;
+//     }();
 
-class StorageTest : public ::testing::Test {
+class StorageTest : public ::testing::Test
+{
 protected:
     eeng::Storage storage;
+
+    static void SetUpTestSuite()
+    {
+        entt::meta_factory<MockResource1>{}
+        .type("MockResource1"_hs)
+            .template func<&assure_storage<MockResource1>>("assure_storage"_hs);
+
+        entt::meta_factory<MockResource2>{}
+        .type("MockResource2"_hs)
+            .template func<&assure_storage<MockResource2>>("assure_storage"_hs);
+    }
 };
 
-TEST_F(StorageTest, AddAndValidate){
+TEST_F(StorageTest, AddAndValidate) {
     // Add a resource and validate the returned handle
     MockResource1 mr; mr.x = 42;
     entt::meta_any any = mr;
@@ -189,7 +218,7 @@ TEST_F(StorageTest, ReleaseInvalidThrows) {
     EXPECT_THROW(storage.release(bad), std::runtime_error);
 }
 
-#if 0
+#if 1
 /**
  * ConcurrencySafety (by o4-mini-high)
  *
@@ -203,35 +232,89 @@ TEST_F(StorageTest, ReleaseInvalidThrows) {
  * Results are reported via GTest assertions inside each thread.
  */
 TEST_F(StorageTest, ConcurrencySafety) {
-    const int N = 10;
-    std::vector<eeng::Guid> guids(N);
-    for (auto& g : guids) g = eeng::Guid::generate();
 
-    std::vector<std::thread> threads;
-    std::vector<bool> results(N, false);
+    // 1) Force EnTT to resolve the type node itself
+// [[maybe_unused]] auto type_node = entt::resolve<MockResource1>();
 
-    for (int i = 0; i < N; ++i) {
-        threads.emplace_back([this, i, &guids, &results] {
-            try {
-                MockResource1 mr; mr.x = size_t(i);
-                entt::meta_any any = mr;
-                auto h = storage.add(any, guids[i]);
-                if (!storage.validate(h)) return;
-                auto& val = storage.get(h).cast<MockResource1&>();
-                if (val.x != size_t(i)) return;
-                storage.release(h);
-                if (storage.validate(h)) return;
-                results[i] = true;
-            }
-            catch (...) {
-                /* swallow: results[i] stays false */
-            }
-            });
-    }
+// 2) (Optional) Build a dummy meta_any so that its vtable
+//    and conversion helpers also get registered
+// [[maybe_unused]] auto any = entt::meta_any{ std::in_place_type<MockResource1> };
 
-    for (auto& t : threads) t.join();
-    for (int i = 0; i < N; ++i) {
-        EXPECT_TRUE(results[i]) << "Thread " << i << " failed";
+// entt::resolve<MockResource1>();
+// [[maybe_unused]] auto w1 = entt::meta_any{ std::in_place_type<MockResource1> };
+// entt::resolve<MockResource2>();
+// [[maybe_unused]] auto w2 = entt::meta_any{ std::in_place_type<MockResource2> };
+
+    std::mutex m;
+    for (int i = 0; i < 1000; i++)
+    {
+        // storage.clear();
+        storage = eeng::Storage{};
+        const int N = 50;
+        std::vector<eeng::Guid> guids(N);
+        for (auto& g : guids) g = eeng::Guid::generate();
+
+        std::vector<std::thread> threads;
+        // std::vector<bool> results(N, false);
+        // std::vector<char> results(N, 0);
+        std::vector<std::atomic<bool>> results(N);
+        for (auto& r : results) r.store(false, std::memory_order_relaxed);
+        std::vector<eeng::MetaHandle> handles(N);
+
+        for (int i = 0; i < N; ++i) {
+            threads.emplace_back([this, i, &guids, &results, &m, &handles] {
+                try {
+                    MockResource1 mr; mr.x = size_t(i);
+
+                    // auto h = storage.add(mr, guids[i]);
+                    // ADD_TYPED
+                    auto h = storage.add_typed<MockResource1>(mr, guids[i]);
+                    // std::lock_guard lock{ m };
+
+                    handles[i] = h;
+                    if (!storage.validate(h)) return; // TYPED???
+
+                    //std::lock_guard lock{ m };
+                    // auto& val = storage.get(h).cast<MockResource1&>();
+
+                    auto val = storage.get_typed<MockResource1>(h);
+                    // auto val_ = storage.get(h);
+                    // auto val = val_.cast<MockResource1&>();
+
+                    if (val.x != size_t(i)) {
+                        // std::cout << val.x << ", " << size_t(i) << std::endl;
+                        std::cout << "Expected " << size_t(i) << " at ofs " << h.ofs << ", got " << val.x << std::endl;
+                        return;
+                    }
+
+                    //storage.release(h);
+                    //if (storage.validate(h)) return;
+
+                    results[i].store(true, std::memory_order_relaxed);
+                }
+                catch (...) {
+                    /* swallow: results[i] stays false */
+                    std::cout << "Exception" << std::endl;
+                }
+                });
+        }
+
+        for (auto& t : threads) t.join();
+        int c = 0;
+        for (int i = 0; i < N; ++i) {
+            // EXPECT_TRUE(results[i]) << "Thread " << i << " failed";
+            EXPECT_TRUE(results[i].load(std::memory_order_relaxed));
+            if (!results[i].load(std::memory_order_relaxed)) c++;
+        }
+        if (c > 0) {
+            std::cout << "nbr errors " << c << std::endl;
+            std::cout << storage.to_string();
+            for (auto& r : results) std::cout << r << ", "; std::cout << std::endl;
+            for (auto& h : handles) std::cout << h.ofs << ", "; std::cout << std::endl;
+        }
+        // Check handles
+        for (int j = 0; j < N; j++)
+            EXPECT_EQ(j, storage.get(handles[j]).cast<MockResource1&>().x);
     }
 }
 #endif
