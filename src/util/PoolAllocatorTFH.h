@@ -132,6 +132,21 @@ namespace eeng {
                 aligned_free(&m_pool);
         }
 
+        void clear()
+        {
+            std::lock_guard lock(m_mutex);
+
+            // Destroy used elements
+            if constexpr (!std::is_trivially_destructible_v<T>)
+                used_visitor([&](T& elem) { elem.~T(); });
+
+            free_first = index_null;
+            free_last = index_null;
+
+            m_pool = nullptr;
+            m_capacity = 0;
+        }
+
         size_t capacity() const
         {
             return m_capacity;
