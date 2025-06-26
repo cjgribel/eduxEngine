@@ -11,45 +11,45 @@ using namespace eeng;
 
 // namespace
 // {
-    struct MockType
+struct MockType
+{
+    int x{ 4 };
+    float y{ 4.0f };
+
+    // TODO
+    // bool flag = true;
+    // debugvec3 position;
+    // std::string somestring = "Hello";
+    // // std::vector<int> vector1 = { 1, 2, 3 };
+    // std::array<int, 3> vector1 = { 1, 2, 3 };
+    // std::vector<ElementType> vector2 = { {4.0f}, {5.0f}, {6.0f} };
+    // std::map<int, float> map1 = { {7, 7.5f}, {8, 8.5f} };
+    // std::map<int, ElementType> map2 = { {9, {9.5f}}, {10, {10.5f}} };
+    // std::map<ElementType, int> map3 = { {{9.5f}, 9}, {{10.5f}, 10} };
+    // std::set<int> set1 = { 11, 12 };
+
+    enum class AnEnum : int { Hello = 5, Bye = 6, Hola = 8 } an_enum{ AnEnum::Bye };
+
+    // Function with value, reference, const reference, pointer, const pointer
+    int mutate_and_sum(int a, float& b, const float& c, double* d, const double* e) const
     {
-        int x{ 4 };
-        float y{ 4.0f };
-
-        // TODO
-        // bool flag = true;
-        // debugvec3 position;
-        // std::string somestring = "Hello";
-        // // std::vector<int> vector1 = { 1, 2, 3 };
-        // std::array<int, 3> vector1 = { 1, 2, 3 };
-        // std::vector<ElementType> vector2 = { {4.0f}, {5.0f}, {6.0f} };
-        // std::map<int, float> map1 = { {7, 7.5f}, {8, 8.5f} };
-        // std::map<int, ElementType> map2 = { {9, {9.5f}}, {10, {10.5f}} };
-        // std::map<ElementType, int> map3 = { {{9.5f}, 9}, {{10.5f}, 10} };
-        // std::set<int> set1 = { 11, 12 };
-
-        enum class AnEnum : int { Hello = 5, Bye = 6, Hola = 8 } an_enum{ AnEnum::Bye };
-
-        // Function with value, reference, const reference, pointer, const pointer
-        int mutate_and_sum(int a, float& b, const float& c, double* d, const double* e) const
-        {
-            b += 1.5f;        // mutate non-const ref
-            *d += 2.5;        // mutate non-const pointer
-            return a + static_cast<int>(b) + static_cast<int>(*d) + static_cast<int>(c) + static_cast<int>(*e);
-        }
-    };
-
-    // Print policy of entt::any_policy
-    std::string policy_to_string(entt::any_policy policy)
-    {
-        switch (policy) {
-        case entt::any_policy::embedded: return "embedded";
-        case entt::any_policy::ref: return "ref";
-        case entt::any_policy::cref: return "cref";
-        case entt::any_policy::dynamic: return "dynamic";
-        default: return "unknown";
-        }
+        b += 1.5f;        // mutate non-const ref
+        *d += 2.5;        // mutate non-const pointer
+        return a + static_cast<int>(b) + static_cast<int>(*d) + static_cast<int>(c) + static_cast<int>(*e);
     }
+};
+
+// Print policy of entt::any_policy
+std::string policy_to_string(entt::any_policy policy)
+{
+    switch (policy) {
+    case entt::any_policy::embedded: return "embedded";
+    case entt::any_policy::ref: return "ref";
+    case entt::any_policy::cref: return "cref";
+    case entt::any_policy::dynamic: return "dynamic";
+    default: return "unknown";
+    }
+}
 // }
 
 // Test Fixture
