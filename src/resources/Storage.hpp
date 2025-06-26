@@ -209,7 +209,7 @@ namespace eeng
         public:
             virtual ~IPool() = default;
             virtual MetaHandle add(const Guid& guid, const entt::meta_any& data) = 0;
-            // virtual MetaHandle add(const Guid& guid, entt::meta_any&& data) = 0;
+            virtual MetaHandle add(const Guid& guid, entt::meta_any&& data) = 0;
 
             virtual entt::meta_any get(const MetaHandle& meta_handle) = 0;
             virtual entt::meta_any get(const MetaHandle& meta_handle) const = 0;
@@ -219,10 +219,8 @@ namespace eeng
 
             virtual void remove_now(const MetaHandle& handle) = 0;
             virtual size_t retain(const MetaHandle& mh) = 0;
-            // virtual size_t release(const MetaHandle& mh) = 0;
             virtual size_t release_and_destroy(const MetaHandle& mh) = 0;
 
-            /// @return true if `mh` is a well-formed handle whose version still matches
             virtual bool valid(const MetaHandle& mh) const noexcept = 0;
             virtual void clear() noexcept = 0;
 
@@ -248,69 +246,42 @@ namespace eeng
             mutable std::mutex m_mutex;
 
         public:
-
             MetaHandle add(const Guid& guid, const entt::meta_any& data) override
             {
-                std::lock_guard lock(m_mutex);
-                assert(guid != Guid::invalid());
-                assert(!map_contains(m_guid_to_handle, guid));
+                std::lock_guard lock{ m_mutex };
+                T copy = data.cast<T>();                              // copy #1
+                return typed_add_no_lock(guid, std::move(copy));      // move #1
+            }
 
-                // deep-copy here, since user passed an lvalue
-                auto any_copy = data;
+            MetaHandle add(const Guid& guid, entt::meta_any&& data) override
+            {
+                std::lock_guard lock{ m_mutex };
+                auto& ref = data.cast<T&>();                          // no copy
+                return typed_add_no_lock(guid, std::move(ref));       // move #2
+            }
 
-                // auto& obj = any_copy.cast<T&>();
-                // auto handle = m_pool.create(std::move(obj));
-                auto obj = any_copy.cast<T>();
-                auto handle = m_pool.create(obj);
-
-                assert(obj == m_pool.get(handle));
-
-                // Assign version to handle & count reference
+        private:
+            MetaHandle typed_add_no_lock(const Guid& guid, T&& object)
+            {
+                auto handle = m_pool.create(std::forward<T>(object));  // one move
                 m_versions.assign_version(handle);
                 m_ref_counts.add_ref(handle);
-
-                // Map guid <-> handle
                 m_guid_to_handle[guid] = handle;
                 m_handle_to_guid[handle] = guid;
-
                 return handle;
             }
 
-            // MetaHandle add(const Guid& guid, entt::meta_any&& data) override
-            // {
-            //     std::lock_guard lock(m_mutex);
-            //     assert(guid != Guid::invalid());
-            //     assert(!map_contains(m_guid_to_handle, guid));
-
-            //     // Data moved in, so its internal buffer is ours
-            //     auto& obj = data.cast<T&>();  // get reference to the stored T
-            //     auto handle = m_pool.create(std::move(obj));
-
-            //     // Assign version to handle & count reference
-            //     m_versions.assign_version(handle);
-            //     m_ref_counts.add_ref(handle);
-
-            //     // Map guid <-> handle
-            //     m_guid_to_handle[guid] = handle;
-            //     m_handle_to_guid[handle] = guid;
-
-            //     return handle;
-            // }
-
+        public:
             entt::meta_any get(const MetaHandle& meta_handle) override
             {
                 std::lock_guard lock{ m_mutex };
                 return get_impl(*this, meta_handle);
-
-                // return entt::forward_as_meta(get_impl(*this, meta_handle));
             }
 
             entt::meta_any get(const MetaHandle& meta_handle) const override
             {
                 std::lock_guard lock{ m_mutex };
                 return get_impl(*this, meta_handle);
-
-                // return entt::forward_as_meta(get_impl(*this, meta_handle));
             }
 
             std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) noexcept override
@@ -347,26 +318,6 @@ namespace eeng
                 if (!opt) throw ValidationError{ "Invalid or not-ready MetaHandle" };
                 return m_ref_counts.add_ref(*opt);
             }
-
-            // size_t release(const MetaHandle& mh) override
-            // {
-            //     std::lock_guard lock{ m_mutex };
-            //     auto opt = validate_handle_no_lock(mh);
-            //     if (!opt) throw ValidationError{ "Invalid or not-ready MetaHandle" };
-            //     auto count = m_ref_counts.release(*opt);
-            //     return count;
-            // }
-
-            /*
-            Even though you still hold storage_mutex the whole time,
-            you end up locking/unlocking the pool’s m_mutex twice,
-            and there’s a micro-window between the two calls where nothing
-            prevents another thread (or future iteration) from sneaking in
-            and racing on that same slot.
-
-            Solution: push the “if‐zero‐then‐destroy” logic down inside the pool
-            so that it’s all under one m_mutex lock:
-            */
 
             size_t release_and_destroy(const MetaHandle& mh) override
             {
@@ -434,13 +385,6 @@ namespace eeng
                         return it->second;
                 }
                 return std::nullopt;
-
-                // if (auto opt = validate_handle(mh)) {
-                //     auto it = m_handle_to_guid.find(*opt);
-                //     if (it != m_handle_to_guid.end())
-                //         return it->second;
-                // }
-                // return std::nullopt;
             }
 
             std::string to_string() const override
@@ -483,8 +427,6 @@ namespace eeng
                 PoolType& self,
                 const MetaHandle& meta_handle)
             {
-                // std::lock_guard lock{ self.m_mutex };
-
                 if (auto opt = self.validate_handle_no_lock(meta_handle); !opt)
                 {
                     throw ValidationError{ "Invalid or not‐ready MetaHandle" };
@@ -501,14 +443,6 @@ namespace eeng
                 PoolType& self,
                 const MetaHandle& meta_handle) noexcept
             {
-                // if (auto opt = self.validate_handle(meta_handle))
-                // {
-                //     std::lock_guard lock{ self.m_mutex };
-                //     auto& obj = self.m_pool.get(*opt);
-                //     return entt::forward_as_meta(obj);
-                // }
-                // return std::nullopt;
-
                 std::lock_guard lock{ self.m_mutex };
                 if (auto opt = self.validate_handle_no_lock(meta_handle)) {
                     return entt::forward_as_meta(self.m_pool.get(*opt));
@@ -555,101 +489,79 @@ namespace eeng
             }
         }
 
-        // add (typed, thread-safe)
-
+        /// @brief Add statically typed object as lvalue (thread-safe)
+        /// @return A copy of the requested object
         template<typename T>
             requires(!std::is_same_v<T, entt::meta_any>)
-        MetaHandle add_typed(const T& t, const Guid& guid)
+        MetaHandle add_typed(
+            const T& t,
+            const Guid& guid)
         {
             std::lock_guard lock{ storage_mutex };
+            auto& pool = get_or_create_pool(entt::resolve<T>());
 
-            auto& pool = get_or_create_pool(entt::resolve<T>());
-            return pool.add(guid, entt::forward_as_meta(t)); // lvalue add
-#if 0
-            // now, *inside* the lock, we touch EnTT's meta once:
-            entt::meta_any any{ t };
-            auto& pool = get_or_create_pool(entt::resolve<T>());
-            return pool.add(guid, std::move(any));
-#endif
-            // auto h = pool.add(guid, std::move(any));
-            // assert(t == pool.get(h).template cast<T>());
-            // return h;
+            entt::meta_any any = entt::forward_as_meta(t); // ref wrapper
+            return pool.add(guid, any); // lvalue add
         }
 
-        // template<typename T>
-        //     requires(!std::is_same_v<std::decay_t<T>, entt::meta_any>)
-        // MetaHandle add_typed(T&& t, const Guid& guid)
-        // {
-        //     std::lock_guard lock{ storage_mutex };
-        //     using U = std::remove_cv_t<std::remove_reference_t<T>>;
-        //     auto& pool = get_or_create_pool(entt::resolve<U>());
+        /// @brief Add statically typed object as rvalue (thread-safe)
+        /// @return A copy of the requested object
+        template<typename T>
+            requires(!std::is_same_v<std::decay_t<T>, entt::meta_any>)
+        MetaHandle add_typed(
+            T&& t,
+            const Guid& guid)
+        {
+            std::lock_guard lock{ storage_mutex };
+            using U = std::remove_cv_t<std::remove_reference_t<T>>;
+            auto& pool = get_or_create_pool(entt::resolve<U>());
 
-        //     // construct a meta_any that *owns* a U by moving from `t`
-        //     //entt::meta_any any{ std::in_place_type<U>, std::forward<T>(t) };
-        //     entt::meta_any any = entt::forward_as_meta(t); // ???
+            entt::meta_any any = entt::forward_as_meta(t);  // ref wrapper
+            return pool.add(guid, std::move(any)); // rvalue add
+        }
 
-        //     // call the rvalue-pool.add so it can steal the `any`’s storage
-        //     return pool.add(guid, std::move(any));
-        // }
-
-        // add (meta based, not thread-safe)
-
-        MetaHandle add(entt::meta_any data, const Guid& guid)
+        /// @brief Add runtime typed object as lvalue (not thread-safe)
+        MetaHandle add(const entt::meta_any& data, const Guid& guid)
         {
             std::lock_guard lock{ storage_mutex };
             auto& pool = get_or_create_pool(data.type());
-            return pool.add(guid, std::move(data));
+            return pool.add(guid, data); // lvalue
         }
 
-        // get (meta based)
+        /// @brief Add runtime typed object as rvalue (not thread-safe)
+        MetaHandle add(entt::meta_any&& data, const Guid& guid)
+        {
+            std::lock_guard lock{ storage_mutex };
+            auto& pool = get_or_create_pool(data.type());
+            return pool.add(guid, std::move(data));  // rvalue
+        }
 
+        /// @brief Runtime-typed get (not thread-safe)
+        /// @return An entt::metaany with a const reference to the requested object
         entt::meta_any get(const MetaHandle& meta_handle) const
         {
             std::lock_guard lock{ storage_mutex };
             return get_pool(meta_handle.type).get(meta_handle);
         }
 
+        /// @brief Runtime-typed get (not thread-safe)
+        /// @return An entt::metaany with a reference to the requested object
         entt::meta_any get(const MetaHandle& meta_handle)
         {
             std::lock_guard lock{ storage_mutex };
             return get_pool(meta_handle.type).get(meta_handle);
         }
 
-        // get (typed)
-
-    private:
-        // entt::meta_any get_nolock(const MetaHandle& mh) const {
-        //     auto& pool = get_pool(mh.type); // no locking here
-        //     return pool.get(mh);
-        // }
-
-        // entt::meta_any get_nolock(const MetaHandle& mh) {
-        //     auto& pool = get_pool(mh.type); // no locking here
-        //     return pool.get(mh);
-        // }
-
-    public:
-        // 
+        /// @brief Statically typed get (thread-safe)
+        /// @return A copy of the requested object
         template<typename T>
         T get_typed(const MetaHandle& mh) const
         {
             std::lock_guard<std::mutex> lk{ storage_mutex };
 
-            // auto any = get_nolock(mh);
-            // return any.cast<T>();
-
-            auto& pool = get_pool(mh.type); // no locking here
+            auto& pool = get_pool(mh.type);
             return pool.get(mh).cast<T>();
         }
-
-        // template<typename T>
-        // T get_typed(const MetaHandle& mh) {
-        //     std::lock_guard<std::mutex> lk{ storage_mutex };
-        //     auto any = get_nolock(mh);
-        //     return any.cast<T>();
-        // }
-    private:
-    public:
 
         std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) const noexcept
         {
@@ -680,20 +592,6 @@ namespace eeng
             return pool.retain(mh);
         }
 
-        /// Decrease the ref-count for a resource, and if it hits zero
-        /// automatically destroy it.
-        /// @returns the new ref-count (0 if destroyed).
-        // size_t release(const MetaHandle& mh)
-        // {
-        //     std::lock_guard lock{ storage_mutex };
-        //     auto& pool = get_pool(mh.type);
-        //     size_t count = pool.release(mh);
-        //     if (count == 0) {
-        //         // now that nobody holds it, force-remove
-        //         pool.remove_now(mh);
-        //     }
-        //     return count;
-        // }
         size_t release(const MetaHandle& mh) {
             std::lock_guard lock{ storage_mutex };
             auto& pool = get_pool(mh.type);
@@ -750,11 +648,9 @@ namespace eeng
             std::lock_guard lock{ storage_mutex };
             std::ostringstream oss;
             oss << "Storage summary:\n";
-            for (auto const& [type_id, pool_ptr] : pools) {
-                // recover the meta_type so we can get a human‐readable name
+            for (auto const& [type_id, pool_ptr] : pools) 
+            {
                 auto name = entt::resolve(type_id).info().name();
-                // entt::meta_type mt{ locator<entt::meta_ctx>::value_or(), internal::resolve_by_id(type_id) };
-                //const char* name = mt ? mt.info().name() : "<unknown>";
                 oss << "— Type “" << name << "” (id = " << type_id << ")\n";
                 oss << pool_ptr->to_string() << "\n";
             }

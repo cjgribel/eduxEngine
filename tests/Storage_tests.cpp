@@ -78,17 +78,48 @@ protected:
     }
 };
 
+// TEST_F(StorageTest, AddAndValidate) {
+//     // Add a resource and validate the returned handle
+//     MockResource1 mr; mr.x = 42;
+//     entt::meta_any any = mr;
+//     auto guid = eeng::Guid::generate();
+
+//     auto handle = storage.add(any, guid);
+//     EXPECT_TRUE(handle.valid());
+//     EXPECT_TRUE(storage.validate(handle));
+
+//     // Invalid empty handle should not validate
+//     eeng::MetaHandle empty;
+//     EXPECT_FALSE(empty);
+//     EXPECT_FALSE(storage.validate(empty));
+// }
 TEST_F(StorageTest, AddAndValidate) {
-    // Add a resource and validate the returned handle
+    // Common setup
     MockResource1 mr; mr.x = 42;
-    entt::meta_any any = mr;
-    auto guid = eeng::Guid::generate();
+    auto guid1 = eeng::Guid::generate();
+    auto guid2 = eeng::Guid::generate();
 
-    auto handle = storage.add(any, guid);
-    EXPECT_TRUE(handle.valid());
-    EXPECT_TRUE(storage.validate(handle));
+    // ————————————————
+    // 1) lvalue‐meta_any overload
+    // ————————————————
+    entt::meta_any any = mr;                 // lvalue
+    auto handle1 = storage.add(any, guid1);
+    EXPECT_TRUE(handle1.valid());
+    EXPECT_TRUE(storage.validate(handle1));
 
-    // Invalid empty handle should not validate
+    // ————————————————
+    // 2) rvalue‐meta_any overload
+    // ————————————————
+    {
+        // create a temporary meta_any and move it into add()
+        auto handle2 = storage.add(entt::forward_as_meta(mr), guid2);
+        EXPECT_TRUE(handle2.valid());
+        EXPECT_TRUE(storage.validate(handle2));
+    }
+
+    // ————————————————
+    // 3) the empty‐handle case
+    // ————————————————
     eeng::MetaHandle empty;
     EXPECT_FALSE(empty);
     EXPECT_FALSE(storage.validate(empty));
@@ -248,15 +279,13 @@ TEST_F(StorageTest, ConcurrencySafety) {
     std::mutex m;
     for (int i = 0; i < 1000; i++)
     {
-        // storage.clear();
-        storage = eeng::Storage{};
+        storage.clear(); // <----------
+        // storage = eeng::Storage{};
         const int N = 50;
         std::vector<eeng::Guid> guids(N);
         for (auto& g : guids) g = eeng::Guid::generate();
 
         std::vector<std::thread> threads;
-        // std::vector<bool> results(N, false);
-        // std::vector<char> results(N, 0);
         std::vector<std::atomic<bool>> results(N);
         for (auto& r : results) r.store(false, std::memory_order_relaxed);
         std::vector<eeng::MetaHandle> handles(N);
@@ -266,28 +295,20 @@ TEST_F(StorageTest, ConcurrencySafety) {
                 try {
                     MockResource1 mr; mr.x = size_t(i);
 
-                    // auto h = storage.add(mr, guids[i]);
-                    // ADD_TYPED
                     auto h = storage.add_typed<MockResource1>(mr, guids[i]);
-                    // std::lock_guard lock{ m };
 
                     handles[i] = h;
-                    if (!storage.validate(h)) return; // TYPED???
-
-                    //std::lock_guard lock{ m };
-                    // auto& val = storage.get(h).cast<MockResource1&>();
+                    if (!storage.validate(h)) return;
 
                     auto val = storage.get_typed<MockResource1>(h);
-                    // auto val_ = storage.get(h);
-                    // auto val = val_.cast<MockResource1&>();
 
                     if (val.x != size_t(i)) {
-                        // std::cout << val.x << ", " << size_t(i) << std::endl;
                         std::cout << "Expected " << size_t(i) << " at ofs " << h.ofs << ", got " << val.x << std::endl;
                         return;
                     }
 
-                    //storage.release(h);
+                    // (We release and validate post-test)
+                    // storage.release(h);
                     //if (storage.validate(h)) return;
 
                     results[i].store(true, std::memory_order_relaxed);
@@ -314,7 +335,12 @@ TEST_F(StorageTest, ConcurrencySafety) {
         }
         // Check handles
         for (int j = 0; j < N; j++)
-            EXPECT_EQ(j, storage.get(handles[j]).cast<MockResource1&>().x);
+        {
+            auto& h = handles[j];
+            EXPECT_EQ(j, storage.get(h).cast<MockResource1&>().x);
+            storage.release(h);
+            EXPECT_FALSE(storage.validate(h));
+        }
     }
 }
 #endif
