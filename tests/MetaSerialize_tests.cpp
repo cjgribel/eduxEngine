@@ -241,7 +241,7 @@ namespace
         // Serialize
         auto j = meta::serialize_any(t);
 
-#if 1
+#if 0
         // Debug print json
         std::cout << meta_type_name(entt::resolve<T>()) << ":" << std::endl;
         std::cout << j.dump(4) << std::endl;
