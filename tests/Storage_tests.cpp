@@ -78,21 +78,6 @@ protected:
     }
 };
 
-// TEST_F(StorageTest, AddAndValidate) {
-//     // Add a resource and validate the returned handle
-//     MockResource1 mr; mr.x = 42;
-//     entt::meta_any any = mr;
-//     auto guid = eeng::Guid::generate();
-
-//     auto handle = storage.add(any, guid);
-//     EXPECT_TRUE(handle.valid());
-//     EXPECT_TRUE(storage.validate(handle));
-
-//     // Invalid empty handle should not validate
-//     eeng::MetaHandle empty;
-//     EXPECT_FALSE(empty);
-//     EXPECT_FALSE(storage.validate(empty));
-// }
 TEST_F(StorageTest, AddAndValidate) {
     // Common setup
     MockResource1 mr; mr.x = 42;
@@ -264,22 +249,10 @@ TEST_F(StorageTest, ReleaseInvalidThrows) {
  */
 TEST_F(StorageTest, ConcurrencySafety) {
 
-    // 1) Force EnTT to resolve the type node itself
-// [[maybe_unused]] auto type_node = entt::resolve<MockResource1>();
-
-// 2) (Optional) Build a dummy meta_any so that its vtable
-//    and conversion helpers also get registered
-// [[maybe_unused]] auto any = entt::meta_any{ std::in_place_type<MockResource1> };
-
-// entt::resolve<MockResource1>();
-// [[maybe_unused]] auto w1 = entt::meta_any{ std::in_place_type<MockResource1> };
-// entt::resolve<MockResource2>();
-// [[maybe_unused]] auto w2 = entt::meta_any{ std::in_place_type<MockResource2> };
-
     std::mutex m;
     for (int i = 0; i < 1000; i++)
     {
-        storage.clear(); // <----------
+        storage.clear();
         // storage = eeng::Storage{};
         const int N = 50;
         std::vector<eeng::Guid> guids(N);
