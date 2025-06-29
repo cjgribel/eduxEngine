@@ -261,7 +261,7 @@ TEST_F(StorageTest, ConcurrencySafety) {
         std::vector<std::thread> threads;
         std::vector<std::atomic<bool>> results(N);
         for (auto& r : results) r.store(false, std::memory_order_relaxed);
-        std::vector<eeng::MetaHandle> handles(N);
+        std::vector<eeng::Handle<MockResource1>> handles(N);
 
         for (int i = 0; i < N; ++i) {
             threads.emplace_back([this, i, &guids, &results, &m, &handles] {
@@ -276,7 +276,7 @@ TEST_F(StorageTest, ConcurrencySafety) {
                     auto val = storage.get_typed<MockResource1>(h);
 
                     if (val.x != size_t(i)) {
-                        std::cout << "Expected " << size_t(i) << " at ofs " << h.ofs << ", got " << val.x << std::endl;
+                        std::cout << "Expected " << size_t(i) << " at ofs " << h.idx << ", got " << val.x << std::endl;
                         return;
                     }
 
@@ -304,7 +304,7 @@ TEST_F(StorageTest, ConcurrencySafety) {
             std::cout << "nbr errors " << c << std::endl;
             std::cout << storage.to_string();
             for (auto& r : results) std::cout << r << ", "; std::cout << std::endl;
-            for (auto& h : handles) std::cout << h.ofs << ", "; std::cout << std::endl;
+            for (auto& h : handles) std::cout << h.idx << ", "; std::cout << std::endl;
         }
         // Check handles
         for (int j = 0; j < N; j++)

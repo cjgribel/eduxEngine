@@ -246,6 +246,23 @@ namespace eeng
             mutable std::mutex m_mutex;
 
         public:
+
+            // --- Statically typed add --------------------------------------------
+
+            Handle add_typed(const T& object, const Guid& guid)
+            {
+                std::lock_guard lock{ m_mutex };
+                return typed_add_no_lock(guid, T{ object }); // copy to pool
+            }
+
+            Handle add_typed(T&& object, const Guid& guid)
+            {
+                std::lock_guard lock{ m_mutex };
+                return typed_add_no_lock(guid, std::move(object)); // move to pool
+            }
+
+            // --- Meta typed add --------------------------------------------------
+
             MetaHandle add(const Guid& guid, const entt::meta_any& data) override
             {
                 std::lock_guard lock{ m_mutex };
@@ -261,7 +278,7 @@ namespace eeng
             }
 
         private:
-            MetaHandle typed_add_no_lock(const Guid& guid, T&& object)
+            Handle typed_add_no_lock(const Guid& guid, T&& object)
             {
                 auto handle = m_pool.create(std::forward<T>(object));  // one move
                 m_versions.assign_version(handle);
@@ -472,53 +489,53 @@ namespace eeng
             return *this;
         }
 
+        // Does not lock
         template<typename T>
-        void assure_storage()
+        entt::id_type assure_storage()
         {
-            // std::lock_guard lock{ storage_mutex };
-            auto type = entt::resolve<T>();
-            auto id = type.id();
+            auto meta_type = entt::resolve<T>();
+            entt::id_type meta_id = get_id_type<T>();
 
-            if (pools.find(id) == pools.end())
+            if (pools.find(meta_id) == pools.end())
             {
-                pools[id] = std::make_unique<Pool<T>>();
+                pools[meta_id] = std::make_unique<Pool<T>>();
 
                 // Debug log
                 // std::string type_name(type.info().name());
                 // eeng::Log("Created storage for type %s", type_name.c_str());
             }
+            return meta_id;
         }
+
+        // --- Statically typed add --------------------------------------------
 
         /// @brief Add statically typed object as lvalue (thread-safe)
         /// @return A copy of the requested object
         template<typename T>
             requires(!std::is_same_v<T, entt::meta_any>)
-        MetaHandle add_typed(
+        Handle<T> add_typed(
             const T& t,
             const Guid& guid)
         {
             std::lock_guard lock{ storage_mutex };
-            auto& pool = get_or_create_pool(entt::resolve<T>());
-
-            entt::meta_any any = entt::forward_as_meta(t); // ref wrapper
-            return pool.add(guid, any); // lvalue add
+            auto& pool = get_or_create_pool<T>();
+            return pool.add_typed(t, guid);
         }
 
         /// @brief Add statically typed object as rvalue (thread-safe)
         /// @return A copy of the requested object
         template<typename T>
             requires(!std::is_same_v<std::decay_t<T>, entt::meta_any>)
-        MetaHandle add_typed(
+        Handle<T> add_typed(
             T&& t,
             const Guid& guid)
         {
             std::lock_guard lock{ storage_mutex };
-            using U = std::remove_cv_t<std::remove_reference_t<T>>;
-            auto& pool = get_or_create_pool(entt::resolve<U>());
-
-            entt::meta_any any = entt::forward_as_meta(t);  // ref wrapper
-            return pool.add(guid, std::move(any)); // rvalue add
+            auto& pool = get_or_create_pool<std::remove_cv_t<std::remove_reference_t<T>>>();
+            return pool.add_typed(std::forward<T>(t), guid);
         }
+
+        // --- Meta typed add --------------------------------------------------
 
         /// @brief Add runtime typed object as lvalue (not thread-safe)
         MetaHandle add(const entt::meta_any& data, const Guid& guid)
@@ -536,6 +553,8 @@ namespace eeng
             return pool.add(guid, std::move(data));  // rvalue
         }
 
+        // --- Meta typed get --------------------------------------------------
+
         /// @brief Runtime-typed get (not thread-safe)
         /// @return An entt::metaany with a const reference to the requested object
         entt::meta_any get(const MetaHandle& meta_handle) const
@@ -552,6 +571,8 @@ namespace eeng
             return get_pool(meta_handle.type).get(meta_handle);
         }
 
+        // --- Statically typed get --------------------------------------------
+
         /// @brief Statically typed get (thread-safe)
         /// @return A copy of the requested object
         template<typename T>
@@ -562,6 +583,8 @@ namespace eeng
             auto& pool = get_pool(mh.type);
             return pool.get(mh).cast<T>();
         }
+
+        // --- try_get ---------------------------------------------------------
 
         std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) const noexcept
         {
@@ -582,6 +605,8 @@ namespace eeng
             auto& pool = get_pool(meta_handle.type);
             return pool.try_get(meta_handle);
         }
+
+        // ---------------------------------------------------------------------
 
         /// Increase the ref-count for a resource.
         /// @returns the new ref-count.
@@ -616,6 +641,8 @@ namespace eeng
             }
         }
 
+        // ---------------------------------------------------------------------
+
         std::optional<MetaHandle> handle_for_guid(const Guid& guid) const noexcept
         {
             std::lock_guard lock(storage_mutex);
@@ -648,7 +675,7 @@ namespace eeng
             std::lock_guard lock{ storage_mutex };
             std::ostringstream oss;
             oss << "Storage summary:\n";
-            for (auto const& [type_id, pool_ptr] : pools) 
+            for (auto const& [type_id, pool_ptr] : pools)
             {
                 auto name = entt::resolve(type_id).info().name();
                 oss << "— Type “" << name << "” (id = " << type_id << ")\n";
@@ -666,6 +693,31 @@ namespace eeng
             entt::meta_any res = meta_func.invoke({}, entt::forward_as_meta(*this));
             assert(res);
         }
+
+        // --- Statically typed pool getters -----------------------------------
+
+        template<typename T>
+        const Pool<T>& get_pool() const
+        {
+            auto meta_id = get_id_type<T>();
+            return *static_cast<const Pool<T>*>(pools.at(meta_id).get());
+        }
+
+        template<typename T>
+        Pool<T>& get_pool()
+        {
+            auto meta_id = get_id_type<T>();
+            return *static_cast<Pool<T>*>(pools.at(meta_id).get());
+        }
+
+        template<typename T>
+        Pool<T>& get_or_create_pool()
+        {
+            auto meta_id = assure_storage<T>();
+            return *static_cast<Pool<T>*>(pools.at(meta_id).get());
+        }
+
+        // --- Meta typed pool getters -----------------------------------------
 
         const IPool& get_pool(entt::meta_type meta_type) const
         {
@@ -685,18 +737,21 @@ namespace eeng
 
         IPool& get_or_create_pool(entt::meta_type meta_type)
         {
-            auto id = meta_type.id();
-            auto it = pools.find(id);
-            if (it == pools.end())
-            {
-                assure_storage(meta_type);
-
-                it = pools.find(id);
-                if (it == pools.end())
-                    throw std::runtime_error("Pool creation failed");
-            }
-            return *it->second;
+            if (!meta_type) throw std::runtime_error("No meta type found");
+            assure_storage(meta_type);
+            return *pools.at(meta_type.id());
         }
+
+        // --- Private helpers -------------------------------------------------
+
+        template<class T>
+        constexpr entt::id_type get_id_type() noexcept
+        {
+            auto meta_type = entt::resolve<T>();
+            return meta_type ? meta_type.id() : entt::type_hash<T>::value();
+        }
+
+        // --- Private members -------------------------------------------------
 
         mutable std::mutex storage_mutex;
         mutable std::mutex meta_mutex;
