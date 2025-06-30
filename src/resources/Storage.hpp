@@ -247,7 +247,7 @@ namespace eeng
 
         public:
 
-            // --- Statically typed add --------------------------------------------
+            // --- Statically typed add ----------------------------------------
 
             Handle add_typed(const T& object, const Guid& guid)
             {
@@ -261,7 +261,7 @@ namespace eeng
                 return typed_add_no_lock(guid, std::move(object)); // move to pool
             }
 
-            // --- Meta typed add --------------------------------------------------
+            // --- Meta typed add ----------------------------------------------
 
             MetaHandle add(const Guid& guid, const entt::meta_any& data) override
             {
@@ -288,6 +288,8 @@ namespace eeng
                 return handle;
             }
 
+            // --- Meta typed get & try_get ------------------------------------
+
         public:
             entt::meta_any get(const MetaHandle& meta_handle) override
             {
@@ -310,7 +312,38 @@ namespace eeng
             {
                 return try_get_impl(*this, meta_handle);
             }
+            
+        private:
+            template<typename PoolType>
+            static entt::meta_any get_impl(
+                PoolType& self,
+                const MetaHandle& meta_handle)
+            {
+                if (auto opt = self.validate_handle_no_lock(meta_handle); !opt)
+                {
+                    throw ValidationError{ "Invalid or not‐ready MetaHandle" };
+                }
+                else
+                {
+                    auto& obj = self.m_pool.get(*opt);
+                    return entt::forward_as_meta(obj);
+                }
+            }
 
+            template<typename PoolType>
+            static std::optional<entt::meta_any> try_get_impl(
+                PoolType& self,
+                const MetaHandle& meta_handle) noexcept
+            {
+                std::lock_guard lock{ self.m_mutex };
+                if (auto opt = self.validate_handle_no_lock(meta_handle)) {
+                    return entt::forward_as_meta(self.m_pool.get(*opt));
+                }
+                return std::nullopt;
+            }
+
+        public:
+            // -----------------------------------------------------------------
             void remove_now(const MetaHandle& mh) override
             {
                 std::lock_guard lock{ m_mutex };
@@ -437,34 +470,6 @@ namespace eeng
             {
                 std::lock_guard lock{ m_mutex };
                 return validate_handle_no_lock(meta_handle);
-            }
-
-            template<typename PoolType>
-            static entt::meta_any get_impl(
-                PoolType& self,
-                const MetaHandle& meta_handle)
-            {
-                if (auto opt = self.validate_handle_no_lock(meta_handle); !opt)
-                {
-                    throw ValidationError{ "Invalid or not‐ready MetaHandle" };
-                }
-                else
-                {
-                    auto& obj = self.m_pool.get(*opt);
-                    return entt::forward_as_meta(obj);
-                }
-            }
-
-            template<typename PoolType>
-            static std::optional<entt::meta_any> try_get_impl(
-                PoolType& self,
-                const MetaHandle& meta_handle) noexcept
-            {
-                std::lock_guard lock{ self.m_mutex };
-                if (auto opt = self.validate_handle_no_lock(meta_handle)) {
-                    return entt::forward_as_meta(self.m_pool.get(*opt));
-                }
-                return std::nullopt;
             }
         };
 
