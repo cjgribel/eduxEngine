@@ -10,7 +10,7 @@
 #include "MetaSerialize.hpp"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
-#include "EngineContext.h"
+#include "EngineContext.hpp"
 
 using namespace eeng;
 

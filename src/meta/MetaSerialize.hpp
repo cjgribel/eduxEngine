@@ -6,7 +6,7 @@
 
 #include <entt/entt.hpp>
 #include <nlohmann/json.hpp>
-#include "EngineContext.h"
+#include "EngineContext.hpp"
 
 // Note: We're including the full nlohmann header and not just 
 // <nlohmann/json_fwd.hpp>. The expected usage of this header is on engine cpp:s

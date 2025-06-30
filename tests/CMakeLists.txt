@@ -26,8 +26,8 @@ add_executable(tests
     PoolAllocatorFH_tests.cpp
     PoolAllocatorTFH_tests.cpp
     Meta_tests.cpp
-    MetaSerialize_tests.cpp ../src/meta/MetaSerialize.cpp
-    Storage_tests.cpp
+    MetaSerialize_tests.cpp ../src/meta/MetaSerialize.cpp ../src/engineapi/EngineContext.cpp ../src/util/ThreadPool.cpp
+    Storage_tests.cpp # ../src/resources/Storage.cpp
     )
 
 target_link_libraries(tests PRIVATE gtest_main nlohmann_json::nlohmann_json)

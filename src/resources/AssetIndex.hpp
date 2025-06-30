@@ -22,13 +22,86 @@
 // #include <optional>
 // #include <unordered_map>
 
-// #include "Handle.h"
-// #include "Guid.h"
+#include "Handle.h"
+#include "Guid.h"
 // #include "PoolAllocatorFH.h"
 // #include "Texture.hpp"
 
 namespace eeng
 {
+
+
+    class AssetIndex
+    {
+        // asset_index.serialize<T>(t, guid, ctx?);
+        void serialize()
+        {
+            /*
+            {
+                "guid": "acdb01b9-f34e-4c68-818a-98eabc22f54e",
+                    "resource" : {
+                    "name": "TestModel",
+                        "meshes" : [
+                    { "guid": "mesh1" },
+                    { "guid": "mesh2" }
+                        ]
+                }
+            }
+*/
+        }
+
+        void deserialize()
+        {
+#if 0
+            // Deserialize file
+            Guid guid = json["guid"];
+            Model model = deserialize<Model>(json["resource"]);
+
+            // Wrap in AssetRef
+            AssetRef<Model> model_ref{ guid, {} };
+
+            // Register resource to storage
+            model_ref.handle = storage.insert(model, guid);
+#endif
+        }
+    };
+
+#if 0
+    class AssetIndex
+    {
+    public:
+        void add_asset(Guid guid, const AssetMetadata& meta)
+        {
+            std::lock_guard lock(mutex_);
+            assets_[guid] = meta;
+        }
+
+        // template<typename T>
+        // handle<T> load(Guid guid)
+        // {
+        //     if (auto existing = storage.get_handle<T>(guid))
+        //         return existing;
+
+        //     auto serialized_data = deserialize_from_disk<T>(guid); // returns object with only GUIDs
+        //     handle<T> h = storage.insert<T>(guid, std::move(serialized_data));
+
+        //     resolve_handles(h); // 🔥 critical step
+        //     return h;
+        // }
+        std::optional<AssetMetadata> get_asset(Guid guid) const
+        {
+            std::shared_lock lock(mutex_);
+            if (auto it = assets_.find(guid); it != assets_.end())
+                return it->second;
+            return {};
+        }
+
+    private:
+        mutable std::shared_mutex mutex_;
+        std::unordered_map<Guid, AssetMetadata> assets_;
+    };
+#endif
+
 #if 0
     class AssetIndex
     {

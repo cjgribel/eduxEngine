@@ -136,10 +136,17 @@ namespace eeng {
 
     void register_meta_types()
     {
-        // === HANDLES ===
+        // === HANDLES (per resource type) ===
 
         register_handle<MockResource1>("Handle<MockResource1>");
         register_handle<MockResource2>("Handle<MockResource2>");
+
+        //  === ASSETREF (per resource type) === ???
+
+        // entt::meta<AssetRef<MeshResource>>()
+        //     .type("AssetRef<Mesh>"_hs)
+        //     .data<&AssetRef<MeshResource>::guid>("guid"_hs)
+        //     .func<&resolve_asset_ref<MeshResource>>("resolve"_hs); // optional
 
         // === RESOURCES ===
 

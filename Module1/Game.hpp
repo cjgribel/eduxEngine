@@ -10,7 +10,7 @@
 // --> ENGINE API
 #include "ShapeRenderer.hpp"
 #include "Storage.hpp"
-#include "EngineContext.h"
+#include "EngineContext.hpp"
 
 #if 0
 // #define SPONZA_PATH "assets/crytek-sponza_hansen/sponza.obj"

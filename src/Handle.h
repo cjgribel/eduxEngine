@@ -19,6 +19,8 @@ namespace eeng
     template<class T>
     struct Handle
     {
+        static_assert(!std::is_reference_v<T>, "AssetRef<T> cannot use reference types");
+        
         using value_type = T;
         using ptr_type = T*;
 

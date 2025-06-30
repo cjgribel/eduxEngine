@@ -5,7 +5,7 @@
 #include "config.h"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
-#include "EngineContext.h"
+#include "EngineContext.hpp"
 #include <iostream>
 #include <sstream>
 #include <cassert>

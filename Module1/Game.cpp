@@ -9,6 +9,7 @@
 
 // --> ENGINE API
 #include "AssimpImporter.hpp"
+#include "MockImporter.hpp"
 
 // FOR TESTS
 #include "ResourceTypes.h"
@@ -35,6 +36,133 @@ bool Game::init()
 
     shapeRenderer = std::make_shared<ShapeRendering::ShapeRenderer>();
     shapeRenderer->init();
+
+    // RESOURCE MANAGER API TESTS
+    {
+        // 1.   Import resources concurrently
+        //      MockImporter => ResourceManager
+
+        const int numTasks = 5;
+        std::vector<std::future<void>> futures;
+        for (int i = 0; i < numTasks; ++i)
+        {
+            futures.emplace_back(
+                ctx->thread_pool->queue_task([this]()
+                    {
+                        eeng::mock::Importer::import(ctx);
+                    })
+            );
+        }
+        // Wait for futures while printing a progress etc ...
+
+        // 2. ResourceManager::AssetIndex serializes added resources
+
+        // 3. Obtain asset list (all / of a given type) (non-concurrently) (-> GUI)
+
+        // 4. Load assets to Storage concurrently
+    }
+
+    // Thread pool test
+    {
+        ThreadPool pool{ 4 };
+
+        // Define your per-frame update/render as a lambda (runs on main thread)
+        auto game_update_and_render = [] {
+            // … physics, input, drawing, etc. …
+            std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS
+            };
+
+        // 1) Prepare N tasks and queue them
+        const int numTasks = 5;
+        std::vector<std::future<int>> futures;
+        futures.reserve(numTasks);
+        for (int i = 0; i < numTasks; ++i) {
+            futures.emplace_back(
+                pool.queue_task([i] {
+                    // simulate variable work time
+                    std::this_thread::sleep_for(std::chrono::seconds(i + 1));
+                    return i * i;
+                    })
+            );
+        }
+
+        // Track which results we've already processed
+        std::vector<bool> done(numTasks, false);
+        int remaining = numTasks;
+
+        // 2) Main loop: run frames and poll futures with zero timeout
+        while (remaining > 0) {
+            // a) Do one frame’s worth of work
+            game_update_and_render();
+
+            // b) Check each future without blocking
+            for (int i = 0; i < numTasks; ++i) {
+                if (!done[i] &&
+                    futures[i].wait_for(std::chrono::milliseconds(0))
+                    == std::future_status::ready)
+                {
+                    // Task i finished—get its result and mark done
+                    int value = futures[i].get();
+                    std::cout << "Task " << i << " result: " << value << "\n";
+                    done[i] = true;
+                    --remaining;
+                }
+            }
+            // (Optionally, you could skip polling every few frames to reduce overhead)
+        }
+
+        // 3) All tasks are done; ThreadPool destructor will shut down workers
+
+    }
+    // Thread test 2
+    {
+        // 1) Create a packaged_task that simulates work by sleeping
+        std::packaged_task<int()> task([] {
+            std::this_thread::sleep_for(std::chrono::seconds(3));  // simulate 3s of work
+            return 42;
+            });
+
+        // 2) Get its future
+        std::future<int> result = task.get_future();
+
+        // 3) Run the task on a worker thread
+        std::thread worker(std::move(task));
+
+        // 4) Meanwhile, do other work in main thread
+        while (result.wait_for(std::chrono::milliseconds(500))
+            != std::future_status::ready)
+        {
+            std::cout << "Main thread is doing other work...\n";
+        }
+
+        // 5) Task is done—retrieve and print its result
+        std::cout << "Task completed, result = " << result.get() << "\n";
+
+        // 6) Clean up
+        worker.join();
+        // return 0;
+    }
+    // Thread test 1
+    {
+        std::packaged_task<int()> task([] {
+            // This is the “work” the task will do
+            return 6 * 7;
+            });
+
+        // 2) Extract the future associated with the task’s result
+        std::future<int> result = task.get_future();
+
+        // 3) Launch the task on a separate thread
+        std::thread worker(std::move(task));
+
+        // (Optional) do other work here...
+
+        // 4) Block until the task is done and get its return value
+        std::cout << "The answer is: " << result.get() << "\n";
+
+        // 5) Clean up
+        worker.join();
+    }
 
     // RESOURCE REGISTRY TEST
 #if 1
@@ -273,7 +401,7 @@ bool Game::init()
         { 0.01f, 0.01f, 0.01f });
 
     return true;
-    }
+}
 
 void Game::update(
     float time,
@@ -444,7 +572,7 @@ void Game::render(
     // Draw shape batches
     shapeRenderer->render(matrices.P * matrices.V);
     shapeRenderer->post_render();
-    }
+}
 
 void Game::renderUI()
 {

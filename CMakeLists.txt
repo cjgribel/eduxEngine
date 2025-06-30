@@ -34,6 +34,7 @@ add_compile_definitions(ENTT_USE_ATOMIC)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/meta)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/resources)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/resources/importers)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/util)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi)
 
@@ -215,12 +216,15 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ForwardRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ShapeRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Log.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi/EngineContext.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/Storage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/AssetIndex.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/ResourceManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/EntityManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AssimpImporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/importers/AssimpImporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/importers/MockImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/Profiler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/util/ThreadPool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
     )

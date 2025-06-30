@@ -2,8 +2,16 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "ResourceManager.hpp"
+#include "AssetIndex.hpp"
+// #include "Storage.hpp"
 
 namespace eeng
 {
+    ResourceManager::ResourceManager()
+        : storage(std::make_unique<Storage>())
+        , asset_index(std::make_unique<AssetIndex>())
+    {
+    }
 
-} // namespace eeng
+    ResourceManager::~ResourceManager() = default;
+}

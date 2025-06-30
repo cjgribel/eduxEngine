@@ -6,7 +6,7 @@
 
 #include "config.h"
 #include "GameBase.h"
-#include "EngineContext.h"
+#include "EngineContext.hpp"
 #include <iostream>
 #include <memory>
 
