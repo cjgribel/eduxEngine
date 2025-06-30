@@ -175,8 +175,17 @@ namespace eeng {
             // Required for all resource types
             .template func<&assure_storage<MockResource1>>(eeng::literals::assure_storage_hs)
 
-            //.func < [](eeng::Storage& storage) { } > (inspect_hs)
-            //.data<&BehaviorScript::on_collision/*, entt::as_ref_t*/>("on_collision"_hs).prop(display_name_hs, "on_collision")
+            // Required only if resource has recursive references
+            //.func<&visit_asset_refs<MockResource1>>("visit_refs"_hs);
+                // Usage:
+                //entt::meta_type type = entt::resolve<MockResource1>();
+                // auto visit_fn = type.func("visit_refs"_hs);
+                // if (visit_fn) {
+                //     visit_fn.invoke({}, entt::forward_as_meta(model), visitor_fn);
+                // }
+
+        //.func < [](eeng::Storage& storage) { } > (inspect_hs)
+        //.data<&BehaviorScript::on_collision/*, entt::as_ref_t*/>("on_collision"_hs).prop(display_name_hs, "on_collision")
 
             ;
     }

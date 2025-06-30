@@ -13,6 +13,7 @@
 
 // FOR TESTS
 #include "ResourceTypes.h"
+#include "ResourceManager.hpp" // eeng::ResourceManager
 
 namespace {
 
@@ -39,21 +40,44 @@ bool Game::init()
 
     // RESOURCE MANAGER API TESTS
     {
-        // 1.   Import resources concurrently
-        //      MockImporter => ResourceManager
+        // Ugly cast to concrete type from interface
+        // https://chatgpt.com/s/t_68630dc8597881918ffd0e6db8a8c57e
+        auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
 
+        // 1.   Import resources concurrently
+        //
+        using ModelRef = eeng::AssetRef<eeng::mock::Model>;
+        entt::meta_factory<eeng::mock::Model>();
+        entt::meta_factory<eeng::mock::Mesh>();
+        
         const int numTasks = 5;
-        std::vector<std::future<void>> futures;
+        std::vector<std::future<ModelRef>> futures;
         for (int i = 0; i < numTasks; ++i)
         {
             futures.emplace_back(
                 ctx->thread_pool->queue_task([this]()
                     {
-                        eeng::mock::Importer::import(ctx);
+                        return eeng::mock::ModelImporter::import(ctx);
                     })
             );
         }
-        // Wait for futures while printing a progress etc ...
+
+        // Wait for futures
+        std::vector<ModelRef> refs;
+        for (auto& f : futures) refs.push_back(f.get());
+
+        // Load assets
+        for (auto& ref : refs) resource_manager.load(ref, *ctx);
+
+        // VISUALIZE storage + asset_index (available assets as a file structure)
+        // gui->draw_storage_view(ctx);
+        // gui->draw_asset_index(ctx);
+
+        // Unload asset
+        for (auto& ref : refs) resource_manager.unload(ref);
+
+        // Unfile the asset
+        // ...
 
         // 2. ResourceManager::AssetIndex serializes added resources
 
@@ -401,7 +425,7 @@ bool Game::init()
         { 0.01f, 0.01f, 0.01f });
 
     return true;
-}
+    }
 
 void Game::update(
     float time,

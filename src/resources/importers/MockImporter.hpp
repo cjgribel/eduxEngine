@@ -12,6 +12,8 @@
 #include "Handle.h"
 #include "EngineContext.hpp"
 
+#include "ResourceTypes.h" // Only for visit_asset_refs: maybe move to e.g. AssetRefVisit.hpp
+
 // Placeholder resources
 namespace eeng
 {
@@ -48,18 +50,37 @@ namespace eeng::mock
     {
         std::vector<float> vertices;
     };
-    
+
     struct Model
     {
         std::vector<AssetRef<Mesh>> meshes;
     };
 
-    class Importer
+    template<typename Visitor>
+    void visit_asset_refs(Model& model, Visitor&& visitor)
+    {
+        for (auto& mesh_ref : model.meshes)
+        {
+            visitor(mesh_ref);
+        }
+    }
+
+    // template<typename Visitor>
+    // void meta_visit_asset_refs(const entt::meta_any& model, Visitor&& visitor)
+    // {
+    //     auto& model = any.cast<Model&>();
+    //     for (auto& mesh_ref : model.meshes)
+    //     {
+    //         visitor(mesh_ref);
+    //     }
+    // }
+
+    class ModelImporter
     {
     public:
-        static void import(EngineContextPtr ctx);
+        static AssetRef<Model> import(EngineContextPtr ctx);
 
-        
+
     };
 
 #if 0
@@ -118,7 +139,7 @@ namespace eeng::mock
             MockMaterial material{ material_guid };
             resource_manager_->add_resource(material_guid, material);
             return material_guid;
-        }
+}
 
         IResourceManager* resource_manager_;
         std::mutex model_mutex_; // protects model.mesh_guids vector

@@ -42,55 +42,75 @@ namespace eeng
         template<class T>
         AssetRef<T> file(T& t)
         {
+            std::cout << "[ResourceManager] Filing type: " << typeid(T).name() << "\n";
+
             auto guid = Guid::generate();
 
             // AssetIndex maps asset type to a file location
             // Use either a) templated or b) entt::meta_type
-            // + ~ asset_index.serialize<T>(t, guid, ctx?);
-/*
-            {
-                "guid": "acdb01b9-f34e-4c68-818a-98eabc22f54e",
-                    "resource" : {
-                    "name": "TestModel",
-                        "meshes" : [
-                    { "guid": "mesh1" },
-                    { "guid": "mesh2" }
-                        ]
-                }
-            }
-*/
+            // asset_index.serialize<T>(t, guid, ctx?);
 
             return AssetRef<T>{ guid, Handle<T> {} }; // Handle is empty until asset is loaded
         }
 
-        // + unfile
+        template<typename T>
+        void unfile(AssetRef<T>& ref)
+        {
+            // For now: require that asset being removed is not loaded
+            assert(!ref.is_loaded());
+
+            // asset_index.remove(ref.guid);
+            //unload(ref); // optional: remove from memory too
+        }
 
         /// @brief Load an asset from disk to storage
         template<class T>
-        void load(AssetRef<T>& asset, EngineContext& ctx)
+        void load(AssetRef<T>& ref, EngineContext& ctx)
         {
-            // CHECK: asset.handle == null
-            // CHECK: asset-handle is not already loaded to storage
+            assert(!ref.is_loaded());
+
+            std::cout << "[ResourceManager] Loading of type: " << typeid(T).name() << "\n";
+            //std::cout << "  ↳ guid = " << ref.guid.raw().to_string() << "\n";
 
             // Deserialize
-            // AssetRef will deserialize recursively
-            T t{}; // <- deserialized
+            T t{}; // = deserialize<T>(ref.guid, *ctx);
+
+            visit_asset_refs(t, [&](auto& subref) { load(subref, ctx); });
 
             // Add to storage and set handle
-            asset.handle = storage->add_typed<T>(t, asset.guid); // could take AssetRef
+            ref.handle = storage->add_typed<T>(t, ref.guid);
+            // ref.load(storage->add_typed<T>(t, ref.guid));
 
             std::cout << storage->to_string() << std::endl;
         }
 
-        // template<typename T>
-        // void ResourceManager::unload(AssetRef<T>& ref)
-        // {
-        //     if (ref.is_loaded())
-        //     {
-        //         storage.remove<T>(ref.handle);
-        //         ref.unload();
-        //     }
-        // }
+        template<typename T>
+        void unload(AssetRef<T>& ref)
+        {
+            if (!ref.is_loaded())
+                throw std::runtime_error("Asset not loaded");
+
+#if 0
+            // 1. Get the loaded resource from storage
+            T& resource = storage->get<T>(ref.handle);
+
+            // 2. Recursively unload any referenced AssetRefs
+            visit_asset_refs(resource, [&](auto& subref)
+                {
+                    using SubT = typename std::remove_reference_t<decltype(subref)>::value_type;
+                    if (subref.is_loaded())
+                    {
+                        unload(subref); // recursive unload
+                    }
+                });
+#endif
+
+            // 3. Release the resource and clear the handle
+            storage->release(ref.handle);
+            ref.unload();
+
+            std::cout << storage->to_string() << std::endl;
+        }
     };
 
 #if 0

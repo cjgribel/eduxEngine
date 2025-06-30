@@ -12,7 +12,7 @@
 
 namespace eeng::mock {
 
-    void Importer::import(EngineContextPtr ctx)
+    AssetRef<Model> ModelImporter::import(EngineContextPtr ctx)
     {
         std::cout << "MockImporter::import" << std::endl;
         auto& resource_manager = static_cast<ResourceManager&>(*ctx->resource_manager);
@@ -29,16 +29,23 @@ namespace eeng::mock {
         // File model
         auto model_ref = resource_manager.file(model);
 
+        // TAKE OUT FROM IMPORTER ->
+
         // Later: load asset to memory
-        resource_manager.load(model_ref, *ctx);
+        // resource_manager.load(model_ref, *ctx);
 
         // VISUALIZE storage + asset_index (available assets as a file structure)
+        // gui->draw_storage_view(ctx);
+        // gui->draw_asset_index(ctx);
 
         // Later: unload asset
-        // ...
+        // HOW ARE REFS UNLOADED RECIRSIVELY?
+        //resource_manager.unload(model_ref);
 
         // Later: unfile the asset
         // ...
+
+        return model_ref;
     }
 
 } // namespace eeng

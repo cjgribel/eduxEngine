@@ -33,6 +33,7 @@ namespace eeng
 
     class AssetIndex
     {
+        // Maps asset type to a file location: a) templated or b) entt::meta_type
         // asset_index.serialize<T>(t, guid, ctx?);
         void serialize()
         {
@@ -50,6 +51,7 @@ namespace eeng
 */
         }
 
+        // Maps asset type to a file location: a) templated or b) entt::meta_type
         void deserialize()
         {
 #if 0

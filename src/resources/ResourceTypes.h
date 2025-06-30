@@ -11,6 +11,12 @@
 
 namespace eeng
 {
+    template<typename T, typename Visitor>
+    void visit_asset_refs(T&, Visitor&&)
+    {
+        // No-op for asset types with no AssetRef dependencies
+    }
+
     struct MockResource1
     {
         int x{};
