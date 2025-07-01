@@ -243,19 +243,20 @@ namespace eeng
             std::unordered_map<Guid, Handle<T>> m_guid_to_handle;
             std::unordered_map<Handle<T>, Guid> m_handle_to_guid;
 
-            mutable std::mutex m_mutex;
+            // mutable std::mutex m_mutex;
+            mutable std::recursive_mutex m_mutex;
 
         public:
 
             // --- Statically typed add ----------------------------------------
 
-            Handle<T> add_typed(const T& object, const Guid& guid)
+            Handle<T> add(const T& object, const Guid& guid)
             {
                 std::lock_guard lock{ m_mutex };
                 return typed_add_no_lock(guid, T{ object }); // copy to pool
             }
 
-            Handle<T> add_typed(T&& object, const Guid& guid)
+            Handle<T> add(T&& object, const Guid& guid)
             {
                 std::lock_guard lock{ m_mutex };
                 return typed_add_no_lock(guid, std::move(object)); // move to pool
@@ -292,6 +293,20 @@ namespace eeng
 
             // --- Meta typed get & try_get ------------------------------------
 
+            T& get_ref(const Handle<T>& handle)
+            {
+                std::lock_guard lock{ m_mutex };
+                if (!validate_handle_no_lock(handle)) throw ValidationError{ "Invalid or not-ready Handle in get_ref_nolock" };
+                return m_pool.get(handle);
+            }
+
+            const T& get_ref(const Handle<T>& handle) const
+            {
+                std::lock_guard lock{ m_mutex };
+                if (!validate_handle_no_lock(handle)) throw ValidationError{ "Invalid or not-ready Handle in get_ref_nolock" };
+                return m_pool.get(handle);
+            }
+
             /// @brief Unsafe, no‑lock reference access. Caller must ensure no concurrent
             ///        add/release on the same slot.
             T& get_ref_nolock(const Handle<T>& handle)
@@ -319,6 +334,8 @@ namespace eeng
                 return m_pool.get(handle);
             }
 
+            // --- Meta typed get & try_get ------------------------------------
+
             entt::meta_any get(const MetaHandle& meta_handle) override
             {
                 std::lock_guard lock{ m_mutex };
@@ -342,7 +359,7 @@ namespace eeng
             }
 
         private:
-        
+
             template<typename PoolType>
             static entt::meta_any get_impl(
                 PoolType& self,
@@ -634,26 +651,26 @@ namespace eeng
         /// @return A copy of the requested object
         template<typename T>
             requires(!std::is_same_v<T, entt::meta_any>)
-        Handle<T> add_typed(
+        Handle<T> add(
             const T& t,
             const Guid& guid)
         {
             std::lock_guard lock{ storage_mutex };
             auto& pool = get_or_create_pool<T>();
-            return pool.add_typed(t, guid);
+            return pool.add(t, guid);
         }
 
         /// @brief Add statically typed object as rvalue (thread-safe)
         /// @return A copy of the requested object
         template<typename T>
             requires(!std::is_same_v<std::decay_t<T>, entt::meta_any>)
-        Handle<T> add_typed(
+        Handle<T> add(
             T&& t,
             const Guid& guid)
         {
             std::lock_guard lock{ storage_mutex };
             auto& pool = get_or_create_pool<std::remove_cv_t<std::remove_reference_t<T>>>();
-            return pool.add_typed(std::forward<T>(t), guid);
+            return pool.add(std::forward<T>(t), guid);
         }
 
         // --- Meta typed add --------------------------------------------------
@@ -697,26 +714,23 @@ namespace eeng
         /// @brief Statically typed get (thread-safe)
         /// @return A copy of the requested object
         template<typename T>
-        T get_typed(const MetaHandle& mh) const
+        T get_val(const Handle<T>& h) const
         {
-            std::lock_guard<std::mutex> lk{ storage_mutex };
-
-            auto& pool = get_pool(mh.type);
-            return pool.get(mh).cast<T>();
+            std::lock_guard lk{ storage_mutex };
+            return get_pool<T>().get_ref(h);
         }
 
         /// @brief Reference‑returning, statically‑typed get (unsafe if you allow
 ///        concurrent add/release on the same type).
         template<typename T>
-        T& get_typed_ref(const Handle<T>& h)
+        T& get_ref(const Handle<T>& h)
         {
             // no internal lock: user must externally guard against races on this slot
             return get_pool<T>().get_ref_nolock(h);
         }
 
-        /// @brief Const overload of get_typed_ref.
         template<typename T>
-        const T& get_typed_ref(const Handle<T>& h) const
+        const T& get_ref(const Handle<T>& h) const
         {
             return get_pool<T>().get_ref_nolock(h);
         }
@@ -743,6 +757,40 @@ namespace eeng
             return pool.try_get(meta_handle);
         }
 
+        // --- modify ----------------------------------------------------------
+
+        template<typename T, typename Fn>
+        auto modify(const Handle<T>& h, Fn&& f)
+            -> std::invoke_result_t<Fn, T&>
+        {
+            std::lock_guard lock{ storage_mutex };
+            auto& pool = get_pool<T>();
+            T& obj = pool.get_ref(h);
+
+            if constexpr (std::is_void_v<std::invoke_result_t<Fn, T&>>) {
+                std::forward<Fn>(f)(obj);
+            }
+            else {
+                return std::forward<Fn>(f)(obj);
+            }
+        }
+
+        // Not needed - just use get_ref<>
+        // template<typename T, typename Fn>
+        // auto modify_no_lock(const Handle<T>& h, Fn&& f)
+        //     -> std::invoke_result_t<Fn, T&>
+        // {
+        //     auto& pool = get_pool<T>();
+        //     T& obj = pool.get_ref_nolock(h);
+
+        //     if constexpr (std::is_void_v<std::invoke_result_t<Fn, T&>>) {
+        //         std::forward<Fn>(f)(obj);
+        //     }
+        //     else {
+        //         return std::forward<Fn>(f)(obj);
+        //     }
+        // }
+
         // ---------------------------------------------------------------------
 
         /// @brief Remove immediately by statically‑typed handle (thread‑safe).
@@ -754,7 +802,7 @@ namespace eeng
         }
 
         /// @brief Immediately destroy the resource referred to by a runtime‑typed handle (thread‑safe).
-        void remove_now(const MetaHandle& mh) 
+        void remove_now(const MetaHandle& mh)
         {
             std::lock_guard lock{ storage_mutex };
             get_pool(mh.type).remove_now(mh);
@@ -932,8 +980,8 @@ namespace eeng
 
         // --- Private members -------------------------------------------------
 
-        mutable std::mutex storage_mutex;
-        mutable std::mutex meta_mutex;
+        // mutable std::mutex storage_mutex;
+        mutable std::recursive_mutex storage_mutex;
         std::unordered_map<entt::id_type, std::unique_ptr<IPool>> pools;
     };
 

@@ -34,7 +34,7 @@ namespace eeng
         // Out-of-line dtor: ensures Storage & AssetIndex are complete when deleted
         ~ResourceManager();
 
-        // NOTE: The main reason to use static types here is to support CONCURRENCY
+        // Must be thread-safe. Use static types.
         /// @brief Import new resource to resource index
         /// @tparam T 
         /// @param t 
@@ -46,13 +46,15 @@ namespace eeng
 
             auto guid = Guid::generate();
 
-            // AssetIndex maps asset type to a file location
+            // AssetIndex maps asset type to a file location - must be TS
             // Use either a) templated or b) entt::meta_type
             // asset_index.serialize<T>(t, guid, ctx?);
 
-            return AssetRef<T>{ guid, Handle<T> {} }; // Handle is empty until asset is loaded
+            return AssetRef<T>{ guid, Handle<T> {} };
+            // ^ handle is empty until asset is loaded
         }
 
+        // TS?
         template<typename T>
         void unfile(AssetRef<T>& ref)
         {
@@ -63,6 +65,7 @@ namespace eeng
             //unload(ref); // optional: remove from memory too
         }
 
+        // TS (storage->add)
         /// @brief Load an asset from disk to storage
         template<class T>
         void load(AssetRef<T>& ref, EngineContext& ctx)
@@ -74,36 +77,43 @@ namespace eeng
 
             // Deserialize
             T t{}; // = deserialize<T>(ref.guid, *ctx);
-
             visit_asset_refs(t, [&](auto& subref) { load(subref, ctx); });
+            // ^ not part of storage yet so can ignore threading issues
 
             // Add to storage and set handle
-            ref.handle = storage->add_typed<T>(t, ref.guid);
-            // ref.load(storage->add_typed<T>(t, ref.guid));
+            ref.handle = storage->add<T>(t, ref.guid);
+            // ref.load(storage->add<T>(t, ref.guid));
 
             std::cout << storage->to_string() << std::endl;
         }
 
+        // Not thread-safe (storage->get_ref)
         template<typename T>
         void unload(AssetRef<T>& ref)
         {
-            if (!ref.is_loaded())
-                throw std::runtime_error("Asset not loaded");
+            if (!ref.is_loaded()) throw std::runtime_error("Asset not loaded");
 
-            // 1. Get the loaded resource from storage
-            T& resource = storage->get_typed_ref<T>(ref.handle);
-
-            // 2. Recursively unload any referenced AssetRefs
-            visit_asset_refs(resource, [&](auto& subref)
+#if 1
+            // TS - will NOT deadlock due to recursive mutex
+            storage->modify(ref.handle, [this](T& t)
                 {
-                    if (subref.is_loaded())
-                    {
-                        unload(subref); // recursive unload
-                    }
+                    visit_asset_refs(t, [this](auto& subref)
+                        {
+                            if (subref.is_loaded()) unload(subref);
+                        });
                 });
+#endif
+#if 0
+            // NON-TS (storage->get_ref)
+            T& t = storage->get_ref(ref.handle);
+            visit_asset_refs(t, [&](auto& subref)
+                {
+                    if (subref.is_loaded()) unload(subref);
+                });
+#endif
 
             // 3. Release the resource and clear the handle
-            storage->release(ref.handle);
+            storage->release(ref.handle); // TS
             ref.unload();
 
             std::cout << storage->to_string() << std::endl;

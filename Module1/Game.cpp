@@ -40,7 +40,7 @@ bool Game::init()
 
     // RESOURCE MANAGER API TESTS
     {
-        // Ugly cast to concrete type from interface
+        // TODO: Ugly cast to concrete type from interface
         // https://chatgpt.com/s/t_68630dc8597881918ffd0e6db8a8c57e
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
 
@@ -50,6 +50,7 @@ bool Game::init()
         entt::meta_factory<eeng::mock::Model>();
         entt::meta_factory<eeng::mock::Mesh>();
         
+        // Make sure resource_manager.file is TS
         std::cout << "Importing assets recursively..." << std::endl;
         const int numTasks = 5;
         std::vector<std::future<ModelRef>> futures;
@@ -68,7 +69,7 @@ bool Game::init()
         std::vector<ModelRef> refs;
         for (auto& f : futures) refs.push_back(f.get());
 
-        // Load assets
+        // Load assets (storage->add - should be TS)
         std::cout << "Loading assets..." << std::endl;
         for (auto& ref : refs) resource_manager.load(ref, *ctx);
 
@@ -76,7 +77,9 @@ bool Game::init()
         // gui->draw_storage_view(ctx);
         // gui->draw_asset_index(ctx);
 
-        // Unload asset
+        // Unload asset 
+        //      CAN BE MADE TS // storage->get_ref - NOT TS
+        //      
         std::cout << "Unloading assets..." << std::endl;
         for (auto& ref : refs) resource_manager.unload(ref);
 

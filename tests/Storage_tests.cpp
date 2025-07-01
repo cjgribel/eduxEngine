@@ -250,7 +250,7 @@ TEST_F(StorageTest, ReleaseInvalidThrows) {
 TEST_F(StorageTest, ConcurrencySafety) {
 
     std::mutex m;
-    for (int i = 0; i < 1000; i++)
+    for (int i = 0; i < 10000; i++)
     {
         storage.clear();
         // storage = eeng::Storage{};
@@ -263,22 +263,41 @@ TEST_F(StorageTest, ConcurrencySafety) {
         for (auto& r : results) r.store(false, std::memory_order_relaxed);
         std::vector<eeng::Handle<MockResource1>> handles(N);
 
-        for (int i = 0; i < N; ++i) {
+        for (int i = 0; i < N; ++i) 
+        {
             threads.emplace_back([this, i, &guids, &results, &m, &handles] {
                 try {
                     MockResource1 mr; mr.x = size_t(i);
 
-                    auto h = storage.add_typed<MockResource1>(mr, guids[i]);
-
+                    // Thread-safe add
+                    auto h = storage.add<MockResource1>(mr, guids[i]);
                     handles[i] = h;
+
+                    // Thread-safe validation
                     if (!storage.validate(h)) return;
 
-                    auto val = storage.get_typed<MockResource1>(h);
+                    // Thread-safe mutatation 
+                    storage.modify(h, [](MockResource1& t) { t.x = 0; });
+                    storage.modify(h, [i](MockResource1& t) { t.x = size_t(i); });
 
+                    // Thread-safe get by value
+                    auto val = storage.get_val<MockResource1>(h);
                     if (val.x != size_t(i)) {
-                        std::cout << "Expected " << size_t(i) << " at ofs " << h.idx << ", got " << val.x << std::endl;
+                        std::cout << "Expected (val) " << size_t(i) << " at ofs " << h.idx << ", got " << val.x << std::endl;
                         return;
                     }
+
+                    // Thread-safe retain & release
+                    storage.retain(h);
+                    storage.release(h);
+                    if (!storage.validate(h)) return;
+
+                    // Can't do this: race can occur as from_ref is assigned
+                    // MockResource1 from_ref = storage.get_typed_ref<MockResource1>(h);
+                    // if (from_ref.x != size_t(i)) {
+                    //     std::cout << "Expected (from_ref) " << size_t(i) << " at ofs " << h.idx << ", got " << from_ref.x << std::endl;
+                    //     return;
+                    // }
 
                     // (We release and validate post-test)
                     // storage.release(h);
