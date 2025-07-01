@@ -289,7 +289,7 @@ namespace eeng
             }
 
         public:
-        
+
             // --- Meta typed get & try_get ------------------------------------
 
             /// @brief Unsafe, no‑lock reference access. Caller must ensure no concurrent
@@ -342,6 +342,7 @@ namespace eeng
             }
 
         private:
+        
             template<typename PoolType>
             static entt::meta_any get_impl(
                 PoolType& self,
@@ -372,6 +373,24 @@ namespace eeng
 
         public:
             // -----------------------------------------------------------------
+
+            /// @brief Remove this object immediately (statically typed).
+            void remove_now(const Handle<T>& h)
+            {
+                std::lock_guard lock{ m_mutex };
+                if (!validate_handle_no_lock(h)) {
+                    throw ValidationError{ "Invalid or not‐ready Handle in remove_now_typed" };
+                }
+                // erase maps & version/refcount, destroy storage
+                auto gid = m_handle_to_guid.at(h);
+                m_handle_to_guid.erase(h);
+                m_guid_to_handle.erase(gid);
+
+                m_versions.remove(h);
+                m_ref_counts.reset(h);
+                m_pool.destroy(h);
+            }
+
             void remove_now(const MetaHandle& mh) override
             {
                 std::lock_guard lock{ m_mutex };
@@ -389,12 +408,35 @@ namespace eeng
                 m_pool.destroy(handle);
             }
 
+            size_t retain(const Handle<T>& h)
+            {
+                std::lock_guard lock{ m_mutex };
+                if (!validate_handle_no_lock(h)) throw ValidationError{ "Bad handle" };
+                return m_ref_counts.add_ref(h);
+            }
+
             size_t retain(const MetaHandle& mh) override
             {
                 std::lock_guard lock{ m_mutex };
                 auto opt = validate_handle_no_lock(mh);
                 if (!opt) throw ValidationError{ "Invalid or not-ready MetaHandle" };
                 return m_ref_counts.add_ref(*opt);
+            }
+
+            size_t release_and_destroy(const Handle<T>& h)
+            {
+                std::lock_guard lock{ m_mutex };
+                if (!validate_handle_no_lock(h)) throw ValidationError{ "Bad handle" };
+                auto cnt = m_ref_counts.release(h);
+                if (cnt == 0) {
+                    auto guid = m_handle_to_guid[h];
+                    m_guid_to_handle.erase(guid);
+                    m_handle_to_guid.erase(h);
+                    m_versions.remove(h);
+                    m_ref_counts.reset(h);
+                    m_pool.destroy(h);
+                }
+                return cnt;
             }
 
             size_t release_and_destroy(const MetaHandle& mh) override
@@ -422,6 +464,12 @@ namespace eeng
                 return cnt;
             }
 
+            bool valid(const Handle<T>& h) const noexcept
+            {
+                std::lock_guard lock{ m_mutex };
+                return validate_handle_no_lock(h);
+            }
+
             bool valid(const MetaHandle& mh) const noexcept override
             {
                 std::lock_guard lock{ m_mutex };
@@ -441,6 +489,21 @@ namespace eeng
                 m_handle_to_guid.clear();
             }
 
+            /// @brief Find the handle associated to a GUID, statically typed.
+            /// @returns an empty optional if no such GUID or wrong type.
+            std::optional<Handle<T>> handle_for_guid_typed(const Guid& guid) const noexcept
+            {
+                std::lock_guard lock{ m_mutex };
+                auto it = m_guid_to_handle.find(guid);
+                if (it == m_guid_to_handle.end()) {
+                    return std::nullopt;
+                }
+                Handle<T> h = it->second;
+                return validate_handle_no_lock(h)
+                    ? std::optional<Handle<T>>(h)
+                    : std::nullopt;
+            }
+
             std::optional<MetaHandle> handle_for_guid(const Guid& guid) const noexcept override
             {
                 std::lock_guard lock{ m_mutex };
@@ -451,6 +514,19 @@ namespace eeng
                         return mh;
                 }
                 return std::nullopt;
+            }
+
+            /// @brief Find the GUID associated to a `Handle<T>`.
+            /// @returns empty if invalid or not in this pool.
+            std::optional<Guid> guid_for_handle_typed(const Handle<T>& h) const noexcept {
+                std::lock_guard lock{ m_mutex };
+                if (!validate_handle_no_lock(h)) {
+                    return std::nullopt;
+                }
+                auto it = m_handle_to_guid.find(h);
+                return it != m_handle_to_guid.end()
+                    ? std::optional<Guid>(it->second)
+                    : std::nullopt;
             }
 
             std::optional<Guid> guid_for_handle(const MetaHandle& mh) const noexcept override
@@ -669,6 +745,31 @@ namespace eeng
 
         // ---------------------------------------------------------------------
 
+        /// @brief Remove immediately by statically‑typed handle (thread‑safe).
+        template<typename T>
+        void remove_now(const Handle<T>& h)
+        {
+            std::lock_guard lock{ storage_mutex };
+            get_pool<T>().remove_now_typed(h);
+        }
+
+        /// @brief Immediately destroy the resource referred to by a runtime‑typed handle (thread‑safe).
+        void remove_now(const MetaHandle& mh) 
+        {
+            std::lock_guard lock{ storage_mutex };
+            get_pool(mh.type).remove_now(mh);
+        }
+
+        /// Increase the ref-count for a resource.
+        /// @returns the new ref-count.
+        template<typename T>
+        size_t retain(const Handle<T>& h)
+        {
+            std::lock_guard lock{ storage_mutex };
+            auto& pool = get_pool<T>();
+            return pool.retain(h);
+        }
+
         /// Increase the ref-count for a resource.
         /// @returns the new ref-count.
         size_t retain(const MetaHandle& mh)
@@ -678,10 +779,27 @@ namespace eeng
             return pool.retain(mh);
         }
 
-        size_t release(const MetaHandle& mh) {
+        template<typename T>
+        size_t release(const Handle<T>& h)
+        {
+            std::lock_guard lock{ storage_mutex };
+            auto& pool = get_pool<T>();
+            return pool.release_and_destroy(h);
+        }
+
+        size_t release(const MetaHandle& mh)
+        {
             std::lock_guard lock{ storage_mutex };
             auto& pool = get_pool(mh.type);
             return pool.release_and_destroy(mh);
+        }
+
+        template<typename T>
+        bool validate(const Handle<T>& h) const noexcept
+        {
+            std::lock_guard lock{ storage_mutex };
+            const auto& pool = get_pool<T>();
+            return pool.valid(h);
         }
 
         /// @return true if there's a pool for `mh.type` and the handle’s version is still valid.
@@ -806,7 +924,7 @@ namespace eeng
         // --- Private helpers -------------------------------------------------
 
         template<class T>
-        constexpr entt::id_type get_id_type() noexcept
+        constexpr entt::id_type get_id_type() const noexcept
         {
             auto meta_type = entt::resolve<T>();
             return meta_type ? meta_type.id() : entt::type_hash<T>::value();
