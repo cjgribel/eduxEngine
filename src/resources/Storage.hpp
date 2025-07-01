@@ -233,15 +233,15 @@ namespace eeng
         template<typename T>
         class Pool : public IPool
         {
-            using Handle = Handle<T>;
+            // using Handle = Handle<T>;
 
             PoolAllocatorTFH<T> m_pool;
 
             VersionMap m_versions;
             RefCountMap m_ref_counts;
 
-            std::unordered_map<Guid, Handle> m_guid_to_handle;
-            std::unordered_map<Handle, Guid> m_handle_to_guid;
+            std::unordered_map<Guid, Handle<T>> m_guid_to_handle;
+            std::unordered_map<Handle<T>, Guid> m_handle_to_guid;
 
             mutable std::mutex m_mutex;
 
@@ -249,13 +249,13 @@ namespace eeng
 
             // --- Statically typed add ----------------------------------------
 
-            Handle add_typed(const T& object, const Guid& guid)
+            Handle<T> add_typed(const T& object, const Guid& guid)
             {
                 std::lock_guard lock{ m_mutex };
                 return typed_add_no_lock(guid, T{ object }); // copy to pool
             }
 
-            Handle add_typed(T&& object, const Guid& guid)
+            Handle<T> add_typed(T&& object, const Guid& guid)
             {
                 std::lock_guard lock{ m_mutex };
                 return typed_add_no_lock(guid, std::move(object)); // move to pool
@@ -278,7 +278,7 @@ namespace eeng
             }
 
         private:
-            Handle typed_add_no_lock(const Guid& guid, T&& object)
+            Handle<T> typed_add_no_lock(const Guid& guid, T&& object)
             {
                 auto handle = m_pool.create(std::forward<T>(object));  // one move
                 m_versions.assign_version(handle);
@@ -288,9 +288,37 @@ namespace eeng
                 return handle;
             }
 
+        public:
+        
             // --- Meta typed get & try_get ------------------------------------
 
-        public:
+            /// @brief Unsafe, no‑lock reference access. Caller must ensure no concurrent
+            ///        add/release on the same slot.
+            T& get_ref_nolock(const Handle<T>& handle)
+            {
+                if (!validate_handle_no_lock(handle)) throw ValidationError{ "Invalid or not-ready Handle in get_ref_nolock" };
+                // validate without locking
+                // MetaHandle mh{ handle };
+                // auto opt = validate_handle_no_lock(mh);
+                // if (!opt || *opt != handle) {
+                //     throw ValidationError{ "Invalid or not-ready Handle in get_ref_nolock" };
+                // }
+                return m_pool.get(handle);
+            }
+
+            /// @brief Unsafe const reference access.
+            const T& get_ref_nolock(const Handle<T>& handle) const
+            {
+                if (!validate_handle_no_lock(handle)) throw ValidationError{ "Invalid or not-ready Handle in get_ref_nolock" };
+
+                // MetaHandle mh{ handle };
+                // auto opt = validate_handle_no_lock(mh);
+                // if (!opt || *opt != handle) {
+                //     throw ValidationError{ "Invalid or not-ready Handle in get_ref_nolock" };
+                // }
+                return m_pool.get(handle);
+            }
+
             entt::meta_any get(const MetaHandle& meta_handle) override
             {
                 std::lock_guard lock{ m_mutex };
@@ -312,7 +340,7 @@ namespace eeng
             {
                 return try_get_impl(*this, meta_handle);
             }
-            
+
         private:
             template<typename PoolType>
             static entt::meta_any get_impl(
@@ -456,16 +484,28 @@ namespace eeng
             }
 
             // Validation without locking or throwing
-            std::optional<Handle> validate_handle_no_lock(
+            bool validate_handle_no_lock(
+                const Handle<T>& handle) const noexcept
+            {
+                return handle && m_versions.validate(handle);
+            }
+
+            // Validation without locking or throwing
+            std::optional<Handle<T>> validate_handle_no_lock(
                 const MetaHandle& meta_handle) const noexcept
             {
                 if (!meta_handle.valid()) return {};
-                if (auto h = meta_handle.template cast<T>(); h && *h && m_versions.validate(*h))
-                    return *h;
+                // if (auto h = meta_handle.template cast<T>(); h && *h && m_versions.validate(*h))
+                // if (auto h = meta_handle.template cast<T>(); h && validate_handle_no_lock(*h))
+                //     return *h;
+                if (auto h = meta_handle.template cast<T>())
+                    if (validate_handle_no_lock(*h))
+                        return *h;
+
                 return {};
             }
 
-            std::optional<Handle> validate_handle(
+            std::optional<Handle<T>> validate_handle(
                 const MetaHandle& meta_handle) const noexcept
             {
                 std::lock_guard lock{ m_mutex };
@@ -587,6 +627,22 @@ namespace eeng
 
             auto& pool = get_pool(mh.type);
             return pool.get(mh).cast<T>();
+        }
+
+        /// @brief Reference‑returning, statically‑typed get (unsafe if you allow
+///        concurrent add/release on the same type).
+        template<typename T>
+        T& get_typed_ref(const Handle<T>& h)
+        {
+            // no internal lock: user must externally guard against races on this slot
+            return get_pool<T>().get_ref_nolock(h);
+        }
+
+        /// @brief Const overload of get_typed_ref.
+        template<typename T>
+        const T& get_typed_ref(const Handle<T>& h) const
+        {
+            return get_pool<T>().get_ref_nolock(h);
         }
 
         // --- try_get ---------------------------------------------------------

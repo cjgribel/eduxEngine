@@ -50,6 +50,7 @@ bool Game::init()
         entt::meta_factory<eeng::mock::Model>();
         entt::meta_factory<eeng::mock::Mesh>();
         
+        std::cout << "Importing assets recursively..." << std::endl;
         const int numTasks = 5;
         std::vector<std::future<ModelRef>> futures;
         for (int i = 0; i < numTasks; ++i)
@@ -63,10 +64,12 @@ bool Game::init()
         }
 
         // Wait for futures
+        std::cout << "Wait for imports..." << std::endl;
         std::vector<ModelRef> refs;
         for (auto& f : futures) refs.push_back(f.get());
 
         // Load assets
+        std::cout << "Loading assets..." << std::endl;
         for (auto& ref : refs) resource_manager.load(ref, *ctx);
 
         // VISUALIZE storage + asset_index (available assets as a file structure)
@@ -74,6 +77,7 @@ bool Game::init()
         // gui->draw_asset_index(ctx);
 
         // Unload asset
+        std::cout << "Unloading assets..." << std::endl;
         for (auto& ref : refs) resource_manager.unload(ref);
 
         // Unfile the asset

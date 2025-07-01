@@ -90,20 +90,17 @@ namespace eeng
             if (!ref.is_loaded())
                 throw std::runtime_error("Asset not loaded");
 
-#if 0
             // 1. Get the loaded resource from storage
-            T& resource = storage->get<T>(ref.handle);
+            T& resource = storage->get_typed_ref<T>(ref.handle);
 
             // 2. Recursively unload any referenced AssetRefs
             visit_asset_refs(resource, [&](auto& subref)
                 {
-                    using SubT = typename std::remove_reference_t<decltype(subref)>::value_type;
                     if (subref.is_loaded())
                     {
                         unload(subref); // recursive unload
                     }
                 });
-#endif
 
             // 3. Release the resource and clear the handle
             storage->release(ref.handle);
