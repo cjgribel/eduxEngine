@@ -3,17 +3,19 @@
 
 #include "EngineContext.hpp"
 #include "ThreadPool.hpp"
+#include "EventQueue.h"
 
 namespace eeng
 {
     EngineContext::EngineContext(
         std::unique_ptr<IEntityManager> entity_manager,
         std::unique_ptr<IResourceManager> resource_manager,
-            std::unique_ptr<IGuiManager> gui_manager)
+        std::unique_ptr<IGuiManager> gui_manager)
         : entity_manager(std::move(entity_manager))
         , resource_manager(std::move(resource_manager))
         , gui_manager(std::move(gui_manager))
         , thread_pool(std::make_unique<ThreadPool>())
+        , event_queue(std::make_unique<EventQueue>())
     {
     }
 

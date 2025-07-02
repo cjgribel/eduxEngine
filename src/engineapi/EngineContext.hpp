@@ -8,6 +8,7 @@
 #include "IResourceManager.hpp"
 #include "IGuiManager.hpp"
 class ThreadPool;
+class EventQueue;
 
 namespace eeng
 {
@@ -34,6 +35,7 @@ namespace eeng
         std::unique_ptr<IResourceManager> resource_manager;
         std::unique_ptr<IGuiManager> gui_manager;
         std::unique_ptr<ThreadPool> thread_pool;
+        std::unique_ptr<EventQueue> event_queue;
     };
 
     using EngineContextPtr = std::shared_ptr<EngineContext>;

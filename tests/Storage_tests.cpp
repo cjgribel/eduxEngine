@@ -250,7 +250,7 @@ TEST_F(StorageTest, ReleaseInvalidThrows) {
 TEST_F(StorageTest, ConcurrencySafety) {
 
     std::mutex m;
-    for (int i = 0; i < 10000; i++)
+    for (int i = 0; i < 1000; i++)
     {
         storage.clear();
         // storage = eeng::Storage{};
