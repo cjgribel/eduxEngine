@@ -15,6 +15,7 @@
 #include "Log.hpp"
 #include "MetaReg.hpp"
 
+#include "ImGuiBackendSDL.hpp"
 // ->
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -123,9 +124,8 @@ namespace eeng
 
     void Engine::shutdown()
     {
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplSDL2_Shutdown();
-        ImGui::DestroyContext();
+        ctx->gui_manager->release();
+        imgui_backend_shutdown();
 
         if (gl_context_)
             SDL_GL_DeleteContext(gl_context_);
@@ -195,17 +195,12 @@ namespace eeng
 
     bool Engine::init_imgui()
     {
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGui::StyleColorsDark();
-
-        if (!ImGui_ImplSDL2_InitForOpenGL(window_, gl_context_) ||
-            !ImGui_ImplOpenGL3_Init("#version 410 core"))
+        if (!imgui_backend_init(window_, gl_context_))
         {
-            eeng::Log("Failed to initialize ImGui.");
+            Log("Failed to initialize ImGui backend");
             return false;
         }
-
+        ctx->gui_manager->init();
         return true;
     }
 
@@ -241,14 +236,9 @@ namespace eeng
 
     void Engine::begin_frame()
     {
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL2_NewFrame(window_);
-        ImGui::NewFrame();
-
+        imgui_backend_begin_frame();
         ImGui::ShowDemoWindow();
-
         render_info_UI();
-
         eeng::LogDraw("Log");
 
         // Set up OpenGL state:
@@ -290,8 +280,7 @@ namespace eeng
 
     void Engine::end_frame()
     {
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        imgui_backend_end_frame();
     }
 
     void Engine::render_info_UI()

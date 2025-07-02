@@ -9,13 +9,15 @@
 
 namespace eeng
 {
-        void GuiManager::init()
-        {
+    void GuiManager::init()
+    {
+        // ImGui::StyleColorsClassic();
+        // ImGui::StyleColorsLight();
+        ImGui::StyleColorsDark();
+    }
 
-        }
+    void GuiManager::release()
+    {
 
-        void GuiManager::release()
-        {
-
-        }
+    }
 } // namespace eeng
