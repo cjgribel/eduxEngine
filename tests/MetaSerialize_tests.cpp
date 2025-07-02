@@ -26,6 +26,12 @@ namespace
     {
     };
 
+    struct MockGuiManager : eeng::IGuiManager
+    {
+        void init() override { }
+        void release() override { }
+    };
+
     struct vec2
     {
         float x, y;
@@ -155,9 +161,10 @@ inline std::string policy_to_string(entt::any_policy policy)
 class MetaSerializationTest : public ::testing::Test
 {
 protected:
-    eeng::EngineContext ctx{ 
-        std::make_unique<MockEntityRegistry>(), 
-        std::make_unique<MockResourceManager>() 
+    eeng::EngineContext ctx{
+        std::make_unique<MockEntityRegistry>(),
+        std::make_unique<MockResourceManager>(),
+        std::make_unique<MockGuiManager>()
     };
 
     static void SetUpTestSuite()

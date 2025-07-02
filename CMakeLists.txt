@@ -37,6 +37,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/resources)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/resources/importers)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/util)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/gui)
 
 #
 # OpenGL
@@ -227,6 +228,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/ThreadPool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
     )
 
 set_target_properties(Module1 PROPERTIES

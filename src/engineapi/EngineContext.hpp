@@ -6,6 +6,7 @@
 #include <memory>
 #include "IEntityManager.hpp"
 #include "IResourceManager.hpp"
+#include "IGuiManager.hpp"
 class ThreadPool;
 
 namespace eeng
@@ -24,12 +25,14 @@ namespace eeng
     {
         EngineContext(
             std::unique_ptr<IEntityManager> entity_manager,
-            std::unique_ptr<IResourceManager> resource_manager);
+            std::unique_ptr<IResourceManager> resource_manager,
+            std::unique_ptr<IGuiManager> gui_manager);
 
         ~EngineContext();
 
         std::unique_ptr<IEntityManager> entity_manager;
         std::unique_ptr<IResourceManager> resource_manager;
+        std::unique_ptr<IGuiManager> gui_manager;
         std::unique_ptr<ThreadPool> thread_pool;
     };
 
