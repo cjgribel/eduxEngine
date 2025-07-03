@@ -101,7 +101,9 @@ namespace eeng
         void end_frame();
 
         /** Render debug and information UI using ImGui. */
-        void render_info_UI();
+        void render_info_UI(); // <- move out
+
+        void on_set_vsync(const SetVsyncEvent& e);
     };
 
     using EnginePtr = std::unique_ptr<Engine>;

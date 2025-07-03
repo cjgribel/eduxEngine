@@ -17,10 +17,31 @@ namespace eeng
     - Entity manager
     - Resource manager
     - Thread pool
-    - (TODO) Event dispatcher
+    - Event dispatcher
+    - (TODO) CommandQueue
     - (TODO?) Scene manager
     - (TODO?) Logger
     */
+
+    struct SetVsyncEvent { bool enabled; };
+    struct SetWireFrameRenderingEvent { bool enabled; };
+
+    class EngineConfig
+    {
+    public:
+        explicit EngineConfig(EventQueue& event_queue);
+
+        void set_vsync(bool enabled);
+        void set_wireframe(bool enabled);
+
+        bool is_vsync_enabled() const;
+        bool is_wireframe_enabled() const;
+
+    private:
+        bool vsync = true;
+        bool wireframe_mode = false;
+        EventQueue& event_queue;
+    };
 
     struct EngineContext
     {
@@ -31,11 +52,12 @@ namespace eeng
 
         ~EngineContext();
 
-        std::unique_ptr<IEntityManager> entity_manager;
-        std::unique_ptr<IResourceManager> resource_manager;
-        std::unique_ptr<IGuiManager> gui_manager;
-        std::unique_ptr<ThreadPool> thread_pool;
-        std::unique_ptr<EventQueue> event_queue;
+        std::unique_ptr<IEntityManager>     entity_manager;
+        std::unique_ptr<IResourceManager>   resource_manager;
+        std::unique_ptr<IGuiManager>        gui_manager;
+        std::unique_ptr<ThreadPool>         thread_pool;
+        std::unique_ptr<EventQueue>         event_queue;
+        std::unique_ptr<EngineConfig>       engine_config;
     };
 
     using EngineContextPtr = std::shared_ptr<EngineContext>;

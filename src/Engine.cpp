@@ -16,6 +16,9 @@
 #include "MetaReg.hpp"
 
 #include "ImGuiBackendSDL.hpp"
+#include "EngineContext.hpp"
+#include "EventQueue.h"
+
 // ->
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -82,6 +85,9 @@ namespace eeng
         input = std::make_shared<eeng::InputManager>();
 
         register_meta_types();
+
+        // Event subscriptions
+        ctx->event_queue->register_callback([&](const SetVsyncEvent& event) { this->on_set_vsync(event); });
 
         eeng::Log("Engine initialized successfully.");
         return true;
@@ -379,6 +385,12 @@ namespace eeng
 
         // End ImGui window
         ImGui::End();
+    }
+
+    void Engine::on_set_vsync(const SetVsyncEvent& e)
+    {
+        // render_config->vsync = e.enabled;
+        SDL_GL_SetSwapInterval(e.enabled);
     }
 
 } // namespace eeng
