@@ -28,8 +28,13 @@ namespace
 
     struct MockGuiManager : eeng::IGuiManager
     {
-        void init() override { }
-        void release() override { }
+        void init() override {}
+        void release() override {}
+
+        void draw_engine_info(EngineContext& ctx) const override {}
+        
+        void set_flag(GuiFlags flag, bool enabled) override {}
+        bool is_flag_enabled(GuiFlags flag) const override {}
     };
 
     struct vec2

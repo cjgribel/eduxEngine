@@ -291,6 +291,10 @@ namespace eeng
 
     void Engine::render_info_UI()
     {
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
+        if (ctx->gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
+            ctx->gui_manager->draw_engine_info(*ctx);
+
         // Start a ImGui window
         ImGui::Begin("Engine Info");
 

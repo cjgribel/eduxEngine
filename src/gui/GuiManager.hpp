@@ -3,13 +3,25 @@
 
 #pragma once
 #include "IGuiManager.hpp"
+#include "EngineContext.hpp"
+#include <unordered_map>
 
 namespace eeng
 {
     class GuiManager : public IGuiManager
     {
+    public:
+
         void init() override;
         void release() override;
+
+        void set_flag(GuiFlags flag, bool enabled) override;
+        bool is_flag_enabled(GuiFlags flag) const override;
+
+        void draw_engine_info(EngineContext& ctx) const override;
+
+    private:
+        std::unordered_map<GuiFlags, bool> flags;
     };
-    
+
 } // namespace eeng
