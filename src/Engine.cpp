@@ -88,6 +88,10 @@ namespace eeng
 
         // Event subscriptions
         ctx->event_queue->register_callback([&](const SetVsyncEvent& event) { this->on_set_vsync(event); });
+        ctx->event_queue->register_callback([&](const SetWireFrameRenderingEvent& event) { this->on_set_wireframe(event); });
+
+        // Gui flags
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
 
         eeng::Log("Engine initialized successfully.");
         return true;
@@ -296,7 +300,7 @@ namespace eeng
             ctx->gui_manager->draw_engine_info(*ctx);
 
         // Start a ImGui window
-        ImGui::Begin("Engine Info");
+        ImGui::Begin("Engine Info X");
 
         if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen))
         {
@@ -393,8 +397,13 @@ namespace eeng
 
     void Engine::on_set_vsync(const SetVsyncEvent& e)
     {
-        // render_config->vsync = e.enabled;
-        SDL_GL_SetSwapInterval(e.enabled);
+        vsync = e.enabled;
+        SDL_GL_SetSwapInterval(vsync);
+    }
+
+    void Engine::on_set_wireframe(const SetWireFrameRenderingEvent& e)
+    {
+        wireframe_mode = e.enabled;
     }
 
 } // namespace eeng

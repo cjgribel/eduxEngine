@@ -17,7 +17,7 @@ namespace eeng
         if (vsync != enabled)
         {
             vsync = enabled;
-            event_queue.enqueue_event(SetVsyncEvent{ enabled });
+            event_queue.dispatch(SetVsyncEvent{ enabled });
         }
     }
 
@@ -26,7 +26,7 @@ namespace eeng
         if (wireframe_mode != enabled)
         {
             wireframe_mode = enabled;
-            event_queue.enqueue_event(SetWireFrameRenderingEvent{ enabled });
+            event_queue.dispatch(SetWireFrameRenderingEvent{ enabled });
         }
     }
 

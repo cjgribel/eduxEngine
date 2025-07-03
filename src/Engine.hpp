@@ -104,6 +104,7 @@ namespace eeng
         void render_info_UI(); // <- move out
 
         void on_set_vsync(const SetVsyncEvent& e);
+        void on_set_wireframe(const SetWireFrameRenderingEvent& e);
     };
 
     using EnginePtr = std::unique_ptr<Engine>;

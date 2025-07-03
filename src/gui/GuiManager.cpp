@@ -23,11 +23,42 @@ namespace eeng
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
     {
-        ImGui::Begin("Engine Info2");
+        ImGui::Begin("Engine Info");
 
-        ImGui::Text("Hello");
         // draw mouse, framerate, fps cap, controller info etc. (same code as before),
         // but now accessed via ctx.input, ctx.vsync, ctx.window, etc.
+
+        if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            // Mouse state
+            // TODO
+
+            // Framerate
+            ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+            // Combo (drop-down) for fps settings
+            // TODO
+
+            // V-sync
+            bool vsync = ctx.engine_config->is_vsync_enabled();
+            if (ImGui::Checkbox("V-Sync", &vsync))
+            {
+                ctx.engine_config->set_vsync(vsync);
+            }
+
+            // Wireframe rendering
+            ImGui::SameLine();
+            bool wf = ctx.engine_config->is_wireframe_enabled();
+            if (ImGui::Checkbox("Wireframe rendering", &wf))
+            {
+                ctx.engine_config->set_wireframe(wf);
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Controllers", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+
+        }
 
         ImGui::End();
     }
