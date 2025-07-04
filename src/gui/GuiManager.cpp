@@ -23,6 +23,9 @@ namespace eeng
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
     {
+        if (!ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
+            return;
+
         ImGui::Begin("Engine Info");
 
         // draw mouse, framerate, fps cap, controller info etc. (same code as before),

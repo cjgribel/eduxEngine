@@ -11,7 +11,7 @@
 #include <SDL_opengl.h>
 #include <memory>
 
-#include "InputManager.hpp"
+#include "InputManager.hpp" // <- remove
 #include "Log.hpp"
 #include "MetaReg.hpp"
 
@@ -295,9 +295,9 @@ namespace eeng
 
     void Engine::render_info_UI()
     {
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
-        if (ctx->gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
-            ctx->gui_manager->draw_engine_info(*ctx);
+        ctx->gui_manager->draw_engine_info(*ctx);
+
+        // remove -->
 
         // Start a ImGui window
         ImGui::Begin("Engine Info X");
