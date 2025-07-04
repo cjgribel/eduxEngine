@@ -149,16 +149,11 @@ struct eeng::InputManager::Impl
 // InputManager implementation
 
 eeng::InputManager::InputManager() : pImpl(new Impl()) {}
-eeng::InputManager::~InputManager() { delete pImpl; }
+eeng::InputManager::~InputManager() = default; // { delete pImpl; }
 
 void eeng::InputManager::HandleEvent(const void* event) 
 {
     pImpl->HandleEvent(*reinterpret_cast<const SDL_Event*>(event));
-}
-
-void eeng::InputManager::Update() 
-{
-
 }
 
 bool eeng::InputManager::IsKeyPressed(Key key) const 
@@ -191,7 +186,7 @@ int eeng::InputManager::GetConnectedControllerCount() const
     return pImpl->GetConnectedControllerCount();
 }
 
-eeng::InputManager::ControllerMap& eeng::InputManager::GetControllers()
+const eeng::InputManager::ControllerMap& eeng::InputManager::GetControllers() const
 {
     return pImpl->controllers;
 }

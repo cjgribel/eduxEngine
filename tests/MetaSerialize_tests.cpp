@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include <gtest/gtest.h>
+// #include <gmock/gmock.h>
 #include <vector>
 #include <array>
 #include "entt/entt.hpp"
@@ -13,6 +14,22 @@
 #include "EngineContext.hpp"
 
 using namespace eeng;
+
+// namespace eeng
+// {
+//     class MockInputManager : public IInputManager
+//     {
+//     public:
+//         MOCK_METHOD(bool, IsKeyPressed, (Key key), (const, override));
+//         MOCK_METHOD(bool, IsMouseButtonDown, (int button), (const, override));
+//         MOCK_METHOD(const MouseState&, GetMouseState, (), (const, override));
+//         MOCK_METHOD(const ControllerState&, GetControllerState, (int controllerIndex), (const, override));
+//         MOCK_METHOD(int, GetConnectedControllerCount, (), (const, override));
+//         MOCK_METHOD(const ControllerMap&, GetControllers, (), (const, override));
+//         MOCK_METHOD(void, HandleEvent, (const void* event), (override));
+//         MOCK_METHOD(void, Update, (), (override));
+//     };
+// }
 
 namespace
 {
@@ -32,9 +49,25 @@ namespace
         void release() override {}
 
         void draw_engine_info(EngineContext& ctx) const override {}
-        
+
         void set_flag(GuiFlags flag, bool enabled) override {}
-        bool is_flag_enabled(GuiFlags flag) const override {}
+        bool is_flag_enabled(GuiFlags flag) const override { return false; }
+    };
+
+    class MockInputManager final : public IInputManager
+    {
+    public:
+        bool IsKeyPressed(Key key) const override { return false; }
+        bool IsMouseButtonDown(int button) const override { return false; }
+        const MouseState& GetMouseState() const override { return m_state; }
+        const ControllerState& GetControllerState(int controllerIndex) const override { return c_state; }
+        int GetConnectedControllerCount() const override { return 0; }
+        const ControllerMap& GetControllers() const override { return c_map; }
+
+    private:
+        MouseState m_state;
+        ControllerState c_state;
+        ControllerMap c_map;
     };
 
     struct vec2
@@ -169,7 +202,8 @@ protected:
     eeng::EngineContext ctx{
         std::make_unique<MockEntityRegistry>(),
         std::make_unique<MockResourceManager>(),
-        std::make_unique<MockGuiManager>()
+        std::make_unique<MockGuiManager>(),
+        std::make_unique<MockInputManager>()
     };
 
     static void SetUpTestSuite()

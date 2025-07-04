@@ -34,7 +34,12 @@ namespace eeng
         if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen))
         {
             // Mouse state
-            // TODO
+            auto mouse = ctx.input_manager->GetMouseState();
+            ImGui::Text("Mouse pos (%i, %i) %s%s",
+                mouse.x,
+                mouse.y,
+                mouse.leftButton ? "L" : "",
+                mouse.rightButton ? "R" : "");
 
             // Framerate
             ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);

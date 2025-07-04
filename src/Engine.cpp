@@ -238,6 +238,7 @@ namespace eeng
             }
 
             input->HandleEvent(&event);
+            static_cast<InputManager&>(*ctx->input_manager).HandleEvent(&event);
 
             if (event.type == SDL_QUIT)
                 running = false;
@@ -370,9 +371,9 @@ namespace eeng
 
         if (ImGui::CollapsingHeader("Controllers", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Text("Controllers connected: %i", input->GetConnectedControllerCount());
+            ImGui::Text("Controllers connected: %i", ctx->input_manager->GetConnectedControllerCount());
 
-            for (auto& [id, state] : input->GetControllers())
+            for (auto& [id, state] : ctx->input_manager->GetControllers())
             {
                 ImGui::PushID(id);
                 ImGui::BeginChild("Controller", ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 6), true);

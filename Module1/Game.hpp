@@ -52,7 +52,7 @@ public:
     void update(
         float time,
         float deltaTime,
-        InputManagerPtr input) override;
+        eeng::InputManagerPtr input) override;
 
     /// @brief For rendering of game contents
     /// @param time Total time elapsed in seconds
@@ -175,13 +175,13 @@ private:
     /// @brief Placeholder system for updating the camera position based on inputs
     /// @param input Input from mouse, keyboard and controllers
     void updateCamera(
-        InputManagerPtr input);
+        eeng::InputManagerPtr input);
 
     /// @brief Placeholder system for updating the 'player' based on inputs
     /// @param deltaTime 
     void updatePlayer(
         float deltaTime,
-        InputManagerPtr input);
+        eeng::InputManagerPtr input);
 };
 
 #endif

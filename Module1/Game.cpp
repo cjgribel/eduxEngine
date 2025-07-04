@@ -437,7 +437,7 @@ bool Game::init()
 void Game::update(
     float time,
     float deltaTime,
-    InputManagerPtr input)
+    eeng::InputManagerPtr input)
 {
     updateCamera(input);
 
@@ -688,7 +688,7 @@ void Game::destroy()
 }
 
 void Game::updateCamera(
-    InputManagerPtr input)
+    eeng::InputManagerPtr input)
 {
     // Fetch mouse and compute movement since last frame
     auto mouse = input->GetMouseState();
@@ -710,7 +710,7 @@ void Game::updateCamera(
 
 void Game::updatePlayer(
     float deltaTime,
-    InputManagerPtr input)
+    eeng::InputManagerPtr input)
 {
     // Fetch keys relevant for player movement
     using Key = eeng::InputManager::Key;
