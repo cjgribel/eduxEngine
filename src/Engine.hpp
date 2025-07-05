@@ -15,8 +15,6 @@ typedef void* SDL_GLContext;    // Forward declaration
 
 namespace eeng
 {
-    class InputManager; // Forward declaration
-
     /**
      * @brief Main engine class handling SDL, OpenGL, ImGui initialization and the main loop.
      */
@@ -64,7 +62,6 @@ namespace eeng
     private:
         SDL_Window* window_ = nullptr;        ///< SDL Window pointer
         SDL_GLContext gl_context_ = nullptr;  ///< OpenGL context
-        std::shared_ptr<InputManager> input;  ///< Input manager for mouse/keyboard/controller input
 
         int window_height;    ///< Window height in pixels
         int window_width;     ///< Window width in pixels

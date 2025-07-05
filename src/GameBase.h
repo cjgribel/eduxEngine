@@ -5,8 +5,6 @@
 #define GameBase_h
 #pragma once
 
-#include "InputManager.hpp"
-
 namespace eeng {
 
 /**
@@ -39,8 +37,7 @@ public:
      */
     virtual void update(
         float time_s,
-        float deltaTime_s,
-        InputManagerPtr input) = 0;
+        float deltaTime_s) = 0;
 
     /**
      * @brief Render the game game.

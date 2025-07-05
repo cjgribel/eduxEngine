@@ -434,12 +434,11 @@ bool Game::init()
 
 void Game::update(
     float time,
-    float deltaTime,
-    eeng::InputManagerPtr input)
+    float deltaTime)
 {
-    updateCamera(input);
+    updateCamera();
 
-    updatePlayer(deltaTime, input);
+    updatePlayer(deltaTime);
 
     pointlight.pos = glm::vec3(
         glm_aux::R(time * 0.1f, { 0.0f, 1.0f, 0.0f }) *
@@ -467,7 +466,7 @@ void Game::update(
 
     // We can also compute a ray from the current mouse position,
     // to use for object picking and such ...
-    if (input->GetMouseState().rightButton)
+    if (ctx->input_manager->GetMouseState().rightButton)
     {
         glm::ivec2 windowPos(camera.mouse_xy_prev.x, matrices.windowSize.y - camera.mouse_xy_prev.y);
         auto ray = glm_aux::world_ray_from_window_coords(windowPos, matrices.V, matrices.P, matrices.VP);
@@ -685,11 +684,10 @@ void Game::destroy()
 
 }
 
-void Game::updateCamera(
-    eeng::InputManagerPtr input)
+void Game::updateCamera()
 {
     // Fetch mouse and compute movement since last frame
-    auto mouse = input->GetMouseState();
+    auto mouse = ctx->input_manager->GetMouseState();
     glm::ivec2 mouse_xy{ mouse.x, mouse.y };
     glm::ivec2 mouse_xy_diff{ 0, 0 };
     if (mouse.leftButton && camera.mouse_xy_prev.x >= 0)
@@ -706,12 +704,11 @@ void Game::updateCamera(
     camera.pos = camera.lookAt + glm::vec3(rotatedPos);
 }
 
-void Game::updatePlayer(
-    float deltaTime,
-    eeng::InputManagerPtr input)
+void Game::updatePlayer(float deltaTime)
 {
     // Fetch keys relevant for player movement
-    using Key = eeng::InputManager::Key;
+    using Key = eeng::IInputManager::Key;
+    auto& input = ctx->input_manager;
     bool W = input->IsKeyPressed(Key::W);
     bool A = input->IsKeyPressed(Key::A);
     bool S = input->IsKeyPressed(Key::S);

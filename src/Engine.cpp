@@ -94,9 +94,6 @@ namespace eeng
             EENG_LOG_INFO(ctx, "Anisotropic samples %i (requested), %i (max))", EENG_ANISO_SAMPLES, (int)maxAniso);
         }
 #endif
-
-        input = std::make_shared<eeng::InputManager>();
-
         register_meta_types();
 
         // Event subscriptions
@@ -136,7 +133,7 @@ namespace eeng
             process_events(running);
             begin_frame();
 
-            game->update(time_s, deltaTime_s, input);
+            game->update(time_s, deltaTime_s);
             game->render(time_s, window_width, window_height);
 
             end_frame();
@@ -257,7 +254,6 @@ namespace eeng
                 continue;
             }
 
-            input->HandleEvent(&event);
             static_cast<InputManager&>(*ctx->input_manager).HandleEvent(&event);
 
             if (event.type == SDL_QUIT)
