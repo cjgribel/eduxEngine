@@ -13,5 +13,10 @@ namespace eeng
     {
     }
 
+    std::string ResourceManager::to_string() const
+    {
+        return storage->to_string();
+    }
+
     ResourceManager::~ResourceManager() = default;
 }

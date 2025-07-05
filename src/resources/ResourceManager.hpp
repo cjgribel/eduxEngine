@@ -34,6 +34,8 @@ namespace eeng
         // Out-of-line dtor: ensures Storage & AssetIndex are complete when deleted
         ~ResourceManager();
 
+        std::string to_string() const override;
+
         // Must be thread-safe. Use static types.
         /// @brief Import new resource to resource index
         /// @tparam T 

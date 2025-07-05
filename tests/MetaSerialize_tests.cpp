@@ -41,6 +41,7 @@ namespace
 
     struct MockResourceManager : eeng::IResourceManager
     {
+        std::string to_string() const override { return std::string {}; }
     };
 
     struct MockGuiManager : eeng::IGuiManager

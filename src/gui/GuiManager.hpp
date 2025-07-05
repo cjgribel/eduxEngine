@@ -21,8 +21,9 @@ namespace eeng
         void draw(EngineContext& ctx) const override;
 
     private:
-        void draw_engine_info(EngineContext& ctx) const;
         void draw_log(EngineContext& ctx) const;
+        void draw_storage(EngineContext& ctx) const;
+        void draw_engine_info(EngineContext& ctx) const;
 
         std::unordered_map<GuiFlags, bool> flags;
     };

@@ -27,6 +27,7 @@ namespace eeng
     class IResourceManager
     {
     public:
+        virtual std::string to_string() const = 0;
         virtual ~IResourceManager() = default;
     };
 } // namespace eeng

@@ -6,18 +6,18 @@
 #include "GLDebugMessageCallback.h"
 #endif
 
-#define SDL_MAIN_HANDLED
-#include <SDL.h>
-#include <SDL_opengl.h>
-#include <memory>
-
-#include "InputManager.hpp" // <- remove
+#include "InputManager.hpp"
 #include "LogMacros.h"
 #include "LogGlobals.hpp"
 #include "MetaReg.hpp"
 
 #include "ImGuiBackendSDL.hpp"
 #include "EventQueue.h"
+
+#define SDL_MAIN_HANDLED
+#include <SDL.h>
+#include <SDL_opengl.h>
+#include <memory>
 
 namespace eeng
 {
@@ -109,6 +109,7 @@ namespace eeng
         // Gui flags
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowLogWindow, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowStorageWindow, true);
 
         EENG_LOG(ctx, "Engine initialized successfully.");
         return true;

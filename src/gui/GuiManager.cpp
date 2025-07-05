@@ -24,16 +24,28 @@ namespace eeng
 
     void GuiManager::draw(EngineContext& ctx) const
     {
-        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
-            draw_engine_info(ctx);
-
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowLogWindow))
             draw_log(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowStorageWindow))
+            draw_storage(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
+            draw_engine_info(ctx);
     }
 
     void GuiManager::draw_log(EngineContext& ctx) const
     {
         static_cast<LogManager&>(*ctx.log_manager).draw_gui_widget("Log");
+    }
+
+    void GuiManager::draw_storage(EngineContext& ctx) const
+    {
+        ImGui::Begin("Storage");
+
+        ImGui::TextUnformatted(ctx.resource_manager->to_string().c_str());
+
+        ImGui::End();
     }
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
