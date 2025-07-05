@@ -7,6 +7,7 @@
 #include <cstdint>
 #include "Handle.h"
 #include "Log.hpp"
+#include "LogGlobals.hpp"
 // #include "hash_combine.h"
 
 namespace eeng
@@ -24,14 +25,14 @@ namespace eeng
 
         // Default constructor
         MockResource1() {
-            eeng::Log("MockResource1 default-constructed");
+            eeng::LogGlobals::log("MockResource1 default-constructed");
         }
 
         // Copy constructor
         MockResource1(const MockResource1& other)
             : x(other.x), y(other.y)
         {
-            eeng::Log("MockResource1 copy-constructed");
+            eeng::LogGlobals::log("MockResource1 copy-constructed");
         }
 
         // Copy assignment
@@ -40,7 +41,7 @@ namespace eeng
             if (this != &other) {
                 x = other.x;
                 y = other.y;
-                eeng::Log("MockResource1 copy-assigned");
+                eeng::LogGlobals::log("MockResource1 copy-assigned");
             }
             return *this;
         }
@@ -51,7 +52,7 @@ namespace eeng
         {
             other.x = 0;
             other.y = 0;
-            eeng::Log("MockResource1 move-constructed");
+            eeng::LogGlobals::log("MockResource1 move-constructed");
         }
 
         // Move assignment
@@ -62,7 +63,7 @@ namespace eeng
                 y = other.y;
                 other.x = 0;
                 other.y = 0;
-                eeng::Log("MockResource1 move-assigned");
+                eeng::LogGlobals::log("MockResource1 move-assigned");
             }
             return *this;
         }
@@ -75,7 +76,7 @@ namespace eeng
 
         // Destructor
         ~MockResource1() {
-            eeng::Log("MockResource1 destroyed");
+            eeng::LogGlobals::log("MockResource1 destroyed");
         }
     };
 

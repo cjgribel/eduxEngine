@@ -10,10 +10,11 @@
 #include "glcommon.h"
 #include "ShaderLoader.h"
 #include "Log.hpp"
+#include "LogGlobals.hpp"
 
 namespace
 {
-    std::string file_to_string(const std::string &filename)
+    std::string file_to_string(const std::string& filename)
     {
         std::ifstream file(filename);
         if (!file.is_open())
@@ -38,19 +39,19 @@ namespace eeng
             glDeleteProgram(phongShader);
     }
 
-    void ForwardRenderer::init(const std::string &vertShaderPath,
-                               const std::string &fragShaderPath)
+    void ForwardRenderer::init(const std::string& vertShaderPath,
+        const std::string& fragShaderPath)
     {
-        Log("Compiling shaders %s, %s",
-                 vertShaderPath.c_str(),
-                 fragShaderPath.c_str());
+        LogGlobals::log("Compiling shaders %s, %s",
+            vertShaderPath.c_str(),
+            fragShaderPath.c_str());
         auto vertSource = file_to_string(vertShaderPath);
         auto fragSource = file_to_string(fragShaderPath);
         phongShader = createShaderProgram(vertSource.c_str(), fragSource.c_str());
 
         // Bind shader samplers to texture units
         glUseProgram(phongShader);
-        for (auto &textureDesc : texturesDescs)
+        for (auto& textureDesc : texturesDescs)
         {
             glUniform1i(glGetUniformLocation(phongShader, textureDesc.samplerName), textureDesc.textureUnit);
         }
@@ -60,11 +61,11 @@ namespace eeng
         // placeholder_texture = create_checker_texture();
     }
 
-    void ForwardRenderer::beginPass(const glm::mat4 &ProjMatrix,
-                                    const glm::mat4 &ViewMatrix,
-                                    const glm::vec3 &lightPos,
-                                    const glm::vec3 &lightColor,
-                                    const glm::vec3 &eyePos)
+    void ForwardRenderer::beginPass(const glm::mat4& ProjMatrix,
+        const glm::mat4& ViewMatrix,
+        const glm::vec3& lightPos,
+        const glm::vec3& lightColor,
+        const glm::vec3& eyePos)
     {
         EENG_ASSERT(phongShader, "Renderer not initialized");
 
@@ -139,21 +140,21 @@ namespace eeng
     }
 
     void ForwardRenderer::renderMesh(const std::shared_ptr<RenderableMesh> mesh,
-                                     const glm::mat4 &WorldMatrix)
+        const glm::mat4& WorldMatrix)
     {
         // Bind bone matrices
         if (mesh->boneMatrices.size())
             glUniformMatrix4fv(glGetUniformLocation(phongShader, "BoneMatrices"),
-                               (GLsizei)mesh->boneMatrices.size(),
-                               0,
-                               glm::value_ptr(mesh->boneMatrices[0]));
+                (GLsizei)mesh->boneMatrices.size(),
+                0,
+                glm::value_ptr(mesh->boneMatrices[0]));
 
         glBindVertexArray(mesh->m_VAO);
 
         for (uint i = 0; i < mesh->m_meshes.size(); i++)
         {
-            const auto &submesh = mesh->m_meshes[i];
-            const auto &mtl = mesh->m_materials[submesh.mtl_index];
+            const auto& submesh = mesh->m_meshes[i];
+            const auto& mtl = mesh->m_materials[submesh.mtl_index];
 
             if (submesh.node_index != EENG_NULL_INDEX && !submesh.is_skinned)
             {
@@ -180,7 +181,7 @@ namespace eeng
             glUniform1f(glGetUniformLocation(phongShader, "shininess"), mtl.shininess);
 
             // Bind textures and texture flags
-            for (auto &textureDesc : texturesDescs)
+            for (auto& textureDesc : texturesDescs)
             {
                 // if (texture.textureTypeIndex == TextureTypeIndex::Cubemap) continue;
                 const int textureIndex = mtl.textureIndices[textureDesc.textureTypeIndex];
@@ -198,14 +199,14 @@ namespace eeng
 
             // Render
             glDrawElementsBaseVertex(GL_TRIANGLES,
-                                     submesh.nbr_indices,
-                                     GL_UNSIGNED_INT,
-                                     (GLvoid *)(sizeof(uint) * submesh.base_index),
-                                     submesh.base_vertex);
+                submesh.nbr_indices,
+                GL_UNSIGNED_INT,
+                (GLvoid*)(sizeof(uint) * submesh.base_index),
+                submesh.base_vertex);
             drawcallCounter++;
 
             // Unbind textures
-            for (auto &texture : texturesDescs)
+            for (auto& texture : texturesDescs)
             {
                 glActiveTexture(GL_TEXTURE0 + texture.textureUnit);
                 glBindTexture(GL_TEXTURE_2D, 0);

@@ -71,7 +71,7 @@ namespace eeng
             std::unique_ptr<IResourceManager> resource_manager,
             std::unique_ptr<IGuiManager> gui_manager,
             std::unique_ptr<IInputManager> input_manager,
-            std::unique_ptr<ILogManager> log_manager);
+            std::shared_ptr<ILogManager> log_manager);
 
         ~EngineContext();
 
@@ -79,7 +79,7 @@ namespace eeng
         std::unique_ptr<IResourceManager>   resource_manager; // NOTE: is cast to ResourceManager by client
         std::unique_ptr<IGuiManager>        gui_manager;
         std::unique_ptr<IInputManager>      input_manager;
-        std::unique_ptr<ILogManager>        log_manager;
+        std::shared_ptr<ILogManager>        log_manager;
         std::unique_ptr<ThreadPool>         thread_pool;
         std::unique_ptr<EventQueue>         event_queue;
         std::unique_ptr<EngineConfig>       engine_config;

@@ -1,17 +1,16 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-#include <entt/entt.hpp>
+#include "Game.hpp"
 #include "glmcommon.hpp"
 #include "imgui.h"
-#include "Log.hpp"
-#include "Game.hpp"
-
-// --> ENGINE API
-#include "AssimpImporter.hpp"
-#include "MockImporter.hpp"
+#include "Log.hpp" // remove
+#include "LogMacros.h"
+#include <entt/entt.hpp>
 
 // FOR TESTS
+#include "AssimpImporter.hpp" // --> ENGINE API
+#include "MockImporter.hpp" // --> ENGINE API
 #include "ResourceTypes.h"
 #include "ResourceManager.hpp" // eeng::ResourceManager
 
@@ -21,10 +20,10 @@ namespace {
     // Log all registered resource types
     void logRegisteredResourceTypes(eeng::ResourceRegistry& registry)
     {
-        eeng::Log("Registered resource types");
-        eeng::Log("Meshes:");
+        EENG_LOG("Registered resource types");
+        EENG_LOG("Meshes:");
         registry.for_all<eeng::Mesh>([](eeng::Mesh& m) {
-            eeng::Log("Mesh value %zu", m.x);
+            EENG_LOG("Mesh value %zu", m.x);
             });
     }
 #endif
@@ -198,7 +197,7 @@ bool Game::init()
     // RESOURCE REGISTRY TEST
 #if 1
     {
-        eeng::Log("Storage test begins");
+        EENG_LOG(ctx, "Storage test begins");
         eeng::Storage storage; // <- Engine API
 
         // RUNTIME
@@ -222,7 +221,7 @@ bool Game::init()
         // Get & "use" resource
         // Cast meta_any to resource type
         // ...
-        eeng::Log("get resource 1");
+        EENG_LOG(ctx, "get resource 1");
         {
             // Non-const get and mutation
             entt::meta_any meta_any1 = storage.get(meta_handle1);
@@ -246,7 +245,7 @@ bool Game::init()
                 assert(meta_any1.base().policy() == entt::any_policy::ref);
                 auto& val = meta_any1.cast<eeng::MockResource1&>();
                 val.x = 10;
-                eeng::Log("Valid resource found");
+                EENG_LOG(ctx, "Valid resource found");
             }
             else assert(0 && "Valid should exist");
         }
@@ -259,7 +258,7 @@ bool Game::init()
                 assert(meta_any1.base().policy() == entt::any_policy::cref);
                 const auto& cval = meta_any1.cast<const eeng::MockResource1&>();
                 assert(cval.x == 10);
-                eeng::Log("Valid resource found");
+                EENG_LOG(ctx, "Valid resource found");
             }
             else assert(0 && "Valid should exist");
         }
@@ -269,7 +268,7 @@ bool Game::init()
             if (auto maybe_meta_any = storage.try_get(meta_handle)) {
                 assert(0 && "Invalid handle found");
             }
-            else { eeng::Log("Invalid resource not found"); };
+            else { EENG_LOG(ctx, "Invalid resource not found"); };
         }
 
         // Remove resource from ResourceRegistry/Storage
@@ -294,7 +293,7 @@ bool Game::init()
 
         */
 
-        eeng::Log("Storage test ends");
+        EENG_LOG(ctx, "Storage test ends");
     }
 #endif
 #if 0
@@ -475,7 +474,7 @@ void Game::update(
         auto ray = glm_aux::world_ray_from_window_coords(windowPos, matrices.V, matrices.P, matrices.VP);
         // Intersect with e.g. AABBs ...
 
-        eeng::Log("Picking ray origin = %s, dir = %s",
+        EENG_LOG(ctx, "Picking ray origin = %s, dir = %s",
             glm_aux::to_string(ray.origin).c_str(),
             glm_aux::to_string(ray.dir).c_str());
     }

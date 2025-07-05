@@ -15,7 +15,7 @@ namespace eeng
             std::make_unique<ResourceManager>(),
             std::make_unique<GuiManager>(),
             std::make_unique<InputManager>(),
-            std::make_unique<LogManager>()
+            std::make_shared<LogManager>()
         );
         return std::make_unique<Engine>(ctx);
     }

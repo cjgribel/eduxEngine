@@ -13,6 +13,8 @@
 
 #include "InputManager.hpp" // <- remove
 #include "Log.hpp"
+#include "LogMacros.h"
+#include "LogGlobals.hpp"
 #include "MetaReg.hpp"
 
 #include "ImGuiBackendSDL.hpp"
@@ -36,30 +38,49 @@ namespace eeng
         window_width = width;
         window_height = height;
 
-        if (!init_sdl(title, width, height))
-            return false;
+        // Set the global logger
+        eeng::LogGlobals::set_logger(ctx->log_manager);
 
-        if (!init_opengl())
-            return false;
+        if (!init_sdl(title, width, height))    return false;
+        if (!init_opengl())                     return false;
+        if (!init_imgui())                      return false;
 
-        if (!init_imgui())
-            return false;
+#ifdef EENG_DEBUG
+        EENG_LOG_INFO(ctx, "Mode DEBUG");
+#else
+        EENG_LOG_INFO(ctx, "Mode RELEASE");
+#endif
 
-        // Log some info about the OpenGL context
-        LOG_DEFINES(eeng::Log);
+#ifdef EENG_COMPILER_MSVC
+        EENG_LOG_INFO(ctx, "Compiler MSVC");
+#elif defined(EENG_COMPILER_CLANG)
+        EENG_LOG_INFO(ctx, "Compiler Clang");
+#elif defined(EENG_COMPILER_GCC)
+        EENG_LOG_INFO(ctx, "Compiler GCC");
+#endif
+
+#ifdef CPP20_SUPPORTED
+        EENG_LOG_INFO(ctx, "C++ version 20");
+#elif defined(CPP17_SUPPORTED)
+        EENG_LOG_INFO(ctx, "C++ version 17");
+#elif defined(CPP14_SUPPORTED)
+        EENG_LOG_INFO(ctx, "C++ version 14");
+#elif defined(CPP11_SUPPORTED)
+        EENG_LOG_INFO(ctx, "C++ version 11");
+#endif
+
         {
             int glMinor, glMajor;
             SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &glMinor);
             SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &glMajor);
-            eeng::Log("GL version %i.%i (requested), %i.%i (actual)", EENG_GLVERSION_MAJOR, EENG_GLVERSION_MINOR, glMajor, glMinor);
+            EENG_LOG_INFO(ctx, "GL version %i.%i (requested), %i.%i (actual)", EENG_GLVERSION_MAJOR, EENG_GLVERSION_MINOR, glMajor, glMinor);
         }
 
-        // Log some info about the MSAA settings
 #ifdef EENG_MSAA
         {
             int actualMSAA;
             SDL_GL_GetAttribute(SDL_GL_MULTISAMPLESAMPLES, &actualMSAA);
-            eeng::Log("MSAA %i (requested), %i (actual)", EENG_MSAA_SAMPLES, actualMSAA);
+            EENG_LOG_INFO(ctx, "MSAA %i (requested), %i (actual)", EENG_MSAA_SAMPLES, actualMSAA);
         }
 #endif
 
@@ -72,7 +93,7 @@ namespace eeng
 #elif defined(EENG_GLVERSION_41)
             glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
 #endif
-            eeng::Log("Anisotropic samples %i (requested), %i (max))", EENG_ANISO_SAMPLES, (int)maxAniso);
+            EENG_LOG_INFO(ctx, "Anisotropic samples %i (requested), %i (max))", EENG_ANISO_SAMPLES, (int)maxAniso);
         }
 #endif
 
@@ -94,7 +115,7 @@ namespace eeng
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowLogWindow, true);
 
-        eeng::Log("Engine initialized successfully.");
+        EENG_LOG(ctx, "Engine initialized successfully.");
         return true;
     }
 
@@ -105,7 +126,7 @@ namespace eeng
         bool running = true;
         float time_s = 0.0f, time_ms, deltaTime_s = 0.016f;
 
-        eeng::Log("Entering main loop...");
+        EENG_LOG(ctx, "Entering main loop...");
         while (running)
         {
             const auto now_ms = SDL_GetTicks();
@@ -154,7 +175,7 @@ namespace eeng
     {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
         {
-            eeng::Log("SDL_Init failed: %s", SDL_GetError());
+            std::cerr << "SDL_Init failed: " << SDL_GetError() << std::endl;
             return false;
         }
 
@@ -174,14 +195,14 @@ namespace eeng
             SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
         if (!window_)
         {
-            eeng::Log("Failed to create SDL window: %s", SDL_GetError());
+            std::cerr << "Failed to create SDL window: " << SDL_GetError() << std::endl;
             return false;
         }
 
         gl_context_ = SDL_GL_CreateContext(window_);
         if (!gl_context_)
         {
-            eeng::Log("Failed to create GL context: %s", SDL_GetError());
+            std::cerr << "Failed to create GL context: " << SDL_GetError() << std::endl;
             return false;
         }
 
@@ -196,7 +217,7 @@ namespace eeng
         GLenum err = glewInit();
         if (err != GLEW_OK)
         {
-            eeng::Log("GLEW initialization failed: %s", glewGetErrorString(err));
+            std::cerr << "GLEW initialization failed: " << glewGetErrorString(err) << std::endl;
             return false;
         }
 

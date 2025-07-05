@@ -114,34 +114,6 @@ static void EENG_ERROR(std::string_view fmt, Args &&...args)
 static_assert(false, "OpenGL 4.1 is required");
 #endif
 
-/// Print defines
-static void LOG_DEFINES(auto& LogFunc)
-{
-#ifdef EENG_DEBUG
-    LogFunc("Mode DEBUG");
-#else
-    LogFunc("Mode RELEASE");
-#endif
-
-#ifdef EENG_COMPILER_MSVC
-    LogFunc("Compiler MSVC");
-#elif defined(EENG_COMPILER_CLANG)
-    LogFunc("Compiler Clang");
-#elif defined(EENG_COMPILER_GCC)
-    LogFunc("Compiler GCC");
-#endif
-
-#ifdef CPP20_SUPPORTED
-    LogFunc("C++ version 20");
-#elif defined(CPP17_SUPPORTED)
-    LogFunc("C++ version 17");
-#elif defined(CPP14_SUPPORTED)
-    LogFunc("C++ version: 14");
-#elif defined(CPP11_SUPPORTED)
-    LogFunc("C++ version 11");
-#endif
-}
-
 /// Convert an enum class to its underlying type
 template <typename E>
 constexpr auto to_integral(E e) -> typename std::underlying_type<E>::type

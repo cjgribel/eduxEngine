@@ -232,6 +232,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogGlobals.cpp
     )
 
 set_target_properties(Module1 PROPERTIES

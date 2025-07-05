@@ -640,7 +640,7 @@ namespace eeng
 
                 // Debug log
                 // std::string type_name(type.info().name());
-                // eeng::Log("Created storage for type %s", type_name.c_str());
+                // EENG_LOG(ctx, "Created storage for type %s", type_name.c_str());
             }
             return meta_id;
         }
