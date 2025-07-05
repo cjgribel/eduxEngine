@@ -12,13 +12,11 @@
 #include <memory>
 
 #include "InputManager.hpp" // <- remove
-#include "Log.hpp"
 #include "LogMacros.h"
 #include "LogGlobals.hpp"
 #include "MetaReg.hpp"
 
 #include "ImGuiBackendSDL.hpp"
-// #include "EngineContext.hpp"
 #include "EventQueue.h"
 
 namespace eeng
@@ -137,10 +135,6 @@ namespace eeng
 
             process_events(running);
             begin_frame();
-            // imgui_backend_begin_frame();
-            // ImGui::ShowDemoWindow(); // TODO move to imgui backend
-            // render_info_UI();
-            // eeng::LogDraw("Log");
 
             game->update(time_s, deltaTime_s, input);
             game->render(time_s, window_width, window_height);
@@ -161,7 +155,7 @@ namespace eeng
     void Engine::shutdown()
     {
         ctx->gui_manager->release();
-        imgui_backend_shutdown();
+        imgui_backend::shutdown();
 
         if (gl_context_)
             SDL_GL_DeleteContext(gl_context_);
@@ -231,9 +225,9 @@ namespace eeng
 
     bool Engine::init_imgui()
     {
-        if (!imgui_backend_init(window_, gl_context_))
+        if (!imgui_backend::init(window_, gl_context_))
         {
-            Log("Failed to initialize ImGui backend");
+            std::cerr <<  "Failed to initialize ImGui backend" << std::endl;
             return false;
         }
         ctx->gui_manager->init();
@@ -245,20 +239,20 @@ namespace eeng
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
-            imgui_backend_process_event(&event);
+            imgui_backend::process_event(&event);
 
             // Skip mouse events if ImGui is capturing mouse input.
             if ((event.type == SDL_MOUSEMOTION ||
                 event.type == SDL_MOUSEBUTTONDOWN ||
                 event.type == SDL_MOUSEBUTTONUP) &&
-                ImGui::GetIO().WantCaptureMouse) // TODO move to imgui backend
+                imgui_backend::want_capture_mouse())
             {
                 continue;
             }
 
             // Skip keyboard events if ImGui is capturing keyboard input.
             if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) &&
-                ImGui::GetIO().WantCaptureKeyboard) // TODO move to imgui backend
+                imgui_backend::want_capture_keyboard())
             {
                 continue;
             }
@@ -273,12 +267,10 @@ namespace eeng
 
     void Engine::begin_frame()
     {
-        imgui_backend_begin_frame();
-        ImGui::ShowDemoWindow(); // TODO move to imgui backend
-        render_info_UI();
-        eeng::LogDraw("Log"); // REMOVE
-        //
-        // ctx->log_manager->log("Hello");
+        imgui_backend::begin_frame();
+
+        imgui_backend::show_demo_window();
+        ctx->gui_manager->draw(*ctx);
 
         // Set up OpenGL state:
 
@@ -319,12 +311,7 @@ namespace eeng
 
     void Engine::end_frame()
     {
-        imgui_backend_end_frame();
-    }
-
-    void Engine::render_info_UI()
-    {
-        ctx->gui_manager->draw(*ctx);
+        imgui_backend::end_frame();
     }
 
     void Engine::on_set_vsync(const SetVsyncEvent& e)

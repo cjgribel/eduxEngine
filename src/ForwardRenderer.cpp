@@ -9,7 +9,6 @@
 #include "ForwardRenderer.hpp"
 #include "glcommon.h"
 #include "ShaderLoader.h"
-#include "Log.hpp"
 #include "LogGlobals.hpp"
 
 namespace

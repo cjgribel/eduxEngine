@@ -4,7 +4,6 @@
 #include "Game.hpp"
 #include "glmcommon.hpp"
 #include "imgui.h"
-#include "Log.hpp" // remove
 #include "LogMacros.h"
 #include <entt/entt.hpp>
 

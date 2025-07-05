@@ -33,7 +33,7 @@ namespace eeng
 
     void GuiManager::draw_log(EngineContext& ctx) const
     {
-        static_cast<LogManager&>(*ctx.log_manager).draw_gui_widget("Log2");
+        static_cast<LogManager&>(*ctx.log_manager).draw_gui_widget("Log");
     }
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const

@@ -16,7 +16,6 @@
 #include "Handle.h"
 #include "Guid.h"
 #include "PoolAllocatorTFH.h"
-#include "Log.hpp"
 
 namespace eeng
 {

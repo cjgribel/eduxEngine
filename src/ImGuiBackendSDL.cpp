@@ -5,9 +5,9 @@
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
 
-namespace eeng
+namespace eeng::imgui_backend
 {
-    bool imgui_backend_init(SDL_Window* window, SDL_GLContext context)
+    bool init(SDL_Window* window, SDL_GLContext context)
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -16,28 +16,43 @@ namespace eeng
             && ImGui_ImplOpenGL3_Init("#version 410 core");
     }
 
-    void imgui_backend_shutdown()
+    void shutdown()
     {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplSDL2_Shutdown();
         ImGui::DestroyContext();
     }
 
-    void imgui_backend_process_event(const SDL_Event* event)
+    void process_event(const SDL_Event* event)
     {
         ImGui_ImplSDL2_ProcessEvent(event);
     }
 
-    void imgui_backend_begin_frame()
+    void begin_frame()
     {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
     }
 
-    void imgui_backend_end_frame()
+    void end_frame()
     {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
+
+    bool want_capture_keyboard()
+    {
+        return ImGui::GetIO().WantCaptureKeyboard;
+    }
+
+    bool want_capture_mouse()
+    {
+        return ImGui::GetIO().WantCaptureMouse;
+    }
+
+    void show_demo_window()
+    {
+        ImGui::ShowDemoWindow();
     }
 }

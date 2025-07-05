@@ -24,7 +24,6 @@ namespace eeng
     {
     public:
         /** Constructor */
-        // Engine();
         explicit Engine(std::shared_ptr<EngineContext> ctx);
 
         /** Destructor, calls shutdown() */
@@ -99,9 +98,6 @@ namespace eeng
 
         /** Finish frame rendering. */
         void end_frame();
-
-        /** Render debug and information UI using ImGui. */
-        void render_info_UI(); // <- move out
 
         void on_set_vsync(const SetVsyncEvent& e);
         void on_set_wireframe(const SetWireFrameRenderingEvent& e);

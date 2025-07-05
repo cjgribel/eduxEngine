@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <cstdint>
 #include "Handle.h"
-#include "Log.hpp"
 #include "LogGlobals.hpp"
 // #include "hash_combine.h"
 
