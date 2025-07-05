@@ -38,6 +38,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/resources/importers)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/util)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/gui)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/input)
 
 #
 # OpenGL
@@ -211,7 +212,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EngineFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GLDebugMessageCallback.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/glmcommon.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/InputManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/input/InputManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderableMesh.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ForwardRenderer.cpp
@@ -230,6 +231,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp
     )
 
 set_target_properties(Module1 PROPERTIES

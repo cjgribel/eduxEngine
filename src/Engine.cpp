@@ -92,6 +92,7 @@ namespace eeng
 
         // Gui flags
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowLogWindow, true);
 
         eeng::Log("Engine initialized successfully.");
         return true;
@@ -115,6 +116,10 @@ namespace eeng
 
             process_events(running);
             begin_frame();
+            // imgui_backend_begin_frame();
+            // ImGui::ShowDemoWindow(); // TODO move to imgui backend
+            // render_info_UI();
+            // eeng::LogDraw("Log");
 
             game->update(time_s, deltaTime_s, input);
             game->render(time_s, window_width, window_height);
@@ -250,7 +255,9 @@ namespace eeng
         imgui_backend_begin_frame();
         ImGui::ShowDemoWindow(); // TODO move to imgui backend
         render_info_UI();
-        eeng::LogDraw("Log");
+        eeng::LogDraw("Log"); // REMOVE
+        //
+        // ctx->log_manager->log("Hello");
 
         // Set up OpenGL state:
 
@@ -296,7 +303,7 @@ namespace eeng
 
     void Engine::render_info_UI()
     {
-        ctx->gui_manager->draw_engine_info(*ctx);
+        ctx->gui_manager->draw(*ctx);
     }
 
     void Engine::on_set_vsync(const SetVsyncEvent& e)

@@ -18,9 +18,12 @@ namespace eeng
         void set_flag(GuiFlags flag, bool enabled) override;
         bool is_flag_enabled(GuiFlags flag) const override;
 
-        void draw_engine_info(EngineContext& ctx) const override;
+        void draw(EngineContext& ctx) const override;
 
     private:
+        void draw_engine_info(EngineContext& ctx) const;
+        void draw_log(EngineContext& ctx) const;
+
         std::unordered_map<GuiFlags, bool> flags;
     };
 

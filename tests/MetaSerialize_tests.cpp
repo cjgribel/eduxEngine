@@ -48,7 +48,7 @@ namespace
         void init() override {}
         void release() override {}
 
-        void draw_engine_info(EngineContext& ctx) const override {}
+        void draw(EngineContext& ctx) const override {}
 
         void set_flag(GuiFlags flag, bool enabled) override {}
         bool is_flag_enabled(GuiFlags flag) const override { return false; }
@@ -68,6 +68,13 @@ namespace
         MouseState m_state;
         ControllerState c_state;
         ControllerMap c_map;
+    };
+
+    class MockLogManager : public ILogManager
+    {
+    public:
+        void log(const char* fmt, ...) override {}
+        void clear() override {}
     };
 
     struct vec2
@@ -203,7 +210,8 @@ protected:
         std::make_unique<MockEntityRegistry>(),
         std::make_unique<MockResourceManager>(),
         std::make_unique<MockGuiManager>(),
-        std::make_unique<MockInputManager>()
+        std::make_unique<MockInputManager>(),
+        std::make_unique<MockLogManager>()
     };
 
     static void SetUpTestSuite()

@@ -4,6 +4,7 @@
 #include "ResourceManager.hpp"
 #include "GuiManager.hpp"
 #include "InputManager.hpp"
+#include "LogManager.hpp"
 
 namespace eeng
 {
@@ -13,7 +14,8 @@ namespace eeng
             std::make_unique<EntityManager>(),
             std::make_unique<ResourceManager>(),
             std::make_unique<GuiManager>(),
-            std::make_unique<InputManager>()
+            std::make_unique<InputManager>(),
+            std::make_unique<LogManager>()
         );
         return std::make_unique<Engine>(ctx);
     }

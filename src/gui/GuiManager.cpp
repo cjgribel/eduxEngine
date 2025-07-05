@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "GuiManager.hpp"
+#include "LogManager.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -21,10 +22,22 @@ namespace eeng
 
     }
 
+    void GuiManager::draw(EngineContext& ctx) const
+    {
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
+            draw_engine_info(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowLogWindow))
+            draw_log(ctx);
+    }
+
+    void GuiManager::draw_log(EngineContext& ctx) const
+    {
+        static_cast<LogManager&>(*ctx.log_manager).draw_gui_widget("Log2");
+    }
+
     void GuiManager::draw_engine_info(EngineContext& ctx) const
     {
-        if (!ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
-            return;
 
         ImGui::Begin("Engine Info");
 

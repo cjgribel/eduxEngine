@@ -11,10 +11,11 @@ namespace eeng
     enum class GuiFlags : uint8_t
     {
         ShowEngineInfo,
-        ShowResourceViewer,
-        ShowSceneGraph,
-        ShowRenderStats,
-        ShowInputDebugger,
+        ShowLogWindow
+        // ShowResourceViewer,
+        // ShowSceneGraph,
+        // ShowRenderStats,
+        // ShowInputDebugger,
         // ...
     };
 
@@ -27,7 +28,7 @@ namespace eeng
         virtual void set_flag(GuiFlags flag, bool enabled) = 0;
         virtual bool is_flag_enabled(GuiFlags flag) const = 0;
         
-        virtual void draw_engine_info(EngineContext& ctx) const = 0;
+        virtual void draw(EngineContext& ctx) const = 0;
         
         virtual ~IGuiManager() = default;
     };
