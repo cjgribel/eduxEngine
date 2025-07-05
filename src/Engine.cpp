@@ -16,14 +16,8 @@
 #include "MetaReg.hpp"
 
 #include "ImGuiBackendSDL.hpp"
-#include "EngineContext.hpp"
+// #include "EngineContext.hpp"
 #include "EventQueue.h"
-
-// ->
-#include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_opengl3.h"
-// -> IGuiManager
 
 namespace eeng
 {
@@ -89,6 +83,12 @@ namespace eeng
         // Event subscriptions
         ctx->event_queue->register_callback([&](const SetVsyncEvent& event) { this->on_set_vsync(event); });
         ctx->event_queue->register_callback([&](const SetWireFrameRenderingEvent& event) { this->on_set_wireframe(event); });
+        ctx->event_queue->register_callback([&](const SetMinFrameTimeEvent& event) { this->on_set_min_frametime(event); });
+
+        // Engine config
+        ctx->engine_config->set_flag(EngineFlag::VSync, true);
+        ctx->engine_config->set_flag(EngineFlag::WireframeRendering, false);
+        ctx->engine_config->set_value(EngineValue::MinFrameTime, 1000.0f / 60.0f);
 
         // Gui flags
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
@@ -219,20 +219,20 @@ namespace eeng
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
-            ImGui_ImplSDL2_ProcessEvent(&event);
+            imgui_backend_process_event(&event);
 
             // Skip mouse events if ImGui is capturing mouse input.
             if ((event.type == SDL_MOUSEMOTION ||
                 event.type == SDL_MOUSEBUTTONDOWN ||
                 event.type == SDL_MOUSEBUTTONUP) &&
-                ImGui::GetIO().WantCaptureMouse)
+                ImGui::GetIO().WantCaptureMouse) // TODO move to imgui backend
             {
                 continue;
             }
 
             // Skip keyboard events if ImGui is capturing keyboard input.
             if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) &&
-                ImGui::GetIO().WantCaptureKeyboard)
+                ImGui::GetIO().WantCaptureKeyboard) // TODO move to imgui backend
             {
                 continue;
             }
@@ -248,7 +248,7 @@ namespace eeng
     void Engine::begin_frame()
     {
         imgui_backend_begin_frame();
-        ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow(); // TODO move to imgui backend
         render_info_UI();
         eeng::LogDraw("Log");
 
@@ -297,103 +297,6 @@ namespace eeng
     void Engine::render_info_UI()
     {
         ctx->gui_manager->draw_engine_info(*ctx);
-
-        // remove -->
-
-        // Start a ImGui window
-        ImGui::Begin("Engine Info X");
-
-        if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            // Mouse state
-            auto mouse = input->GetMouseState();
-            ImGui::Text("Mouse pos (%i, %i) %s%s",
-                mouse.x,
-                mouse.y,
-                mouse.leftButton ? "L" : "",
-                mouse.rightButton ? "R" : "");
-
-            // Framerate
-            ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-            // Combo (drop-down) for fps settings
-            static const char* items[] = { "10", "30", "60", "120", "Uncapped" };
-            static int currentItem = 2;
-            if (ImGui::BeginCombo("FPS cap##targetfps", items[currentItem]))
-            {
-                for (int i = 0; i < IM_ARRAYSIZE(items); i++)
-                {
-                    const bool isSelected = (currentItem == i);
-                    if (ImGui::Selectable(items[i], isSelected))
-                        currentItem = i;
-
-                    if (isSelected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-            if (currentItem == 0)
-                min_frametime_ms = 1000.0f / 10;
-            else if (currentItem == 1)
-                min_frametime_ms = 1000.0f / 30;
-            else if (currentItem == 2)
-                min_frametime_ms = 1000.0f / 60;
-            else if (currentItem == 3)
-                min_frametime_ms = 1000.0f / 120;
-            else if (currentItem == 4)
-                min_frametime_ms = 0.0f;
-
-            if (ImGui::Checkbox("V-Sync", &vsync))
-            {
-                SDL_GL_SetSwapInterval(vsync);
-            }
-
-            ImGui::SameLine();
-            ImGui::Checkbox("Wireframe rendering", &wireframe_mode);
-
-            // if (SOUND_PLAY)
-            // {
-            //     if (ImGui::Button("Pause sound"))
-            //     {
-            //         SDL_PauseAudioDevice(deviceId, 1);
-            //         SOUND_PLAY = false;
-            //     }
-            // }
-            // else
-            // {
-            //     if (ImGui::Button("Play sound"))
-            //     {
-            //         SDL_PauseAudioDevice(deviceId, 0);
-            //         SOUND_PLAY = true;
-            //     }
-            // }
-        }
-
-        if (ImGui::CollapsingHeader("Controllers", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            ImGui::Text("Controllers connected: %i", ctx->input_manager->GetConnectedControllerCount());
-
-            for (auto& [id, state] : ctx->input_manager->GetControllers())
-            {
-                ImGui::PushID(id);
-                ImGui::BeginChild("Controller", ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 6), true);
-
-                ImGui::Text("Controller %i: '%s'", id, state.name.c_str());
-                ImGui::Text("Left stick:  X: %.2f  Y: %.2f", state.axisLeftX, state.axisLeftY);
-                ImGui::Text("Right stick: X: %.2f  Y: %.2f", state.axisRightX, state.axisRightY);
-                ImGui::Text("Triggers:    L: %.2f  R: %.2f", state.triggerLeft, state.triggerRight);
-                std::string buttons;
-                for (const auto& [buttonId, isPressed] : state.buttonStates)
-                    buttons += "#" + std::to_string(buttonId) + "(" + (isPressed ? "1) " : "0) ");
-                ImGui::Text("Buttons: %s", buttons.c_str());
-
-                ImGui::EndChild();
-                ImGui::PopID();
-            }
-        }
-
-        // End ImGui window
-        ImGui::End();
     }
 
     void Engine::on_set_vsync(const SetVsyncEvent& e)
@@ -405,6 +308,11 @@ namespace eeng
     void Engine::on_set_wireframe(const SetWireFrameRenderingEvent& e)
     {
         wireframe_mode = e.enabled;
+    }
+
+    void Engine::on_set_min_frametime(const SetMinFrameTimeEvent& e)
+    {
+        min_frametime_ms = e.dt;
     }
 
 } // namespace eeng

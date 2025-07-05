@@ -12,26 +12,54 @@ namespace eeng
     {
     }
 
-    void EngineConfig::set_vsync(bool enabled)
+    void EngineConfig::set_flag(EngineFlag flag, bool enabled)
     {
-        if (vsync != enabled)
+        if (flags[flag] != enabled)
         {
-            vsync = enabled;
-            event_queue.dispatch(SetVsyncEvent{ enabled });
+            flags[flag] = enabled;
+
+            switch (flag)
+            {
+            case EngineFlag::VSync:
+                event_queue.dispatch(SetVsyncEvent{ enabled });
+                break;
+            case EngineFlag::WireframeRendering:
+                event_queue.dispatch(SetWireFrameRenderingEvent{ enabled });
+                break;
+            }
         }
     }
 
-    void EngineConfig::set_wireframe(bool enabled)
+    bool EngineConfig::get_flag(EngineFlag flag) const
     {
-        if (wireframe_mode != enabled)
+        auto it = flags.find(flag);
+        return it != flags.end() ? it->second : false;
+    }
+
+    void EngineConfig::set_value(EngineValue key, float new_value)
+    {
+        float& current = values[key];
+        if (current != new_value)
         {
-            wireframe_mode = enabled;
-            event_queue.dispatch(SetWireFrameRenderingEvent{ enabled });
+            current = new_value;
+
+            switch (key)
+            {
+            case EngineValue::MinFrameTime:
+                event_queue.dispatch(SetMinFrameTimeEvent{ new_value });
+                break;
+            case EngineValue::MasterVolume:
+                // ...
+                break;
+            }
         }
     }
 
-    bool EngineConfig::is_vsync_enabled() const { return vsync; }
-    bool EngineConfig::is_wireframe_enabled() const { return wireframe_mode; }
+    float EngineConfig::get_value(EngineValue key) const
+    {
+        auto it = values.find(key);
+        return it != values.end() ? it->second : 0.0f;
+    }
 
     EngineContext::EngineContext(
         std::unique_ptr<IEntityManager> entity_manager,

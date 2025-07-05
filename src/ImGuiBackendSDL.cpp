@@ -23,6 +23,11 @@ namespace eeng
         ImGui::DestroyContext();
     }
 
+    void imgui_backend_process_event(const SDL_Event* event)
+    {
+        ImGui_ImplSDL2_ProcessEvent(event);
+    }
+
     void imgui_backend_begin_frame()
     {
         ImGui_ImplOpenGL3_NewFrame();

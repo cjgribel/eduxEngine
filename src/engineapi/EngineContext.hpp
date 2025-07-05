@@ -19,28 +19,47 @@ namespace eeng
     - Resource manager
     - Thread pool
     - Event dispatcher
+    - (TODO?) Logger
     - (TODO) CommandQueue
     - (TODO?) Scene manager
-    - (TODO?) Logger
     */
 
     struct SetVsyncEvent { bool enabled; };
     struct SetWireFrameRenderingEvent { bool enabled; };
+    struct SetMinFrameTimeEvent { float dt; };
+
+    enum class EngineFlag : uint8_t
+    {
+        VSync,
+        WireframeRendering,
+        // ...
+    };
+
+    enum class EngineValue : uint8_t
+    {
+        MinFrameTime,
+        MasterVolume,
+        // ...
+    };
 
     class EngineConfig
     {
     public:
         explicit EngineConfig(EventQueue& event_queue);
 
-        void set_vsync(bool enabled);
-        void set_wireframe(bool enabled);
+        // --- Flag handling ---
+        void set_flag(EngineFlag flag, bool enabled);
 
-        bool is_vsync_enabled() const;
-        bool is_wireframe_enabled() const;
+        bool get_flag(EngineFlag flag) const;
+
+        // --- Value handling ---
+        void set_value(EngineValue key, float new_value);
+
+        float get_value(EngineValue key) const;
 
     private:
-        bool vsync = true;
-        bool wireframe_mode = false;
+        std::unordered_map<EngineFlag, bool> flags;
+        std::unordered_map<EngineValue, float> values;
         EventQueue& event_queue;
     };
 
