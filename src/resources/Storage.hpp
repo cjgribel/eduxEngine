@@ -220,6 +220,9 @@ namespace eeng
             virtual size_t retain(const MetaHandle& mh) = 0;
             virtual size_t release_and_destroy(const MetaHandle& mh) = 0;
 
+            virtual size_t element_size() const noexcept = 0;
+            virtual size_t count_free() const noexcept = 0;
+            virtual size_t capacity() const noexcept = 0;
             virtual bool valid(const MetaHandle& mh) const noexcept = 0;
             virtual void clear() noexcept = 0;
 
@@ -480,6 +483,23 @@ namespace eeng
                 }
 
                 return cnt;
+            }
+
+            size_t element_size() const noexcept override
+            {
+                return sizeof(T);
+            }
+
+            size_t count_free() const noexcept override
+            {
+                std::lock_guard lock{ m_mutex };
+                return m_pool.count_free();
+            }
+
+            size_t capacity() const noexcept override
+            {
+                std::lock_guard lock{ m_mutex };
+                return m_pool.capacity();
             }
 
             bool valid(const Handle<T>& h) const noexcept
@@ -745,7 +765,7 @@ namespace eeng
         entt::meta_any get(const MetaHandle& meta_handle) const
         {
             std::lock_guard lock{ storage_mutex };
-            return get_pool(meta_handle.type).get(meta_handle);
+            return get_pool(meta_handle.type.id()).get(meta_handle);
         }
 
         /// @brief Runtime-typed get (not thread-safe)
@@ -753,7 +773,7 @@ namespace eeng
         entt::meta_any get(const MetaHandle& meta_handle)
         {
             std::lock_guard lock{ storage_mutex };
-            return get_pool(meta_handle.type).get(meta_handle);
+            return get_pool(meta_handle.type.id()).get(meta_handle);
         }
 
         // --- Statically typed get --------------------------------------------
@@ -800,7 +820,7 @@ namespace eeng
             auto it = pools.find(meta_handle.type.id());
             if (it == pools.end()) return std::nullopt;
 
-            auto& pool = get_pool(meta_handle.type);
+            auto& pool = get_pool(meta_handle.type.id());
             return pool.try_get(meta_handle);
         }
 
@@ -852,7 +872,7 @@ namespace eeng
         void remove_now(const MetaHandle& mh)
         {
             std::lock_guard lock{ storage_mutex };
-            get_pool(mh.type).remove_now(mh);
+            get_pool(mh.type.id()).remove_now(mh);
         }
 
         /// Increase the ref-count for a resource.
@@ -870,7 +890,7 @@ namespace eeng
         size_t retain(const MetaHandle& mh)
         {
             std::lock_guard lock{ storage_mutex };
-            auto& pool = get_pool(mh.type);
+            auto& pool = get_pool(mh.type.id());
             return pool.retain(mh);
         }
 
@@ -885,9 +905,26 @@ namespace eeng
         size_t release(const MetaHandle& mh)
         {
             std::lock_guard lock{ storage_mutex };
-            auto& pool = get_pool(mh.type);
+            auto& pool = get_pool(mh.type.id());
             return pool.release_and_destroy(mh);
         }
+
+        // --- Capacity and free slots -----------------------------------------
+
+        template<typename T>
+        size_t count_free() const noexcept
+        {
+            std::lock_guard lock{ storage_mutex };
+            return get_pool<T>().count_free();
+        }
+
+        size_t capacity(entt::id_type id_type) const noexcept
+        {
+            std::lock_guard lock{ storage_mutex };
+            return get_pool(id_type).capacity();
+        }
+
+        // --- Validation methods ----------------------------------------------
 
         template<typename T>
         bool validate(const Handle<T>& h) const noexcept
@@ -979,11 +1016,11 @@ namespace eeng
         /// Visit all objects of a runtime typed pool (const).
         template<class F>
             requires std::is_invocable_v<F, entt::meta_any>
-        bool visit(entt::meta_type type, F&& visitor) const noexcept
+        bool visit(entt::id_type id_type, F&& visitor) const noexcept
         {
             std::lock_guard lock{ storage_mutex };
             try {
-                auto& pool = get_pool(type);
+                auto& pool = get_pool(id_type);
                 pool.visit_any(
                     std::function<void(entt::meta_any)>{
                     [vis = std::forward<F>(visitor)]
@@ -1002,11 +1039,11 @@ namespace eeng
         /// Visit all objects of a runtime typed pool (non-const).
         template<class F>
             requires std::is_invocable_v<F, entt::meta_any>
-        bool visit(entt::meta_type type, F&& visitor) noexcept
+        bool visit(entt::id_type id_type, F&& visitor) noexcept
         {
             std::lock_guard lock{ storage_mutex };
             try {
-                auto& pool = get_pool(type);
+                auto& pool = get_pool(id_type);
                 pool.visit_any(
                     std::function<void(entt::meta_any)>{
                     [vis = std::forward<F>(visitor)]
@@ -1073,17 +1110,17 @@ namespace eeng
 
         // --- Meta typed pool getters -----------------------------------------
 
-        const IPool& get_pool(entt::meta_type meta_type) const
+        const IPool& get_pool(entt::id_type id_type) const
         {
-            auto id = meta_type.id();
+            auto id = id_type; //meta_type.id();
             auto it = pools.find(id);
             if (it == pools.end()) throw std::runtime_error("Pool not found");
             return *it->second;
         }
 
-        IPool& get_pool(entt::meta_type meta_type)
+        IPool& get_pool(entt::id_type id_type)
         {
-            auto id = meta_type.id();
+            auto id = id_type; //meta_type.id();
             auto it = pools.find(id);
             if (it == pools.end()) throw std::runtime_error("Pool not found");
             return *it->second;

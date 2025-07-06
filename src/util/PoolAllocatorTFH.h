@@ -149,7 +149,7 @@ namespace eeng {
 
         size_t capacity() const
         {
-            return m_capacity;
+            return m_capacity / sizeof(T);
         }
 
         template<class... Args>
