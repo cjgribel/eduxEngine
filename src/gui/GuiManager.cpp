@@ -40,26 +40,126 @@ namespace eeng
         static_cast<LogManager&>(*ctx.log_manager).draw_gui_widget("Log");
     }
 
+void DrawOccupancyBar(size_t used, size_t capacity)
+{
+    if (capacity == 0) return;
+
+    float cell_size = 6.0f;
+    float spacing = 2.0f;
+    ImVec2 p = ImGui::GetCursorScreenPos();
+    auto* draw_list = ImGui::GetWindowDrawList();
+
+    for (size_t i = 0; i < capacity; ++i)
+    {
+        ImU32 color = ImGui::ColorConvertFloat4ToU32(
+            (i < used) ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f) : ImVec4(0.8f, 0.2f, 0.2f, 1.0f)
+        );
+
+        ImVec2 cell_min = ImVec2(p.x + i * (cell_size + spacing), p.y);
+        ImVec2 cell_max = ImVec2(cell_min.x + cell_size, cell_min.y + cell_size);
+
+        draw_list->AddRectFilled(cell_min, cell_max, color);
+    }
+
+    // Advance cursor
+    ImGui::Dummy(ImVec2(capacity * (cell_size + spacing), cell_size));
+}
+
     void GuiManager::draw_storage(EngineContext& ctx) const
     {
         ImGui::Begin("Storage");
 
-        // auto& storage = static_cast<ResourceManager&>(*ctx.resource_manager).storage();
-        // for (auto& [id_type, pool] : storage)
-        // {
+        auto& storage = static_cast<ResourceManager&>(*ctx.resource_manager).storage();
 
-        //     auto mtype = entt::resolve(id_type); // entt::resolve<int>();
-        //     auto res = storage.visit(mtype, [](entt::meta_any any) {
-        //         // auto& b = any.cast<int&>();
-        //         // std::cout << b << "\n";
-        //         std::cout << any.type().info().name() << "\n";
-        //         });
-        // }
+        for (const auto& [type_id, pool_ptr] : storage)
+        {
+            const auto meta_type = entt::resolve(type_id);
+            const std::string type_name = std::string(meta_type.info().name());
 
-        ImGui::TextUnformatted(ctx.resource_manager->to_string().c_str());
+            if (ImGui::TreeNode(type_name.c_str()))
+            {
+                const size_t capacity = pool_ptr->capacity();
+                const size_t free = pool_ptr->count_free();
+                const size_t used = capacity - free;
+                const size_t elem_size = pool_ptr->element_size();
+
+                const float kb_total = (capacity * elem_size) / 1024.0f;
+                const float kb_used = (used * elem_size) / 1024.0f;
+
+                ImGui::Text("Entries: %zu", used);
+                ImGui::Text("Capacity: %zu (%.1f kB total, %.1f kB used)",
+                    capacity, kb_total, kb_used);
+                ImGui::Text("Used: %zu | Free: %zu", used, free);
+
+                // ───── Occupancy Grid ─────
+                const int items_per_row = 64;
+                for (size_t i = 0; i < capacity; ++i)
+                {
+                    if (i % items_per_row != 0)
+                        ImGui::SameLine();
+
+                    bool is_used = (i < used); // Replace if you track this precisely
+                    ImVec4 color = is_used
+                        ? ImVec4(0.2f, 1.0f, 0.2f, 1.0f)  // green
+                        : ImVec4(0.4f, 0.4f, 0.4f, 1.0f); // gray
+
+                    ImGui::TextColored(color, "[]");
+                }
+
+                ImGui::NewLine();
+
+                if (ImGui::TreeNode("Details"))
+                {
+                    ImGui::TextUnformatted(pool_ptr->to_string().c_str());
+                    ImGui::TreePop();
+                }
+
+                ImGui::TreePop();
+            }
+
+        }
 
         ImGui::End();
+
+        // ───── Storage Occupancy Table ─────
+        // This is a separate window to show a summary of all storage pools
+        
+        ImGui::Begin("Storage Occupancy");
+
+        if (ImGui::BeginTable("StorageTable", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+        {
+            ImGui::TableSetupColumn("Type");
+            ImGui::TableSetupColumn("Used / Capacity");
+            ImGui::TableSetupColumn("Occupancy");
+            ImGui::TableHeadersRow();
+
+            for (auto& [id_type, pool_ptr] : storage)
+            {
+                ImGui::TableNextRow();
+
+                // Column 1: Type name
+                ImGui::TableSetColumnIndex(0);
+                auto meta_type = entt::resolve(id_type);
+                ImGui::TextUnformatted(meta_type.info().name().data());
+
+                // Column 2: Usage summary
+                ImGui::TableSetColumnIndex(1);
+                const size_t capacity = pool_ptr->capacity();
+                const size_t used = capacity - pool_ptr->count_free();
+                ImGui::Text("%zu / %zu", used, capacity);
+
+                // Column 3: Colored cell bar
+                ImGui::TableSetColumnIndex(2);
+                DrawOccupancyBar(used, capacity);
+            }
+
+            ImGui::EndTable();
+        }
+
+        ImGui::End();
+
     }
+
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
     {

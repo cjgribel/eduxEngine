@@ -90,6 +90,12 @@ namespace eeng
             ref.handle = storage_->add<T>(t, ref.guid);
             // ref.load(storage->add<T>(t, ref.guid));
 
+            // For now: just add an int asset to demonstrate
+            AssetRef<size_t> int_ref1{ Guid::generate(), Handle<size_t>{} };
+            AssetRef<size_t> int_ref2{ Guid::generate(), Handle<size_t>{} };
+            storage_->add<size_t>(42, int_ref1.guid);
+            storage_->add<size_t>(43, int_ref2.guid);
+
             std::cout << storage_->to_string() << std::endl;
         }
 
