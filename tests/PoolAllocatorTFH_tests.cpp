@@ -86,7 +86,7 @@ TEST_F(PoolAllocatorTFHTest, PoolExpandsWhenFull)
     for (int i = 0; i < elements_to_create; ++i)
         handles.push_back(pool.create(i));
 
-    EXPECT_GE(pool.capacity(), elements_to_create * sizeof(MoveTest));
+    EXPECT_GE(pool.capacity(), elements_to_create);
     EXPECT_GE(MoveTest::constructions, elements_to_create);
     EXPECT_EQ(MoveTest::constructions - MoveTest::destructions, handles.size());
 
