@@ -8,14 +8,24 @@
 namespace eeng
 {
     ResourceManager::ResourceManager()
-        : storage(std::make_unique<Storage>())
-        , asset_index(std::make_unique<AssetIndex>())
+        : storage_(std::make_unique<Storage>())
+        , asset_index_(std::make_unique<AssetIndex>())
     {
+    }
+
+    const Storage& ResourceManager::storage()
+    {
+        return *storage_;
+    }
+
+    const AssetIndex& ResourceManager::asset_index()
+    {
+        return *asset_index_;
     }
 
     std::string ResourceManager::to_string() const
     {
-        return storage->to_string();
+        return storage_->to_string();
     }
 
     ResourceManager::~ResourceManager() = default;

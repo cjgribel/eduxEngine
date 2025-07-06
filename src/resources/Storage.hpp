@@ -226,6 +226,8 @@ namespace eeng
             virtual std::optional<MetaHandle> handle_for_guid(const Guid& guid) const noexcept = 0;
             virtual std::optional<Guid> guid_for_handle(const MetaHandle& mh) const noexcept = 0;
 
+            virtual void visit_any(const std::function<void(entt::meta_any)>& visitor) const noexcept = 0;
+            virtual void visit_any(const std::function<void(entt::meta_any)>& visitor) noexcept = 0;
             virtual std::string to_string() const = 0;
         };
 
@@ -557,6 +559,50 @@ namespace eeng
                 return std::nullopt;
             }
 
+            // --- Visitor methods ---------------------------------------------
+
+            /// @brief Visit all objects of this static type in the pool.
+            /// @param visitor A function that takes a const reference to T
+            template<class F>
+            void visit(F&& visitor) const noexcept
+            {
+                std::lock_guard lock{ m_mutex };
+                m_pool.used_visitor(std::forward<F>(visitor));
+            }
+
+            /// @brief Visit all objects of this static type in the pool.
+            /// @param visitor A function that takes a reference to T
+            template<class F>
+            void visit(F&& visitor) noexcept
+            {
+                std::lock_guard lock{ m_mutex };
+                m_pool.used_visitor(std::forward<F>(visitor));
+            }
+
+            /// @brief Visit all objects of this runtime type in the pool (const).
+            /// @param visitor A function that takes an entt::meta_any with a const reference to T
+            void visit_any(const std::function<void(entt::meta_any)>& visitor) const noexcept override
+            {
+                std::lock_guard lock{ m_mutex };
+                m_pool.used_visitor([&](const T& elem) {
+                    visitor(entt::forward_as_meta(elem));
+                    });
+            }
+
+            /// @brief Visit all objects of this runtime type in the pool.
+            /// @param visitor A function that takes an entt::meta_any with a reference to T
+            void visit_any(const std::function<void(entt::meta_any)>& visitor) noexcept override
+            {
+                std::lock_guard lock{ m_mutex };
+                m_pool.used_visitor([&](T& elem) {
+                    visitor(entt::forward_as_meta(elem));
+                    });
+            }
+
+            // --- Debugging methods -------------------------------------------
+
+            /// @brief Return a string representation of this pool.
+            /// @note Thread-safe, but may block if used in a visitor.
             std::string to_string() const override
             {
                 std::lock_guard lock{ m_mutex };
@@ -626,7 +672,9 @@ namespace eeng
             return *this;
         }
 
-        // Does not lock
+        // ---------------------------------------------------------------------
+
+        /// Make sure a pool exists. Used by meta types. Not thread-safe.
         template<typename T>
         entt::id_type assure_storage()
         {
@@ -896,6 +944,86 @@ namespace eeng
 
         // pool(entt::id_type id) 
 
+        // --- Visitor methods -------------------------------------------------
+
+        /// Visit all objects of a statically typed pool (non-const).
+        template<typename T, class F>
+            requires std::is_invocable_v<F, T&>
+        bool visit(F&& visitor) noexcept
+        {
+            std::lock_guard lock{ storage_mutex };
+            try {
+                get_pool<T>().visit(std::forward<F>(visitor));
+            }
+            catch (const std::out_of_range&) {
+                return false;
+            }
+            return true;
+        }
+
+        /// Visit all objects of a statically typed pool (const).
+        template<typename T, class F>
+            requires std::is_invocable_v<F, const T&>
+        bool visit(F&& visitor) const noexcept
+        {
+            std::lock_guard lock{ storage_mutex };
+            try {
+                get_pool<T>().visit(std::forward<F>(visitor));
+            }
+            catch (const std::out_of_range&) {
+                return false;
+            }
+            return true;
+        }
+
+        /// Visit all objects of a runtime typed pool (const).
+        template<class F>
+            requires std::is_invocable_v<F, entt::meta_any>
+        bool visit(entt::meta_type type, F&& visitor) const noexcept
+        {
+            std::lock_guard lock{ storage_mutex };
+            try {
+                auto& pool = get_pool(type);
+                pool.visit_any(
+                    std::function<void(entt::meta_any)>{
+                    [vis = std::forward<F>(visitor)]
+                    (entt::meta_any any) mutable {
+                        vis(any);
+                        }
+                }
+                );
+            }
+            catch (const std::runtime_error&) {
+                return false;
+            }
+            return true;
+        }
+
+        /// Visit all objects of a runtime typed pool (non-const).
+        template<class F>
+            requires std::is_invocable_v<F, entt::meta_any>
+        bool visit(entt::meta_type type, F&& visitor) noexcept
+        {
+            std::lock_guard lock{ storage_mutex };
+            try {
+                auto& pool = get_pool(type);
+                pool.visit_any(
+                    std::function<void(entt::meta_any)>{
+                    [vis = std::forward<F>(visitor)]
+                    (entt::meta_any any) mutable {
+                        vis(any);
+                        }
+                }
+                );
+            }
+            catch (const std::runtime_error&) {
+                return false;
+            }
+            return true;
+        }
+
+        // --- Debugging methods -----------------------------------------------
+
         std::string to_string() const
         {
             std::lock_guard lock{ storage_mutex };
@@ -982,6 +1110,34 @@ namespace eeng
         // mutable std::mutex storage_mutex;
         mutable std::recursive_mutex storage_mutex;
         std::unordered_map<entt::id_type, std::unique_ptr<IPool>> pools;
+
+    public:
+
+        // --- Iterators -------------------------------------------------------
+
+        using iterator = decltype(pools)::iterator;
+        using const_iterator = decltype(pools)::const_iterator;
+
+        iterator begin() {
+            std::lock_guard lock{ storage_mutex };
+            return pools.begin();
+        }
+        iterator end() {
+            std::lock_guard lock{ storage_mutex };
+            return pools.end();
+        }
+
+        const_iterator begin() const {
+            std::lock_guard lock{ storage_mutex };
+            return pools.begin();
+        }
+        const_iterator end() const {
+            std::lock_guard lock{ storage_mutex };
+            return pools.end();
+        }
+
+        const_iterator cbegin() const { return begin(); }
+        const_iterator cend()   const { return end(); }
     };
 
     static_assert(!std::is_copy_constructible_v<Storage>);

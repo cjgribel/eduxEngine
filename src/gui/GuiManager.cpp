@@ -3,6 +3,7 @@
 
 #include "GuiManager.hpp"
 #include "LogManager.hpp"
+#include "ResourceManager.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -42,6 +43,18 @@ namespace eeng
     void GuiManager::draw_storage(EngineContext& ctx) const
     {
         ImGui::Begin("Storage");
+
+        // auto& storage = static_cast<ResourceManager&>(*ctx.resource_manager).storage();
+        // for (auto& [id_type, pool] : storage)
+        // {
+
+        //     auto mtype = entt::resolve(id_type); // entt::resolve<int>();
+        //     auto res = storage.visit(mtype, [](entt::meta_any any) {
+        //         // auto& b = any.cast<int&>();
+        //         // std::cout << b << "\n";
+        //         std::cout << any.type().info().name() << "\n";
+        //         });
+        // }
 
         ImGui::TextUnformatted(ctx.resource_manager->to_string().c_str());
 

@@ -93,8 +93,8 @@ bool try_apply(const entt::meta_any& value, Callable callable)
 }
 
 /// @brief Get inspector-friendly name of a meta_type
-        /// @param meta_type 
-        /// @return Name provided as a display name property, or default name
+/// @param meta_type 
+/// @return Name provided as a display name property, or default name
 inline auto meta_type_name(const entt::meta_type meta_type)
 {
     assert(meta_type);

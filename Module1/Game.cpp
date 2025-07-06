@@ -79,7 +79,7 @@ bool Game::init()
         //      CAN BE MADE TS // storage->get_ref - NOT TS
         //      
         std::cout << "Unloading assets..." << std::endl;
-        for (auto& ref : refs) resource_manager.unload(ref);
+        // for (auto& ref : refs) resource_manager.unload(ref);
 
         // Unfile the asset
         // ...

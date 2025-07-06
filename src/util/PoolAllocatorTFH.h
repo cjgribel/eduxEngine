@@ -268,7 +268,31 @@ namespace eeng {
             return oss.str();
         }
 
-        /// @brief Visit all used elements in the pool.
+        /// @brief Visit all used elements in the pool (const).
+        /// @tparam F The function type.
+        /// @param f The function to call for each used element.
+        /// @note O(2N). Uses dynamic allocation. Mainly intended for debug use.
+        template<class F>
+        void used_visitor(F&& f) const
+        {
+            std::lock_guard lock(m_mutex);
+
+            std::vector<bool> used(m_capacity / sizeof(T), true);
+            freelist_visitor([&](index_type i)
+                {
+                    used[i / sizeof(T)] = false;
+                });
+
+            for (index_type index = 0;
+                index < m_capacity;
+                index += sizeof(T))
+            {
+                if (used[index / sizeof(T)])
+                    f(*ptr_at<T>(m_pool, index));
+            }
+        }
+
+        /// @brief Visit all used elements in the pool (non-const).
         /// @tparam F The function type.
         /// @param f The function to call for each used element.
         /// @note O(2N). Uses dynamic allocation. Mainly intended for debug use.

@@ -26,13 +26,17 @@ namespace eeng
     class ResourceManager : public IResourceManager
     {
     private:
-        std::unique_ptr<Storage>    storage;
-        std::unique_ptr<AssetIndex> asset_index;
+        std::unique_ptr<Storage>    storage_;
+        std::unique_ptr<AssetIndex> asset_index_;
 
     public:
         ResourceManager(/* any ctor args */);
         // Out-of-line dtor: ensures Storage & AssetIndex are complete when deleted
         ~ResourceManager();
+
+        const Storage& storage();
+
+        const AssetIndex& asset_index();
 
         std::string to_string() const override;
 
@@ -83,10 +87,10 @@ namespace eeng
             // ^ not part of storage yet so can ignore threading issues
 
             // Add to storage and set handle
-            ref.handle = storage->add<T>(t, ref.guid);
+            ref.handle = storage_->add<T>(t, ref.guid);
             // ref.load(storage->add<T>(t, ref.guid));
 
-            std::cout << storage->to_string() << std::endl;
+            std::cout << storage_->to_string() << std::endl;
         }
 
         // Not thread-safe (storage->get_ref)
@@ -97,7 +101,7 @@ namespace eeng
 
 #if 1
             // TS - will NOT deadlock due to recursive mutex
-            storage->modify(ref.handle, [this](T& t)
+            storage_->modify(ref.handle, [this](T& t)
                 {
                     visit_asset_refs(t, [this](auto& subref)
                         {
@@ -115,10 +119,10 @@ namespace eeng
 #endif
 
             // 3. Release the resource and clear the handle
-            storage->release(ref.handle); // TS
+            storage_->release(ref.handle); // TS
             ref.unload();
 
-            std::cout << storage->to_string() << std::endl;
+            std::cout << storage_->to_string() << std::endl;
         }
     };
 
