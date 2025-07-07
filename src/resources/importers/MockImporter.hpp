@@ -12,69 +12,11 @@
 #include "Handle.h"
 #include "EngineContext.hpp"
 
-#include "ResourceTypes.h" // Only for visit_asset_refs: maybe move to e.g. AssetRefVisit.hpp
-
-// Placeholder resources
-namespace eeng
-{
-    // struct Mesh { size_t x; };
-    // struct Material { size_t x; };
-    // struct Skeleton { size_t x; };
-    // struct AnimationClip { size_t x; };
-
-    // using MeshHandle = Handle<Mesh>;
-    // using MaterialHandle = Handle<Material>;
-    // using TextureHandle = Handle<Texture2D>;
-    // using SkeletonHandle = Handle<Skeleton>;
-    // using AnimationClipHandle = Handle<AnimationClip>;
-
-    // struct Model
-    // {
-    //     std::vector<Handle<Mesh>> meshes;
-    //     std::vector<Handle<Texture2D>> textures;
-    //     std::vector<Handle<Material>> materials;
-    //     std::optional<Handle<Skeleton>> skeleton;
-    //     std::vector<Handle<AnimationClip>> animation_clips;
-
-    //     std::string source_file;
-    //     uint32_t loading_flags;
-    // };
-    // using ModelHandle = Handle<Model>;
-
-
-} // namespace eeng
+#include "ResourceTypes.h" // For AssetRef<Model>, mock types
+#include "Guid.h"         // For Guid
 
 namespace eeng::mock
 {
-    struct Mesh
-    {
-        std::vector<float> vertices;
-    };
-
-    struct Model
-    {
-        std::vector<AssetRef<Mesh>> meshes;
-    };
-
-    template<typename Visitor>
-    void visit_asset_refs(Model& model, Visitor&& visitor)
-    {
-        for (auto& mesh_ref : model.meshes)
-        {
-            visitor(mesh_ref);
-        }
-    }
-
-    // template<typename Visitor>
-    // void meta_visit_asset_refs(const entt::meta_any& model, Visitor&& visitor)
-    // {
-    //     auto& model = any.cast<Model&>();
-    //     for (auto& mesh_ref : model.meshes)
-    //     {
-    //         visitor(mesh_ref);
-    //     }
-    // }
-
     class ModelImporter
     {
     public:

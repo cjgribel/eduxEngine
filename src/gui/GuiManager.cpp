@@ -40,30 +40,30 @@ namespace eeng
         static_cast<LogManager&>(*ctx.log_manager).draw_gui_widget("Log");
     }
 
-void DrawOccupancyBar(size_t used, size_t capacity)
-{
-    if (capacity == 0) return;
-
-    float cell_size = 6.0f;
-    float spacing = 2.0f;
-    ImVec2 p = ImGui::GetCursorScreenPos();
-    auto* draw_list = ImGui::GetWindowDrawList();
-
-    for (size_t i = 0; i < capacity; ++i)
+    void DrawOccupancyBar(size_t used, size_t capacity)
     {
-        ImU32 color = ImGui::ColorConvertFloat4ToU32(
-            (i < used) ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f) : ImVec4(0.8f, 0.2f, 0.2f, 1.0f)
-        );
+        if (capacity == 0) return;
 
-        ImVec2 cell_min = ImVec2(p.x + i * (cell_size + spacing), p.y);
-        ImVec2 cell_max = ImVec2(cell_min.x + cell_size, cell_min.y + cell_size);
+        float cell_size = 6.0f;
+        float spacing = 2.0f;
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        auto* draw_list = ImGui::GetWindowDrawList();
 
-        draw_list->AddRectFilled(cell_min, cell_max, color);
+        for (size_t i = 0; i < capacity; ++i)
+        {
+            ImU32 color = ImGui::ColorConvertFloat4ToU32(
+                (i < used) ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f) : ImVec4(0.8f, 0.2f, 0.2f, 1.0f)
+            );
+
+            ImVec2 cell_min = ImVec2(p.x + i * (cell_size + spacing), p.y);
+            ImVec2 cell_max = ImVec2(cell_min.x + cell_size, cell_min.y + cell_size);
+
+            draw_list->AddRectFilled(cell_min, cell_max, color);
+        }
+
+        // Advance cursor
+        ImGui::Dummy(ImVec2(capacity * (cell_size + spacing), cell_size));
     }
-
-    // Advance cursor
-    ImGui::Dummy(ImVec2(capacity * (cell_size + spacing), cell_size));
-}
 
     void GuiManager::draw_storage(EngineContext& ctx) const
     {
@@ -74,7 +74,7 @@ void DrawOccupancyBar(size_t used, size_t capacity)
         for (const auto& [type_id, pool_ptr] : storage)
         {
             const auto meta_type = entt::resolve(type_id);
-            const std::string type_name = std::string(meta_type.info().name());
+            const auto type_name = std::string(meta_type.info().name());
 
             if (ImGui::TreeNode(type_name.c_str()))
             {
@@ -122,8 +122,8 @@ void DrawOccupancyBar(size_t used, size_t capacity)
         ImGui::End();
 
         // ───── Storage Occupancy Table ─────
-        // This is a separate window to show a summary of all storage pools
-        
+        // Separate window to show a summary of all storage pools
+
         ImGui::Begin("Storage Occupancy");
 
         if (ImGui::BeginTable("StorageTable", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
@@ -140,7 +140,9 @@ void DrawOccupancyBar(size_t used, size_t capacity)
                 // Column 1: Type name
                 ImGui::TableSetColumnIndex(0);
                 auto meta_type = entt::resolve(id_type);
-                ImGui::TextUnformatted(meta_type.info().name().data());
+                const auto type_name = std::string(meta_type.info().name());
+                ImGui::Text("%s", type_name.c_str());
+                // ImGui::TextUnformatted(meta_type.info().name().data()); // has garbage at end
 
                 // Column 2: Usage summary
                 ImGui::TableSetColumnIndex(1);

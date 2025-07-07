@@ -11,6 +11,9 @@
 #include "MetaLiterals.h"
 #include "Storage.hpp"
 #include "MetaInfo.h"
+#include "IResourceManager.hpp" // For AssetRef<T>
+
+#include "MockImporter.hpp" // For mock types
 
 namespace eeng {
 
@@ -114,6 +117,12 @@ namespace eeng {
         //     handle = registry.get_or_load<T>(guid);
         // }
 
+        template<class T>
+        void assure_storage(eeng::Storage& storage)
+        {
+            storage.assure_storage<T>();
+        }
+
         template<typename T>
         void register_handle(const std::string& name)
         {
@@ -127,19 +136,79 @@ namespace eeng {
                 ;
         }
 
-        template<class T>
-        void assure_storage(eeng::Storage& storage)
+        template<typename T>
+        void register_resource(/*const std::string& name*/)
         {
-            storage.assure_storage<T>();
+            // constexpr auto alias = entt::type_name<T>::value();  // e.g. "ResourceTest"
+            // constexpr auto id    = entt::type_hash<T>::value();
+
+            entt::meta_factory<T>()
+                // .type(entt::hashed_string{ name.c_str() })
+                // .type(id)
+                .template func<&assure_storage<T>>(eeng::literals::assure_storage_hs)
+                ;
+
+            // Caution: this name will include namespaces
+            auto name = std::string{ entt::resolve<T>().info().name() };
+
+            // Handle<T>
+            // NOTE: Should not be needed - is part of AssetRef<T>
+            // entt::meta_factory<Handle<T>>{};
+
+            // AssetRef<T>
+            entt::meta_factory<AssetRef<T>>{}
+            // .type(entt::hashed_string{ ("AssetRef<" + name + ">").c_str() })
+            .template data<&AssetRef<T>::guid>("guid"_hs)
+                ;
         }
-    }
+    } // namespace
+
+    namespace
+    {
+        // Guid to and from json
+        void serialize_Guid(nlohmann::json& j, const void* ptr)
+        {
+            j = static_cast<const Guid*>(ptr)->raw();
+        }
+
+        void deserialize_Guid(const nlohmann::json& j, void* ptr)
+        {
+            *static_cast<Guid*>(ptr) = Guid{ j.get<uint64_t>() };
+        }
+
+    } // namespace
+
+#if 0
+        // --- Serialization ---
+    auto mt = entt::resolve<T>();
+    std::string type_name = mt.info().name();    // e.g. "eeng::ResourceTest"
+    // write `type_name` into your JSON
+
+    // --- Deserialization ---
+    std::string type_name = /* read from JSON */;
+    auto id = entt::hashed_string{ type_name.data(), type_name.size() };
+    auto mt = entt::resolve(id);
+    // now `mt` is the same meta‐type you originally registered
+#endif
 
     void register_meta_types()
     {
+
+
+
+        // === Guid ===
+        entt::meta_factory<Guid>{}
+        //     .type("Guid"_hs)
+            // .type(entt::hashed_string{"Guid"_hs})
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "Guid", "A globally unique identifier." })
+            .func<&serialize_Guid>(eeng::literals::serialize_hs)
+            .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
+            ;
+
         // === HANDLES (per resource type) ===
 
-        register_handle<MockResource1>("Handle<MockResource1>");
-        register_handle<MockResource2>("Handle<MockResource2>");
+        // register_handle<MockResource1>("Handle<MockResource1>");
+        // register_handle<MockResource2>("Handle<MockResource2>");
 
         //  === ASSETREF (per resource type) === ???
 
@@ -150,6 +219,12 @@ namespace eeng {
 
         // === RESOURCES ===
 
+        // mock::Mesh
+        register_resource<mock::Mesh>();
+
+        // mock::Model
+        register_resource<mock::Model>();
+
         // entt::meta<Texture>()
         //     .type("Texture"_hs)
         //     .func<&assure_storage<Texture>>("assure_storage"_hs);
@@ -158,22 +233,24 @@ namespace eeng {
         // auto assure_fn = entt::resolve<Texture>().func("assure_storage"_hs);
         // assure_fn.invoke({}, registry);
 
-        entt::meta_factory<MockResource1>{}
-        .type("MockResource1"_hs)
+        // mock::MockResource1
+        register_resource<mock::MockResource1>();
+        entt::meta_factory<mock::MockResource1>{}
+        // .type("MockResource1"_hs)
             .custom<TypeMetaInfo>(TypeMetaInfo{ "MockResource1", "This is a mock resource type." })
 
             // Register member 'x' with DisplayInfo and DataFlags
-            .data<&MockResource1::x>("x"_hs)
+            .data<&mock::MockResource1::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "An integer member 'x'" })
             .traits(MetaFlags::read_only)
 
             // Register member 'y' with DisplayInfo and multiple DataFlags
-            .data<&MockResource1::y>("y"_hs)
+            .data<&mock::MockResource1::y>("y"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "y", "A float member 'y'" })
             .traits(MetaFlags::hidden | MetaFlags::read_only)
 
             // Required for all resource types
-            .template func<&assure_storage<MockResource1>>(eeng::literals::assure_storage_hs)
+            .template func<&assure_storage<mock::MockResource1>>(eeng::literals::assure_storage_hs)
 
             // Required only if resource has recursive references
             //.func<&visit_asset_refs<MockResource1>>("visit_refs"_hs);
@@ -188,6 +265,8 @@ namespace eeng {
         //.data<&BehaviorScript::on_collision/*, entt::as_ref_t*/>("on_collision"_hs).prop(display_name_hs, "on_collision")
 
             ;
+
+        register_resource<mock::MockResource2>();
     }
 
 } // namespace eeng

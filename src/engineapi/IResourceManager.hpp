@@ -8,22 +8,6 @@
 
 namespace eeng
 {
-    template<class T>
-    struct AssetRef
-    {
-        static_assert(!std::is_reference_v<T>, "AssetRef<T> cannot use reference types");
-
-        Guid guid;
-        Handle<T> handle;
-
-        // Optional helpers
-        bool is_loaded() const { return bool(handle); }
-        void load(Handle<T> handle) { this->handle = handle; }
-        void unload() { handle.reset(); }
-        Guid get_guid() const { return guid; }
-        Handle<T> get_handle() const { return handle; }
-    };
-
     class IResourceManager
     {
     public:

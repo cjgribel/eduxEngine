@@ -273,7 +273,7 @@ namespace eeng::meta
 
         return json;
 #endif
-}
+    }
 #endif
     void deserialize_any(
         const nlohmann::json& json,
@@ -287,25 +287,36 @@ namespace eeng::meta
         {
             if (entt::meta_func meta_func = meta_type.func(literals::deserialize_hs); meta_func)
             {
-                // Function signature: void(const nlohmann::json&, void*))
-                // In this call, presumably, a meta_any is created for 'json',
-                //      which and will hold a copy of it.
-#if 1
-                // Note: any.data() is deprecated. any.base()data() is const
-                auto res = meta_func.invoke(
+                // 1) Try signature (json, any)
+                entt::meta_any res = meta_func.invoke(
                     {},
                     entt::forward_as_meta(json),
-                    entt::forward_as_meta(any),
-                    entt::forward_as_meta(entity),
-                    entt::forward_as_meta(context)
+                    entt::forward_as_meta(any)
                 );
-#else
-            // json node is possibly copied to an entt::meta_any here
-                auto res = meta_func.invoke({}, json, any.data());
-#endif
-                assert(res && "Failed to invoke from_json");
 
-                // std::cout << "from_json invoked: " << json.dump() << std::endl;
+                if (!res) {
+                    // 2) Try signature (json, any, context)
+                    res = meta_func.invoke(
+                        {},
+                        entt::forward_as_meta(json),
+                        entt::forward_as_meta(any),
+                        entt::forward_as_meta(context)
+                    );
+                }
+
+                if (!res) {
+                    // 3) Try signature (json, any, entity, context)
+                    res = meta_func.invoke(
+                        {},
+                        entt::forward_as_meta(json),
+                        entt::forward_as_meta(any),
+                        entt::forward_as_meta(entity),
+                        entt::forward_as_meta(context)
+                    );
+                }
+
+                // If none succeeded, fail
+                assert(res && "Failed to invoke deserialize");
             }
             else if (meta_type.is_enum())
             {
@@ -552,6 +563,6 @@ namespace eeng::meta
             }
         }
 #endif
-}
+    }
 #endif
 } // namespace eeng::meta

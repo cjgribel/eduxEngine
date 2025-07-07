@@ -1069,7 +1069,7 @@ namespace eeng
             for (auto const& [type_id, pool_ptr] : pools)
             {
                 auto name = entt::resolve(type_id).info().name();
-                oss << "— Type “" << name << "” (id = " << type_id << ")\n";
+                oss << "- Type " << name << " (id = " << type_id << ")\n";
                 oss << pool_ptr->to_string() << "\n";
             }
             return oss.str();

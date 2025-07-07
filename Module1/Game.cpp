@@ -46,7 +46,9 @@ bool Game::init()
         //
         using ModelRef = eeng::AssetRef<eeng::mock::Model>;
         entt::meta_factory<eeng::mock::Model>();
-        entt::meta_factory<eeng::mock::Mesh>();
+        // entt::meta_factory<eeng::mock::Model>();
+        // entt::meta_factory<eeng::mock::Mesh>();
+        entt::meta_factory<size_t>(); //
         
         // Make sure resource_manager.file is TS
         std::cout << "Importing assets recursively..." << std::endl;
@@ -202,7 +204,7 @@ bool Game::init()
         // RUNTIME
 
         // "Import new resource" (GUI)
-        eeng::MockResource1 mockResource1; // <- IMPORTER
+        eeng::mock::MockResource1 mockResource1; // <- IMPORTER
         // resource -> AssetIndex -> Serialize
 
         // Add/Load resource - by NAME or GUID"
@@ -225,7 +227,7 @@ bool Game::init()
             // Non-const get and mutation
             entt::meta_any meta_any1 = storage.get(meta_handle1);
             assert(meta_any1.base().policy() == entt::any_policy::ref);
-            auto& val = meta_any1.cast<eeng::MockResource1&>();
+            auto& val = meta_any1.cast<eeng::mock::MockResource1&>();
             val.x = 5;
         }
         {
@@ -233,7 +235,7 @@ bool Game::init()
             const auto& cstorage = storage;
             entt::meta_any meta_any1 = cstorage.get(meta_handle1);
             assert(meta_any1.base().policy() == entt::any_policy::cref);
-            const auto& cval = meta_any1.cast<const eeng::MockResource1&>();
+            const auto& cval = meta_any1.cast<const eeng::mock::MockResource1&>();
             assert(cval.x == 5);
         }
         {
@@ -242,7 +244,7 @@ bool Game::init()
                 // got a valid meta_any
                 auto& meta_any1 = *maybe_meta_any;
                 assert(meta_any1.base().policy() == entt::any_policy::ref);
-                auto& val = meta_any1.cast<eeng::MockResource1&>();
+                auto& val = meta_any1.cast<eeng::mock::MockResource1&>();
                 val.x = 10;
                 EENG_LOG(ctx, "Valid resource found");
             }
@@ -255,7 +257,7 @@ bool Game::init()
                 // got a valid meta_any
                 auto& meta_any1 = *maybe_meta_any;
                 assert(meta_any1.base().policy() == entt::any_policy::cref);
-                const auto& cval = meta_any1.cast<const eeng::MockResource1&>();
+                const auto& cval = meta_any1.cast<const eeng::mock::MockResource1&>();
                 assert(cval.x == 10);
                 EENG_LOG(ctx, "Valid resource found");
             }
