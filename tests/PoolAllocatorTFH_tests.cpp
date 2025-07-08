@@ -15,10 +15,10 @@ namespace {
     struct MoveTest {
         static std::atomic<int> constructions;
         static std::atomic<int> destructions;
-        int value;
+        size_t value;
         char padding[sizeof(std::size_t)]; // Ensure object is large enough for freelist
 
-        MoveTest(int val) : value(val) { ++constructions; }
+        MoveTest(size_t val) : value(val) { ++constructions; }
         MoveTest(const MoveTest&) = delete;
         MoveTest(MoveTest&& other) noexcept : value(other.value) { other.value = -1; ++constructions; }
         ~MoveTest() { ++destructions; }

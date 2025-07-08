@@ -5,7 +5,7 @@
 
 #include "EngineContext.hpp"
 
-#define EENG_LOG_ (...)        (ctx)->log_manager->log(__VA_ARGS__)
+#define EENG_LOG_(...)        (ctx)->log_manager->log(__VA_ARGS__)
 
 #define EENG_LOG(ctx, ...)        (ctx)->log_manager->log(__VA_ARGS__)
 #define EENG_LOG_INFO(ctx, ...)   (ctx)->log_manager->log("[INFO] " __VA_ARGS__)

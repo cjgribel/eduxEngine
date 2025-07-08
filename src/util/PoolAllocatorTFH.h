@@ -31,11 +31,23 @@ namespace eeng {
     template<
         class T,
         class TIndex = std::size_t,
+#ifdef _MSC_VER
+        size_t Alignment = (alignof(T) > alignof(TIndex) ? alignof(T) : alignof(TIndex))
+#else
         size_t Alignment = std::max(alignof(T), alignof(TIndex))
+#endif
     >
-        requires (sizeof(T) >= sizeof(TIndex) && Alignment >= PoolMinAlignment && (Alignment % PoolMinAlignment) == 0)
+    requires (
+        sizeof(T) >= sizeof(TIndex) &&
+        Alignment >= PoolMinAlignment &&
+        (Alignment % PoolMinAlignment) == 0
+    )
     class PoolAllocatorTFH
     {
+        static_assert(sizeof(T) >= sizeof(TIndex), "T must be at least as large as TIndex");
+        static_assert(Alignment >= PoolMinAlignment, "Alignment must be >= PoolMinAlignment");
+        static_assert((Alignment% PoolMinAlignment) == 0, "Alignment must be multiple of PoolMinAlignment");
+
         using value_type = T;
         using cvalue_type = const T;
         using ptr_type = T*;

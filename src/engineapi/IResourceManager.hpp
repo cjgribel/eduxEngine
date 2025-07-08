@@ -3,6 +3,7 @@
 
 #include "Guid.h"
 #include "Handle.h"
+#include <string>
 
 #pragma once
 

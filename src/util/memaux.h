@@ -5,7 +5,7 @@
 #define memaux_h
 
 // std::max_align_t is the maximum alignment required for any type in the C++ standard library.
-#define PoolMinAlignment alignof(std::max_align_t)
+#define PoolMinAlignment 4 // alignof(std::max_align_t)
 
 inline void aligned_alloc(void** ptr,
                           size_t size,

@@ -10,6 +10,7 @@
 #include <typeindex>
 #include <memory>
 #include <string>
+#include <optional>
 
 #include "entt/entt.hpp"
 #include "MetaLiterals.h"

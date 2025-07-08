@@ -6,7 +6,7 @@
 
 namespace eeng
 {
-    class EngineContext;
+    struct EngineContext;
 
     enum class GuiFlags : uint8_t
     {
