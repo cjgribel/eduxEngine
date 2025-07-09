@@ -8,6 +8,14 @@
 #include "AssetIndex.hpp"
 #include "ResourceTypes.h" // For AssetRef<T>, visit_asset_refs
 
+#include <string>
+#include <mutex> // std::mutex - > maybe AssetIndex
+
+// -> AssetIndex ???
+#include "MetaSerialize.hpp"
+#include <nlohmann/json.hpp> // <nlohmann/json_fwd.hpp>
+#include <fstream>
+
 namespace eeng
 {
     /*
@@ -31,6 +39,8 @@ namespace eeng
         std::unique_ptr<Storage>    storage_;
         std::unique_ptr<AssetIndex> asset_index_;
 
+        std::mutex mutex_; // Protects asset_index_ (storage_ is thread-safe)
+
     public:
         ResourceManager(/* any ctor args */);
         // Out-of-line dtor: ensures Storage & AssetIndex are complete when deleted
@@ -48,17 +58,29 @@ namespace eeng
         /// @param t 
         /// @return 
         template<class T>
-        AssetRef<T> file(T& t)
+        AssetRef<T> file(const T& t, const std::string& filepath)
         {
+            std::lock_guard lock{ mutex_ };
             std::cout << "[ResourceManager] Filing type: " << typeid(T).name() << "\n";
 
             auto guid = Guid::generate();
+            auto ref = AssetRef<T>{ guid, Handle<T> {} };
 
             // AssetIndex maps asset type to a file location - must be TS
             // Use either a) templated or b) entt::meta_type
             // asset_index.serialize<T>(t, guid, ctx?);
 
-            return AssetRef<T>{ guid, Handle<T> {} };
+            // seria
+            std::ofstream file(filepath);
+            assert(file.is_open() && "Failed to open file for writing");
+            // auto any = t;
+            nlohmann::json j;
+            j["guid"] = guid.raw(); // Store as string
+            j["type"] = std::string(entt::resolve<T>().info().name());
+            j["data"] = meta::serialize_any(entt::forward_as_meta(t));
+            file << j.dump(4); // Indent with 4 spaces
+
+            return ref;
             // ^ handle is empty until asset is loaded
         }
 

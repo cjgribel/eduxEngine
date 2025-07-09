@@ -1,36 +1,14 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-// ResourceRegistry.hpp
 #pragma once
-// #include <cstdint>
-// #include <limits>
-// #include <vector>
-// #include <unordered_map>
-// #include <typeindex>
-// #include <memory>
-// #include <string>
-
-// #include <chrono>
-// #include <iostream>
-// #include <iostream>
-// #include <ostream>
-// #include <iomanip>
-// #include <mutex>
-// #include <string>
-// #include <unordered_map>
-// #include <optional>
-// #include <unordered_map>
 
 #include "Handle.h"
 #include "Guid.h"
-// #include "PoolAllocatorFH.h"
-// #include "Texture.hpp"
+#include <nlohmann/json.hpp>
 
 namespace eeng
 {
-
-
     class AssetIndex
     {
         // Maps asset type to a file location: a) templated or b) entt::meta_type
@@ -40,12 +18,13 @@ namespace eeng
             /*
             {
                 "guid": "acdb01b9-f34e-4c68-818a-98eabc22f54e",
-                    "resource" : {
+                "resource" : {
                     "name": "TestModel",
-                        "meshes" : [
-                    { "guid": "mesh1" },
-                    { "guid": "mesh2" }
-                        ]
+                    "meshes" : [
+                        { "guid": "mesh1" },
+                        { "guid": "mesh2" }
+                    ]
+                }
                 }
             }
 */

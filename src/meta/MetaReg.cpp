@@ -158,7 +158,10 @@ namespace eeng {
             // AssetRef<T>
             entt::meta_factory<AssetRef<T>>{}
             // .type(entt::hashed_string{ ("AssetRef<" + name + ">").c_str() })
+
             .template data<&AssetRef<T>::guid>("guid"_hs)
+                .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "A globally unique identifier." })
+                .traits(MetaFlags::read_only)
                 ;
         }
     } // namespace
@@ -166,15 +169,28 @@ namespace eeng {
     namespace
     {
         // Guid to and from json
-        void serialize_Guid(nlohmann::json& j, const void* ptr)
+        void serialize_Guid(nlohmann::json& j, const entt::meta_any& any)
         {
-            j = static_cast<const Guid*>(ptr)->raw();
+            auto ptr = any.try_cast<Guid>();
+            assert(ptr && "serialize_Guid: could not cast meta_any to Guid");
+            j = ptr->raw();
         }
 
-        void deserialize_Guid(const nlohmann::json& j, void* ptr)
+        void deserialize_Guid(const nlohmann::json& j, entt::meta_any& any)
         {
-            *static_cast<Guid*>(ptr) = Guid{ j.get<uint64_t>() };
+            auto ptr = any.try_cast<Guid>();
+            assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
+            *ptr = Guid{ j.get<uint64_t>() };
         }
+        // void serialize_Guid(nlohmann::json& j, const void* ptr)
+        // {
+        //     j = static_cast<const Guid*>(ptr)->raw();
+        // }
+
+        // void deserialize_Guid(const nlohmann::json& j, void* ptr)
+        // {
+        //     *static_cast<Guid*>(ptr) = Guid{ j.get<uint64_t>() };
+        // }
 
     } // namespace
 
@@ -221,9 +237,21 @@ namespace eeng {
 
         // mock::Mesh
         register_resource<mock::Mesh>();
+        entt::meta_factory<mock::Mesh>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "Mesh", "This is a mock mesh type." })
+            .data<&mock::Mesh::vertices>("vertices"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "vertices", "A vector of vertex positions." })
+            .traits(MetaFlags::read_only)
+            ;
 
         // mock::Model
         register_resource<mock::Model>();
+        entt::meta_factory<mock::Model>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "Model", "This is a mock model type." })
+            .data<&mock::Model::meshes>("meshes"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "meshes", "A vector of mesh references." })
+            .traits(MetaFlags::read_only)
+            ;
 
         // entt::meta<Texture>()
         //     .type("Texture"_hs)
@@ -237,7 +265,7 @@ namespace eeng {
         register_resource<mock::MockResource1>();
         entt::meta_factory<mock::MockResource1>{}
         // .type("MockResource1"_hs)
-            .custom<TypeMetaInfo>(TypeMetaInfo{ "MockResource1", "This is a mock resource type." })
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "MockResource1", "This is a mock resource type." })
 
             // Register member 'x' with DisplayInfo and DataFlags
             .data<&mock::MockResource1::x>("x"_hs)

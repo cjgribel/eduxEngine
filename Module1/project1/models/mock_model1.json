@@ -1,0 +1,11 @@
+{
+    "data": {
+        "meshes": [
+            {
+                "guid": 3
+            }
+        ]
+    },
+    "guid": 4,
+    "type": "eeng::mock::Model"
+}

@@ -5,7 +5,7 @@
 #include "GameBase.h"
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
-#include <entt/fwd.hpp>
+#include <entt/fwd.hpp> // For entt::registry - remove from here
 
 // --> ENGINE API
 #include "ShapeRenderer.hpp"

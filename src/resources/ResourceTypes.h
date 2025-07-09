@@ -69,7 +69,7 @@ namespace eeng::mock
 {
     struct Mesh
     {
-        std::vector<float> vertices;
+        std::vector<float> vertices {1.0f, 2.0f, 3.0f}; // Example vertex data
     };
 
     struct Model
@@ -77,6 +77,8 @@ namespace eeng::mock
         std::vector<AssetRef<Mesh>> meshes;
     };
 
+    // Found via ADL if visit_asset_refs is called unqualified
+    // (e.g. visit_asset_refs(model, visitor))
     template<typename Visitor>
     void visit_asset_refs(Model& model, Visitor&& visitor)
     {
@@ -85,10 +87,7 @@ namespace eeng::mock
             visitor(mesh_ref);
         }
     }
-// }
-
-// namespace eeng
-// {
+    
     struct MockResource1
     {
         int x{};

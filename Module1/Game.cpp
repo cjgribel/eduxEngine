@@ -38,6 +38,8 @@ bool Game::init()
 
     // RESOURCE MANAGER API TESTS
     {
+        std::cout << "RESOURCE MANAGER API TESTS..." << std::endl;
+
         // TODO: Ugly cast to concrete type from interface
         // https://chatgpt.com/s/t_68630dc8597881918ffd0e6db8a8c57e
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
@@ -45,12 +47,11 @@ bool Game::init()
         // 1.   Import resources concurrently
         //
         using ModelRef = eeng::AssetRef<eeng::mock::Model>;
-        entt::meta_factory<eeng::mock::Model>();
         // entt::meta_factory<eeng::mock::Model>();
         // entt::meta_factory<eeng::mock::Mesh>();
         entt::meta_factory<size_t>(); //
-        
-        // Make sure resource_manager.file is TS
+
+        // Make sure resource_manager.file is TS <- HOW??? IT IS META BASED...
         std::cout << "Importing assets recursively..." << std::endl;
         const int numTasks = 5;
         std::vector<std::future<ModelRef>> futures;
@@ -64,7 +65,9 @@ bool Game::init()
             );
         }
 
-        // Wait for futures
+        // Fetch asset references from futures
+        // - get() blocks until the task is done
+        // - wait_for() checks & waits for a period of time without blocking
         std::cout << "Wait for imports..." << std::endl;
         std::vector<ModelRef> refs;
         for (auto& f : futures) refs.push_back(f.get());
@@ -93,8 +96,10 @@ bool Game::init()
         // 4. Load assets to Storage concurrently
     }
 
-    // Thread pool test
+    // Thread pool test 1
     {
+        std::cout << "Thread pool test 1..." << std::endl;
+
         ThreadPool pool{ 4 };
 
         // Define your per-frame update/render as a lambda (runs on main thread)
@@ -147,6 +152,8 @@ bool Game::init()
     }
     // Thread test 2
     {
+        std::cout << "Thread pool test 2..." << std::endl;
+
         // 1) Create a packaged_task that simulates work by sleeping
         std::packaged_task<int()> task([] {
             std::this_thread::sleep_for(std::chrono::seconds(3));  // simulate 3s of work
@@ -173,8 +180,10 @@ bool Game::init()
         worker.join();
         // return 0;
     }
-    // Thread test 1
+    // Thread test 3
     {
+        std::cout << "Thread pool test 3..." << std::endl;
+
         std::packaged_task<int()> task([] {
             // This is the “work” the task will do
             return 6 * 7;
@@ -327,7 +336,7 @@ bool Game::init()
         // registry.remove(h); // 
 
         logRegisteredResourceTypes(registry);
-    }
+}
 #endif
 
     // Do some entt stuff
@@ -432,7 +441,7 @@ bool Game::init()
         { 0.01f, 0.01f, 0.01f });
 
     return true;
-    }
+}
 
 void Game::update(
     float time,
@@ -596,7 +605,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-    }
+}
 #endif
 
     // Draw shape batches
