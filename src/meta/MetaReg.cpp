@@ -11,7 +11,7 @@
 #include "MetaLiterals.h"
 #include "Storage.hpp"
 #include "MetaInfo.h"
-#include "IResourceManager.hpp" // For AssetRef<T>
+#include "IResourceManager.hpp" // For AssetRef<T>, AssetMetaData
 
 #include "MockImporter.hpp" // For mock types
 
@@ -123,18 +123,18 @@ namespace eeng {
             storage.assure_storage<T>();
         }
 
-        template<typename T>
-        void register_handle(const std::string& name)
-        {
-            using handle_type = Handle<T>;
+        // template<typename T>
+        // void register_handle(const std::string& name)
+        // {
+        //     using handle_type = Handle<T>;
 
-            entt::meta_factory<handle_type>()
-                .type(entt::hashed_string{ name.c_str() })
-                //.type(entt::hashed_string::value(name.c_str()))
-                // .template func<&serialize_handle<T>>("serialize"_hs)
-                // .template func<&deserialize_handle<T>>("deserialize"_hs)
-                ;
-        }
+        //     entt::meta_factory<handle_type>()
+        //         .type(entt::hashed_string{ name.c_str() })
+        //         //.type(entt::hashed_string::value(name.c_str()))
+        //         // .template func<&serialize_handle<T>>("serialize"_hs)
+        //         // .template func<&deserialize_handle<T>>("deserialize"_hs)
+        //         ;
+        // }
 
         template<typename T>
         void register_resource(/*const std::string& name*/)
@@ -143,8 +143,6 @@ namespace eeng {
             // constexpr auto id    = entt::type_hash<T>::value();
 
             entt::meta_factory<T>()
-                // .type(entt::hashed_string{ name.c_str() })
-                // .type(id)
                 .template func<&assure_storage<T>>(eeng::literals::assure_storage_hs)
                 ;
 
@@ -152,13 +150,20 @@ namespace eeng {
             auto name = std::string{ entt::resolve<T>().info().name() };
 
             // Handle<T>
-            // NOTE: Should not be needed - is part of AssetRef<T>
-            // entt::meta_factory<Handle<T>>{};
+            // NOTE: Is not exposed via AssetRef<T>
+#if 0
+            entt::meta_factory<Handle<T>>{}
+            .data<&Handle<T>::idx>("idx"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "idx", "The index of the handle in storage." })
+                .traits(MetaFlags::read_only)
+                .data<&Handle<T>::ver>("ver"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "ver", "The version of the handle." })
+                .traits(MetaFlags::read_only)
+                ;
+#endif
 
             // AssetRef<T>
             entt::meta_factory<AssetRef<T>>{}
-            // .type(entt::hashed_string{ ("AssetRef<" + name + ">").c_str() })
-
             .template data<&AssetRef<T>::guid>("guid"_hs)
                 .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "A globally unique identifier." })
                 .traits(MetaFlags::read_only)
@@ -194,44 +199,40 @@ namespace eeng {
 
     } // namespace
 
-#if 0
-        // --- Serialization ---
-    auto mt = entt::resolve<T>();
-    std::string type_name = mt.info().name();    // e.g. "eeng::ResourceTest"
-    // write `type_name` into your JSON
-
-    // --- Deserialization ---
-    std::string type_name = /* read from JSON */;
-    auto id = entt::hashed_string{ type_name.data(), type_name.size() };
-    auto mt = entt::resolve(id);
-    // now `mt` is the same meta‐type you originally registered
-#endif
-
     void register_meta_types()
     {
-
-
-
         // === Guid ===
+
         entt::meta_factory<Guid>{}
-        //     .type("Guid"_hs)
-            // .type(entt::hashed_string{"Guid"_hs})
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Guid", "A globally unique identifier." })
             .func<&serialize_Guid>(eeng::literals::serialize_hs)
             .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
             ;
 
-        // === HANDLES (per resource type) ===
+        // === AssetMetaData ===
 
-        // register_handle<MockResource1>("Handle<MockResource1>");
-        // register_handle<MockResource2>("Handle<MockResource2>");
+        entt::meta_factory<AssetMetaData>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "AssetMetaData", "Metadata for an asset." })
 
-        //  === ASSETREF (per resource type) === ???
+            .data<&AssetMetaData::guid>("guid"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "Guid", "A globally unique identifier." })
+            .traits(MetaFlags::read_only)
 
-        // entt::meta<AssetRef<MeshResource>>()
-        //     .type("AssetRef<Mesh>"_hs)
-        //     .data<&AssetRef<MeshResource>::guid>("guid"_hs)
-        //     .func<&resolve_asset_ref<MeshResource>>("resolve"_hs); // optional
+            .data<&AssetMetaData::guid_parent>("guid_parent"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "Parent Guid", "The GUID of the parent asset." })
+            .traits(MetaFlags::read_only)
+
+            .data<&AssetMetaData::name>("name"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "Name", "The name of the asset." })
+            .traits(MetaFlags::read_only)
+
+            .data<&AssetMetaData::type_name>("type_name"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "Type name", "The type name of the asset." })
+            .traits(MetaFlags::read_only)
+
+            .data<&AssetMetaData::file_path>("file_path"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "File path", "The file path of the asset." })
+            .traits(MetaFlags::read_only);
 
         // === RESOURCES ===
 

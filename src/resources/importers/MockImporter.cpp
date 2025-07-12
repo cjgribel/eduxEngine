@@ -5,12 +5,13 @@
 #include "ResourceManager.hpp" // Treats IResourceManager as this type
 #include "Storage.hpp"
 #include "ThreadPool.hpp"
+#include "Guid.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <iostream>
 #include <atomic> // For thread-safe unique identifiers
-#include <format>
+#include <format> // For formatted strings
 
 namespace eeng::mock {
 
@@ -23,7 +24,9 @@ namespace eeng::mock {
         static std::atomic<int> counter{ 0 };  // thread-safe static counter
         int value = counter.fetch_add(1, std::memory_order_relaxed);  // or use memory_order_seq_cst
         auto mesh_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/meshes/mock_mesh{}.json", value);
+        auto mesh_meta_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/meshes/mock_mesh{}.json.meta", value);
         auto model_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/models/mock_model{}.json", value);
+        auto model_meta_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/models/mock_model{}.json.meta", value);
 
         // + use thread pool, e.g. for "textures" (by index to assimp's texture array)
 
@@ -31,14 +34,34 @@ namespace eeng::mock {
         Mesh mesh;
         Model model;
 
-        // File mesh
-        auto mesh_ref = resource_manager.file(mesh, mesh_path);
+        auto model_guid = Guid::generate();
+
+        // Mesh
+        // - Create meta data
+        // - File
+        auto mesh_ref = AssetRef<Mesh>{ Guid::generate() };
+        auto mesh_meta = AssetMetaData{
+            Guid::generate(),
+            model_guid, // Parent GUID
+            std::string("MockMesh") + std::to_string(value), // name
+            std::string(entt::resolve<Mesh>().info().name()), // type name
+            mesh_path // desired filepath
+        };
+        //auto mesh_ref = resource_manager.file(mesh, mesh_path);
 
         // Add mesh reference to model
         model.meshes.push_back(mesh_ref);
 
         // File model
-        auto model_ref = resource_manager.file(model, model_path);
+        auto model_ref = AssetRef<Model>{ Guid::generate() };
+        auto model_meta = AssetMetaData{
+            Guid::generate(),
+            Guid::invalid(), // Parent GUID
+            std::string("MockModel") + std::to_string(value), // name
+            std::string(entt::resolve<Model>().info().name()), // type name
+            model_path // desired filepath
+        };
+        //auto model_ref = resource_manager.file(model, model_path);
 
         return model_ref;
     }
