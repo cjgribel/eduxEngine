@@ -42,6 +42,7 @@ bool Game::init()
 
         // TODO: Ugly cast to concrete type from interface
         // https://chatgpt.com/s/t_68630dc8597881918ffd0e6db8a8c57e
+        // - Use helper free function for loading etc?
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
 
         // 1.   Import resources concurrently

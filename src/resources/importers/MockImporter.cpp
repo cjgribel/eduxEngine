@@ -24,10 +24,12 @@ namespace eeng::mock {
         static std::atomic<int> counter{ 0 };  // thread-safe static counter
         int value = counter.fetch_add(1, std::memory_order_relaxed);  // or use memory_order_seq_cst
         auto mesh_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/meshes/mock_mesh{}.json", value);
-        auto mesh_meta_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/meshes/mock_mesh{}.json.meta", value);
+        auto mesh_meta_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/meshes/mock_mesh{}.meta.json", value);
         auto model_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/models/mock_model{}.json", value);
-        auto model_meta_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/models/mock_model{}.json.meta", value);
+        auto model_meta_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/models/mock_model{}.meta.json", value);
 
+        // + make sure folders exist
+        // + use std::filesystem for paths
         // + use thread pool, e.g. for "textures" (by index to assimp's texture array)
 
         // Imported resources:
@@ -47,6 +49,11 @@ namespace eeng::mock {
             std::string(entt::resolve<Mesh>().info().name()), // type name
             mesh_path // desired filepath
         };
+        resource_manager.file(
+            mesh, 
+            mesh_path, 
+            mesh_meta, 
+            mesh_meta_path); // Serialize to file
         //auto mesh_ref = resource_manager.file(mesh, mesh_path);
 
         // Add mesh reference to model
@@ -61,6 +68,11 @@ namespace eeng::mock {
             std::string(entt::resolve<Model>().info().name()), // type name
             model_path // desired filepath
         };
+        resource_manager.file(
+            model, 
+            model_path, 
+            model_meta, 
+            model_meta_path); // Serialize to file
         //auto model_ref = resource_manager.file(model, model_path);
 
         return model_ref;

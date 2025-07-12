@@ -52,35 +52,46 @@ namespace eeng
 
         std::string to_string() const override;
 
-        // Must be thread-safe. Use static types.
+        // Must be thread-safe. Use static types, or lock meta paths.
         /// @brief Import new resource to resource index
         /// @tparam T 
         /// @param t 
         /// @return 
         template<class T>
-        AssetRef<T> file(const T& t, const std::string& filepath)
+        void file(
+            const T& t,
+            const std::string& file_path,
+            const AssetMetaData& meta,
+            const std::string& meta_file_path)
         {
             std::lock_guard lock{ mutex_ };
             std::cout << "[ResourceManager] Filing type: " << typeid(T).name() << "\n";
 
-            auto guid = Guid::generate();
-            auto ref = AssetRef<T>{ guid, Handle<T> {} };
+            // auto guid = Guid::generate();
+            // auto ref = AssetRef<T>{ guid, Handle<T> {} };
 
             // AssetIndex maps asset type to a file location - must be TS
             // Use either a) templated or b) entt::meta_type
             // asset_index.serialize<T>(t, guid, ctx?);
 
-            // seria
-            std::ofstream file(filepath);
-            assert(file.is_open() && "Failed to open file for writing");
-            // auto any = t;
-            nlohmann::json j;
-            j["guid"] = guid.raw(); // Store as string
-            j["type"] = std::string(entt::resolve<T>().info().name());
-            j["data"] = meta::serialize_any(entt::forward_as_meta(t));
-            file << j.dump(4); // Indent with 4 spaces
+            // Serialize
+            // CONCURRENT?
+            std::ofstream data_file(file_path), meta_file(meta_file_path);
+            assert(data_file.is_open() && "Failed to open file for writing");
+            assert(meta_file.is_open() && "Failed to open meta file for writing");
 
-            return ref;
+            // NOT CONCURRENT
+            nlohmann::json j_data, j_meta;
+            // j_asset_meta["guid"] = guid.raw(); // Store as string
+            // j_meta["type"] = std::string(entt::resolve<T>().info().name());
+            // j_meta["data"] = meta::serialize_any(entt::forward_as_meta(t));
+            j_data = meta::serialize_any(entt::forward_as_meta(t));
+            j_meta = meta::serialize_any(entt::forward_as_meta(meta));
+            // CONCURRENT?
+            data_file << j_data.dump(4);
+            meta_file << j_meta.dump(4);
+
+            // return ref;
             // ^ handle is empty until asset is loaded
         }
 
