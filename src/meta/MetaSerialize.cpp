@@ -48,7 +48,7 @@ namespace eeng::meta
             // Destroy the temporary entity
             registry.destroy(temp_entity);
 
-            // std::cout << "Ceeated storage for " << meta_type_name(meta_type) << std::endl;
+            // std::cout << "Ceeated storage for " << meta_type_display_name(meta_type) << std::endl;
         }
     }
 #endif
@@ -153,7 +153,7 @@ namespace eeng::meta
                     json = value;
                 });
             if (!res)
-                throw std::runtime_error(std::string("Unable to cast ") + meta_type_name(any.type()));
+                throw std::runtime_error(std::string("Unable to cast ") + meta_type_display_name(any.type()));
         }
 
         return json;
@@ -177,7 +177,7 @@ namespace eeng::meta
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
                 auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
-                // auto type_name = meta_type_name(meta_type); // Display name or mangled name
+                // auto type_name = meta_type_display_name(meta_type); // Display name or mangled name
 
                 entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity)));
             }
@@ -258,7 +258,7 @@ namespace eeng::meta
                 if (entt::meta_type meta_type = entt::resolve(id); meta_type)
                 {
                     auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
-                    // auto type_name = meta_type_name(meta_type); // Inspector-friendly version
+                    // auto type_name = meta_type_display_name(meta_type); // Inspector-friendly version
 
                     entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity)));
                 }
@@ -437,7 +437,7 @@ namespace eeng::meta
                     any.assign(json.get<Type>());
                 });
             if (!res)
-                throw std::runtime_error(std::string("Unable to cast ") + meta_type_name(any.type()));
+                throw std::runtime_error(std::string("Unable to cast ") + meta_type_display_name(any.type()));
         }
     }
 #if 0

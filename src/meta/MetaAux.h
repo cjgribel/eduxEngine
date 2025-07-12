@@ -95,13 +95,21 @@ bool try_apply(const entt::meta_any& value, Callable callable)
 /// @brief Get inspector-friendly name of a meta_type
 /// @param meta_type 
 /// @return Name provided as a display name property, or default name
-inline auto meta_type_name(const entt::meta_type meta_type)
+inline auto meta_type_display_name(const entt::meta_type meta_type)
 {
     assert(meta_type);
     eeng::TypeMetaInfo* type_info = meta_type.custom();
     if (type_info)
         return type_info->display_name;
     return std::string(meta_type.info().name());
+}
+
+template<typename T>
+inline auto meta_type_display_name()
+{
+    entt::meta_type meta_type = entt::resolve<T>();
+    assert(meta_type);
+    return meta_type_display_name(meta_type);
 }
 
 /// @brief Get name of a meta data field
