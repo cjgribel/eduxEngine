@@ -9,6 +9,7 @@
 #include "Guid.h"
 #include "LogGlobals.hpp"
 // #include "hash_combine.h"
+#include "IResourceManager.hpp" // For AssetRef<T>
 
 // Placeholder resources
 namespace eeng
@@ -40,36 +41,13 @@ namespace eeng
 
 } // namespace eeng
 
-namespace eeng
-{
-    template<class T>
-    struct AssetRef
-    {
-        static_assert(!std::is_reference_v<T>, "AssetRef<T> cannot use reference types");
 
-        Guid guid;
-        Handle<T> handle;
-
-        // Optional helpers
-        bool is_loaded() const { return bool(handle); }
-        void load(Handle<T> handle) { this->handle = handle; }
-        void unload() { handle.reset(); }
-        Guid get_guid() const { return guid; }
-        Handle<T> get_handle() const { return handle; }
-    };
-
-    template<typename T, typename Visitor>
-    void visit_asset_refs(T&, Visitor&&)
-    {
-        // No-op for asset types with no AssetRef dependencies
-    }
-}
 
 namespace eeng::mock
 {
     struct Mesh
     {
-        std::vector<float> vertices {1.0f, 2.0f, 3.0f}; // Example vertex data
+        std::vector<float> vertices{ 1.0f, 2.0f, 3.0f }; // Example vertex data
     };
 
     struct Model
@@ -87,7 +65,7 @@ namespace eeng::mock
             visitor(mesh_ref);
         }
     }
-    
+
     struct MockResource1
     {
         int x{};
