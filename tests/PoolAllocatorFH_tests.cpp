@@ -158,7 +158,7 @@ TEST_F(PoolAllocatorFHTest, ToStringIsNonEmptyAfterCreates)
         EXPECT_FALSE(s.empty()) << "to_string() should produce at least some output";
     });
 
-    std::cout << pool.to_string() << std::endl;
+    //std::cout << pool.to_string() << std::endl;
 }
 
 TEST_F(PoolAllocatorFHTest, TypeMismatchAssert)
