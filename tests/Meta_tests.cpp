@@ -102,6 +102,43 @@ protected:
     }
 };
 
+TEST(MetaBasicTests, VerifyResolution)
+{
+    struct NonRegType { int x; float y; };
+
+    // We get a valid meta type from a static type
+    auto mt = entt::resolve<NonRegType>();
+    EXPECT_TRUE(mt) << "Failed to resolve type NonRegType";
+
+    // We don't get a valid meta type from the id of an unregistered type
+    auto id = entt::type_hash<NonRegType>::value();
+    EXPECT_FALSE(entt::resolve(id)) << "Unregistered type resolved unexpectedly";
+
+    std::cout << mt.info().name() << " resolved successfully." << std::endl;
+}
+
+TEST(MetaBasicTests, VerifySerializationRoundtrip)
+{
+    // Setup and registration
+    struct RegType { int x; float y; };
+    entt::meta_factory<RegType>{};
+
+    // "Serialize"
+    auto mt_ser = entt::resolve<RegType>();
+    EXPECT_TRUE(mt_ser) << "Failed to resolve type RegType";
+    EXPECT_EQ(mt_ser.id(), entt::type_hash<RegType>::value()) << "Type id does not match expected value";
+    auto id_ser = mt_ser.id();
+    auto type_name = std::string{ mt_ser.info().name() };
+
+    // "Deserialize"
+    auto id_deser = entt::hashed_string::value(type_name.data(), type_name.size());
+    EXPECT_EQ(id_deser, id_ser) << "Type id mismatch after serialization/deserialization";
+    auto mt_deser = entt::resolve(id_deser);
+    EXPECT_TRUE(mt_deser) << "Failed to resolve type after deserialization";
+    EXPECT_EQ(mt_deser, mt_ser) << "Meta types do not match after serialization/deserialization";
+    EXPECT_EQ(mt_ser.info().name(), mt_deser.info().name()) << "Type names do not match after serialization/deserialization";
+}
+
 TEST(MetaAnyPolicyTest, VerifyMetaAnyBasePolicies)
 {
     int value = 42;
