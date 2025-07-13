@@ -59,25 +59,25 @@ protected:
     static void SetUpTestSuite()
     {
         // Register MockType::AnEnum
-        auto enum_info = EnumMetaInfo{
-            .display_name = "AnEnum",
+        auto enum_info = EnumTypeMetaInfo{
+            .name = "AnEnum",
             .tooltip = "AnEnum is a test enum with three values.",
             .underlying_type = entt::resolve<std::underlying_type_t<MockType::AnEnum>>()
         };
         entt::meta_factory<MockType::AnEnum>()
             .type("AnEnum"_hs)
-            .custom<EnumMetaInfo>(enum_info)
+            .custom<EnumTypeMetaInfo>(enum_info)
 
             .data<MockType::AnEnum::Hello>("Hello"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Hello", "Greeting in English." })
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hello", "Greeting in English." })
             .traits(MetaFlags::none)
 
             .data<MockType::AnEnum::Bye>("Bye"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Bye", "Farewell in English." })
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Bye", "Farewell in English." })
             .traits(MetaFlags::none)
 
             .data<MockType::AnEnum::Hola>("Hola"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Hola", "Greeting in Spanish." })
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hola", "Greeting in Spanish." })
             .traits(MetaFlags::none);
 
         // Register MockType
@@ -87,11 +87,11 @@ protected:
             .traits(MetaFlags::none)
 
             .data<&MockType::x>("x"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "x", "Integer member x." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "Integer member x." })
             .traits(MetaFlags::read_only)
 
             .data<&MockType::y>("y"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "y", "Float member y." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "Float member y." })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
 
             // enum
@@ -222,7 +222,7 @@ TEST_F(MetaRegistrationTest, VerifyMetaInformation)
     {
         TypeMetaInfo* type_info = meta_type.custom();
         ASSERT_NE(type_info, nullptr);
-        EXPECT_EQ(type_info->display_name, "MockType");
+        EXPECT_EQ(type_info->name, "MockType");
         EXPECT_EQ(type_info->tooltip, "A mock resource type.");
 
         auto type_flags = meta_type.traits<MetaFlags>();
@@ -238,13 +238,13 @@ TEST_F(MetaRegistrationTest, VerifyMetaInformation)
         auto flags = meta_data.traits<MetaFlags>();
         EXPECT_TRUE(any(flags)); // must have at least some flags set
 
-        if (member_info->display_name == "x")
+        if (member_info->name == "x")
         {
             EXPECT_EQ(member_info->tooltip, "Integer member x.");
             EXPECT_TRUE((flags & MetaFlags::read_only) == MetaFlags::read_only);
             EXPECT_FALSE(any(flags & MetaFlags::hidden));
         }
-        else if (member_info->display_name == "y")
+        else if (member_info->name == "y")
         {
             EXPECT_EQ(member_info->tooltip, "Float member y.");
             EXPECT_TRUE((flags & MetaFlags::read_only) == MetaFlags::read_only);
@@ -252,7 +252,7 @@ TEST_F(MetaRegistrationTest, VerifyMetaInformation)
         }
         else
         {
-            FAIL() << "Unexpected member: " << member_info->display_name;
+            FAIL() << "Unexpected member: " << member_info->name;
         }
     }
 
@@ -265,7 +265,7 @@ TEST_F(MetaRegistrationTest, VerifyMetaInformation)
         // Validate custom info
         FuncMetaInfo* func_info = func_meta.custom();
         ASSERT_NE(func_info, nullptr);
-        EXPECT_EQ(func_info->display_name, "mutate_and_sum");
+        EXPECT_EQ(func_info->name, "mutate_and_sum");
         EXPECT_EQ(func_info->tooltip, "Mutates ref and ptr args, and sums them.");
 
         // Validate traits

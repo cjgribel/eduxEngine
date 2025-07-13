@@ -48,7 +48,7 @@ namespace eeng::meta
             // Destroy the temporary entity
             registry.destroy(temp_entity);
 
-            // std::cout << "Ceeated storage for " << meta_type_display_name(meta_type) << std::endl;
+            // std::cout << "Ceeated storage for " << get_meta_type_name(meta_type) << std::endl;
         }
     }
 #endif
@@ -96,7 +96,7 @@ namespace eeng::meta
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
                     // JSON key name is the display name if present, or the id type
-                    std::string key_name = meta_data_name(id, meta_data);
+                    std::string key_name = get_meta_data_nice_name(id, meta_data);
 
                     auto field_any = meta_data.get(any);
                     json[key_name] = serialize_any(field_any);
@@ -153,7 +153,7 @@ namespace eeng::meta
                     json = value;
                 });
             if (!res)
-                throw std::runtime_error(std::string("Unable to cast ") + meta_type_display_name(any.type()));
+                throw std::runtime_error(std::string("Unable to cast ") + get_meta_type_name(any.type()));
         }
 
         return json;
@@ -177,7 +177,7 @@ namespace eeng::meta
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
                 auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
-                // auto type_name = meta_type_display_name(meta_type); // Display name or mangled name
+                // auto type_name = get_meta_type_name(meta_type); // Display name or mangled name
 
                 entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity)));
             }
@@ -258,7 +258,7 @@ namespace eeng::meta
                 if (entt::meta_type meta_type = entt::resolve(id); meta_type)
                 {
                     auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
-                    // auto type_name = meta_type_display_name(meta_type); // Inspector-friendly version
+                    // auto type_name = get_meta_type_name(meta_type); // Inspector-friendly version
 
                     entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity)));
                 }
@@ -347,7 +347,7 @@ namespace eeng::meta
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
                     // JSON key name is the display name if present, or the id type
-                    std::string key_name = meta_data_name(id, meta_data);
+                    std::string key_name = get_meta_data_nice_name(id, meta_data);
 
                     entt::meta_any field_any = meta_data.get(any);
                     deserialize_any(json[key_name], field_any, entity, context);
@@ -437,7 +437,7 @@ namespace eeng::meta
                     any.assign(json.get<Type>());
                 });
             if (!res)
-                throw std::runtime_error(std::string("Unable to cast ") + meta_type_display_name(any.type()));
+                throw std::runtime_error(std::string("Unable to cast ") + get_meta_type_name(any.type()));
         }
     }
 #if 0

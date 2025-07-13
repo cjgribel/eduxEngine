@@ -154,10 +154,10 @@ namespace eeng {
 #if 0
             entt::meta_factory<Handle<T>>{}
             .data<&Handle<T>::idx>("idx"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "idx", "The index of the handle in storage." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "idx", "Index", "The index of the handle in storage." })
                 .traits(MetaFlags::read_only)
                 .data<&Handle<T>::ver>("ver"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "ver", "The version of the handle." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "ver", "Version", "The version of the handle." })
                 .traits(MetaFlags::read_only)
                 ;
 #endif
@@ -165,7 +165,7 @@ namespace eeng {
             // AssetRef<T>
             entt::meta_factory<AssetRef<T>>{}
             .template data<&AssetRef<T>::guid>("guid"_hs)
-                .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "A globally unique identifier." })
+                .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
                 .traits(MetaFlags::read_only)
                 ;
         }
@@ -215,23 +215,23 @@ namespace eeng {
         .custom<TypeMetaInfo>(TypeMetaInfo{ "AssetMetaData", "Metadata for an asset." })
 
             .data<&AssetMetaData::guid>("guid"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Guid", "A globally unique identifier." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
             .traits(MetaFlags::read_only)
 
             .data<&AssetMetaData::guid_parent>("guid_parent"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Parent Guid", "The GUID of the parent asset." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "parent_guid", "Parent Guid", "The GUID of the parent asset." })
             .traits(MetaFlags::read_only)
 
             .data<&AssetMetaData::name>("name"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Name", "The name of the asset." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the asset." })
             .traits(MetaFlags::read_only)
 
             .data<&AssetMetaData::type_name>("type_name"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Type name", "The type name of the asset." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "type_name", "Type Name", "The type name of the asset." })
             .traits(MetaFlags::read_only)
 
             .data<&AssetMetaData::file_path>("file_path"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "File path", "The file path of the asset." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "file_path", "File Path", "The file path of the asset." })
             .traits(MetaFlags::read_only);
 
         // === RESOURCES ===
@@ -241,7 +241,7 @@ namespace eeng {
         entt::meta_factory<mock::Mesh>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Mesh", "This is a mock mesh type." })
             .data<&mock::Mesh::vertices>("vertices"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "vertices", "A vector of vertex positions." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "vertices", "Vertices", "A vector of vertex positions." })
             .traits(MetaFlags::read_only)
             ;
 
@@ -250,7 +250,7 @@ namespace eeng {
         entt::meta_factory<mock::Model>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Model", "This is a mock model type." })
             .data<&mock::Model::meshes>("meshes"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "meshes", "A vector of mesh references." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "meshes", "Meshes", "A vector of mesh references." })
             .traits(MetaFlags::read_only)
             ;
 
@@ -270,12 +270,12 @@ namespace eeng {
 
             // Register member 'x' with DisplayInfo and DataFlags
             .data<&mock::MockResource1::x>("x"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "x", "An integer member 'x'" })
+            .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "An integer member 'x'" })
             .traits(MetaFlags::read_only)
 
             // Register member 'y' with DisplayInfo and multiple DataFlags
             .data<&mock::MockResource1::y>("y"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "y", "A float member 'y'" })
+            .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "A float member 'y'" })
             .traits(MetaFlags::hidden | MetaFlags::read_only)
 
             // Required for all resource types

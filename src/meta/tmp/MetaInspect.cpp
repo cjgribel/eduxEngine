@@ -126,7 +126,7 @@ namespace Editor {
         assert(any);
         bool mod = false; // TODO: not used yet
 #ifdef INSPECTION_DEBUG_PRINTS
-        std::cout << "inspect_any " << meta_type_display_name(any.type()) << std::endl;
+        std::cout << "inspect_any " << get_meta_type_name(any.type()) << std::endl;
 #endif
 
         if (entt::meta_type meta_type = entt::resolve(any.type().id()); meta_type)
@@ -186,7 +186,7 @@ namespace Editor {
                 // inspect() not available: traverse data members
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
-                    std::string key_name = meta_data_name(id, meta_data);
+                    std::string key_name = get_meta_data_nice_name(id, meta_data);
 #ifdef INSPECTION_DEBUG_PRINT
                     std::cout << "inspecting data field: " << key_name << std::endl;
 #endif
@@ -241,7 +241,7 @@ namespace Editor {
             auto view = any.as_sequence_container();
             assert(view && "as_sequence_container() failed");
 #ifdef INSPECTION_DEBUG_PRINT
-            std::cout << "is_sequence_container: " << meta_type_display_name(any.type()) << ", size " << view.size() << std::endl;
+            std::cout << "is_sequence_container: " << get_meta_type_name(any.type()) << ", size " << view.size() << std::endl;
 #endif
             int count = 0;
             for (auto&& v : view)
@@ -273,7 +273,7 @@ namespace Editor {
             auto view = any.as_associative_container();
             assert(view && "as_associative_container() failed");
 #ifdef INSPECTION_DEBUG_PRINT
-            std::cout << "is_associative_container: " << meta_type_display_name(any.type()) << ", size " << view.size() << std::endl;
+            std::cout << "is_associative_container: " << get_meta_type_name(any.type()) << ", size " << view.size() << std::endl;
 #endif
             int count = 0;
             for (auto&& [key_any, mapped_any] : view)
@@ -352,12 +352,12 @@ namespace Editor {
 #endif
                 });
             if (!res)
-                throw std::runtime_error(std::string("Unable to cast type ") + meta_type_display_name(any.type()));
+                throw std::runtime_error(std::string("Unable to cast type ") + get_meta_type_name(any.type()));
         }
         // else { /* cref */ }
 
 #ifdef INSPECTION_DEBUG_PRINT
-        std::cout << "DONE inspect_any " << meta_type_display_name(any.type()) << std::endl;
+        std::cout << "DONE inspect_any " << get_meta_type_name(any.type()) << std::endl;
 #endif
         return mod;
     }
@@ -379,7 +379,7 @@ namespace Editor {
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
-                auto type_name = meta_type_display_name(meta_type);
+                auto type_name = get_meta_type_name(meta_type);
 
                 if (inspector.begin_node(type_name.c_str()))
                 {
@@ -430,7 +430,7 @@ namespace Editor {
 
                 if (entt::meta_type meta_type = entt::resolve(id); meta_type)
                 {
-                    auto type_name = meta_type_display_name(meta_type);
+                    auto type_name = get_meta_type_name(meta_type);
 
                     if (inspector.begin_node(type_name.c_str()))
                     {

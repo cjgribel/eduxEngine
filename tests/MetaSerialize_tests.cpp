@@ -237,34 +237,34 @@ protected:
             .type("vec3"_hs)
 
             .data<&vec3::xy>("xy"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "xy", "n/a" })
+            .custom<DataMetaInfo>(DataMetaInfo{ "xy", "XY", "n/a" })
             .traits(MetaFlags::none)
 
             .data<&vec3::z>("z"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "z", "n/a" })
+            .custom<DataMetaInfo>(DataMetaInfo{ "z", "Z", "n/a" })
             .traits(MetaFlags::none)
             ;
 
         // Register MockType2::AnEnum
-        auto enum_info = EnumMetaInfo{
-            .display_name = "AnEnum",
+        auto enum_info = EnumTypeMetaInfo{
+            .name = "AnEnum",
             .tooltip = "AnEnum is a test enum with three values.",
             .underlying_type = entt::resolve<std::underlying_type_t<MockType2::AnEnum>>()
         };
         entt::meta_factory<MockType2::AnEnum>()
             .type("MockType2::AnEnum"_hs)
-            .custom<EnumMetaInfo>(enum_info)
+            .custom<EnumTypeMetaInfo>(enum_info)
 
             .data<MockType2::AnEnum::Hello>("Hello"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Hello", "Greeting in English." })
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hello", "Greeting in English." })
             .traits(MetaFlags::none)
 
             .data<MockType2::AnEnum::Bye>("Bye"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Bye", "Farewell in English." })
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Bye", "Farewell in English." })
             .traits(MetaFlags::none)
 
             .data<MockType2::AnEnum::Hola>("Hola"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "Hola", "Greeting in Spanish." })
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hola", "Greeting in Spanish." })
             .traits(MetaFlags::none);
 
         // Register MockType2
@@ -274,15 +274,15 @@ protected:
             .traits(MetaFlags::none)
 
             .data<&MockType2::x>("x"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "x", "Integer member x." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "Integer member x." })
             .traits(MetaFlags::read_only)
 
             .data<&MockType2::y>("y"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "y", "Float member y." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "Float member y." })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
 
             .data<&MockType2::an_enum>("an_enum"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "an_enum", "Enum member" })
+            .custom<DataMetaInfo>(DataMetaInfo{ "an_enum", "AnEnum", "Enum member" })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
             ;
     }
@@ -298,7 +298,7 @@ namespace
 
 #if 0
         // Debug print json
-        std::cout << meta_type_display_name(entt::resolve<T>()) << ":" << std::endl;
+        std::cout << get_meta_type_name(entt::resolve<T>()) << ":" << std::endl;
         std::cout << j.dump(4) << std::endl;
 #endif
         // Deserialize

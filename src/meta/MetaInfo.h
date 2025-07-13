@@ -10,26 +10,33 @@ namespace eeng
 {
     struct TypeMetaInfo
     {
-        std::string display_name;
+        std::string name;
         std::string tooltip;
     };
 
     struct DataMetaInfo
     {
-        std::string display_name;
+        std::string name;
+        std::string nice_name;
         std::string tooltip;
     };
 
-    struct EnumMetaInfo
+    struct EnumTypeMetaInfo
     {
-        std::string display_name;
+        std::string name;
         std::string tooltip;
         entt::meta_type underlying_type;
     };
 
+    struct EnumDataMetaInfo
+    {
+        std::string name;
+        std::string tooltip;
+    };
+
     struct FuncMetaInfo
     {
-        std::string display_name;
+        std::string name;
         std::string tooltip;
     };
 

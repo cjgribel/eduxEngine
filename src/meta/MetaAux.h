@@ -95,28 +95,30 @@ bool try_apply(const entt::meta_any& value, Callable callable)
 /// @brief Get inspector-friendly name of a meta_type
 /// @param meta_type 
 /// @return Name provided as a display name property, or default name
-inline auto meta_type_display_name(const entt::meta_type meta_type)
+inline auto get_meta_type_name(const entt::meta_type meta_type)
 {
     assert(meta_type);
     eeng::TypeMetaInfo* type_info = meta_type.custom();
     if (type_info)
-        return type_info->display_name;
+        return type_info->name;
     return std::string(meta_type.info().name());
 }
 
 template<typename T>
-inline auto meta_type_display_name()
+inline auto get_meta_type_name()
 {
+    // Or: use entt::type_name<T>(), and don't require type to be registered?
+
     entt::meta_type meta_type = entt::resolve<T>();
     assert(meta_type);
-    return meta_type_display_name(meta_type);
+    return get_meta_type_name(meta_type);
 }
 
 /// @brief Get name of a meta data field
 /// @param id Data field id, used as fallback
 /// @param data Meta data field
-/// @return Name provided as a display name property, or string generated from id
-inline auto meta_data_name(
+/// @return Name provided as a name property, or string generated from id
+inline auto get_meta_data_name(
     const entt::id_type& id,
     const entt::meta_data& meta_data)
 {
@@ -125,18 +127,27 @@ inline auto meta_data_name(
     assert(meta_data);
     eeng::DataMetaInfo* data_info = meta_data.custom();
     if (data_info)
-        return data_info->display_name;
+        return data_info->name;
     return std::to_string(id);
-
-
-    // if (auto display_name_prop = data.prop(display_name_hs); display_name_prop)
-    // {
-    //     auto name_ptr = display_name_prop.value().try_cast<const char*>();
-    //     assert(name_ptr);
-    //     return std::string(*name_ptr);
-    // }
-    // return std::to_string(id);
 }
+
+/// @brief Get nice name of a meta data field
+/// @param id Data field id, used as fallback
+/// @param data Meta data field
+/// @return Name provided as a nice name property, or string generated from id
+inline auto get_meta_data_nice_name(
+    const entt::id_type& id,
+    const entt::meta_data& meta_data)
+{
+    // Note: data.type().info().name() gives type name, not the field name
+
+    assert(meta_data);
+    eeng::DataMetaInfo* data_info = meta_data.custom();
+    if (data_info)
+        return data_info->nice_name;
+    return std::to_string(id);
+}
+
 #if 0
 /// @brief Get the value of a meta_type property
 /// @tparam Type Non-class property type
@@ -172,7 +183,7 @@ inline Type get_meta_data_prop(const entt::meta_data& data, const entt::id_type&
 inline auto cast_to_underlying_type(const entt::meta_type& meta_type, const entt::meta_any& enum_any)
 {
     assert(meta_type.is_enum());
-    eeng::EnumMetaInfo* enum_info = meta_type.custom();
+    eeng::EnumTypeMetaInfo* enum_info = meta_type.custom();
     assert(enum_info);
     assert(enum_info->underlying_type);
     return enum_any.allow_cast(enum_info->underlying_type);
@@ -187,11 +198,11 @@ inline auto gather_meta_enum_entries(const entt::meta_any& enum_any)
 
     for (auto [id_type, meta_data] : meta_type.data())
     {
-        eeng::DataMetaInfo* data_info = meta_data.custom();
+        eeng::EnumDataMetaInfo* data_info = meta_data.custom();
         assert(data_info);
 
         entries.push_back({
-            data_info->display_name,
+            data_info->name,
             cast_to_underlying_type(meta_type, meta_data.get(enum_any))
             });
     }
