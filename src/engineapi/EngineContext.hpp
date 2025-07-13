@@ -20,7 +20,7 @@ namespace eeng
     - Resource manager
     - Thread pool
     - Event dispatcher
-    - (TODO?) Logger
+    - Logger
     - (TODO) CommandQueue
     - (TODO?) Scene manager
     */
