@@ -5,7 +5,10 @@
 #include "ResourceManager.hpp" // Treats IResourceManager as this type
 #include "Storage.hpp"
 #include "ThreadPool.hpp"
-#include "Guid.h"
+// #include "Guid.h"
+#include "AssetMetaData.hpp"
+#include "AssetRef.hpp"
+
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -23,7 +26,7 @@ namespace eeng::mock {
         // Generate unique identifiers for mock resources
         static std::atomic<int> counter{ 0 };  // thread-safe static counter
         int value = counter.fetch_add(1, std::memory_order_relaxed);  // or use memory_order_seq_cst
-        auto asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/assets/MockModel1/";
+        auto asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/MockModel1/";
         auto mesh_path = std::format("{}meshes/mock_mesh{}.json", asset_root, value);
         auto mesh_meta_path = std::format("{}meshes/mock_mesh{}.meta.json", asset_root, value);
         auto model_path = std::format("{}models/mock_model{}.json", asset_root, value);

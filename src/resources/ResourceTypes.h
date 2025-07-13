@@ -5,8 +5,10 @@
 #define ResourceTypes_h
 #include <cstddef>
 #include <cstdint>
-#include "Handle.h"
-#include "Guid.h"
+#include "AssetMetaData.hpp"
+#include "AssetRef.hpp"
+// #include "Handle.h"
+// #include "Guid.h"
 #include "LogGlobals.hpp"
 // #include "hash_combine.h"
 #include "IResourceManager.hpp" // For AssetRef<T>

@@ -7,11 +7,13 @@
 #include "LogMacros.h"
 #include <entt/entt.hpp>
 
-// FOR TESTS
+// FOR TESTS ->
 #include "AssimpImporter.hpp" // --> ENGINE API
 #include "MockImporter.hpp" // --> ENGINE API
 #include "ResourceTypes.h"
 #include "ResourceManager.hpp" // eeng::ResourceManager
+#include <filesystem>
+// <-
 
 namespace {
 
@@ -44,6 +46,7 @@ bool Game::init()
         // https://chatgpt.com/s/t_68630dc8597881918ffd0e6db8a8c57e
         // - Use helper free function for loading etc?
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
+        std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/";
 
         // 1.   Import resources concurrently
         //
@@ -72,6 +75,11 @@ bool Game::init()
         std::cout << "Wait for imports..." << std::endl;
         std::vector<ModelRef> refs;
         for (auto& f : futures) refs.push_back(f.get());
+
+        // Now scan assets from disk
+        // - This is a blocking operation, so it should be done after all imports are done
+        std::cout << "Scanning assets..." << std::endl;
+        resource_manager.scan_assets("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
 
         // Load assets (storage->add - should be TS)
         std::cout << "Loading assets..." << std::endl;

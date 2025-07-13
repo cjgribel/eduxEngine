@@ -3,14 +3,27 @@
 
 #pragma once
 
-#include "Handle.h"
-#include "Guid.h"
-#include <nlohmann/json.hpp>
+// #include "Handle.h"
+// #include "Guid.h"
+#include "AssetMetaData.hpp"
+// #include "IResourceManager.hpp" // AssetMetaData - somewhat strange dependency
+// #include <nlohmann/json.hpp>
+#include <filesystem>
+#include <vector>
 
 namespace eeng
 {
+    struct EngineContext; // Forward declaration
+
     class AssetIndex
     {
+    public:
+
+        std::vector<AssetMetaData> scan_meta_files(
+            const std::filesystem::path& root,
+            EngineContext& ctx
+        );
+
         // Maps asset type to a file location: a) templated or b) entt::meta_type
         // asset_index.serialize<T>(t, guid, ctx?);
         void serialize()
@@ -80,7 +93,7 @@ namespace eeng
     private:
         mutable std::shared_mutex mutex_;
         std::unordered_map<Guid, AssetMetadata> assets_;
-    };
+};
 #endif
 
 #if 0
