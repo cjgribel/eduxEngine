@@ -23,10 +23,11 @@ namespace eeng::mock {
         // Generate unique identifiers for mock resources
         static std::atomic<int> counter{ 0 };  // thread-safe static counter
         int value = counter.fetch_add(1, std::memory_order_relaxed);  // or use memory_order_seq_cst
-        auto mesh_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/meshes/mock_mesh{}.json", value);
-        auto mesh_meta_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/meshes/mock_mesh{}.meta.json", value);
-        auto model_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/models/mock_model{}.json", value);
-        auto model_meta_path = std::format("/Users/ag1498/GitHub/eduEngine/Module1/project1/models/mock_model{}.meta.json", value);
+        auto asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/assets/MockModel1/";
+        auto mesh_path = std::format("{}meshes/mock_mesh{}.json", asset_root, value);
+        auto mesh_meta_path = std::format("{}meshes/mock_mesh{}.meta.json", asset_root, value);
+        auto model_path = std::format("{}models/mock_model{}.json", asset_root, value);
+        auto model_meta_path = std::format("{}models/mock_model{}.meta.json", asset_root, value);
 
         // + make sure folders exist
         // + use std::filesystem for paths
