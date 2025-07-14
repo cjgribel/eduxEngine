@@ -5,22 +5,25 @@
 #ifndef MockImporter_hpp
 #define MockImporter_hpp
 
+#include "Guid.h"
+#include "Handle.h"
+#include "EngineContext.hpp"
+#include "AssetRef.hpp"    // AssetRef<T>
+#include "ResourceTypes.h" // mock types
 #include <string>
 #include <vector>
 #include <memory>
 #include <optional>
-#include "Handle.h"
-#include "EngineContext.hpp"
-
-#include "ResourceTypes.h" // For AssetRef<Model>, mock types
-#include "Guid.h"         // For Guid
+#include <filesystem>
 
 namespace eeng::mock
 {
     class ModelImporter
     {
     public:
-        static AssetRef<Model> import(EngineContextPtr ctx);
+        static AssetRef<Model> import(
+            const std::filesystem::path& assets_root,
+            EngineContextPtr ctx);
 
 
     };

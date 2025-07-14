@@ -18,7 +18,9 @@
 
 namespace eeng::mock {
 
-    AssetRef<Model> ModelImporter::import(EngineContextPtr ctx)
+    AssetRef<Model> ModelImporter::import(
+        const std::filesystem::path& assets_root,
+        EngineContextPtr ctx)
     {
         std::cout << "MockImporter::import" << std::endl;
         auto& resource_manager = static_cast<ResourceManager&>(*ctx->resource_manager);
@@ -26,11 +28,17 @@ namespace eeng::mock {
         // Generate unique identifiers for mock resources
         static std::atomic<int> counter{ 0 };  // thread-safe static counter
         int value = counter.fetch_add(1, std::memory_order_relaxed);  // or use memory_order_seq_cst
-        auto asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/MockModel1/";
-        auto mesh_path = std::format("{}meshes/mock_mesh{}.json", asset_root, value);
-        auto mesh_meta_path = std::format("{}meshes/mock_mesh{}.meta.json", asset_root, value);
-        auto model_path = std::format("{}models/mock_model{}.json", asset_root, value);
-        auto model_meta_path = std::format("{}models/mock_model{}.meta.json", asset_root, value);
+        
+        auto asset_path = assets_root / std::format("MockModel{}", value);
+        auto mesh_path = asset_path / "meshes";
+        std::filesystem::create_directories(asset_path);
+        std::filesystem::create_directories(mesh_path);
+
+        auto model_file_path = asset_path / "mock_model.json";
+        auto model_meta_file_path = asset_path / "mock_model.meta.json";
+        
+        auto mesh_file_path = mesh_path / "mock_mesh.json";
+        auto mesh_meta_file_path = mesh_path / "mock_mesh.meta.json";
 
         // + make sure folders exist
         // + use std::filesystem for paths
@@ -50,15 +58,15 @@ namespace eeng::mock {
             Guid::generate(),
             model_guid, // Parent GUID
             std::string("MockMesh") + std::to_string(value), // name
-            std::string(entt::resolve<Mesh>().info().name()), // type name
-            mesh_path // desired filepath
+            std::string(entt::resolve<Mesh>().info().name()) // type name
+            // mesh_file_path // desired filepath
         };
         resource_manager.file(
             mesh, 
-            mesh_path, 
+            mesh_file_path, 
             mesh_meta, 
-            mesh_meta_path); // Serialize to file
-        //auto mesh_ref = resource_manager.file(mesh, mesh_path);
+            mesh_meta_file_path); // Serialize to file
+        //auto mesh_ref = resource_manager.file(mesh, mesh_file_path);
 
         // Add mesh reference to model
         model.meshes.push_back(mesh_ref);
@@ -69,14 +77,14 @@ namespace eeng::mock {
             Guid::generate(),
             Guid::invalid(), // Parent GUID
             std::string("MockModel") + std::to_string(value), // name
-            std::string(entt::resolve<Model>().info().name()), // type name
-            model_path // desired filepath
+            std::string(entt::resolve<Model>().info().name()) // type name
+            // model_file_path // desired filepath
         };
         resource_manager.file(
             model, 
-            model_path, 
+            model_file_path, 
             model_meta, 
-            model_meta_path); // Serialize to file
+            model_meta_file_path); // Serialize to file
         //auto model_ref = resource_manager.file(model, model_path);
 
         return model_ref;

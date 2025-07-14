@@ -263,15 +263,43 @@ TEST_F(StorageTest, ConcurrencySafety) {
         for (auto& r : results) r.store(false, std::memory_order_relaxed);
         std::vector<eeng::Handle<MockResource1>> handles(N);
 
-        for (int i = 0; i < N; ++i) 
+        for (int i = 0; i < N; ++i)
         {
             threads.emplace_back([this, i, &guids, &results, &m, &handles] {
                 try {
                     MockResource1 mr; mr.x = size_t(i);
+#if 1
+                    // -- Partially meta based workflow --
+
+                    entt::meta_any any = mr;
+                    auto h = storage.add(any, guids[i]);
+
+                    auto casted = h.cast<MockResource1>();
+                    EXPECT_TRUE(casted.has_value());
+                    auto h_ = *casted;
+                    EXPECT_TRUE(h_);
+                    EXPECT_TRUE(storage.validate(h_));
+                    handles[i] = h_;
+
+                    // Thread-safe mutatation 
+                    storage.modify(h_, [](MockResource1& t) { t.x = 0; });
+                    storage.modify(h_, [i](MockResource1& t) { t.x = size_t(i); });
+
+                    // Retain & release
+                    storage.retain(h);
+                    storage.release(h);
+                    if (!storage.validate(h)) return;
+#else
+                    // -- Templated workflow --
 
                     // Thread-safe add
                     auto h = storage.add<MockResource1>(mr, guids[i]);
                     handles[i] = h;
+                    // // entt::meta_any any = mr;
+                    // // auto h2 = storage.add(any, guids[i]);
+                    // auto h2 = storage.add(entt::forward_as_meta(mr), guids[i]);
+                    // auto h = *h2.cast<MockResource1>();
+                    // handles[i] = h;
 
                     // Thread-safe validation
                     if (!storage.validate(h)) return;
@@ -302,7 +330,7 @@ TEST_F(StorageTest, ConcurrencySafety) {
                     // (We release and validate post-test)
                     // storage.release(h);
                     //if (storage.validate(h)) return;
-
+#endif
                     results[i].store(true, std::memory_order_relaxed);
                 }
                 catch (...) {
@@ -326,13 +354,38 @@ TEST_F(StorageTest, ConcurrencySafety) {
             for (auto& h : handles) std::cout << h.idx << ", "; std::cout << std::endl;
         }
         // Check handles
+#if 1
         for (int j = 0; j < N; j++)
         {
+            // auto& h = handles[j];
+            // EXPECT_TRUE(h);
+            // if (!storage.validate(h))
+            //     std::cout << "Invalid handle: " << h.idx << ", ver: " << h.ver << std::endl;
+            // EXPECT_TRUE(storage.validate(h));
+            // auto any = storage.get(h);
+            // EXPECT_TRUE(any);
+            // auto val = any.cast<MockResource1&>().x;
+            // if (val != size_t(j)) {
+            //     std::cout << "Expected " << size_t(j) << " at ofs " << h.idx << ", got " << val << std::endl;
+            // }
+            // std::cout << j << ", " << storage.get(h).cast<MockResource1&>().x << std::endl;
+
             auto& h = handles[j];
             EXPECT_EQ(j, storage.get(h).cast<MockResource1&>().x);
             storage.release(h);
             EXPECT_FALSE(storage.validate(h));
         }
+#else
+        for (int j = 0; j < N; j++)
+        {
+            auto& h = handles[j];
+            std::cout << "handle: " << h.idx << ", ver: " << h.ver << std::endl;
+            EXPECT_EQ(j, storage.get(h).cast<MockResource1&>().x);
+            storage.release(h);
+            EXPECT_FALSE(storage.validate(h));
+        }
+        std::cout << "------" << std::endl;
+#endif
     }
 }
 #endif

@@ -62,9 +62,9 @@ bool Game::init()
         for (int i = 0; i < numTasks; ++i)
         {
             futures.emplace_back(
-                ctx->thread_pool->queue_task([this]()
+                ctx->thread_pool->queue_task([this, &asset_root]()
                     {
-                        return eeng::mock::ModelImporter::import(ctx);
+                        return eeng::mock::ModelImporter::import(asset_root, ctx);
                     })
             );
         }
@@ -77,9 +77,29 @@ bool Game::init()
         for (auto& f : futures) refs.push_back(f.get());
 
         // Now scan assets from disk
-        // - This is a blocking operation, so it should be done after all imports are done
-        std::cout << "Scanning assets..." << std::endl;
-        resource_manager.scan_assets("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
+        // ??? - This is a blocking operation, so it should be done after all imports are done
+        {
+            std::cout << "Scanning assets..." << std::endl;
+            resource_manager.start_async_scan("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
+            // Wait for scanning to finish
+            while (resource_manager.is_scanning())
+            {
+                // Wait for scanning to finish
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                std::cout << "[ResourceManager] Waiting for asset scan to finish...\n";
+                // std::this_thread::yield(); // Yield to other threads
+            }
+            // Get asset index snapshot and log it
+            auto asset_index = resource_manager.get_asset_entries_snapshot();
+            EENG_LOG(ctx, "[ResourceManager] Found %zu assets:", asset_index.size());
+            for (const auto& entry : asset_index)
+            {
+                EENG_LOG(ctx, "  - %s (%s) at %s",
+                    entry.meta.name.c_str(),
+                    entry.meta.type_name.c_str(),
+                    entry.relative_path.string().c_str());
+            }
+        }
 
         // Load assets (storage->add - should be TS)
         std::cout << "Loading assets..." << std::endl;

@@ -3,6 +3,7 @@
 
 #include "Guid.h"
 #include "Handle.h"
+#include "AssetEntry.hpp"
 #include <string>
 
 #pragma once
@@ -21,6 +22,10 @@ namespace eeng
     class IResourceManager
     {
     public:
+
+        virtual bool is_scanning() const = 0;
+        virtual std::vector<AssetEntry> get_asset_entries_snapshot() const = 0;
+
         virtual std::string to_string() const = 0;
         virtual ~IResourceManager() = default;
     };

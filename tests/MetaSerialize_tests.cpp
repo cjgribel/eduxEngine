@@ -5,6 +5,8 @@
 // #include <gmock/gmock.h>
 #include <vector>
 #include <array>
+#include <thread>
+#include <atomic>
 #include "entt/entt.hpp"
 #include "hash_combine.h"
 #include "MetaInfo.h"
@@ -41,7 +43,9 @@ namespace
 
     struct MockResourceManager : eeng::IResourceManager
     {
-        std::string to_string() const override { return std::string {}; }
+        bool is_scanning() const override { return false; }
+        std::vector<eeng::AssetEntry> get_asset_entries_snapshot() const override { return {}; }
+        std::string to_string() const override { return std::string{}; }
     };
 
     struct MockGuiManager : eeng::IGuiManager
@@ -412,4 +416,110 @@ TEST_F(MetaSerializationTest, SerializeMockType2)
 {
     MockType2 t;
     test_type(t, ctx);
+}
+
+TEST_F(MetaSerializationTest, ConcurrentSerializeAny) {
+    constexpr int THREAD_COUNT = 50;
+    constexpr int ITERATIONS = 1000;
+
+    // Prepare a shared vec2 and its meta_any wrapper
+    vec2 v{ 1.23f, 4.56f };
+    entt::meta_any any = v;
+
+    std::atomic<bool> error{ false };
+    std::vector<std::thread> threads;
+    threads.reserve(THREAD_COUNT);
+
+    for (int t = 0; t < THREAD_COUNT; ++t) {
+        threads.emplace_back([&]() {
+            for (int i = 0; i < ITERATIONS; ++i) {
+                try {
+                    // Invoke the serialization on the same any
+                    auto j = meta::serialize_any(any);
+                    // Check we got back the correct fields
+                    if (j["x"].get<float>() != v.x
+                        || j["y"].get<float>() != v.y) {
+                        error.store(true, std::memory_order_relaxed);
+                        return;
+                    }
+                }
+                catch (...) {
+                    error.store(true, std::memory_order_relaxed);
+                    return;
+                }
+            }
+            });
+    }
+
+    for (auto& th : threads) th.join();
+    EXPECT_FALSE(error.load());
+}
+
+TEST_F(MetaSerializationTest, ConcurrentDeserializeAny) {
+    constexpr int THREAD_COUNT = 50;
+    constexpr int ITERATIONS = 1000;
+
+    // Prepare JSON and a fresh any wrapping a vec2
+    nlohmann::json j = { {"x", 7.89f}, {"y", 0.12f} };
+    vec2 v0{ 0, 0 };
+    entt::meta_any any = v0;
+
+    std::atomic<bool> error{ false };
+    std::vector<std::thread> threads;
+    threads.reserve(THREAD_COUNT);
+
+    for (int t = 0; t < THREAD_COUNT; ++t) {
+        threads.emplace_back([&, t]() {
+            for (int i = 0; i < ITERATIONS; ++i) {
+                try {
+                    meta::deserialize_any(j, any, Entity{}, ctx);
+                    auto& vv = any.cast<vec2&>();
+                    // All threads write the same values, so vv.x/y should always match j
+                    if (vv.x != j["x"].get<float>()
+                        || vv.y != j["y"].get<float>()) {
+                        error.store(true, std::memory_order_relaxed);
+                        return;
+                    }
+                }
+                catch (...) {
+                    error.store(true, std::memory_order_relaxed);
+                    return;
+                }
+            }
+            });
+    }
+
+    for (auto& th : threads) th.join();
+    EXPECT_FALSE(error.load());
+}
+
+TEST(MetaReadOnly, ManyThreadsDifferentMetaAny) {
+    struct Foo { int x; };
+    entt::meta_factory<Foo>()
+        .type("Foo"_hs)
+        .ctor<int>()
+        .data<&Foo::x>("x"_hs)
+        .func<&Foo::x>("getX"_hs);
+
+    constexpr int THREADS = 100;
+    constexpr int ITERATIONS = 1000;
+
+    std::atomic<bool> error{ false };
+    std::vector<std::thread> threads;
+
+    for (int t = 0; t < THREADS; ++t) {
+        threads.emplace_back([&]() {
+            for (int i = 0; i < ITERATIONS; ++i) {
+                Foo f{ i };
+                auto any = entt::meta_any{ f };             // private to this thread
+                auto type = entt::resolve<Foo>();         // read-only on registry
+                auto fn = type.func("getX"_hs);
+                int x = fn.invoke(any).cast<int>();
+                if (x != i) error.store(true);
+            }
+            });
+    }
+
+    for (auto& th : threads) th.join();
+    ASSERT_FALSE(error.load());
 }

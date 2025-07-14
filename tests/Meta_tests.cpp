@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include <gtest/gtest.h>
-#include "entt/entt.hpp"
+#include <entt/entt.hpp>
 #include "MetaLiterals.h"
 #include "MetaInfo.h"
 #include "MetaAux.h"

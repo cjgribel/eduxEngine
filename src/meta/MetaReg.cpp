@@ -230,9 +230,10 @@ namespace eeng {
             .custom<DataMetaInfo>(DataMetaInfo{ "type_name", "Type Name", "The type name of the asset." })
             .traits(MetaFlags::read_only)
 
-            .data<&AssetMetaData::file_path>("file_path"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "file_path", "File Path", "The file path of the asset." })
-            .traits(MetaFlags::read_only);
+            // .data<&AssetMetaData::file_path>("file_path"_hs)
+            // .custom<DataMetaInfo>(DataMetaInfo{ "file_path", "File Path", "The file path of the asset." })
+            // .traits(MetaFlags::read_only)
+            ;
 
         // === RESOURCES ===
 

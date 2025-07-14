@@ -3,35 +3,84 @@
 
 #include "AssetIndex.hpp"
 #include "EngineContext.hpp"
+#include "ThreadPool.hpp"
 #include "MetaSerialize.hpp"
 #include <fstream>
 
 namespace eeng
 {
-    std::vector<AssetMetaData> AssetIndex::scan_meta_files(
-        const std::filesystem::path& root, 
+    void AssetIndex::start_async_scan(
+        const std::filesystem::path& root,
         EngineContext& ctx)
     {
-        std::vector<AssetMetaData> assets;
+        scanning_flag.store(true, std::memory_order_relaxed);
 
-        for (auto& entry : std::filesystem::recursive_directory_iterator(root))
-        {
-            if (entry.path().extension() == ".json" &&
-                entry.path().filename().string().ends_with(".meta.json"))
+        ctx.thread_pool->queue_task([this, root, &ctx]()
             {
-                std::ifstream in(entry.path());
-                if (!in) continue;
+                auto result = this->scan_meta_files(root, ctx);
+                {
+                    std::lock_guard lock(this->entries_mutex);
+                    this->entries = std::move(result);
+                }
+                scanning_flag.store(false, std::memory_order_relaxed);
+            });
+    }
 
-                nlohmann::json json;
-                in >> json;
-                
-                // Convert json to AssetMetaData and push_back
-                entt::meta_any any = AssetMetaData {};
-                meta::deserialize_any(json, any, Entity{}, ctx);
-                assets.push_back(any.cast<AssetMetaData>());
-            }
+    std::vector<AssetEntry> AssetIndex::get_entries_snapshot() const
+    {
+        std::lock_guard lock(entries_mutex);
+        return entries; // copy for safety
+    }
+
+    bool AssetIndex::is_scanning() const
+    {
+        return scanning_flag.load(std::memory_order_relaxed);
+    }
+
+    std::vector<AssetEntry> AssetIndex::scan_meta_files(
+        const std::filesystem::path& root,
+        EngineContext& ctx)
+    {
+        std::vector<AssetEntry> assets;
+
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(root))
+        {
+            if (!entry.is_regular_file()) continue;
+
+            const auto& meta_path = entry.path();
+            std::string filename = meta_path.filename().string();
+
+            // Ensure the file ends with ".meta.json"
+            if (!filename.ends_with(".meta.json"))
+                continue;
+
+            // Open and parse the meta file
+            std::ifstream in(meta_path);
+            if (!in) continue;
+
+            nlohmann::json json;
+            in >> json;
+
+            // Deserialize into AssetMetaData
+            entt::meta_any any = AssetMetaData{};
+            meta::deserialize_any(json, any, Entity{}, ctx);
+            AssetMetaData meta = any.cast<AssetMetaData>();
+
+            // Derive the resource .json file path from the meta path
+            std::string base_name = filename.substr(0, filename.size() - std::string(".meta.json").size());
+            std::filesystem::path asset_path = meta_path.parent_path() / (base_name + ".json");
+
+            // Compute path relative to the root (for GUI display etc.)
+            std::filesystem::path relative_path = std::filesystem::relative(asset_path, root);
+
+            assets.emplace_back(AssetEntry{
+                std::move(meta),
+                std::move(relative_path),
+                std::move(asset_path)
+                });
         }
 
         return assets;
     }
+
 } // namespace eeng

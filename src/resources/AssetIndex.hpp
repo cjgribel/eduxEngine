@@ -5,9 +5,12 @@
 
 // #include "Handle.h"
 // #include "Guid.h"
-#include "AssetMetaData.hpp"
+// #include "AssetMetaData.hpp"
+#include "AssetEntry.hpp"
 // #include "IResourceManager.hpp" // AssetMetaData - somewhat strange dependency
 // #include <nlohmann/json.hpp>
+#include <mutex>
+#include <atomic>
 #include <filesystem>
 #include <vector>
 
@@ -18,11 +21,9 @@ namespace eeng
     class AssetIndex
     {
     public:
-
-        std::vector<AssetMetaData> scan_meta_files(
-            const std::filesystem::path& root,
-            EngineContext& ctx
-        );
+        void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
+        std::vector<AssetEntry> get_entries_snapshot() const;
+        bool is_scanning() const;
 
         // Maps asset type to a file location: a) templated or b) entt::meta_type
         // asset_index.serialize<T>(t, guid, ctx?);
@@ -58,6 +59,16 @@ namespace eeng
             model_ref.handle = storage.insert(model, guid);
 #endif
         }
+    private:
+
+        std::vector<AssetEntry> entries;
+        mutable std::mutex entries_mutex;
+
+        std::atomic<bool> scanning_flag{ false };
+
+        std::vector<AssetEntry> scan_meta_files(
+            const std::filesystem::path& root,
+            EngineContext& ctx);
     };
 
 #if 0

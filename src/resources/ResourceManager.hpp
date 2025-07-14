@@ -14,6 +14,7 @@
 
 // -> AssetIndex ???
 #include "MetaSerialize.hpp"
+#include "LogMacros.h"
 #include <nlohmann/json.hpp> // <nlohmann/json_fwd.hpp>
 #include <fstream>
 
@@ -40,7 +41,7 @@ namespace eeng
         std::unique_ptr<Storage>    storage_;
         std::unique_ptr<AssetIndex> asset_index_;
 
-        std::mutex mutex_; // Protects asset_index_ (storage_ is thread-safe)
+        mutable std::mutex mutex_; // Protects asset_index_ (storage_ is thread-safe)
 
     public:
         ResourceManager(/* any ctor args */);
@@ -53,26 +54,35 @@ namespace eeng
 
         std::string to_string() const override;
 
-        void scan_assets(
+        void start_async_scan(
             const std::filesystem::path& root,
             EngineContext& ctx
         )
         {
-            std::lock_guard lock{ mutex_ };
+            // std::lock_guard lock{ mutex_ };
             // ??? If concurrent - Put manager in a scanning state?
 
             std::cout << "[ResourceManager] Scanning assets in: " << root.string() << "\n";
-            auto asset_index = asset_index_->scan_meta_files(root, ctx);
+            // auto asset_index = asset_index_->scan_meta_files(root, ctx);
+            asset_index_->start_async_scan(root, ctx);
 
             // Print asset info
-            for (const auto& asset_meta : asset_index)
+#if 0
+            std::cout << "[ResourceManager] Found " << asset_index.size() << " assets:\n";
+            for (const auto& entry : asset_index)
             {
-                std::cout << "Asset: " << asset_meta.name
-                          << ", GUID: " << asset_meta.guid.raw()
-                          << ", Type: " << asset_meta.type_name
-                          << ", File: " << asset_meta.file_path << "\n";
+                std::cout << "  - " << entry.meta.name << " ("
+                    << entry.meta.type_name << ") at "
+                    << entry.relative_path.string() << "\n";
             }
+#endif
         }
+
+        bool is_scanning() const override;
+
+        /// @brief Get a snapshot of the asset index
+        /// @return std::vector<AssetEntry>
+        std::vector<AssetEntry> get_asset_entries_snapshot() const override;
 
         // Must be thread-safe. Use static types, or lock meta paths.
         /// @brief Import new resource to resource index

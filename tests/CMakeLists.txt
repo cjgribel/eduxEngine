@@ -25,6 +25,7 @@ add_executable(tests
     VecTree_tests.cpp 
     PoolAllocatorFH_tests.cpp
     PoolAllocatorTFH_tests.cpp
+    MetaThreading_tests.cpp
     Meta_tests.cpp
     MetaSerialize_tests.cpp ../src/meta/MetaSerialize.cpp ../src/engineapi/EngineContext.cpp ../src/util/ThreadPool.cpp
     Storage_tests.cpp ../src/resources/Storage.cpp
