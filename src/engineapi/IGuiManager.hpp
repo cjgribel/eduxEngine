@@ -13,7 +13,7 @@ namespace eeng
         ShowEngineInfo,
         ShowLogWindow,
         ShowStorageWindow,
-        // ShowResourceViewer,
+        ShowResourceBrowser
         // ShowSceneGraph,
         // ShowRenderStats,
         // ShowInputDebugger,

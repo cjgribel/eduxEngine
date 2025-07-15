@@ -13,12 +13,22 @@ namespace eeng
     {
     }
 
-    const Storage& ResourceManager::storage()
+    const Storage& ResourceManager::storage() const
     {
         return *storage_;
     }
 
-    const AssetIndex& ResourceManager::asset_index()
+    Storage& ResourceManager::storage()
+    {
+        return *storage_;
+    }
+
+    const AssetIndex& ResourceManager::asset_index() const
+    {
+        return *asset_index_;
+    }
+
+    AssetIndex& ResourceManager::asset_index()
     {
         return *asset_index_;
     }

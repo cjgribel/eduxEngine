@@ -33,6 +33,9 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
             draw_engine_info(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowResourceBrowser))
+            draw_resource_browser(ctx);
     }
 
     void GuiManager::draw_log(EngineContext& ctx) const
@@ -40,6 +43,7 @@ namespace eeng
         static_cast<LogManager&>(*ctx.log_manager).draw_gui_widget("Log");
     }
 
+    // Content
     void DrawOccupancyBar(size_t used, size_t capacity)
     {
         if (capacity == 0) return;
@@ -162,6 +166,74 @@ namespace eeng
 
     }
 
+    // Window content
+    void draw_asset_flat_list(EngineContext& ctx)
+    {
+        // auto* index = ctx.resource_manager->asset_index();
+        auto& index = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index();
+        //if (!index) return;
+
+        // const auto& entries = index->get_entries();
+        auto entries = index.get_entries_snapshot();
+
+        ImGui::Text("Assets found: %zu", entries.size());
+        ImGui::Separator();
+
+        for (const auto& entry : entries)
+        {
+            ImGui::PushID(entry.meta.guid.raw()); // Avoid ImGui ID collisions
+
+            if (ImGui::TreeNode(entry.meta.name.c_str()))
+            {
+                ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
+                ImGui::Text("File: %s", entry.relative_path.string().c_str());
+
+                // Future: Add preview, buttons for loading, etc.
+
+                ImGui::TreePop();
+            }
+
+            ImGui::PopID();
+        }
+    }
+
+    void GuiManager::draw_resource_browser(EngineContext& ctx) const
+    {
+        ImGui::Begin("Resource Browser");
+
+        // Future: tabs or filter bar
+        if (ImGui::BeginTabBar("ResourceViews"))
+        {
+            if (ImGui::BeginTabItem("Flat List"))
+            {
+                draw_asset_flat_list(ctx);
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("By Type"))
+            {
+                ImGui::TextUnformatted("(Unimplemented) Grouped by resource type");
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("File View"))
+            {
+                ImGui::TextUnformatted("(Unimplemented) Hierarchical file/folder view");
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Reference View"))
+            {
+                ImGui::TextUnformatted("(Unimplemented) Dependencies between assets");
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar();
+        }
+
+        ImGui::End();
+    }
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
     {

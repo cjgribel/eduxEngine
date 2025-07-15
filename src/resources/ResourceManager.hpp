@@ -48,9 +48,11 @@ namespace eeng
         // Out-of-line dtor: ensures Storage & AssetIndex are complete when deleted
         ~ResourceManager();
 
-        const Storage& storage();
+        const Storage& storage() const;
+        Storage& storage();
 
-        const AssetIndex& asset_index();
+        const AssetIndex& asset_index() const;
+        AssetIndex& asset_index();
 
         std::string to_string() const override;
 

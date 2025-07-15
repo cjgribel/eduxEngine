@@ -110,6 +110,7 @@ namespace eeng
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowLogWindow, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowStorageWindow, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowResourceBrowser, true);
 
         EENG_LOG(ctx, "Engine initialized successfully.");
         return true;
