@@ -29,6 +29,7 @@ namespace eeng
         bool operator<(const Guid& other) const { return value < other.value; }
 
         uint64_t raw() const { return value; }
+        std::string to_string() const { return std::to_string(value); }
 
     private:
         uint64_t value;

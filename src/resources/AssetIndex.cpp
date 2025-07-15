@@ -13,28 +13,28 @@ namespace eeng
         const std::filesystem::path& root,
         EngineContext& ctx)
     {
-        scanning_flag.store(true, std::memory_order_relaxed);
+        scanning_flag_.store(true, std::memory_order_relaxed);
 
         ctx.thread_pool->queue_task([this, root, &ctx]()
             {
                 auto result = this->scan_meta_files(root, ctx);
                 {
-                    std::lock_guard lock(this->entries_mutex);
-                    this->entries = std::move(result);
+                    std::lock_guard lock(this->entries_mutex_);
+                    this->entries_ = std::move(result);
                 }
-                scanning_flag.store(false, std::memory_order_relaxed);
+                scanning_flag_.store(false, std::memory_order_relaxed);
             });
     }
 
     std::vector<AssetEntry> AssetIndex::get_entries_snapshot() const
     {
-        std::lock_guard lock(entries_mutex);
-        return entries; // copy for safety
+        std::lock_guard lock(entries_mutex_);
+        return entries_; // copy for safety
     }
 
     bool AssetIndex::is_scanning() const
     {
-        return scanning_flag.load(std::memory_order_relaxed);
+        return scanning_flag_.load(std::memory_order_relaxed);
     }
 
     std::vector<AssetEntry> AssetIndex::scan_meta_files(

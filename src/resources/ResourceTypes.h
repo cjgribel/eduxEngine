@@ -49,7 +49,7 @@ namespace eeng::mock
 {
     struct Mesh
     {
-        std::vector<float> vertices{ 1.0f, 2.0f, 3.0f }; // Example vertex data
+        std::vector<float> vertices;
     };
 
     struct Model

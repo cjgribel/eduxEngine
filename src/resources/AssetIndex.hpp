@@ -3,16 +3,21 @@
 
 #pragma once
 
-// #include "Handle.h"
-// #include "Guid.h"
-// #include "AssetMetaData.hpp"
+#include "Handle.h"
+#include "Guid.h"
+#include "AssetMetaData.hpp"
 #include "AssetEntry.hpp"
-// #include "IResourceManager.hpp" // AssetMetaData - somewhat strange dependency
-// #include <nlohmann/json.hpp>
+#include "MetaSerialize.hpp"
+#include "EngineContext.hpp"
+
+#include <nlohmann/json.hpp> // <nlohmann/json_fwd.hpp>
 #include <mutex>
 #include <atomic>
 #include <filesystem>
 #include <vector>
+#include <string>
+#include <fstream>
+#include "LogMacros.h"
 
 namespace eeng
 {
@@ -21,50 +26,78 @@ namespace eeng
     class AssetIndex
     {
     public:
+        AssetIndex() = default;
+        ~AssetIndex() = default;
+
         void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
         std::vector<AssetEntry> get_entries_snapshot() const;
         bool is_scanning() const;
 
-        // Maps asset type to a file location: a) templated or b) entt::meta_type
-        // asset_index.serialize<T>(t, guid, ctx?);
-        void serialize()
+        /// @brief Serializes an asset to disk.
+        template<typename T>
+        void serialize_to_file(const T& asset, const AssetMetaData& meta,
+            const std::filesystem::path& asset_path,
+            const std::filesystem::path& meta_path)
         {
-            /*
+            // Serialize data first
+            nlohmann::json j_asset = meta::serialize_any(entt::forward_as_meta(asset));
+            nlohmann::json j_meta = meta::serialize_any(entt::forward_as_meta(meta));
+
+            // Write asset first (may be large)
             {
-                "guid": "acdb01b9-f34e-4c68-818a-98eabc22f54e",
-                "resource" : {
-                    "name": "TestModel",
-                    "meshes" : [
-                        { "guid": "mesh1" },
-                        { "guid": "mesh2" }
-                    ]
-                }
-                }
+                std::ofstream out_asset(asset_path);
+                if (!out_asset)
+                    throw std::runtime_error("Failed to open asset file for writing: " + asset_path.string());
+                out_asset << j_asset.dump(4);
             }
-*/
+
+            // Then write meta last (signals scan readiness)
+            {
+                std::ofstream out_meta(meta_path);
+                if (!out_meta)
+                    throw std::runtime_error("Failed to open meta file for writing: " + meta_path.string());
+                out_meta << j_meta.dump(4);
+            }
         }
 
-        // Maps asset type to a file location: a) templated or b) entt::meta_type
-        void deserialize()
+        template<typename T>
+        T deserialize_from_file(
+            const Guid& guid,
+            EngineContext& ctx) const
         {
-#if 0
-            // Deserialize file
-            Guid guid = json["guid"];
-            Model model = deserialize<Model>(json["resource"]);
+            std::lock_guard lock{ entries_mutex_ }; // Protect access to entries_
 
-            // Wrap in AssetRef
-            AssetRef<Model> model_ref{ guid, {} };
+            auto it = std::find_if(entries_.begin(), entries_.end(), [&](const AssetEntry& entry)
+                {
+                    return entry.meta.guid == guid;
+                });
 
-            // Register resource to storage
-            model_ref.handle = storage.insert(model, guid);
-#endif
+            if (it == entries_.end())
+                throw std::runtime_error("AssetIndex: Failed to find asset file for guid " + guid.to_string());
+
+            const auto& path = it->absolute_path;
+            std::ifstream file(path);
+            if (!file)
+                throw std::runtime_error("AssetIndex: Failed to open asset file: " + path.string());
+
+            nlohmann::json j;
+            file >> j;
+
+            entt::meta_any t = T{};
+            // entt::meta_any any = entt::resolve<T>().construct(); // meta based
+            meta::deserialize_any(j, t, Entity{}, ctx);
+            return t.cast<T>();
+            //T result;
+            // meta::deserialize_any(j, entt::forward_as_meta(result), Entity{}, ctx);
+            // return result;
         }
+
     private:
 
-        std::vector<AssetEntry> entries;
-        mutable std::mutex entries_mutex;
+        std::vector<AssetEntry> entries_;
+        mutable std::mutex entries_mutex_;
 
-        std::atomic<bool> scanning_flag{ false };
+        std::atomic<bool> scanning_flag_{ false };
 
         std::vector<AssetEntry> scan_meta_files(
             const std::filesystem::path& root,
@@ -104,7 +137,7 @@ namespace eeng
     private:
         mutable std::shared_mutex mutex_;
         std::unordered_map<Guid, AssetMetadata> assets_;
-};
+    };
 #endif
 
 #if 0
@@ -203,4 +236,4 @@ namespace eeng
     };
 #endif
 
-} // namespace eeng
+    } // namespace eeng

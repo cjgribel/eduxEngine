@@ -57,7 +57,7 @@ bool Game::init()
 
         // Make sure resource_manager.file is TS <- HOW??? IT IS META BASED...
         std::cout << "Importing assets recursively..." << std::endl;
-        const int numTasks = 5;
+        const int numTasks = 256;
         std::vector<std::future<ModelRef>> futures;
         for (int i = 0; i < numTasks; ++i)
         {
@@ -72,26 +72,26 @@ bool Game::init()
         // Fetch asset references from futures
         // - get() blocks until the task is done
         // - wait_for() checks & waits for a period of time without blocking
-        std::cout << "Wait for imports..." << std::endl;
+        EENG_LOG(ctx, "[Game::init()] Wait for imports...");
         std::vector<ModelRef> refs;
         for (auto& f : futures) refs.push_back(f.get());
 
         // Now scan assets from disk
         // ??? - This is a blocking operation, so it should be done after all imports are done
         {
-            std::cout << "Scanning assets..." << std::endl;
+            EENG_LOG(ctx, "[Game::init()] Scanning assets...");
             resource_manager.start_async_scan("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
             // Wait for scanning to finish
             while (resource_manager.is_scanning())
             {
                 // Wait for scanning to finish
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                std::cout << "[ResourceManager] Waiting for asset scan to finish...\n";
+                EENG_LOG(ctx, "[Game::init()] Waiting for asset scan to finish...");
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
             }
             // Get asset index snapshot and log it
             auto asset_index = resource_manager.get_asset_entries_snapshot();
-            EENG_LOG(ctx, "[ResourceManager] Found %zu assets:", asset_index.size());
+            EENG_LOG(ctx, "[Game::init()] Found %zu assets:", asset_index.size());
             for (const auto& entry : asset_index)
             {
                 EENG_LOG(ctx, "  - %s (%s) at %s",
@@ -102,16 +102,63 @@ bool Game::init()
         }
 
         // Load assets (storage->add - should be TS)
-        std::cout << "Loading assets..." << std::endl;
-        for (auto& ref : refs) resource_manager.load(ref, *ctx);
+        EENG_LOG(ctx, "[Game::init()] Loading assets...");
+        // for (auto& ref : refs) resource_manager.load(ref, *ctx);
+        // CONCURRENTLY
+        std::vector<std::future<void>> load_futures;
+        for (auto& ref : refs) {
+            load_futures.emplace_back(
+                ctx->thread_pool->queue_task([this, &resource_manager, &ref]() {
+                    resource_manager.load(ref, *ctx);
+                    })
+            );
+        }
+        // Wait for all loads to finish
+        for (auto& future : load_futures) future.get();
+        // Verify content
+        EENG_LOG(ctx, "[Game::init()] Loaded %zu assets", refs.size());
+        for (const auto& ref : refs)
+        {
+            assert(ref.is_loaded());
+            EENG_LOG(ctx, "  - Model .. with guid %s",
+                // m.to_string().c_str(),
+                ref.get_guid().to_string().c_str());
+            auto m = resource_manager.storage().get_ref<eeng::mock::Model>(ref.get_handle());
+            for (const auto& mesh_ref : m.meshes)
+            {
+                assert(mesh_ref.is_loaded());
+                auto mesh = resource_manager.storage().get_ref<eeng::mock::Mesh>(mesh_ref.get_handle());
+                EENG_LOG(ctx, "  - Mesh .. with guid %s",
+                    // mesh.get()->to_string().c_str(),
+                    mesh_ref.get_guid().to_string().c_str());
+                assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
+                for (const auto& v : mesh.vertices)
+                    EENG_LOG(ctx, "    - Vertex: %f", v);
+            }
+        }
 
-        // VISUALIZE storage + asset_index (available assets as a file structure)
-        // gui->draw_storage_view(ctx);
-        // gui->draw_asset_index(ctx);
+        // {
+        //     EENG_LOG(ctx, "  - %s (%s) with guid %s",
+        //         ref.get_handle().get()->to_string().c_str(),
+        //         entt::resolve(ref.get_handle().get()).info().name(),
+        //         ref.get_guid().to_string().c_str());
+        // }
+        // else
+        // {
+        //     EENG_LOG(ctx, "  - %s (%s) with guid %s is not loaded",
+        //         ref.get_handle().get()->to_string().c_str(),
+        //         entt::resolve(ref.get_handle().get()).info().name(),
+        //         ref.get_guid().to_string().c_str());
+        // }
+    // }
 
-        // Unload asset 
-        //      CAN BE MADE TS // storage->get_ref - NOT TS
-        //      
+    // VISUALIZE storage + asset_index (available assets as a file structure)
+    // gui->draw_storage_view(ctx);
+    // gui->draw_asset_index(ctx);
+
+    // Unload asset 
+    //      CAN BE MADE TS // storage->get_ref - NOT TS
+    //      
         std::cout << "Unloading assets..." << std::endl;
         // for (auto& ref : refs) resource_manager.unload(ref);
 
@@ -365,7 +412,7 @@ bool Game::init()
         // registry.remove(h); // 
 
         logRegisteredResourceTypes(registry);
-}
+    }
 #endif
 
     // Do some entt stuff
@@ -634,7 +681,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-}
+    }
 #endif
 
     // Draw shape batches

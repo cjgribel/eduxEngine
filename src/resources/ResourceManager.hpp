@@ -96,6 +96,12 @@ namespace eeng
             const AssetMetaData& meta,
             const std::string& meta_file_path)
         {
+            // EENG_LOG("[ResourceManager] Filing type: %s", typeid(T).name());
+
+            asset_index_->serialize_to_file<T>(t, meta, file_path, meta_file_path);
+            return;
+
+
             std::lock_guard lock{ mutex_ };
             std::cout << "[ResourceManager] Filing type: " << typeid(T).name() << "\n";
 
@@ -138,6 +144,28 @@ namespace eeng
             //unload(ref); // optional: remove from memory too
         }
 
+#if 1
+        template<typename T>
+        void load(AssetRef<T>& ref, EngineContext& ctx)
+        {
+            if (ref.is_loaded()) return;
+
+            std::cout << "[ResourceManager] Loading type: " << typeid(T).name()
+                << ", guid = " << ref.guid.to_string() << "\n";
+
+            // 1. Deserialize from disk
+            T asset = asset_index_->deserialize_from_file<T>(ref.guid, ctx);
+
+            // 2. Recursively load dependencies
+            visit_asset_refs(asset, [&](auto& subref)
+                {
+                    load(subref, ctx); // Recursively load children
+                });
+
+            // 3. Add to storage
+            ref.handle = storage_->add<T>(std::move(asset), ref.guid);
+        }
+#else
         // TS (storage->add)
         /// @brief Load an asset from disk to storage
         template<class T>
@@ -167,6 +195,7 @@ namespace eeng
 
             std::cout << storage_->to_string() << std::endl;
         }
+#endif
 
         // Not thread-safe (storage->get_ref)
         template<typename T>
@@ -198,8 +227,8 @@ namespace eeng
             ref.unload();
 
             std::cout << storage_->to_string() << std::endl;
-        }
-    };
+                }
+        };
 
 #if 0
     // Read
@@ -215,4 +244,4 @@ namespace eeng
     void unload_resource(Guid guid);
     bool serialize_resource(Guid guid);
 #endif
-} // namespace eeng
+    } // namespace eeng

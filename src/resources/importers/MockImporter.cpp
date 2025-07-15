@@ -45,7 +45,7 @@ namespace eeng::mock {
         // + use thread pool, e.g. for "textures" (by index to assimp's texture array)
 
         // Imported resources:
-        Mesh mesh;
+        Mesh mesh {{1.0f, 2.0f, 3.0f}};
         Model model;
 
         auto model_guid = Guid::generate();
@@ -53,9 +53,10 @@ namespace eeng::mock {
         // Mesh
         // - Create meta data
         // - File
-        auto mesh_ref = AssetRef<Mesh>{ Guid::generate() };
+        auto mesh_guid = Guid::generate();
+        auto mesh_ref = AssetRef<Mesh>{ mesh_guid };
         auto mesh_meta = AssetMetaData{
-            Guid::generate(),
+            mesh_guid,
             model_guid, // Parent GUID
             std::string("MockMesh") + std::to_string(value), // name
             std::string(entt::resolve<Mesh>().info().name()) // type name
@@ -72,9 +73,9 @@ namespace eeng::mock {
         model.meshes.push_back(mesh_ref);
 
         // File model
-        auto model_ref = AssetRef<Model>{ Guid::generate() };
+        auto model_ref = AssetRef<Model>{ model_guid };
         auto model_meta = AssetMetaData{
-            Guid::generate(),
+            model_guid,
             Guid::invalid(), // Parent GUID
             std::string("MockModel") + std::to_string(value), // name
             std::string(entt::resolve<Model>().info().name()) // type name
