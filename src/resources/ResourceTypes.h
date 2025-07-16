@@ -5,6 +5,7 @@
 #define ResourceTypes_h
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include "AssetMetaData.hpp"
 #include "AssetRef.hpp"
 // #include "Handle.h"
@@ -52,9 +53,15 @@ namespace eeng::mock
         std::vector<float> vertices;
     };
 
+    struct Texture
+    {
+        std::string name;
+    };
+
     struct Model
     {
         std::vector<AssetRef<Mesh>> meshes;
+        std::vector<AssetRef<Texture>> textures;
     };
 
     // Found via ADL if visit_asset_refs is called unqualified
@@ -62,10 +69,11 @@ namespace eeng::mock
     template<typename Visitor>
     void visit_asset_refs(Model& model, Visitor&& visitor)
     {
-        for (auto& mesh_ref : model.meshes)
-        {
-            visitor(mesh_ref);
-        }
+        for (auto& ref : model.meshes)
+            visitor(ref);
+
+        for (auto& ref : model.textures)
+            visitor(ref);
     }
 
     struct MockResource1

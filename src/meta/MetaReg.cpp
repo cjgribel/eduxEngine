@@ -246,12 +246,26 @@ namespace eeng {
             .traits(MetaFlags::read_only)
             ;
 
+        // mock::Texture
+        register_resource<mock::Texture>();
+        entt::meta_factory<mock::Texture>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "Texture", "This is a mock Texture type." })
+            .data<&mock::Texture::name>("name"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the texture." })
+            .traits(MetaFlags::read_only)
+            ;
+
         // mock::Model
         register_resource<mock::Model>();
         entt::meta_factory<mock::Model>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Model", "This is a mock model type." })
+
             .data<&mock::Model::meshes>("meshes"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "meshes", "Meshes", "A vector of mesh references." })
+            .traits(MetaFlags::read_only)
+
+            .data<&mock::Model::textures>("textures"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "textures", "Textures", "A vector of texture references." })
             .traits(MetaFlags::read_only)
             ;
 
