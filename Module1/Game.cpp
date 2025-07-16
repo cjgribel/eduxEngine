@@ -90,15 +90,15 @@ bool Game::init()
                 // std::this_thread::yield(); // Yield to other threads
             }
             // Get asset index snapshot and log it
-            auto asset_index = resource_manager.get_asset_entries_snapshot();
-            EENG_LOG(ctx, "[Game::init()] Found %zu assets:", asset_index.size());
-            for (const auto& entry : asset_index)
-            {
-                EENG_LOG(ctx, "  - %s (%s) at %s",
-                    entry.meta.name.c_str(),
-                    entry.meta.type_name.c_str(),
-                    entry.relative_path.string().c_str());
-            }
+            // auto asset_index = resource_manager.get_asset_entries_snapshot();
+            // EENG_LOG(ctx, "[Game::init()] Found %zu assets:", asset_index.size());
+            // for (const auto& entry : asset_index)
+            // {
+            //     EENG_LOG(ctx, "  - %s (%s) at %s",
+            //         entry.meta.name.c_str(),
+            //         entry.meta.type_name.c_str(),
+            //         entry.relative_path.string().c_str());
+            // }
         }
 
         // Load assets (storage->add - should be TS)
