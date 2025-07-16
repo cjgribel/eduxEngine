@@ -3,7 +3,7 @@
 
 #include "Guid.h"
 #include "Handle.h"
-#include "AssetEntry.hpp"
+#include "AssetIndexData.hpp"
 #include <string>
 
 #pragma once
@@ -24,7 +24,8 @@ namespace eeng
     public:
 
         virtual bool is_scanning() const = 0;
-        virtual std::vector<AssetEntry> get_asset_entries_snapshot() const = 0;
+        virtual AssetIndexDataPtr get_index_data() const = 0;
+        // virtual std::vector<AssetEntry> get_asset_entries_snapshot() const = 0;
 
         virtual std::string to_string() const = 0;
         virtual ~IResourceManager() = default;

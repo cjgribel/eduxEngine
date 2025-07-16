@@ -44,7 +44,9 @@ namespace
     struct MockResourceManager : eeng::IResourceManager
     {
         bool is_scanning() const override { return false; }
-        std::vector<eeng::AssetEntry> get_asset_entries_snapshot() const override { return {}; }
+        //std::vector<eeng::AssetEntry> get_asset_entries_snapshot() const override { return {}; }
+        //std::shared_ptr<const std::vector<AssetEntry>> get_entries_view() const override { return nullptr; }
+        AssetIndexDataPtr get_index_data() const override { return nullptr; };
         std::string to_string() const override { return std::string{}; }
     };
 

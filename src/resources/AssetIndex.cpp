@@ -19,17 +19,40 @@ namespace eeng
             {
                 auto result = this->scan_meta_files(root, ctx);
                 {
-                    std::lock_guard lock(this->entries_mutex_);
-                    this->entries_ = std::move(result);
+                    // std::lock_guard lock(this->entries_mutex_);
+                    // entries_ = std::make_shared<const std::vector<AssetEntry>>(std::move(result));
+
+                    auto data = std::make_shared<AssetIndexData>();
+                    data->entries = std::move(result);
+                    
+                    // Build aux containers
+                    for (const auto& entry : data->entries)
+                    {
+                        data->by_guid[entry.meta.guid] = &entry;
+                        data->by_type[entry.meta.type_name].push_back(&entry);
+                        data->by_parent[entry.meta.guid_parent].push_back(&entry);
+                    }
+
+                    {
+                        std::lock_guard lock(entries_mutex_);
+                        index_data_ = std::move(data);
+                    }
                 }
                 scanning_flag_.store(false, std::memory_order_relaxed);
             });
     }
 
-    std::vector<AssetEntry> AssetIndex::get_entries_snapshot() const
+    // std::vector<AssetEntry> AssetIndex::get_entries_snapshot() const
+    // {
+    //     std::lock_guard lock(entries_mutex_);
+    //     return entries_; // copy for safety
+    // }
+
+    //std::shared_ptr<const std::vector<AssetEntry>> AssetIndex::get_entries_view() const
+    AssetIndexDataPtr AssetIndex::get_index_data() const
     {
-        std::lock_guard lock(entries_mutex_);
-        return entries_; // copy for safety
+        // Atomic access: no need for mutex
+        return index_data_;
     }
 
     bool AssetIndex::is_scanning() const

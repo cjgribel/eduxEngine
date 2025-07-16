@@ -174,7 +174,11 @@ namespace eeng
         //if (!index) return;
 
         // const auto& entries = index->get_entries();
-        auto entries = index.get_entries_snapshot();
+        // auto entries = index.get_entries_snapshot();
+        //auto entry_view = index.get_entries_view();
+        auto index_data = index.get_index_data();
+        if (!index_data) return;
+        const auto& entries = index_data->entries; // *entry_view;
 
         ImGui::Text("Assets found: %zu", entries.size());
         ImGui::Separator();

@@ -7,6 +7,7 @@
 #include "Guid.h"
 #include "AssetMetaData.hpp"
 #include "AssetEntry.hpp"
+#include "AssetIndexData.hpp"
 #include "MetaSerialize.hpp"
 #include "EngineContext.hpp"
 
@@ -30,7 +31,11 @@ namespace eeng
         ~AssetIndex() = default;
 
         void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
-        std::vector<AssetEntry> get_entries_snapshot() const;
+
+        // std::vector<AssetEntry> get_entries_snapshot() const;
+        //std::shared_ptr<const std::vector<AssetEntry>> get_entries_view() const;
+        AssetIndexDataPtr get_index_data() const;
+
         bool is_scanning() const;
 
         /// @brief Serializes an asset to disk.
@@ -65,17 +70,25 @@ namespace eeng
             const Guid& guid,
             EngineContext& ctx) const
         {
-            std::lock_guard lock{ entries_mutex_ }; // Protect access to entries_
+            // std::lock_guard lock{ entries_mutex_ }; // Protect access to entries_
 
-            auto it = std::find_if(entries_.begin(), entries_.end(), [&](const AssetEntry& entry)
+            // auto it = std::find_if(entries_.begin(), entries_.end(), [&](const AssetEntry& entry)
+            //     {
+            //         return entry.meta.guid == guid;
+            //     });
+            auto entries = index_data_->entries; // atomic snapshot
+            auto it = std::find_if(entries.begin(), entries.end(), [&](const AssetEntry& entry)
                 {
                     return entry.meta.guid == guid;
                 });
 
-            if (it == entries_.end())
+            if (it == entries.end())
                 throw std::runtime_error("AssetIndex: Failed to find asset file for guid " + guid.to_string());
 
             const auto& path = it->absolute_path;
+            //
+            // TODO: Check what file is: json, png ...
+            //
             std::ifstream file(path);
             if (!file)
                 throw std::runtime_error("AssetIndex: Failed to open asset file: " + path.string());
@@ -94,7 +107,9 @@ namespace eeng
 
     private:
 
-        std::vector<AssetEntry> entries_;
+        // std::vector<AssetEntry> entries_;
+        //std::shared_ptr<const std::vector<AssetEntry>> entries_ = std::make_shared<std::vector<AssetEntry>>();
+        std::shared_ptr<const AssetIndexData> index_data_;
         mutable std::mutex entries_mutex_;
 
         std::atomic<bool> scanning_flag_{ false };
@@ -132,7 +147,7 @@ namespace eeng
             if (auto it = assets_.find(guid); it != assets_.end())
                 return it->second;
             return {};
-        }
+    }
 
     private:
         mutable std::shared_mutex mutex_;
@@ -232,7 +247,7 @@ namespace eeng
             T resource;
             resource.deserialize(ifs);
             return resource;
-        }
+}
     };
 #endif
 

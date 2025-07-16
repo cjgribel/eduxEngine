@@ -40,10 +40,15 @@ namespace eeng
 
     /// @brief Get a snapshot of the asset index
     /// @return std::vector<AssetEntry>
-    std::vector<AssetEntry> ResourceManager::get_asset_entries_snapshot() const
+    // std::vector<AssetEntry> ResourceManager::get_asset_entries_snapshot() const
+    // {
+    //     std::lock_guard lock{ mutex_ }; // Is this needed?
+    //     return asset_index_->get_entries_snapshot();
+    // }
+
+    AssetIndexDataPtr ResourceManager::get_index_data() const
     {
-        std::lock_guard lock{ mutex_ }; // Is this needed?
-        return asset_index_->get_entries_snapshot();
+        return asset_index_->get_index_data();
     }
 
     std::string ResourceManager::to_string() const

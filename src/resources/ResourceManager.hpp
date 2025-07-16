@@ -84,7 +84,8 @@ namespace eeng
 
         /// @brief Get a snapshot of the asset index
         /// @return std::vector<AssetEntry>
-        std::vector<AssetEntry> get_asset_entries_snapshot() const override;
+        // std::vector<AssetEntry> get_asset_entries_snapshot() const override;
+        AssetIndexDataPtr get_index_data() const override;
 
         // Must be thread-safe. Use static types, or lock meta paths.
         /// @brief Import new resource to resource index
