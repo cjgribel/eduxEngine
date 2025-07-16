@@ -871,8 +871,69 @@ public:
             std::forward<F>(func));
     }
 
+    // --- Traverse children ---------------------------------------------------
 
-    // --- Ascend -------------------------------------------------------------
+private:
+    //–– core children‑traversal implementation
+    template<typename Self, typename F>
+    static void traverse_children_impl(
+        Self& self,
+        size_t parent_idx,
+        F&& visitor)
+    {
+        assert(parent_idx < self.nodes.size());
+        const auto& parent = self.nodes[parent_idx];
+        size_t      child_idx = parent_idx + 1;
+
+        for (unsigned i = 0; i < parent.m_nbr_children; ++i) {
+            visitor(self.nodes[child_idx].m_payload,
+                child_idx,
+                parent_idx);
+            child_idx += self.nodes[child_idx].m_branch_stride;
+        }
+    }
+
+public:
+    //–– by index, const
+    template<typename F>
+        requires std::invocable<F, const PayloadType&, size_t, size_t>
+    void traverse_children(size_t parent_idx, F&& visitor) const 
+    {
+        // *this is const VecTree<PayloadType>&, Self deduced accordingly
+        traverse_children_impl(*this, parent_idx, std::forward<F>(visitor));
+    }
+
+    //–– by index, non‑const
+    template<typename F>
+        requires std::invocable<F, PayloadType&, size_t, size_t>
+    void traverse_children(size_t parent_idx, F&& visitor) 
+    {
+        traverse_children_impl(*this, parent_idx, std::forward<F>(visitor));
+    }
+
+    //–– by payload, const
+    template<typename F>
+        requires std::invocable<F, const PayloadType&, size_t, size_t>
+    bool traverse_children(const PayloadType& parent_payload, F&& visitor) const 
+    {
+        auto idx = find_node_index(parent_payload);
+        if (idx == VecTree_NullIndex) return false;
+        traverse_children(idx, std::forward<F>(visitor));
+        return true;
+    }
+
+    //–– by payload, non‑const
+    template<typename F>
+        requires std::invocable<F, PayloadType&, size_t, size_t>
+    bool traverse_children(const PayloadType& parent_payload, F&& visitor) 
+    {
+        auto idx = find_node_index(parent_payload);
+        if (idx == VecTree_NullIndex) return false;
+        traverse_children(idx, std::forward<F>(visitor));
+        return true;
+    }
+
+    // --- Ascend --------------------------------------------------------------
 
     /// @brief Ascend to root.
     /// @param node_name Name of node to ascend from

@@ -415,4 +415,103 @@ TEST(VecTreeReparentDeepTest, ReparentMidSubtree) {
     EXPECT_TRUE(tree.is_leaf("D"));
 }
 
+// 1) Index‑based: visits exactly the two direct children of the root
+TEST(VecTreeTraverseChildren, IndexVisitsTwoChildren) {
+    VecTree<int> tree;
+    tree.insert_as_root(1);
+    ASSERT_TRUE(tree.insert(2, 1));
+    ASSERT_TRUE(tree.insert(3, 1));
+
+    std::vector<int> visited;
+    size_t rootIdx = 0;  // force the index overload
+    tree.traverse_children(rootIdx,
+        [&](const int& v, size_t ci, size_t pi) {
+            visited.push_back(v);
+            EXPECT_EQ(pi, rootIdx);
+            EXPECT_TRUE(ci == 1u || ci == 2u);
+        }
+    );
+
+    EXPECT_EQ(visited.size(), 2u);
+    EXPECT_NE(std::find(visited.begin(), visited.end(), 2), visited.end());
+    EXPECT_NE(std::find(visited.begin(), visited.end(), 3), visited.end());
+}
+
+// 2) Payload‑based: visits the correct children for two different parents
+TEST(VecTreeTraverseChildren, PayloadVisitsCorrectKids) {
+    VecTree<int> tree;
+    tree.insert_as_root(10);
+    ASSERT_TRUE(tree.insert(20, 10));
+    ASSERT_TRUE(tree.insert(30, 10));
+    ASSERT_TRUE(tree.insert(40, 30));
+
+    std::vector<int> rootKids;
+    ASSERT_TRUE(tree.traverse_children(10, // by payload
+        [&](const int& v, size_t /*ci*/, size_t /*pi*/) {
+            rootKids.push_back(v);
+        }
+    ));
+    EXPECT_EQ(rootKids.size(), 2u);
+    EXPECT_NE(std::find(rootKids.begin(), rootKids.end(), 20), rootKids.end());
+    EXPECT_NE(std::find(rootKids.begin(), rootKids.end(), 30), rootKids.end());
+
+    std::vector<int> kidsOf30;
+    ASSERT_TRUE(tree.traverse_children(30, // by payload
+        [&](const int& v, size_t /*ci*/, size_t /*pi*/) {
+            kidsOf30.push_back(v);
+        }
+    ));
+    EXPECT_EQ(kidsOf30.size(), 1u);
+    EXPECT_EQ(kidsOf30[0], 40);
+}
+
+// 3) Leaf vs. missing: leaf returns true but does not call visitor; missing returns false
+TEST(VecTreeTraverseChildren, LeafAndMissingBehavior) {
+    VecTree<int> tree;
+    tree.insert_as_root(5);
+
+    std::vector<int> visitedLeaf;
+    ASSERT_TRUE(tree.traverse_children(5, // by payload
+        [&](const int& v, size_t /*ci*/, size_t /*pi*/) {
+            visitedLeaf.push_back(v);
+        }
+    ));
+    EXPECT_TRUE(visitedLeaf.empty());
+
+    std::vector<int> visitedMissing;
+    EXPECT_FALSE(tree.traverse_children(999, // by payload
+        [&](const int& v, size_t /*ci*/, size_t /*pi*/) {
+            visitedMissing.push_back(v);
+        }
+    ));
+    EXPECT_TRUE(visitedMissing.empty());
+}
+
+TEST(VecTreeTraverseChildren, SkipsOverSubtreesCorrectly_StringPayload) {
+    VecTree<std::string> tree;
+    // Build:
+    //    "A"
+    //   /   \
+    // "B"   "D"
+    //  /
+    // "C"
+    tree.insert_as_root("A");
+    ASSERT_TRUE(tree.insert("B", "A"));
+    ASSERT_TRUE(tree.insert("C", "B"));  // grandchild
+    ASSERT_TRUE(tree.insert("D", "A"));  // another direct child
+
+    std::vector<std::pair<std::string, size_t>> seen;
+    // 0 here can only bind to the index‐based overload, since payload is std::string.
+    tree.traverse_children(0, [&](const std::string& v, size_t idx, size_t /*p*/) {
+        seen.emplace_back(v, idx);
+    });
+
+    ASSERT_EQ(seen.size(), 2u);
+    // First should be "D" at index 1, then "B" at index 2
+    EXPECT_EQ(seen[0].first, "D");
+    EXPECT_EQ(seen[0].second, 1u);
+    EXPECT_EQ(seen[1].first, "B");
+    EXPECT_EQ(seen[1].second, 2u);
+}
+
 // main() can be omitted if linked with GTest's main library
