@@ -13,7 +13,7 @@ namespace eeng::asset::builders {
     using DependencyTree = VecTree<Guid>;
 
     // template<typename Visitor>
-    // void visit_asset_refs(const AssetEntry& entry, Visitor&& visitor); // defined elsewhere
+    // void visit_assets(const AssetEntry& entry, Visitor&& visitor); // defined elsewhere
 
     inline DependencyTree build_dependency_tree(const std::vector<AssetEntry>& entries)
     {
@@ -38,7 +38,7 @@ namespace eeng::asset::builders {
                 const auto* entry = by_guid[guid];
                 if (!entry) return;
 
-                visit_asset_refs(*entry, [&](const Guid& ref_guid) {
+                visit_assets(*entry, [&](const Guid& ref_guid) {
                     self(self, ref_guid, &guid);
                     });
             };

@@ -6,7 +6,7 @@
 #include "EngineContext.hpp"
 #include "Storage.hpp" // Can't pimpl-away since class is templated
 #include "AssetIndex.hpp"
-#include "ResourceTypes.h" // For AssetRef<T>, visit_asset_refs
+#include "ResourceTypes.h" // For AssetRef<T>, visit_assets
 #include "AssetMetaData.hpp"
 #include "AssetRef.hpp"
 #include <string>
@@ -160,7 +160,7 @@ namespace eeng
             T asset = asset_index_->deserialize_from_file<T>(ref.guid, ctx);
 
             // 2. Recursively load dependencies
-            visit_asset_refs(asset, [&](auto& subref)
+            visit_assets(asset, [&](auto& subref)
                 {
                     load(subref, ctx); // Recursively load children
                 });
@@ -181,7 +181,7 @@ namespace eeng
 
             // Deserialize
             T t{}; // = deserialize<T>(ref.guid, *ctx);
-            visit_asset_refs(t, [&](auto& subref) { load(subref, ctx); });
+            visit_assets(t, [&](auto& subref) { load(subref, ctx); });
             // ^ not part of storage yet so can ignore threading issues
 
             // Add to storage and set handle
@@ -210,7 +210,7 @@ namespace eeng
             // TS - will NOT deadlock due to recursive mutex
             storage_->modify(ref.handle, [this](T& t)
                 {
-                    visit_asset_refs(t, [this](auto& subref)
+                    visit_assets(t, [this](auto& subref)
                         {
                             if (subref.is_loaded()) unload(subref);
                         });
@@ -219,7 +219,7 @@ namespace eeng
 #if 0
             // NON-TS (storage->get_ref)
             T& t = storage->get_ref(ref.handle);
-            visit_asset_refs(t, [&](auto& subref)
+            visit_assets(t, [&](auto& subref)
                 {
                     if (subref.is_loaded()) unload(subref);
                 });

@@ -64,10 +64,10 @@ namespace eeng::mock
         std::vector<AssetRef<Texture>> textures;
     };
 
-    // Found via ADL if visit_asset_refs is called unqualified
-    // (e.g. visit_asset_refs(model, visitor))
+    // Found via ADL if visit_assets is called unqualified
+    // (e.g. visit_assets(model, visitor))
     template<typename Visitor>
-    void visit_asset_refs(Model& model, Visitor&& visitor)
+    void visit_assets(Model& model, Visitor&& visitor)
     {
         for (auto& ref : model.meshes)
             visitor(ref);

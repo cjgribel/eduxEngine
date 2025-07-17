@@ -11,7 +11,7 @@
 namespace eeng
 {
     template<typename T, typename Visitor>
-    void visit_asset_refs(T&, Visitor&&)
+    void visit_assets(T&, Visitor&&)
     {
         // No-op for asset types with no AssetRef dependencies
     }

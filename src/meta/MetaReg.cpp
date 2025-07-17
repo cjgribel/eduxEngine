@@ -297,7 +297,7 @@ namespace eeng {
             .template func<&assure_storage<mock::MockResource1>>(eeng::literals::assure_storage_hs)
 
             // Required only if resource has recursive references
-            //.func<&visit_asset_refs<MockResource1>>("visit_refs"_hs);
+            //.func<&visit_assets<MockResource1>>("visit_refs"_hs);
                 // Usage:
                 //entt::meta_type type = entt::resolve<MockResource1>();
                 // auto visit_fn = type.func("visit_refs"_hs);
