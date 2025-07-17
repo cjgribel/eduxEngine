@@ -239,6 +239,68 @@ namespace eeng
         ImGui::End();
     }
 
+#if 0
+    // Selection system
+    struct GuiContext {
+        std::unordered_set<Guid> selected_assets;
+    };
+
+    // in ImGui code:
+    bool selected = ctx.gui_context.selected_assets.contains(entry.meta.guid);
+    if (ImGui::Selectable(entry.meta.name.c_str(), selected)) {
+        if (!selected)
+            ctx.gui_context.selected_assets.insert(entry.meta.guid);
+        else
+            ctx.gui_context.selected_assets.erase(entry.meta.guid);
+    }
+#endif
+#if 0
+    void GuiManager::draw_dependency_tree(const eeng::asset::builders::DependencyTree& tree,
+        const eeng::AssetIndexData& index_data,
+        EngineContext& ctx)
+    {
+        ImGui::Begin("Asset Dependency Tree");
+
+        std::function<void(size_t)> draw_node_recursive;
+        draw_node_recursive = [&](size_t node_idx) {
+            const Guid& guid = tree.get_payload_at(node_idx);
+            auto it = index_data.by_guid.find(guid);
+            if (it == index_data.by_guid.end()) return;
+
+            const AssetEntry& entry = *it->second;
+
+            ImGuiTreeNodeFlags flags = (tree.get_nbr_children(guid) == 0)
+                ? ImGuiTreeNodeFlags_Leaf
+                : 0;
+
+            bool opened = ImGui::TreeNodeEx(entry.meta.name.c_str(), flags);
+
+            if (opened)
+            {
+                ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
+                ImGui::Text("File: %s", entry.relative_path.string().c_str());
+
+                tree.traverse_children(node_idx, [&](const Guid& child_guid, size_t child_idx, size_t) {
+                    draw_node_recursive(child_idx);
+                    });
+
+                ImGui::TreePop();
+            }
+    };
+
+        // Start traversal from all roots
+        size_t idx = 0;
+        while (idx < tree.size())
+        {
+            draw_node_recursive(idx);
+            idx += tree.get_branch_size(tree.get_payload_at(idx));
+        }
+
+        ImGui::End();
+}
+#endif
+
     void GuiManager::draw_engine_info(EngineContext& ctx) const
     {
 

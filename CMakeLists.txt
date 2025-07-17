@@ -30,7 +30,10 @@ else()
 endif()
 add_compile_definitions(ENTT_USE_ATOMIC)
 
-# 'target_include_directories' if target specific
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+# ^ consider target_include_directories
+# skip all these ->
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/util)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/meta)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/assets)

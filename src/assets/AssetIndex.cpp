@@ -5,6 +5,7 @@
 #include "EngineContext.hpp"
 #include "ThreadPool.hpp"
 #include "MetaSerialize.hpp"
+#include "builders/DependencyTreeBuilder.hpp"
 #include <fstream>
 
 namespace eeng
