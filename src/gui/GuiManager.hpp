@@ -26,6 +26,9 @@ namespace eeng
         void draw_log(EngineContext& ctx) const;
         void draw_storage(EngineContext& ctx) const;
         void draw_resource_browser(EngineContext& ctx) const;
+
+        void draw_dependency_tree(EngineContext& ctx) const;
+
         void draw_engine_info(EngineContext& ctx) const;
 
         std::unordered_map<GuiFlags, bool> flags;

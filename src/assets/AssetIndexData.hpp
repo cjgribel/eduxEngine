@@ -9,6 +9,8 @@
 
 namespace eeng
 {
+    struct AssetTreeViews;
+    
     struct AssetIndexData
     {
         std::vector<AssetEntry> entries;
@@ -16,6 +18,8 @@ namespace eeng
         std::unordered_map<Guid, const AssetEntry*> by_guid;
         std::unordered_map<std::string, std::vector<const AssetEntry*>> by_type;
         std::unordered_map<Guid, std::vector<const AssetEntry*>> by_parent;
+
+        std::shared_ptr<AssetTreeViews> trees;
     };
 
     using AssetIndexDataPtr = std::shared_ptr<const AssetIndexData>;

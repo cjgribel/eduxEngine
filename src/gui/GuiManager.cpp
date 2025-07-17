@@ -4,6 +4,7 @@
 #include "GuiManager.hpp"
 #include "LogManager.hpp"
 #include "ResourceManager.hpp"
+#include "AssetTreeViews.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -214,6 +215,12 @@ namespace eeng
                 draw_asset_flat_list(ctx);
                 ImGui::EndTabItem();
             }
+            if (ImGui::BeginTabItem("By Dependency"))
+            {
+                //ImGui::TextUnformatted("(Unimplemented) Grouped by resource type");
+                draw_dependency_tree(ctx);
+                ImGui::EndTabItem();
+            }
 
             if (ImGui::BeginTabItem("By Type"))
             {
@@ -254,18 +261,27 @@ namespace eeng
             ctx.gui_context.selected_assets.erase(entry.meta.guid);
     }
 #endif
-#if 0
-    void GuiManager::draw_dependency_tree(const eeng::asset::builders::DependencyTree& tree,
-        const eeng::AssetIndexData& index_data,
-        EngineContext& ctx)
+#if 1
+    void GuiManager::draw_dependency_tree(
+        //const eeng::asset::builders::DependencyTree& tree,
+        // const eeng::AssetIndexData& index_data,
+        EngineContext& ctx) const
     {
         ImGui::Begin("Asset Dependency Tree");
+
+        auto index_data = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index().get_index_data();
+        // auto& index_data = index_data.get_index_data();
+
+        //auto index_data = index.get_index_data();
+        if (!index_data) return;
+
+        auto& tree = index_data->trees->dependency_tree; // index_data.trees->dependency_tree;
 
         std::function<void(size_t)> draw_node_recursive;
         draw_node_recursive = [&](size_t node_idx) {
             const Guid& guid = tree.get_payload_at(node_idx);
-            auto it = index_data.by_guid.find(guid);
-            if (it == index_data.by_guid.end()) return;
+            auto it = index_data->by_guid.find(guid);
+            if (it == index_data->by_guid.end()) return;
 
             const AssetEntry& entry = *it->second;
 
@@ -287,7 +303,7 @@ namespace eeng
 
                 ImGui::TreePop();
             }
-    };
+            };
 
         // Start traversal from all roots
         size_t idx = 0;
@@ -298,7 +314,7 @@ namespace eeng
         }
 
         ImGui::End();
-}
+    }
 #endif
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
