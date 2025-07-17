@@ -100,21 +100,21 @@ public:
         return std::make_tuple(node.m_payload, node.m_nbr_children, node.m_branch_stride, node.m_parent_ofs);
     }
 
-    auto get_branch_size(const PayloadType& payload)
+    auto get_branch_size(const PayloadType& payload) const
     {
         auto index = find_node_index(payload);
         assert(index != VecTree_NullIndex);
         return nodes[index].m_branch_stride;
     }
 
-    auto get_nbr_children(const PayloadType& payload)
+    auto get_nbr_children(const PayloadType& payload) const
     {
         auto index = find_node_index(payload);
         assert(index != VecTree_NullIndex);
         return nodes[index].m_nbr_children;
     }
 
-    auto get_parent_ofs(const PayloadType& payload)
+    auto get_parent_ofs(const PayloadType& payload) const
     {
         auto index = find_node_index(payload);
         assert(index != VecTree_NullIndex);
@@ -248,6 +248,20 @@ public:
             auto& parent_node = branch[i - node.m_parent_ofs];
             insert(node.m_payload, parent_node.m_payload);
         }
+    }
+
+    /// @brief Returns the indices of all root nodes in the forest.
+    /// A root is any node with m_parent_ofs == 0.
+    std::vector<size_t> get_roots() const 
+    {
+        std::vector<size_t> roots;
+        // Fast version: skip entire branches by using branch_stride.
+        size_t i = 0;
+        while (i < nodes.size()) {
+            roots.push_back(i);
+            i += nodes[i].m_branch_stride;
+        }
+        return roots;
     }
 
     void insert_as_root(const PayloadType& payload)
@@ -897,7 +911,7 @@ public:
     //–– by index, const
     template<typename F>
         requires std::invocable<F, const PayloadType&, size_t, size_t>
-    void traverse_children(size_t parent_idx, F&& visitor) const 
+    void traverse_children(size_t parent_idx, F&& visitor) const
     {
         // *this is const VecTree<PayloadType>&, Self deduced accordingly
         traverse_children_impl(*this, parent_idx, std::forward<F>(visitor));
@@ -906,7 +920,7 @@ public:
     //–– by index, non‑const
     template<typename F>
         requires std::invocable<F, PayloadType&, size_t, size_t>
-    void traverse_children(size_t parent_idx, F&& visitor) 
+    void traverse_children(size_t parent_idx, F&& visitor)
     {
         traverse_children_impl(*this, parent_idx, std::forward<F>(visitor));
     }
@@ -914,7 +928,7 @@ public:
     //–– by payload, const
     template<typename F>
         requires std::invocable<F, const PayloadType&, size_t, size_t>
-    bool traverse_children(const PayloadType& parent_payload, F&& visitor) const 
+    bool traverse_children(const PayloadType& parent_payload, F&& visitor) const
     {
         auto idx = find_node_index(parent_payload);
         if (idx == VecTree_NullIndex) return false;
@@ -925,7 +939,7 @@ public:
     //–– by payload, non‑const
     template<typename F>
         requires std::invocable<F, PayloadType&, size_t, size_t>
-    bool traverse_children(const PayloadType& parent_payload, F&& visitor) 
+    bool traverse_children(const PayloadType& parent_payload, F&& visitor)
     {
         auto idx = find_node_index(parent_payload);
         if (idx == VecTree_NullIndex) return false;

@@ -168,59 +168,59 @@ namespace eeng
     }
 
     // Window content
-void draw_asset_flat_list(EngineContext& ctx)
-{
-    auto& index = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index();
-    auto index_data = index.get_index_data();
-    if (!index_data) return;
-
-    const auto& entries = index_data->entries;
-    const auto& by_guid = index_data->by_guid;
-
-    ImGui::Text("Assets found: %zu", entries.size());
-    ImGui::Separator();
-
-    for (const auto& entry : entries)
+    void draw_asset_flat_list(EngineContext& ctx)
     {
-        ImGui::PushID(entry.meta.guid.raw()); // Avoid ImGui ID collisions
+        auto& index = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index();
+        auto index_data = index.get_index_data();
+        if (!index_data) return;
 
-        if (ImGui::TreeNode(entry.meta.name.c_str()))
+        const auto& entries = index_data->entries;
+        const auto& by_guid = index_data->by_guid;
+
+        ImGui::Text("Assets found: %zu", entries.size());
+        ImGui::Separator();
+
+        for (const auto& entry : entries)
         {
-            ImGui::Text("Type: %s", entry.meta.type_name.c_str());
-            ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
-            ImGui::Text("File: %s", entry.relative_path.string().c_str());
+            ImGui::PushID(entry.meta.guid.raw()); // Avoid ImGui ID collisions
 
-            // Show contained assets
-            const auto& children = entry.meta.contained_assets;
-            if (!children.empty())
+            if (ImGui::TreeNode(entry.meta.name.c_str()))
             {
-                if (ImGui::TreeNode("Contained Assets"))
+                ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
+                ImGui::Text("File: %s", entry.relative_path.string().c_str());
+
+                // Show contained assets
+                const auto& children = entry.meta.contained_assets;
+                if (!children.empty())
                 {
-                    for (const auto& child_guid : children)
+                    if (ImGui::TreeNode("Contained Assets"))
                     {
-                        auto it = by_guid.find(child_guid);
-                        if (it != by_guid.end())
+                        for (const auto& child_guid : children)
                         {
-                            const AssetEntry* child = it->second;
-                            ImGui::BulletText("%s [%s]",
-                                child->meta.name.c_str(),
-                                child->meta.type_name.c_str());
+                            auto it = by_guid.find(child_guid);
+                            if (it != by_guid.end())
+                            {
+                                const AssetEntry* child = it->second;
+                                ImGui::BulletText("%s [%s]",
+                                    child->meta.name.c_str(),
+                                    child->meta.type_name.c_str());
+                            }
+                            else
+                            {
+                                ImGui::BulletText("Unknown GUID: %s", child_guid.to_string().c_str());
+                            }
                         }
-                        else
-                        {
-                            ImGui::BulletText("Unknown GUID: %s", child_guid.to_string().c_str());
-                        }
+                        ImGui::TreePop();
                     }
-                    ImGui::TreePop();
                 }
+
+                ImGui::TreePop();
             }
 
-            ImGui::TreePop();
+            ImGui::PopID();
         }
-
-        ImGui::PopID();
     }
-}
 
 
     void GuiManager::draw_resource_browser(EngineContext& ctx) const
@@ -238,7 +238,7 @@ void draw_asset_flat_list(EngineContext& ctx)
             if (ImGui::BeginTabItem("By Dependency"))
             {
                 //ImGui::TextUnformatted("(Unimplemented) Grouped by resource type");
-                draw_dependency_tree(ctx);
+                draw_content_tree(ctx);
                 ImGui::EndTabItem();
             }
 
@@ -281,61 +281,54 @@ void draw_asset_flat_list(EngineContext& ctx)
             ctx.gui_context.selected_assets.erase(entry.meta.guid);
     }
 #endif
-#if 1
-    void GuiManager::draw_dependency_tree(
-        //const eeng::asset::builders::DependencyTree& tree,
-        // const eeng::AssetIndexData& index_data,
-        EngineContext& ctx) const
+
+void GuiManager::draw_content_tree(EngineContext& ctx) const
+{
+    auto index_data = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index().get_index_data();
+    if (!index_data) return;
+
+    const auto& tree = index_data->trees->content_tree;
+
+    std::function<void(size_t)> draw_node_recursive;
+    draw_node_recursive = [&](size_t node_idx)
     {
-        ImGui::Begin("Asset Dependency Tree");
+        const Guid& guid = tree.get_payload_at(node_idx);
+        auto it = index_data->by_guid.find(guid);
+        if (it == index_data->by_guid.end()) return;
 
-        auto index_data = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index().get_index_data();
-        // auto& index_data = index_data.get_index_data();
+        const AssetEntry& entry = *it->second;
 
-        //auto index_data = index.get_index_data();
-        if (!index_data) return;
+        const bool is_leaf = tree.get_nbr_children(guid) == 0;
 
-        auto& tree = index_data->trees->dependency_tree; // index_data.trees->dependency_tree;
-
-        std::function<void(size_t)> draw_node_recursive;
-        draw_node_recursive = [&](size_t node_idx) {
-            const Guid& guid = tree.get_payload_at(node_idx);
-            auto it = index_data->by_guid.find(guid);
-            if (it == index_data->by_guid.end()) return;
-
-            const AssetEntry& entry = *it->second;
-
-            ImGuiTreeNodeFlags flags = (tree.get_nbr_children(guid) == 0)
-                ? ImGuiTreeNodeFlags_Leaf
-                : 0;
-
-            bool opened = ImGui::TreeNodeEx(entry.meta.name.c_str(), flags);
-
+        if (is_leaf)
+        {
+            ImGui::BulletText("%s", entry.meta.name.c_str());
+        }
+        else
+        {
+            bool opened = ImGui::TreeNode(entry.meta.name.c_str());
             if (opened)
             {
                 ImGui::Text("Type: %s", entry.meta.type_name.c_str());
                 ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
                 ImGui::Text("File: %s", entry.relative_path.string().c_str());
 
-                tree.traverse_children(node_idx, [&](const Guid& child_guid, size_t child_idx, size_t) {
+                tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
+                {
                     draw_node_recursive(child_idx);
-                    });
+                });
 
                 ImGui::TreePop();
             }
-            };
-
-        // Start traversal from all roots
-        size_t idx = 0;
-        while (idx < tree.size())
-        {
-            draw_node_recursive(idx);
-            idx += tree.get_branch_size(tree.get_payload_at(idx));
         }
+    };
 
-        ImGui::End();
+    for (size_t root_idx : tree.get_roots())
+    {
+        draw_node_recursive(root_idx);
     }
-#endif
+}
+
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
     {

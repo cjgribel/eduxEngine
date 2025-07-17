@@ -6,7 +6,7 @@
 #include "EngineContext.hpp"
 #include "ThreadPool.hpp"
 #include "MetaSerialize.hpp"
-#include "builders/DependencyTreeBuilder.hpp"
+#include "builders/ContentTreeBuilder.hpp"
 #include <fstream>
 
 namespace eeng
@@ -34,7 +34,7 @@ namespace eeng
 
                 // Build tree views
                 auto views = std::make_shared<AssetTreeViews>();
-                views->dependency_tree = asset::builders::build_dependency_tree(data->entries);
+                views->content_tree = asset::builders::build_content_tree(data->entries);
                 // other tree builds ...
                 data->trees = views;
 

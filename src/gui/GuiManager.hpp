@@ -27,7 +27,7 @@ namespace eeng
         void draw_storage(EngineContext& ctx) const;
         void draw_resource_browser(EngineContext& ctx) const;
 
-        void draw_dependency_tree(EngineContext& ctx) const;
+        void draw_content_tree(EngineContext& ctx) const;
 
         void draw_engine_info(EngineContext& ctx) const;
 

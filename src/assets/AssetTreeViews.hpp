@@ -12,7 +12,7 @@ namespace eeng
 {
     struct AssetTreeViews
     {
-        VecTree<Guid> dependency_tree;
+        VecTree<Guid> content_tree;
         VecTree<std::filesystem::path> file_tree;
 
         // reference tree, inclusion tree, chunk nesting tree...
