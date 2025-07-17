@@ -57,7 +57,7 @@ bool Game::init()
 
         // Make sure resource_manager.file is TS <- HOW??? IT IS META BASED...
         std::cout << "Importing assets recursively..." << std::endl;
-        const int numTasks = 256;
+        const int numTasks = 5;
         std::vector<std::future<ModelRef>> futures;
         for (int i = 0; i < numTasks; ++i)
         {

@@ -168,40 +168,60 @@ namespace eeng
     }
 
     // Window content
-    void draw_asset_flat_list(EngineContext& ctx)
+void draw_asset_flat_list(EngineContext& ctx)
+{
+    auto& index = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index();
+    auto index_data = index.get_index_data();
+    if (!index_data) return;
+
+    const auto& entries = index_data->entries;
+    const auto& by_guid = index_data->by_guid;
+
+    ImGui::Text("Assets found: %zu", entries.size());
+    ImGui::Separator();
+
+    for (const auto& entry : entries)
     {
-        // auto* index = ctx.resource_manager->asset_index();
-        auto& index = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index();
-        //if (!index) return;
+        ImGui::PushID(entry.meta.guid.raw()); // Avoid ImGui ID collisions
 
-        // const auto& entries = index->get_entries();
-        // auto entries = index.get_entries_snapshot();
-        //auto entry_view = index.get_entries_view();
-        auto index_data = index.get_index_data();
-        if (!index_data) return;
-        const auto& entries = index_data->entries; // *entry_view;
-
-        ImGui::Text("Assets found: %zu", entries.size());
-        ImGui::Separator();
-
-        for (const auto& entry : entries)
+        if (ImGui::TreeNode(entry.meta.name.c_str()))
         {
-            ImGui::PushID(entry.meta.guid.raw()); // Avoid ImGui ID collisions
+            ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+            ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
+            ImGui::Text("File: %s", entry.relative_path.string().c_str());
 
-            if (ImGui::TreeNode(entry.meta.name.c_str()))
+            // Show contained assets
+            const auto& children = entry.meta.contained_assets;
+            if (!children.empty())
             {
-                ImGui::Text("Type: %s", entry.meta.type_name.c_str());
-                ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
-                ImGui::Text("File: %s", entry.relative_path.string().c_str());
-
-                // Future: Add preview, buttons for loading, etc.
-
-                ImGui::TreePop();
+                if (ImGui::TreeNode("Contained Assets"))
+                {
+                    for (const auto& child_guid : children)
+                    {
+                        auto it = by_guid.find(child_guid);
+                        if (it != by_guid.end())
+                        {
+                            const AssetEntry* child = it->second;
+                            ImGui::BulletText("%s [%s]",
+                                child->meta.name.c_str(),
+                                child->meta.type_name.c_str());
+                        }
+                        else
+                        {
+                            ImGui::BulletText("Unknown GUID: %s", child_guid.to_string().c_str());
+                        }
+                    }
+                    ImGui::TreePop();
+                }
             }
 
-            ImGui::PopID();
+            ImGui::TreePop();
         }
+
+        ImGui::PopID();
     }
+}
+
 
     void GuiManager::draw_resource_browser(EngineContext& ctx) const
     {

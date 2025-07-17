@@ -101,7 +101,15 @@ namespace eeng
         {
             // EENG_LOG("[ResourceManager] Filing type: %s", typeid(T).name());
 
-            asset_index_->serialize_to_file<T>(t, meta, file_path, meta_file_path);
+    // Add contained assets
+            auto meta2 = meta;
+            visit_assets(t, [&](const auto& ref)
+                {
+                    //if (ref.valid())
+                        meta2.contained_assets.push_back(ref.get_guid());
+                });
+
+            asset_index_->serialize_to_file<T>(t, meta2, file_path, meta_file_path);
             return;
 
 
@@ -197,7 +205,7 @@ namespace eeng
             storage_->add<mock::MockResource2>({}, int_ref3.guid);
 
             std::cout << storage_->to_string() << std::endl;
-        }
+                }
 #endif
 
         // Not thread-safe (storage->get_ref)
@@ -230,8 +238,8 @@ namespace eeng
             ref.unload();
 
             std::cout << storage_->to_string() << std::endl;
-                }
-        };
+        }
+    };
 
 #if 0
     // Read
@@ -247,4 +255,4 @@ namespace eeng
     void unload_resource(Guid guid);
     bool serialize_resource(Guid guid);
 #endif
-    } // namespace eeng
+                } // namespace eeng

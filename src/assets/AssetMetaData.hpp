@@ -18,7 +18,7 @@ namespace eeng
         std::string type_name; // meta_type.info().name() / entt::type_name<T>. E.g., "eeng::mock::Model"
         // std::string file_path;
 
-        // bool is_collection; ???
+        std::vector<Guid> contained_assets;
 
         AssetMetaData() = default;
 

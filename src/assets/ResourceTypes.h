@@ -76,6 +76,16 @@ namespace eeng::mock
             visitor(ref);
     }
 
+    template<typename Visitor>
+    void visit_assets(const Model& model, Visitor&& visitor)
+    {
+        for (auto& ref : model.meshes)
+            visitor(ref);
+
+        for (auto& ref : model.textures)
+            visitor(ref);
+    }
+
     struct MockResource1
     {
         int x{};
