@@ -48,16 +48,12 @@ bool Game::init()
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
         std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/";
 
-        // 1.   Import resources concurrently
+        // 1.   IMPORT resources concurrently
         //
         using ModelRef = eeng::AssetRef<eeng::mock::Model>;
-        // entt::meta_factory<eeng::mock::Model>();
-        // entt::meta_factory<eeng::mock::Mesh>();
-        entt::meta_factory<size_t>(); //
-
-        // Make sure resource_manager.file is TS <- HOW??? IT IS META BASED...
+        // Requires ResourceManager to be TS
         std::cout << "Importing assets recursively..." << std::endl;
-        const int numTasks = 5;
+        const int numTasks = 256;
         std::vector<std::future<ModelRef>> futures;
         for (int i = 0; i < numTasks; ++i)
         {
@@ -69,15 +65,16 @@ bool Game::init()
             );
         }
 
-        // Fetch asset references from futures
+        // 1b. Fetch asset references from futures
+        //
         // - get() blocks until the task is done
         // - wait_for() checks & waits for a period of time without blocking
         EENG_LOG(ctx, "[Game::init()] Wait for imports...");
         std::vector<ModelRef> refs;
         for (auto& f : futures) refs.push_back(f.get());
 
-        // Now scan assets from disk
-        // ??? - This is a blocking operation, so it should be done after all imports are done
+        // 3. SCAN assets from disk concurrently
+        //
         {
             EENG_LOG(ctx, "[Game::init()] Scanning assets...");
             resource_manager.start_async_scan("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
@@ -101,7 +98,8 @@ bool Game::init()
             // }
         }
 
-        // Load assets (storage->add - should be TS)
+        // 4. LOAD assets concurrently
+        //
         EENG_LOG(ctx, "[Game::init()] Loading assets...");
         // for (auto& ref : refs) resource_manager.load(ref, *ctx);
         // CONCURRENTLY
@@ -137,39 +135,13 @@ bool Game::init()
             }
         }
 
-        // {
-        //     EENG_LOG(ctx, "  - %s (%s) with guid %s",
-        //         ref.get_handle().get()->to_string().c_str(),
-        //         entt::resolve(ref.get_handle().get()).info().name(),
-        //         ref.get_guid().to_string().c_str());
-        // }
-        // else
-        // {
-        //     EENG_LOG(ctx, "  - %s (%s) with guid %s is not loaded",
-        //         ref.get_handle().get()->to_string().c_str(),
-        //         entt::resolve(ref.get_handle().get()).info().name(),
-        //         ref.get_guid().to_string().c_str());
-        // }
-    // }
-
-    // VISUALIZE storage + asset_index (available assets as a file structure)
-    // gui->draw_storage_view(ctx);
-    // gui->draw_asset_index(ctx);
-
-    // Unload asset 
+    // 5. UNLOAD assets (concurrently)
     //      CAN BE MADE TS // storage->get_ref - NOT TS
     //      
         std::cout << "Unloading assets..." << std::endl;
-        // for (auto& ref : refs) resource_manager.unload(ref);
+        for (auto& ref : refs) resource_manager.unload(ref);
 
-        // Unfile the asset
-        // ...
-
-        // 2. ResourceManager::AssetIndex serializes added resources
-
-        // 3. Obtain asset list (all / of a given type) (non-concurrently) (-> GUI)
-
-        // 4. Load assets to Storage concurrently
+        // GUI: import. load, unload, unimport ...
     }
 
     // Thread pool test 1

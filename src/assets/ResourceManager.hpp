@@ -101,47 +101,15 @@ namespace eeng
         {
             // EENG_LOG("[ResourceManager] Filing type: %s", typeid(T).name());
 
-    // Add contained assets
-            auto meta2 = meta;
+            // Add contained assets
+            auto _meta = meta;
             visit_assets(t, [&](const auto& ref)
                 {
                     //if (ref.valid())
-                        meta2.contained_assets.push_back(ref.get_guid());
+                    _meta.contained_assets.push_back(ref.get_guid());
                 });
 
-            asset_index_->serialize_to_file<T>(t, meta2, file_path, meta_file_path);
-            return;
-
-
-            std::lock_guard lock{ mutex_ };
-            std::cout << "[ResourceManager] Filing type: " << typeid(T).name() << "\n";
-
-            // auto guid = Guid::generate();
-            // auto ref = AssetRef<T>{ guid, Handle<T> {} };
-
-            // AssetIndex maps asset type to a file location - must be TS
-            // Use either a) templated or b) entt::meta_type
-            // asset_index.serialize<T>(t, guid, ctx?);
-
-            // Serialize
-            // CONCURRENT?
-            std::ofstream data_file(file_path), meta_file(meta_file_path);
-            assert(data_file.is_open() && "Failed to open file for writing");
-            assert(meta_file.is_open() && "Failed to open meta file for writing");
-
-            // NOT CONCURRENT
-            nlohmann::json j_data, j_meta;
-            // j_asset_meta["guid"] = guid.raw(); // Store as string
-            // j_meta["type"] = std::string(entt::resolve<T>().info().name());
-            // j_meta["data"] = meta::serialize_any(entt::forward_as_meta(t));
-            j_data = meta::serialize_any(entt::forward_as_meta(t));
-            j_meta = meta::serialize_any(entt::forward_as_meta(meta));
-            // CONCURRENT?
-            data_file << j_data.dump(4);
-            meta_file << j_meta.dump(4);
-
-            // return ref;
-            // ^ handle is empty until asset is loaded
+            asset_index_->serialize_to_file<T>(t, _meta, file_path, meta_file_path);
         }
 
         // TS?
@@ -155,7 +123,6 @@ namespace eeng
             //unload(ref); // optional: remove from memory too
         }
 
-#if 1
         template<typename T>
         void load(AssetRef<T>& ref, EngineContext& ctx)
         {
@@ -176,37 +143,6 @@ namespace eeng
             // 3. Add to storage
             ref.handle = storage_->add<T>(std::move(asset), ref.guid);
         }
-#else
-        // TS (storage->add)
-        /// @brief Load an asset from disk to storage
-        template<class T>
-        void load(AssetRef<T>& ref, EngineContext& ctx)
-        {
-            assert(!ref.is_loaded());
-
-            std::cout << "[ResourceManager] Loading of type: " << typeid(T).name() << "\n";
-            //std::cout << "  ↳ guid = " << ref.guid.raw().to_string() << "\n";
-
-            // Deserialize
-            T t{}; // = deserialize<T>(ref.guid, *ctx);
-            visit_assets(t, [&](auto& subref) { load(subref, ctx); });
-            // ^ not part of storage yet so can ignore threading issues
-
-            // Add to storage and set handle
-            ref.handle = storage_->add<T>(t, ref.guid);
-            // ref.load(storage->add<T>(t, ref.guid));
-
-            // Debug assets
-            AssetRef<mock::Mesh> int_ref1{ Guid::generate(), Handle<mock::Mesh>{} };
-            storage_->add<mock::Mesh>({}, int_ref1.guid);
-            AssetRef<mock::MockResource1> int_ref2{ Guid::generate(), Handle<mock::MockResource1>{} };
-            storage_->add<mock::MockResource1>({}, int_ref2.guid);
-            AssetRef<mock::MockResource2> int_ref3{ Guid::generate(), Handle<mock::MockResource2>{} };
-            storage_->add<mock::MockResource2>({}, int_ref3.guid);
-
-            std::cout << storage_->to_string() << std::endl;
-                }
-#endif
 
         // Not thread-safe (storage->get_ref)
         template<typename T>
@@ -255,4 +191,4 @@ namespace eeng
     void unload_resource(Guid guid);
     bool serialize_resource(Guid guid);
 #endif
-                } // namespace eeng
+} // namespace eeng
