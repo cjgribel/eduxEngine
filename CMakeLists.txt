@@ -33,8 +33,8 @@ add_compile_definitions(ENTT_USE_ATOMIC)
 # 'target_include_directories' if target specific
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/meta)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/resources)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/resources/importers)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/assets)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/util)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/gui)
@@ -219,12 +219,12 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ShapeRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ImGuiBackendSDL.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi/EngineContext.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/Storage.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/AssetIndex.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/ResourceManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/EntityManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/importers/AssimpImporter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/importers/MockImporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Storage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AssetIndex.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ResourceManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/EntityManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/AssimpImporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/MockImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/Profiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/ThreadPool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaReg.cpp

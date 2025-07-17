@@ -28,7 +28,7 @@ add_executable(tests
     MetaThreading_tests.cpp
     Meta_tests.cpp
     MetaSerialize_tests.cpp ../src/meta/MetaSerialize.cpp ../src/engineapi/EngineContext.cpp ../src/util/ThreadPool.cpp
-    Storage_tests.cpp ../src/resources/Storage.cpp
+    Storage_tests.cpp ../src/assets/Storage.cpp
     EventQueue_tests.cpp
     )
 
