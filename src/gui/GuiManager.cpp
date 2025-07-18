@@ -225,7 +225,6 @@ namespace eeng
         }
     }
 
-
     void GuiManager::draw_resource_browser(EngineContext& ctx) const
     {
         ImGui::Begin("Resource Browser");
@@ -338,60 +337,97 @@ namespace eeng
 
     void GuiManager::draw_content_tree(EngineContext& ctx) const
     {
-        auto index_data = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index().get_index_data();
+        auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+        auto index_data = resource_manager.asset_index().get_index_data();
         if (!index_data) return;
+        auto& storage = resource_manager.storage();
 
         const auto& tree = index_data->trees->content_tree;
         auto& selection = *ctx.asset_selection;
 
-        std::function<void(size_t)> draw_node_recursive;
-        draw_node_recursive = [&](size_t node_idx)
-            {
-                const Guid& guid = tree.get_payload_at(node_idx);
-                auto it = index_data->by_guid.find(guid);
-                if (it == index_data->by_guid.end()) return;
-
-                const AssetEntry& entry = *it->second;
-
-                const bool is_leaf = tree.get_nbr_children(guid) == 0;
-                const bool is_selected = selection.contains(guid);
-
-                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
-                if (is_leaf) flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet; // | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-                if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
-
-                intptr_t id_int = static_cast<intptr_t>(guid.raw());
-                void* id_ptr = reinterpret_cast<void*>(id_int);
-
-                bool opened = ImGui::TreeNodeEx(id_ptr, flags, "%s", entry.meta.name.c_str());
-                if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
-                {
-                    const bool ctrl = ImGui::GetIO().KeyCtrl;
-                    if (ctrl && is_selected) selection.remove(guid);    // deselect
-                    else if (ctrl) selection.add(guid);                 // multi-select
-                    else { selection.clear(); selection.add(guid); }    // single-select
-                }
-                if (opened)
-                {
-                    ImGui::Text("Type: %s", entry.meta.type_name.c_str());
-                    ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
-                    ImGui::Text("File: %s", entry.relative_path.string().c_str());
-
-                    tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
-                        {
-                            draw_node_recursive(child_idx);
-                        });
-
-                    ImGui::TreePop();
-                }
-            };
-
-        for (size_t root_idx : tree.get_roots())
+        // Begin a 2‑column table
+        if (ImGui::BeginTable("##ContentTree", 2,
+            ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
         {
-            draw_node_recursive(root_idx);
+            ImVec2 table_pos = ImGui::GetCursorScreenPos();
+            // Column 0: fixed width just big enough for the circle
+            ImGui::TableSetupColumn("Loaded", ImGuiTableColumnFlags_WidthFixed, 20.0f);
+            // Column 1: stretch for the tree
+            ImGui::TableSetupColumn("Assets", ImGuiTableColumnFlags_WidthStretch);
+            // no header row, skip TableHeadersRow()
+
+            std::function<void(size_t)> draw_node_recursive;
+            draw_node_recursive = [&](size_t node_idx)
+                {
+                    const Guid& guid = tree.get_payload_at(node_idx);
+
+                    // Get asset entry = meta data + paths
+                    auto it = index_data->by_guid.find(guid);
+                    if (it == index_data->by_guid.end()) return;
+                    const AssetEntry& entry = *it->second;
+
+                    // Asset loaded status
+                    bool is_loaded = false;
+                    if (auto maybe_handle = storage.handle_for_guid(guid))
+                    {
+                        auto handle = *maybe_handle;
+                        is_loaded = storage.validate(handle);
+                    }
+
+                    const bool is_leaf = tree.get_nbr_children(guid) == 0;
+                    const bool is_selected = selection.contains(guid);
+
+                    // Table: shift row and draw is_loaded-circle in absolute coordinates
+                    ImGui::TableNextRow();
+                    ImVec2 row_pos = ImGui::GetCursorScreenPos();  // indent + table cell origin
+                    float  row_h = ImGui::GetFrameHeight();
+                    float  r = row_h * 0.25f;
+                    ImU32  col = is_loaded ? IM_COL32(0, 200, 0, 255) : IM_COL32(200, 0, 0, 255);
+                    // draw circle at fixed X = table_pos.x
+                    ImVec2 center{ table_pos.x + r + 2.0f, row_pos.y + row_h * 0.5f };
+                    ImGui::GetWindowDrawList()->AddCircleFilled(center, r, col);
+
+                    // Table: shift to column 1
+                    ImGui::TableSetColumnIndex(1);
+
+                    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+                    if (is_leaf) flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet; // | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                    if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
+
+                    intptr_t id_int = static_cast<intptr_t>(guid.raw());
+                    void* id_ptr = reinterpret_cast<void*>(id_int);
+
+                    bool opened = ImGui::TreeNodeEx(id_ptr, flags, "%s", entry.meta.name.c_str());
+                    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+                    {
+                        const bool ctrl = ImGui::GetIO().KeyCtrl;
+                        if (ctrl && is_selected) selection.remove(guid);    // deselect
+                        else if (ctrl) selection.add(guid);                 // multi-select
+                        else { selection.clear(); selection.add(guid); }    // single-select
+                    }
+                    if (opened)
+                    {
+                        ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                        ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
+                        ImGui::Text("File: %s", entry.relative_path.string().c_str());
+
+                        tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
+                            {
+                                draw_node_recursive(child_idx);
+                            });
+
+                        ImGui::TreePop();
+                    }
+                };
+
+            for (size_t root_idx : tree.get_roots())
+            {
+                draw_node_recursive(root_idx);
+            }
+
+            ImGui::EndTable();
         }
     }
-
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
     {
