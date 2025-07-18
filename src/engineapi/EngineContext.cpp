@@ -4,6 +4,7 @@
 #include "EngineContext.hpp"
 #include "ThreadPool.hpp"
 #include "EventQueue.h"
+#include "engineapi/SelectionManager.hpp"
 
 namespace eeng
 {
@@ -74,6 +75,8 @@ namespace eeng
         , log_manager(log_manager)
         , thread_pool(std::make_unique<ThreadPool>())
         , event_queue(std::make_unique<EventQueue>())
+        , asset_selection(std::make_unique<editor::SelectionManager<Guid>>())
+        , entity_selection(std::make_unique<editor::SelectionManager<Entity>>())
         , engine_config(std::make_unique<EngineConfig>(*event_queue))
     {
     }

@@ -5,6 +5,7 @@
 #include "LogManager.hpp"
 #include "ResourceManager.hpp"
 #include "AssetTreeViews.hpp"
+#include "engineapi/SelectionManager.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -237,10 +238,21 @@ namespace eeng
             }
             if (ImGui::BeginTabItem("By Dependency"))
             {
-                //ImGui::TextUnformatted("(Unimplemented) Grouped by resource type");
+                // Selection
+                ImGui::TextDisabled("Selected: ");
+                for (auto& a : ctx.asset_selection->get_all())
+                {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s%s",
+                        a.to_string().c_str(),
+                        (a == ctx.asset_selection->last()) ? "" : ", ");
+                }
+
                 draw_content_tree(ctx);
                 ImGui::EndTabItem();
             }
+
+            ImGui::BeginDisabled();
 
             if (ImGui::BeginTabItem("By Type"))
             {
@@ -260,74 +272,69 @@ namespace eeng
                 ImGui::EndTabItem();
             }
 
+            ImGui::EndDisabled();
+
             ImGui::EndTabBar();
         }
 
         ImGui::End();
     }
 
-#if 0
-    // Selection system
-    struct GuiContext {
-        std::unordered_set<Guid> selected_assets;
-    };
-
-    // in ImGui code:
-    bool selected = ctx.gui_context.selected_assets.contains(entry.meta.guid);
-    if (ImGui::Selectable(entry.meta.name.c_str(), selected)) {
-        if (!selected)
-            ctx.gui_context.selected_assets.insert(entry.meta.guid);
-        else
-            ctx.gui_context.selected_assets.erase(entry.meta.guid);
-    }
-#endif
-
-void GuiManager::draw_content_tree(EngineContext& ctx) const
-{
-    auto index_data = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index().get_index_data();
-    if (!index_data) return;
-
-    const auto& tree = index_data->trees->content_tree;
-
-    std::function<void(size_t)> draw_node_recursive;
-    draw_node_recursive = [&](size_t node_idx)
+    void GuiManager::draw_content_tree(EngineContext& ctx) const
     {
-        const Guid& guid = tree.get_payload_at(node_idx);
-        auto it = index_data->by_guid.find(guid);
-        if (it == index_data->by_guid.end()) return;
+        auto index_data = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index().get_index_data();
+        if (!index_data) return;
 
-        const AssetEntry& entry = *it->second;
+        const auto& tree = index_data->trees->content_tree;
+        auto& selection = *ctx.asset_selection;
 
-        const bool is_leaf = tree.get_nbr_children(guid) == 0;
-
-        if (is_leaf)
-        {
-            ImGui::BulletText("%s", entry.meta.name.c_str());
-        }
-        else
-        {
-            bool opened = ImGui::TreeNode(entry.meta.name.c_str());
-            if (opened)
+        std::function<void(size_t)> draw_node_recursive;
+        draw_node_recursive = [&](size_t node_idx)
             {
-                ImGui::Text("Type: %s", entry.meta.type_name.c_str());
-                ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
-                ImGui::Text("File: %s", entry.relative_path.string().c_str());
+                const Guid& guid = tree.get_payload_at(node_idx);
+                auto it = index_data->by_guid.find(guid);
+                if (it == index_data->by_guid.end()) return;
 
-                tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
+                const AssetEntry& entry = *it->second;
+
+                const bool is_leaf = tree.get_nbr_children(guid) == 0;
+                const bool is_selected = selection.contains(guid);
+
+                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+                if (is_leaf) flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet; // | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
+
+                intptr_t id_int = static_cast<intptr_t>(guid.raw());
+                void* id_ptr = reinterpret_cast<void*>(id_int);
+
+                bool opened = ImGui::TreeNodeEx(id_ptr, flags, "%s", entry.meta.name.c_str());
+                if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
                 {
-                    draw_node_recursive(child_idx);
-                });
+                    const bool ctrl = ImGui::GetIO().KeyCtrl;
+                    if (ctrl && is_selected) selection.remove(guid);    // deselect
+                    else if (ctrl) selection.add(guid);                 // multi-select
+                    else { selection.clear(); selection.add(guid); }    // single-select
+                }
+                if (opened)
+                {
+                    ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                    ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
+                    ImGui::Text("File: %s", entry.relative_path.string().c_str());
 
-                ImGui::TreePop();
-            }
+                    tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
+                        {
+                            draw_node_recursive(child_idx);
+                        });
+
+                    ImGui::TreePop();
+                }
+            };
+
+        for (size_t root_idx : tree.get_roots())
+        {
+            draw_node_recursive(root_idx);
         }
-    };
-
-    for (size_t root_idx : tree.get_roots())
-    {
-        draw_node_recursive(root_idx);
     }
-}
 
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
