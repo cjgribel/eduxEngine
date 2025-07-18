@@ -11,6 +11,8 @@
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
 
+#include <algorithm>
+
 namespace eeng
 {
     void GuiManager::init()
@@ -228,6 +230,23 @@ namespace eeng
     {
         ImGui::Begin("Resource Browser");
 
+        // 1) persistent bottom‑pane height
+        static float bottom_pane_height = 120.0f;
+        const float splitter_thickness = 6.0f;
+
+        // 2) figure out how much total vertical space we have
+        ImVec2 avail = ImGui::GetContentRegionAvail();
+        // clamp so neither pane shrinks below 50px
+        float min_h = 50.0f;
+        float max_h = avail.y - 50.0f;
+        bottom_pane_height = std::min(std::max(bottom_pane_height, min_h), max_h);
+
+        // 3) top pane size = remaining space after bottom + splitter
+        float top_pane_height = avail.y - bottom_pane_height - splitter_thickness;
+
+        // ─── TOP PANE ──────────────────────────────────────────────
+        ImGui::BeginChild("##TopPane", ImVec2(0, top_pane_height), true);
+
         // Future: tabs or filter bar
         if (ImGui::BeginTabBar("ResourceViews"))
         {
@@ -276,6 +295,43 @@ namespace eeng
 
             ImGui::EndTabBar();
         }
+        ImGui::EndChild();
+
+        // ─── SPLITTER ──────────────────────────────────────────────
+        ImGui::PushID("Splitter");  // isolate its ID
+        ImGui::InvisibleButton("##SplitDrag", ImVec2(-1, splitter_thickness));
+        bool hovered = ImGui::IsItemHovered();
+        bool active = ImGui::IsItemActive();
+        if (hovered || active)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+
+        // while dragging, adjust bottom height
+        if (active)
+            bottom_pane_height -= ImGui::GetIO().MouseDelta.y;
+        // clamp again just in case
+        bottom_pane_height = std::min(std::max(bottom_pane_height, min_h), max_h);
+        ImGui::PopID();
+
+        // draw a filled splitter band + center line for accent
+        ImVec2 min = ImGui::GetItemRectMin();
+        ImVec2 max = ImGui::GetItemRectMax();
+        ImU32 bg_col = ImGui::GetColorU32(active ? ImGuiCol_SeparatorActive
+            : hovered ? ImGuiCol_SeparatorHovered
+            : ImGuiCol_Separator);
+        ImGui::GetWindowDrawList()->AddRectFilled(min, max, bg_col);
+        float y = (min.y + max.y) * 0.5f;
+        ImGui::GetWindowDrawList()
+            ->AddLine({ min.x, y }, { max.x, y }, ImGui::GetColorU32(ImGuiCol_SeparatorActive));
+
+        // ─── BOTTOM PANE ───────────────────────────────────────────
+        ImGui::BeginChild("##BottomPane", ImVec2(0, bottom_pane_height), true);
+        if (ImGui::Button("Load")) { /* ... */ }
+        ImGui::SameLine();
+        if (ImGui::Button("Unload")) { /* ... */ }
+        ImGui::Separator();
+        ImGui::TextUnformatted("Inspection:");
+        ImGui::TextWrapped("Select an asset above to see details here...");
+        ImGui::EndChild();
 
         ImGui::End();
     }
