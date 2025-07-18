@@ -53,7 +53,7 @@ bool Game::init()
         using ModelRef = eeng::AssetRef<eeng::mock::Model>;
         // Requires ResourceManager to be TS
         std::cout << "Importing assets recursively..." << std::endl;
-        const int numTasks = 256;
+        const int numTasks = 10;
         std::vector<std::future<ModelRef>> futures;
         for (int i = 0; i < numTasks; ++i)
         {
@@ -135,15 +135,16 @@ bool Game::init()
             }
         }
 
-    // 5. UNLOAD assets (concurrently)
-    //      CAN BE MADE TS // storage->get_ref - NOT TS
-    //      
+        // 5. UNLOAD assets (concurrently)
+        //      CAN BE MADE TS // storage->get_ref - NOT TS
+        //      
         std::cout << "Unloading assets..." << std::endl;
         for (auto& ref : refs) resource_manager.unload(ref);
 
         // GUI: import. load, unload, unimport ...
     }
 
+#if 0
     // Thread pool test 1
     {
         std::cout << "Thread pool test 1..." << std::endl;
@@ -198,6 +199,8 @@ bool Game::init()
         // 3) All tasks are done; ThreadPool destructor will shut down workers
 
     }
+#endif
+#if 0
     // Thread test 2
     {
         std::cout << "Thread pool test 2..." << std::endl;
@@ -228,6 +231,8 @@ bool Game::init()
         worker.join();
         // return 0;
     }
+#endif
+#if 0
     // Thread test 3
     {
         std::cout << "Thread pool test 3..." << std::endl;
@@ -251,9 +256,10 @@ bool Game::init()
         // 5) Clean up
         worker.join();
     }
+#endif
 
     // RESOURCE REGISTRY TEST
-#if 1
+#if 0
     {
         EENG_LOG(ctx, "Storage test begins");
         eeng::Storage storage; // <- Engine API
