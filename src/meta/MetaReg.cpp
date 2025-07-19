@@ -96,27 +96,9 @@ namespace eeng {
 
     namespace
     {
-        // class AssetDatabase;
-
-        // template<typename T>
-        // void serialize_handle(
-        //     const Handle<T>& handle,
-        //     nlohmann::json& j,
-        //     AssetDatabase& adb)
-        // {
-        //     Guid guid = adb.get_guid(handle);
-        //     j = guid.to_string();
-        // }
-
-        // template<typename T>
-        // void deserialize_handle(
-        //     Handle<T>& handle,
-        //     const nlohmann::json& j,
-        //     AssetDatabase& registry)
-        // {
-        //     Guid guid = Guid::from_string(j.get<std::string>());
-        //     handle = registry.get_or_load<T>(guid);
-        // }
+        //
+        // Standard asset meta functions
+        //
 
         template<class T>
         void assure_storage(eeng::Storage& storage)
@@ -124,6 +106,8 @@ namespace eeng {
             storage.assure_storage<T>();
         }
 
+        // For meta-based loading
+        // Will bypass any existing owners of the asset guid
         template<class T>
         void load_asset(const Guid& guid, EngineContext& ctx)
         {
@@ -131,6 +115,8 @@ namespace eeng {
             static_cast<ResourceManager&>(*ctx.resource_manager).load(ref, ctx);
         }
 
+        // For meta-based unloading
+        // Will bypass any existing owners of the asset guid
         template<class T>
         void unload_asset(const Guid& guid, EngineContext& ctx)
         {
@@ -142,19 +128,6 @@ namespace eeng {
                 throw std::runtime_error("Failed to reconstruct AssetRef<T> for GUID: " + guid.to_string());
             }
         }
-
-        // template<typename T>
-        // void register_handle(const std::string& name)
-        // {
-        //     using handle_type = Handle<T>;
-
-        //     entt::meta_factory<handle_type>()
-        //         .type(entt::hashed_string{ name.c_str() })
-        //         //.type(entt::hashed_string::value(name.c_str()))
-        //         // .template func<&serialize_handle<T>>("serialize"_hs)
-        //         // .template func<&deserialize_handle<T>>("deserialize"_hs)
-        //         ;
-        // }
 
         template<typename T>
         void register_resource(/*const std::string& name*/)
@@ -212,16 +185,6 @@ namespace eeng {
             assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
             *ptr = Guid{ j.get<uint64_t>() };
         }
-        // void serialize_Guid(nlohmann::json& j, const void* ptr)
-        // {
-        //     j = static_cast<const Guid*>(ptr)->raw();
-        // }
-
-        // void deserialize_Guid(const nlohmann::json& j, void* ptr)
-        // {
-        //     *static_cast<Guid*>(ptr) = Guid{ j.get<uint64_t>() };
-        // }
-
     } // namespace
 
     void register_meta_types()

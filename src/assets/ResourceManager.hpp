@@ -49,22 +49,24 @@ namespace eeng
         // Out-of-line dtor: ensures Storage & AssetIndex are complete when deleted
         ~ResourceManager();
 
-        const Storage& storage() const;
-        Storage& storage();
-
-        const AssetIndex& asset_index() const;
-        AssetIndex& asset_index();
-
-        std::string to_string() const override;
-
-        void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
-
         bool is_scanning() const override;
 
         /// @brief Get a snapshot of the asset index
         /// @return std::vector<AssetEntry>
         // std::vector<AssetEntry> get_asset_entries_snapshot() const override;
         AssetIndexDataPtr get_index_data() const override;
+
+        std::string to_string() const override;
+
+        const Storage& storage() const;
+        Storage& storage();
+
+        const AssetIndex& asset_index() const;
+        AssetIndex& asset_index();
+
+        void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
+
+
 
         // --- Typed file / unfile ---------------------------------------------
 
@@ -112,19 +114,13 @@ namespace eeng
             if (ref.is_loaded()) //return;
                 throw std::runtime_error("Asset already loaded for " + ref.get_guid().to_string());
 
-            // std::cout << "[ResourceManager] Loading type: " << typeid(T).name()
-            //     << ", guid = " << ref.guid.to_string() << "\n";
-
-            // 1. Deserialize from disk
             T asset = asset_index_->deserialize_from_file<T>(ref.guid, ctx);
 
-            // 2. Recursively load dependencies
             visit_assets(asset, [&](auto& subref)
                 {
                     load(subref, ctx); // Recursively load children
                 });
 
-            // 3. Add to storage
             ref.handle = storage_->add<T>(std::move(asset), ref.guid);
         }
 
@@ -133,30 +129,16 @@ namespace eeng
         {
             if (!ref.is_loaded()) return; //throw std::runtime_error("Asset not loaded");
 
-#if 1
-            // TS - will NOT deadlock due to recursive mutex
             storage_->modify(ref.handle, [&](T& t)
                 {
                     visit_assets(t, [&](auto& subref)
                         {
-                            if (subref.is_loaded()) unload(subref, ctx);
+                            unload(subref, ctx);
                         });
                 });
-#endif
-#if 0
-            // NON-TS (storage->get_ref)
-            T& t = storage->get_ref(ref.handle);
-            visit_assets(t, [&](auto& subref)
-                {
-                    if (subref.is_loaded()) unload(subref);
-                });
-#endif
 
-            // 3. Release the resource and clear the handle
             storage_->release(ref.handle); // TS
             ref.unload();
-
-            // std::cout << "unloaded " << storage_->to_string() << std::endl;
         }
 
         // --- Meta based load / unload ----------------------------------------
