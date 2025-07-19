@@ -109,7 +109,8 @@ namespace eeng
         template<typename T>
         void load(AssetRef<T>& ref, EngineContext& ctx)
         {
-            if (ref.is_loaded()) return;
+            if (ref.is_loaded()) //return;
+                throw std::runtime_error("Asset already loaded for " + ref.get_guid().to_string());
 
             // std::cout << "[ResourceManager] Loading type: " << typeid(T).name()
             //     << ", guid = " << ref.guid.to_string() << "\n";
@@ -130,7 +131,7 @@ namespace eeng
         template<typename T>
         void unload(AssetRef<T>& ref, EngineContext& ctx)
         {
-            if (!ref.is_loaded()) throw std::runtime_error("Asset not loaded");
+            if (!ref.is_loaded()) return; //throw std::runtime_error("Asset not loaded");
 
 #if 1
             // TS - will NOT deadlock due to recursive mutex
@@ -163,6 +164,18 @@ namespace eeng
         void load(const Guid& guid, EngineContext& ctx);
 
         void unload(const Guid& guid, EngineContext& ctx);
+
+        // --- Helpers ---------------------------------------------------------
+
+        template<typename T>
+        std::optional<AssetRef<T>> ref_for_guid(const Guid& guid)
+        {
+            if (auto meta_handle = storage_->handle_for_guid(guid)) {
+                if (auto handle = meta_handle->cast<T>())
+                    return AssetRef<T>{ guid, * handle };
+            }
+            return std::nullopt;
+        }
 
     };
 } // namespace eeng
