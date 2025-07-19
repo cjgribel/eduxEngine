@@ -9,11 +9,14 @@ using namespace entt::literals;
 
 namespace eeng::literals
 {
-    constexpr entt::hashed_string to_string_hs      = "to_string"_hs;       // unused
-    constexpr entt::hashed_string clone_hs          = "clone"_hs;           // unused
-    constexpr entt::hashed_string serialize_hs      = "serialize"_hs;
-    constexpr entt::hashed_string deserialize_hs    = "deserialize"_hs;
-    constexpr entt::hashed_string inspect_hs        = "inspect"_hs;         // unused
+    constexpr entt::hashed_string to_string_hs = "to_string"_hs;       // unused
+    constexpr entt::hashed_string clone_hs = "clone"_hs;           // unused
+    constexpr entt::hashed_string serialize_hs = "serialize"_hs;
+    constexpr entt::hashed_string deserialize_hs = "deserialize"_hs;
+    constexpr entt::hashed_string inspect_hs = "inspect"_hs;         // unused
     constexpr entt::hashed_string assure_storage_hs = "assure_storage"_hs;
+
+    constexpr entt::hashed_string load_asset_hs = "load_asset"_hs;
+    constexpr entt::hashed_string unload_asset_hs = "unload_asset"_hs;
 }
 #endif // MetaLiterals_h

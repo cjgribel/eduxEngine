@@ -99,47 +99,67 @@ bool Game::init()
         }
 
         // 4. LOAD assets concurrently
-        //
-        EENG_LOG(ctx, "[Game::init()] Loading assets...");
-        // for (auto& ref : refs) resource_manager.load(ref, *ctx);
-        // CONCURRENTLY
-        std::vector<std::future<void>> load_futures;
-        for (auto& ref : refs) {
-            load_futures.emplace_back(
-                ctx->thread_pool->queue_task([this, &resource_manager, &ref]() {
-                    resource_manager.load(ref, *ctx);
-                    })
-            );
-        }
-        // Wait for all loads to finish
-        for (auto& future : load_futures) future.get();
-        // Verify content
-        EENG_LOG(ctx, "[Game::init()] Loaded %zu assets", refs.size());
-        for (const auto& ref : refs)
+#if 0
+//
         {
-            assert(ref.is_loaded());
-            EENG_LOG(ctx, "  - Model .. with guid %s",
-                // m.to_string().c_str(),
-                ref.get_guid().to_string().c_str());
-            auto m = resource_manager.storage().get_ref<eeng::mock::Model>(ref.get_handle());
-            for (const auto& mesh_ref : m.meshes)
+            EENG_LOG(ctx, "[Game::init()] Loading assets...");
+            // for (auto& ref : refs) resource_manager.load(ref, *ctx);
+            // CONCURRENTLY
+            std::vector<std::future<void>> load_futures;
+            for (auto& ref : refs) {
+                load_futures.emplace_back(
+                    ctx->thread_pool->queue_task([this, &resource_manager, &ref]() {
+                        resource_manager.load(ref, *ctx);
+                        })
+                );
+            }
+            // Wait for all loads to finish
+            for (auto& future : load_futures) future.get();
+            // Verify content
+            EENG_LOG(ctx, "[Game::init()] Loaded %zu assets", refs.size());
+            for (const auto& ref : refs)
             {
-                assert(mesh_ref.is_loaded());
-                auto mesh = resource_manager.storage().get_ref<eeng::mock::Mesh>(mesh_ref.get_handle());
-                EENG_LOG(ctx, "  - Mesh .. with guid %s",
-                    // mesh.get()->to_string().c_str(),
-                    mesh_ref.get_guid().to_string().c_str());
-                assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
-                for (const auto& v : mesh.vertices)
-                    EENG_LOG(ctx, "    - Vertex: %f", v);
+                assert(ref.is_loaded());
+                EENG_LOG(ctx, "  - Model .. with guid %s",
+                    // m.to_string().c_str(),
+                    ref.get_guid().to_string().c_str());
+                auto m = resource_manager.storage().get_ref<eeng::mock::Model>(ref.get_handle());
+                for (const auto& mesh_ref : m.meshes)
+                {
+                    assert(mesh_ref.is_loaded());
+                    auto mesh = resource_manager.storage().get_ref<eeng::mock::Mesh>(mesh_ref.get_handle());
+                    EENG_LOG(ctx, "  - Mesh .. with guid %s",
+                        // mesh.get()->to_string().c_str(),
+                        mesh_ref.get_guid().to_string().c_str());
+                    assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
+                    for (const auto& v : mesh.vertices)
+                        EENG_LOG(ctx, "    - Vertex: %f", v);
+                }
             }
         }
+#endif
 
         // 5. UNLOAD assets (concurrently)
         //      CAN BE MADE TS // storage->get_ref - NOT TS
         //      
-        std::cout << "Unloading assets..." << std::endl;
-        for (auto& ref : refs) resource_manager.unload(ref);
+#if 0
+        {
+            std::cout << "Unloading assets..." << std::endl;
+            // SERIALLY
+            //for (auto& ref : refs) resource_manager.unload(ref);
+            // CONCURRENTLY
+            std::vector<std::future<void>> load_futures;
+            for (auto& ref : refs) {
+                load_futures.emplace_back(
+                    ctx->thread_pool->queue_task([this, &resource_manager, &ref]() {
+                        resource_manager.unload(ref, *ctx);
+                        })
+                );
+            }
+            // Wait for all loads to finish
+            for (auto& future : load_futures) future.get();
+        }
+#endif
 
         // GUI: import. load, unload, unimport ...
     }
@@ -198,7 +218,7 @@ bool Game::init()
 
         // 3) All tasks are done; ThreadPool destructor will shut down workers
 
-    }
+}
 #endif
 #if 0
     // Thread test 2
@@ -659,7 +679,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-    }
+}
 #endif
 
     // Draw shape batches

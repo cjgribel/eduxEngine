@@ -31,6 +31,11 @@ namespace eeng::editor
             );
         }
 
+        size_t count() const
+        {
+            return items.size();
+        }
+
         // Check if an item is selected
         bool contains(const T& item) const
         {

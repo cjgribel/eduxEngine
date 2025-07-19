@@ -324,9 +324,31 @@ namespace eeng
 
         // ─── BOTTOM PANE ───────────────────────────────────────────
         ImGui::BeginChild("##BottomPane", ImVec2(0, bottom_pane_height), true);
-        if (ImGui::Button("Load")) { /* ... */ }
+        if (ImGui::Button("Import")) { /* Import a batch of mock assets (META)  */ }
         ImGui::SameLine();
-        if (ImGui::Button("Unload")) { /* ... */ }
+        if (ImGui::Button("Unimport")) { /* ... */ }
+        ImGui::SameLine();
+        if (ImGui::Button("Load"))
+        {
+            /* Todo: load all selected assets concurrently */
+
+            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+            if (ctx.asset_selection->size() == 1) {
+                auto& selected_guid = ctx.asset_selection->first();
+                if (!resource_manager.storage().handle_for_guid(selected_guid))
+                    resource_manager.load(selected_guid, ctx);
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Unload"))
+        {
+            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+            if (ctx.asset_selection->size() == 1) {
+                const Guid& guid = ctx.asset_selection->first();
+                if (resource_manager.storage().handle_for_guid(guid))
+                    resource_manager.unload(guid, ctx);
+            }
+        }
         ImGui::Separator();
         ImGui::TextUnformatted("Inspection:");
         ImGui::TextWrapped("Select an asset above to see details here...");

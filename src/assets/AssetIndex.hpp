@@ -71,11 +71,7 @@ namespace eeng
             EngineContext& ctx) const
         {
             // std::lock_guard lock{ entries_mutex_ }; // Protect access to entries_
-
-            // auto it = std::find_if(entries_.begin(), entries_.end(), [&](const AssetEntry& entry)
-            //     {
-            //         return entry.meta.guid == guid;
-            //     });
+            
             auto entries = index_data_->entries; // atomic snapshot
             auto it = std::find_if(entries.begin(), entries.end(), [&](const AssetEntry& entry)
                 {

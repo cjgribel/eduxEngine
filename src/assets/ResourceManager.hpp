@@ -9,6 +9,7 @@
 #include "ResourceTypes.h" // For AssetRef<T>, visit_assets
 #include "AssetMetaData.hpp"
 #include "AssetRef.hpp"
+#include "MetaLiterals.h" // load_asset_hs, unload_asset_hs
 #include <string>
 #include <mutex> // std::mutex - > maybe AssetIndex
 
@@ -56,29 +57,7 @@ namespace eeng
 
         std::string to_string() const override;
 
-        void start_async_scan(
-            const std::filesystem::path& root,
-            EngineContext& ctx
-        )
-        {
-            // std::lock_guard lock{ mutex_ };
-            // ??? If concurrent - Put manager in a scanning state?
-
-            std::cout << "[ResourceManager] Scanning assets in: " << root.string() << "\n";
-            // auto asset_index = asset_index_->scan_meta_files(root, ctx);
-            asset_index_->start_async_scan(root, ctx);
-
-            // Print asset info
-#if 0
-            std::cout << "[ResourceManager] Found " << asset_index.size() << " assets:\n";
-            for (const auto& entry : asset_index)
-            {
-                std::cout << "  - " << entry.meta.name << " ("
-                    << entry.meta.type_name << ") at "
-                    << entry.relative_path.string() << "\n";
-            }
-#endif
-        }
+        void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
 
         bool is_scanning() const override;
 
@@ -86,6 +65,8 @@ namespace eeng
         /// @return std::vector<AssetEntry>
         // std::vector<AssetEntry> get_asset_entries_snapshot() const override;
         AssetIndexDataPtr get_index_data() const override;
+
+        // --- Typed file / unfile ---------------------------------------------
 
         // Must be thread-safe. Use static types, or lock meta paths.
         /// @brief Import new resource to resource index
@@ -123,13 +104,15 @@ namespace eeng
             //unload(ref); // optional: remove from memory too
         }
 
+        // --- Typed load / unload ---------------------------------------------
+
         template<typename T>
         void load(AssetRef<T>& ref, EngineContext& ctx)
         {
             if (ref.is_loaded()) return;
 
-            std::cout << "[ResourceManager] Loading type: " << typeid(T).name()
-                << ", guid = " << ref.guid.to_string() << "\n";
+            // std::cout << "[ResourceManager] Loading type: " << typeid(T).name()
+            //     << ", guid = " << ref.guid.to_string() << "\n";
 
             // 1. Deserialize from disk
             T asset = asset_index_->deserialize_from_file<T>(ref.guid, ctx);
@@ -144,19 +127,18 @@ namespace eeng
             ref.handle = storage_->add<T>(std::move(asset), ref.guid);
         }
 
-        // Not thread-safe (storage->get_ref)
         template<typename T>
-        void unload(AssetRef<T>& ref)
+        void unload(AssetRef<T>& ref, EngineContext& ctx)
         {
             if (!ref.is_loaded()) throw std::runtime_error("Asset not loaded");
 
 #if 1
             // TS - will NOT deadlock due to recursive mutex
-            storage_->modify(ref.handle, [this](T& t)
+            storage_->modify(ref.handle, [&](T& t)
                 {
-                    visit_assets(t, [this](auto& subref)
+                    visit_assets(t, [&](auto& subref)
                         {
-                            if (subref.is_loaded()) unload(subref);
+                            if (subref.is_loaded()) unload(subref, ctx);
                         });
                 });
 #endif
@@ -173,22 +155,14 @@ namespace eeng
             storage_->release(ref.handle); // TS
             ref.unload();
 
-            std::cout << storage_->to_string() << std::endl;
+            // std::cout << "unloaded " << storage_->to_string() << std::endl;
         }
+
+        // --- Meta based load / unload ----------------------------------------
+
+        void load(const Guid& guid, EngineContext& ctx);
+
+        void unload(const Guid& guid, EngineContext& ctx);
+
     };
-
-#if 0
-    // Read
-    std::vector<AssetInfo> list_assets_of_type(entt::meta_type);
-    AssetInfo get_asset_info(Guid guid);
-    bool is_loaded(Guid guid);
-    entt::meta_any get_loaded_resource(Guid guid);
-
-    // Write
-    bool import_resource(const std::filesystem::path& source);
-    bool reimport_resource(Guid guid);
-    Guid load_resource(Guid guid);
-    void unload_resource(Guid guid);
-    bool serialize_resource(Guid guid);
-#endif
 } // namespace eeng

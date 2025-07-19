@@ -699,7 +699,7 @@ namespace eeng
         template<typename T>
         entt::id_type assure_storage()
         {
-            auto meta_type = entt::resolve<T>();
+            //auto meta_type = entt::resolve<T>();
             entt::id_type meta_id = get_id_type<T>();
 
             if (pools.find(meta_id) == pools.end())

@@ -25,7 +25,16 @@ namespace eeng
 
         virtual bool is_scanning() const = 0;
         virtual AssetIndexDataPtr get_index_data() const = 0;
-        // virtual std::vector<AssetEntry> get_asset_entries_snapshot() const = 0;
+
+        // Can be added
+        // const Storage& storage() const;
+        // Storage& storage();
+        // const AssetIndex& asset_index() const;
+        // AssetIndex& asset_index();
+        // void start_async_scan(const std::filesystem::path& root,EngineContext& ctx);
+
+        // Not part of abstract API:
+        // 
 
         virtual std::string to_string() const = 0;
         virtual ~IResourceManager() = default;

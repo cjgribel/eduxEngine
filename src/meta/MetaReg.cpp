@@ -11,7 +11,8 @@
 #include "MetaLiterals.h"
 #include "Storage.hpp"
 #include "MetaInfo.h"
-#include "IResourceManager.hpp" // For AssetRef<T>, AssetMetaData
+// #include "IResourceManager.hpp" 
+#include "ResourceManager.hpp" // For AssetRef<T>, AssetMetaData, ResourceManager::load<>/unload
 
 #include "MockImporter.hpp" // For mock types
 
@@ -123,6 +124,25 @@ namespace eeng {
             storage.assure_storage<T>();
         }
 
+        template<class T>
+        void load_asset(const Guid& guid, EngineContext& ctx)
+        {
+            AssetRef<T> ref{ guid };
+            static_cast<ResourceManager&>(*ctx.resource_manager).load(ref, ctx);
+        }
+
+        template<class T>
+        void unload_asset(const Guid& guid, EngineContext& ctx)
+        {
+            // AssetRef<T> ref{ guid };
+            // static_cast<ResourceManager&>(*ctx.resource_manager).unload(ref, ctx);
+
+            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+            auto handle = resource_manager.storage().handle_for_guid(guid).value().cast<T>().value();
+            AssetRef<T> ref{ guid, handle };
+            resource_manager.unload(ref, ctx);
+        }
+
         // template<typename T>
         // void register_handle(const std::string& name)
         // {
@@ -143,7 +163,12 @@ namespace eeng {
             // constexpr auto id    = entt::type_hash<T>::value();
 
             entt::meta_factory<T>()
+                // Assuring type storage
                 .template func<&assure_storage<T>>(eeng::literals::assure_storage_hs)
+                // Type-safe load
+                .template func<&load_asset<T>>(eeng::literals::load_asset_hs)
+                // Type-safe unload
+                .template func<&unload_asset<T>>(eeng::literals::unload_asset_hs)
                 ;
 
             // Caution: this name will include namespaces
