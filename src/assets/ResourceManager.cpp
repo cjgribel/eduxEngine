@@ -13,6 +13,21 @@ namespace eeng
     {
     }
 
+    bool ResourceManager::is_scanning() const
+    {
+        return asset_index_->is_scanning();
+    }
+
+    AssetIndexDataPtr ResourceManager::get_index_data() const
+    {
+        return asset_index_->get_index_data();
+    }
+
+    std::string ResourceManager::to_string() const
+    {
+        return storage_->to_string();
+    }
+
     const Storage& ResourceManager::storage() const
     {
         return *storage_;
@@ -39,8 +54,7 @@ namespace eeng
     )
     {
         // std::lock_guard lock{ mutex_ };
-        // ??? If concurrent - Put manager in a scanning state?
-
+        
         std::cout << "[ResourceManager] Scanning assets in: " << root.string() << "\n";
         // auto asset_index = asset_index_->scan_meta_files(root, ctx);
         asset_index_->start_async_scan(root, ctx);
@@ -57,35 +71,23 @@ namespace eeng
 #endif
     }
 
-    bool ResourceManager::is_scanning() const
-    {
-        return asset_index_->is_scanning();
-    }
-
-    /// @brief Get a snapshot of the asset index
-    /// @return std::vector<AssetEntry>
-    // std::vector<AssetEntry> ResourceManager::get_asset_entries_snapshot() const
-    // {
-    //     std::lock_guard lock{ mutex_ }; // Is this needed?
-    //     return asset_index_->get_entries_snapshot();
-    // }
-
-    AssetIndexDataPtr ResourceManager::get_index_data() const
-    {
-        return asset_index_->get_index_data();
-    }
-
-    std::string ResourceManager::to_string() const
-    {
-        return storage_->to_string();
-    }
-
     ResourceManager::~ResourceManager() = default;
 
     void ResourceManager::load(const Guid& guid, EngineContext& ctx)
     {
         if (storage_->handle_for_guid(guid))
             throw std::runtime_error("Asset already loaded for " + guid.to_string());
+
+        // AssetEntry const* ResourceManager::entry_for_guid(const Guid & guid) const
+        // {
+        //     auto index_data = asset_index_->get_index_data();
+        //     auto it = index_data->by_guid.find(guid);
+        //     return (it != index_data->by_guid.end()) ? it->second : nullptr;
+        // }
+        // auto entry = entry_for_guid(guid);
+        // if (!entry) throw ...;
+        // auto type = entt::resolve(...);
+        // auto fn = type.func(...);
 
         auto index_data = asset_index_->get_index_data();
 
