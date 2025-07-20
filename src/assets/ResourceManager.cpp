@@ -3,6 +3,8 @@
 
 #include "ResourceManager.hpp"
 #include "AssetIndex.hpp"
+#include "ThreadPool.hpp"
+// #include <async>
 // #include "Storage.hpp"
 
 namespace eeng
@@ -11,6 +13,99 @@ namespace eeng
         : storage_(std::make_unique<Storage>())
         , asset_index_(std::make_unique<AssetIndex>())
     {
+    }
+
+    AssetStatus ResourceManager::get_status(const Guid& guid) const
+    {
+        std::lock_guard lock(status_mutex_);
+        auto it = statuses_.find(guid);
+        if (it != statuses_.end())
+            return it->second;
+        return AssetStatus{};
+    }
+
+    std::future<void> ResourceManager::load_async(const Guid& guid, EngineContext& ctx)
+    {
+        {
+            std::lock_guard lock(status_mutex_);
+            auto& status = statuses_[guid];
+
+            if (status.state == LoadState::Loaded || status.state == LoadState::Loading)
+            {
+                ++status.ref_count;
+                return std::async(std::launch::deferred, [] {});
+            }
+            status.state = LoadState::Loading;
+            status.ref_count = 1;
+        }
+
+        return ctx.thread_pool->queue_task([=, this, &ctx]() {
+            try {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
+                this->load(guid, ctx); // loads recursively
+                std::lock_guard lock(status_mutex_);
+                statuses_[guid].state = LoadState::Loaded;
+            }
+            catch (const std::exception& ex) {
+                std::lock_guard lock(status_mutex_);
+                statuses_[guid].state = LoadState::Failed;
+                statuses_[guid].error_message = ex.what();
+            }
+            });
+    }
+
+    std::future<void> ResourceManager::unload_async(const Guid& guid, EngineContext& ctx)
+    {
+        {
+            std::lock_guard lock(status_mutex_);
+            auto& status = statuses_[guid];
+
+            if (status.ref_count == 0) {
+                EENG_LOG(&ctx, "unload_async: ref_count already 0");
+                return std::async(std::launch::deferred, [] {});
+            }
+
+            if (status.state == LoadState::Loading) {
+                EENG_LOG(&ctx, "unload_async: can't unload asset while it's loading");
+                return std::async(std::launch::deferred, [] {});
+            }
+
+            if (--status.ref_count > 0) {
+                return std::async(std::launch::deferred, [] {});
+            }
+        }
+
+        return ctx.thread_pool->queue_task([guid, this, &ctx]() {
+            try {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
+                this->unload(guid, ctx); // unloads recursively
+                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
+                std::lock_guard lock(status_mutex_);
+                statuses_.erase(guid); // or set state = Unloaded
+            }
+            catch (const std::exception& ex) {
+                std::lock_guard lock(status_mutex_);
+                statuses_[guid].state = LoadState::Failed;
+                statuses_[guid].error_message = ex.what();
+            }
+            });
+    }
+
+    void ResourceManager::retain_guid(const Guid& guid)
+    {
+        std::lock_guard lock(status_mutex_);
+        statuses_[guid].ref_count++;
+    }
+
+    void ResourceManager::release_guid(const Guid& guid, EngineContext& ctx)
+    {
+        std::lock_guard lock(status_mutex_);
+        auto& status = statuses_[guid];
+        if (--status.ref_count <= 0) {
+            // unload when no more references
+            // unload_async(guid, ctx);
+            statuses_.erase(guid);
+        }
     }
 
     bool ResourceManager::is_scanning() const
@@ -54,7 +149,7 @@ namespace eeng
     )
     {
         // std::lock_guard lock{ mutex_ };
-        
+
         std::cout << "[ResourceManager] Scanning assets in: " << root.string() << "\n";
         // auto asset_index = asset_index_->scan_meta_files(root, ctx);
         asset_index_->start_async_scan(root, ctx);

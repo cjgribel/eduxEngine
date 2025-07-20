@@ -866,7 +866,7 @@ namespace eeng
         void remove_now(const Handle<T>& h)
         {
             std::lock_guard lock{ storage_mutex };
-            get_pool<T>().remove_now_typed(h);
+            get_pool<T>().remove_now(h);
         }
 
         /// @brief Immediately destroy the resource referred to by a runtime‑typed handle (thread‑safe).

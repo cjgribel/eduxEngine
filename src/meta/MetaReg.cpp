@@ -106,6 +106,38 @@ namespace eeng {
             storage.assure_storage<T>();
         }
 
+#if 0
+        // Resolve AssetRef<> for Assets or Components
+        template<typename T>
+        void bind_refs(T& component, ResourceManager& resource_manager)
+        {
+            visit_assets(component, [&](auto& asset_ref) {
+                using AssetT = typename std::decay_t<decltype(asset_ref)>::asset_type;
+
+                auto meta_handle = resource_manager.storage().handle_for_guid(asset_ref.guid);
+                if (meta_handle) {
+                    auto handle = meta_handle->template cast<AssetT>();
+                    if (!handle)
+                        throw std::runtime_error("Failed to cast handle for asset type");
+                    asset_ref.handle = *handle;
+                }
+                else {
+                    throw std::runtime_error("Asset not loaded: " + asset_ref.guid.to_string());
+                }
+                });
+        }
+
+        // Collect referenced GUIDs for Assets or Components
+        template<typename T>
+        void collect_guids(T& component, std::unordered_set<Guid>& out_guids)
+        {
+            visit_assets(component, [&](const auto& asset_ref) {
+                out_guids.insert(asset_ref.guid);
+                });
+        }
+
+#endif
+
         // For meta-based loading
         // Will bypass any existing owners of the asset guid
         template<class T>
@@ -142,6 +174,10 @@ namespace eeng {
                 .template func<&load_asset<T>>(eeng::literals::load_asset_hs)
                 // Type-safe unload
                 .template func<&unload_asset<T>>(eeng::literals::unload_asset_hs)
+                // Bind references
+                // .func<&bind_refs<T>>("bind_assets"_hs)
+                //
+                //.func<&collect_guids<MeshRendererComponent>>("collect_asset_guids"_hs)
                 ;
 
             // Caution: this name will include namespaces

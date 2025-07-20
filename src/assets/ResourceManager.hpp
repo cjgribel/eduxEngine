@@ -42,12 +42,24 @@ namespace eeng
         std::unique_ptr<Storage>    storage_;
         std::unique_ptr<AssetIndex> asset_index_;
 
-        mutable std::mutex mutex_; // Protects asset_index_ (storage_ is thread-safe)
+        // mutable std::mutex mutex_; // Protects asset_index_ (storage_ is thread-safe)
+
+        mutable std::mutex status_mutex_;
+        std::unordered_map<Guid, AssetStatus> statuses_;
 
     public:
         ResourceManager(/* any ctor args */);
         // Out-of-line dtor: ensures Storage & AssetIndex are complete when deleted
         ~ResourceManager();
+
+#if 1
+        AssetStatus get_status(const Guid& guid) const override;
+        std::future<void> load_async(const Guid& guid, EngineContext& ctx) override;
+        std::future<void> unload_async(const Guid& guid, EngineContext& ctx) override;
+
+        void retain_guid(const Guid& guid) override;
+        void release_guid(const Guid& guid, EngineContext& ctx) override;
+#endif
 
         bool is_scanning() const override;
 
@@ -137,9 +149,47 @@ namespace eeng
                         });
                 });
 
-            storage_->release(ref.handle); // TS
+            storage_->remove_now(ref.handle); // TODO
+            //storage_->release(ref.handle); // Todo: unload directly & bypass Storage ref. count
+            
             ref.unload();
         }
+
+#if 0
+        // -----
+
+        // Probably never needed – assets are initially loaded on a meta basis
+        template<typename T>
+        void load_async(AssetRef<T>& ref, EngineContext& ctx)
+        {
+            const Guid guid = ref.guid;
+
+            {
+                std::lock_guard lock(status_mutex_);
+                auto& status = statuses_[guid];
+                if (status.state == LoadState::Loaded || status.state == LoadState::Loading)
+                    return;
+                status.state = LoadState::Loading;
+            }
+
+            ctx.thread_pool->queue_task([=, &ref, this]() mutable {
+                try {
+                    if (!ref.is_loaded()) {
+                        // This internally populates handle
+                        this->load(ref, ctx);
+                    }
+
+                    std::lock_guard lock(status_mutex_);
+                    statuses_[guid].state = LoadState::Loaded;
+                }
+                catch (const std::exception& ex) {
+                    std::lock_guard lock(status_mutex_);
+                    statuses_[guid].state = LoadState::Failed;
+                    statuses_[guid].error_message = ex.what();
+                }
+                });
+    }
+#endif
 
         // --- Meta based load / unload ----------------------------------------
 
@@ -159,5 +209,5 @@ namespace eeng
             return std::nullopt;
         }
 
-    };
+};
 } // namespace eeng

@@ -33,6 +33,10 @@ using namespace eeng;
 //     };
 // }
 
+namespace eeng {
+    struct EngineContext;
+}
+
 namespace
 {
     struct MockEntityRegistry : eeng::IEntityManager
@@ -41,12 +45,20 @@ namespace
         void destroy_entity(Entity entity) override {}
     };
 
+
     struct MockResourceManager : eeng::IResourceManager
     {
+#if 1
+        AssetStatus get_status(const Guid& guid) const override { return AssetStatus{}; }
+        std::future<void> load_async(const Guid& guid, eeng::EngineContext& ctx) override { return std::async(std::launch::deferred, [] {}); }
+        std::future<void> unload_async(const Guid& guid, EngineContext& ctx) override { return std::async(std::launch::deferred, [] {}); }
+
+        void retain_guid(const Guid& guid) override {}
+        void release_guid(const Guid& guid, eeng::EngineContext& ctx) override {}
+#endif
+
         bool is_scanning() const override { return false; }
-        //std::vector<eeng::AssetEntry> get_asset_entries_snapshot() const override { return {}; }
-        //std::shared_ptr<const std::vector<AssetEntry>> get_entries_view() const override { return nullptr; }
-        AssetIndexDataPtr get_index_data() const override { return nullptr; };
+        AssetIndexDataPtr get_index_data() const override { return nullptr; }
         std::string to_string() const override { return std::string{}; }
     };
 

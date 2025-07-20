@@ -6,12 +6,14 @@
 #include "ResourceManager.hpp"
 #include "AssetTreeViews.hpp"
 #include "engineapi/SelectionManager.hpp"
+#include "ThreadPool.hpp" // remove
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
 
 #include <algorithm>
+//#include <future>
 
 namespace eeng
 {
@@ -328,27 +330,68 @@ namespace eeng
         ImGui::SameLine();
         if (ImGui::Button("Unimport")) { /* ... */ }
         ImGui::SameLine();
+        // ->
+
+        auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+        auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         if (ImGui::Button("Load"))
         {
-            /* Todo: load all selected assets concurrently */
-
+#if 1
+            // load_async - tracks load status of guid:s
+            for (auto& guid : ctx.asset_selection->get_all()) {
+                if (content_tree.is_root(guid))
+                    resource_manager.load_async(guid, ctx);
+            }
+#endif
+#if 0
+            // NOTE
+            // - Avoid capturing references
+            // - Spamming the button causes multiple load commands
+            // - Need to: track guid:s and their load status
+            std::vector<std::future<void>> load_futures;
+            for (auto& guid : ctx.asset_selection->get_all()) {
+                load_futures.emplace_back(
+                    ctx.thread_pool->queue_task([&]() {
+                        if (content_tree.is_root(guid)) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                            resource_manager.load(guid, ctx);
+                        }
+                        })
+                );
+            }
+            //for (auto& future : load_futures) future.get(); // BLOCK AND WAIT
+#endif
+#if 0
             auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
             if (ctx.asset_selection->size() == 1) {
                 auto& selected_guid = ctx.asset_selection->first();
                 if (!resource_manager.storage().handle_for_guid(selected_guid))
                     resource_manager.load(selected_guid, ctx);
             }
+#endif
         }
         ImGui::SameLine();
         if (ImGui::Button("Unload"))
         {
+#if 1
+            // load_async - tracks load status of guid:s
+            for (auto& guid : ctx.asset_selection->get_all()) {
+                if (content_tree.is_root(guid))
+                    resource_manager.unload_async(guid, ctx);
+            }
+#endif
+#if 0
+            // Unloads ONLY IF ONE (1) IS SELECTED
             auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
             if (ctx.asset_selection->size() == 1) {
                 const Guid& guid = ctx.asset_selection->first();
                 if (resource_manager.storage().handle_for_guid(guid))
                     resource_manager.unload(guid, ctx);
             }
+#endif
         }
+
+        // <-
         ImGui::Separator();
         ImGui::TextUnformatted("Inspection:");
         ImGui::TextWrapped("Select an asset above to see details here...");
@@ -432,6 +475,14 @@ namespace eeng
                         ImGui::Text("Type: %s", entry.meta.type_name.c_str());
                         ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
                         ImGui::Text("File: %s", entry.relative_path.string().c_str());
+
+                        auto status = resource_manager.get_status(guid);
+                        switch (status.state) {
+                        case LoadState::Unloaded: ImGui::Text("Not loaded"); break;
+                        case LoadState::Loading:  ImGui::Text("Loading"); break;
+                        case LoadState::Loaded:   ImGui::Text("Loaded"); break;
+                        case LoadState::Failed:   ImGui::Text("Failed"); break;
+                        }
 
                         tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
                             {
