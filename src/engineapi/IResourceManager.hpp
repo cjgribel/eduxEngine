@@ -23,9 +23,10 @@ namespace eeng
     struct EngineContext;
 
     enum class LoadState {
-        Unloaded,
         Loading,
         Loaded,
+        Unloading,
+        Unloaded,
         Failed
     };
 

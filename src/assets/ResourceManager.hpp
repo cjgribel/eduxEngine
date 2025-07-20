@@ -123,37 +123,121 @@ namespace eeng
         template<typename T>
         void load(AssetRef<T>& ref, EngineContext& ctx)
         {
-            if (ref.is_loaded()) //return;
-                throw std::runtime_error("Asset already loaded for " + ref.get_guid().to_string());
+            // if (ref.is_loaded()) //return;
+            //     throw std::runtime_error("Asset already loaded for " + guid.to_string());
 
-            T asset = asset_index_->deserialize_from_file<T>(ref.guid, ctx);
+            const Guid& guid = ref.get_guid();
 
+            {
+                std::lock_guard lock(status_mutex_);
+                auto& status = statuses_[guid];
+
+                if (status.state == LoadState::Loaded || status.state == LoadState::Loading) {
+                    ++status.ref_count;
+                    //ref.handle = storage_->handle_for_guid(guid).value().cast<T>().value(); // Resolve existing handle
+                    ref.handle = storage_->handle_for_guid<T>(guid).value(); // Resolve existing handle
+                    return;
+                }
+
+                status.state = LoadState::Loading;
+                status.ref_count = 1;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            T asset = asset_index_->deserialize_from_file<T>(guid, ctx);
+
+#if 1
+            // Async
+            std::vector<std::future<void>> futures;
+            visit_assets(asset, [&](auto& subref) {
+                futures.emplace_back(this->load_async(subref.guid, ctx));
+                });
+            // Wait for all children to finish loading
+            for (auto& f : futures) f.get();
+
+            // Re-bind resolved handles back into the subrefs
+            // TODO: can we use bind_refs ?
+            visit_assets(asset, [&](auto& subref)
+                {
+                    // using SubT = typename std::decay_t<decltype(subref.handle)>::value_type;
+                    using SubT = decltype(subref.handle)::value_type;
+
+                    auto typed_handle = storage_->handle_for_guid<SubT>(subref.guid);
+                    if (!typed_handle)
+                        throw std::runtime_error("Failed to resolve handle for: " + subref.guid.to_string());
+
+                    subref.handle = *typed_handle;
+                });
+#else
+            // Serial
             visit_assets(asset, [&](auto& subref)
                 {
                     load(subref, ctx); // Recursively load children
                 });
+#endif
 
-            ref.handle = storage_->add<T>(std::move(asset), ref.guid);
+            ref.handle = storage_->add<T>(std::move(asset), guid);
+
+            {
+                std::lock_guard lock(status_mutex_);
+                statuses_[guid].state = LoadState::Loaded;
+            }
         }
 
         template<typename T>
         void unload(AssetRef<T>& ref, EngineContext& ctx)
         {
-            if (!ref.is_loaded()) return; //throw std::runtime_error("Asset not loaded");
+            const Guid& guid = ref.get_guid();
+            bool should_unload = false;
 
-            storage_->modify(ref.handle, [&](T& t)
-                {
-                    visit_assets(t, [&](auto& subref)
-                        {
-                            unload(subref, ctx);
+            {
+                std::lock_guard lock(status_mutex_);
+                auto& status = statuses_[guid];
+
+                if (status.state == LoadState::Loading)
+                    return; // Cannot unload while loading
+
+                if (status.ref_count == 0)
+                    return; // Already unloaded
+
+                if (--status.ref_count == 0) {
+                    status.state = LoadState::Unloading;
+                    should_unload = true;
+                }
+            }
+
+            if (!should_unload)
+                return;
+
+            if (ref.is_loaded()) // ???
+            {
+#if 1
+                std::vector<std::future<void>> futures;
+                storage_->modify(ref.handle, [&](T& asset) {
+                    visit_assets(asset, [&](auto& subref) {
+                        futures.emplace_back(this->unload_async(subref.guid, ctx));
                         });
-                });
+                    });
+                for (auto& f : futures) f.get();
+#else
+                // Serial
+                storage_->modify(ref.handle, [&](T& asset) {
+                    visit_assets(asset, [&](auto& subref) {
+                        unload(subref, ctx); // Recursively unload children
+                        });
+                    });
+#endif
 
-            storage_->remove_now(ref.handle); // TODO
-            //storage_->release(ref.handle); // Todo: unload directly & bypass Storage ref. count
-            
-            ref.unload();
-        }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                storage_->remove_now(ref.handle);
+                ref.unload();
+                        }
+
+            {
+                std::lock_guard lock(status_mutex_);
+                statuses_.erase(guid); // Optional: clean up status entry
+            }
+                    }
 
 #if 0
         // -----
@@ -188,7 +272,7 @@ namespace eeng
                     statuses_[guid].error_message = ex.what();
                 }
                 });
-    }
+        }
 #endif
 
         // --- Meta based load / unload ----------------------------------------
@@ -209,5 +293,5 @@ namespace eeng
             return std::nullopt;
         }
 
-};
-} // namespace eeng
+            };
+        } // namespace eeng

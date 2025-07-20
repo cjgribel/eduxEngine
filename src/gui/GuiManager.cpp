@@ -479,6 +479,7 @@ namespace eeng
                         auto status = resource_manager.get_status(guid);
                         switch (status.state) {
                         case LoadState::Unloaded: ImGui::Text("Not loaded"); break;
+                        case LoadState::Unloading: ImGui::Text("Unloading"); break;
                         case LoadState::Loading:  ImGui::Text("Loading"); break;
                         case LoadState::Loaded:   ImGui::Text("Loaded"); break;
                         case LoadState::Failed:   ImGui::Text("Failed"); break;

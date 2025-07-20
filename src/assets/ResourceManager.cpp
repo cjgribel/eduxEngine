@@ -26,25 +26,25 @@ namespace eeng
 
     std::future<void> ResourceManager::load_async(const Guid& guid, EngineContext& ctx)
     {
-        {
-            std::lock_guard lock(status_mutex_);
-            auto& status = statuses_[guid];
+        // {
+        //     std::lock_guard lock(status_mutex_);
+        //     auto& status = statuses_[guid];
 
-            if (status.state == LoadState::Loaded || status.state == LoadState::Loading)
-            {
-                ++status.ref_count;
-                return std::async(std::launch::deferred, [] {});
-            }
-            status.state = LoadState::Loading;
-            status.ref_count = 1;
-        }
+        //     if (status.state == LoadState::Loaded || status.state == LoadState::Loading)
+        //     {
+        //         ++status.ref_count;
+        //         return std::async(std::launch::deferred, [] {});
+        //     }
+        //     status.state = LoadState::Loading;
+        //     status.ref_count = 1;
+        // }
 
         return ctx.thread_pool->queue_task([=, this, &ctx]() {
             try {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
+                // std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
                 this->load(guid, ctx); // loads recursively
-                std::lock_guard lock(status_mutex_);
-                statuses_[guid].state = LoadState::Loaded;
+                // std::lock_guard lock(status_mutex_);
+                // statuses_[guid].state = LoadState::Loaded;
             }
             catch (const std::exception& ex) {
                 std::lock_guard lock(status_mutex_);
@@ -56,32 +56,31 @@ namespace eeng
 
     std::future<void> ResourceManager::unload_async(const Guid& guid, EngineContext& ctx)
     {
-        {
-            std::lock_guard lock(status_mutex_);
-            auto& status = statuses_[guid];
+        // {
+        //     std::lock_guard lock(status_mutex_);
+        //     auto& status = statuses_[guid];
 
-            if (status.ref_count == 0) {
-                EENG_LOG(&ctx, "unload_async: ref_count already 0");
-                return std::async(std::launch::deferred, [] {});
-            }
+        //     if (status.ref_count == 0) {
+        //         EENG_LOG(&ctx, "unload_async: ref_count already 0");
+        //         return std::async(std::launch::deferred, [] {});
+        //     }
 
-            if (status.state == LoadState::Loading) {
-                EENG_LOG(&ctx, "unload_async: can't unload asset while it's loading");
-                return std::async(std::launch::deferred, [] {});
-            }
+        //     if (status.state == LoadState::Loading) {
+        //         EENG_LOG(&ctx, "unload_async: can't unload asset while it's loading");
+        //         return std::async(std::launch::deferred, [] {});
+        //     }
 
-            if (--status.ref_count > 0) {
-                return std::async(std::launch::deferred, [] {});
-            }
-        }
+        //     if (--status.ref_count > 0) {
+        //         return std::async(std::launch::deferred, [] {});
+        //     }
+        // }
 
         return ctx.thread_pool->queue_task([guid, this, &ctx]() {
             try {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
+                // std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
                 this->unload(guid, ctx); // unloads recursively
-                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
-                std::lock_guard lock(status_mutex_);
-                statuses_.erase(guid); // or set state = Unloaded
+                // std::lock_guard lock(status_mutex_);
+                // statuses_.erase(guid); // or set state = Unloaded
             }
             catch (const std::exception& ex) {
                 std::lock_guard lock(status_mutex_);

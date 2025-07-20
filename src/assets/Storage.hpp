@@ -530,7 +530,7 @@ namespace eeng
 
             /// @brief Find the handle associated to a GUID, statically typed.
             /// @returns an empty optional if no such GUID or wrong type.
-            std::optional<Handle<T>> handle_for_guid_typed(const Guid& guid) const noexcept
+            std::optional<Handle<T>> typed_handle_for_guid(const Guid& guid) const noexcept
             {
                 std::lock_guard lock{ m_mutex };
                 auto it = m_guid_to_handle.find(guid);
@@ -954,6 +954,13 @@ namespace eeng
         }
 
         // ---------------------------------------------------------------------
+
+        template<class T>
+        std::optional<Handle<T>> handle_for_guid(const Guid& guid) const noexcept
+        {
+            std::lock_guard lock(storage_mutex);
+            return get_pool<T>().typed_handle_for_guid(guid);
+        }
 
         std::optional<MetaHandle> handle_for_guid(const Guid& guid) const noexcept
         {
