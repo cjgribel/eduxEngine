@@ -477,6 +477,7 @@ namespace eeng
                         ImGui::Text("File: %s", entry.relative_path.string().c_str());
 
                         auto status = resource_manager.get_status(guid);
+                        ImGui::Text("Ref. Count %i", status.ref_count);
                         switch (status.state) {
                         case LoadState::Unloaded: ImGui::Text("Not loaded"); break;
                         case LoadState::Unloading: ImGui::Text("Unloading"); break;

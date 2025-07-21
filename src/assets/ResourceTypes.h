@@ -76,6 +76,7 @@ namespace eeng::mock
             visitor(ref);
     }
 
+    // Used by ResourceManager::file
     template<typename Visitor>
     void visit_assets(const Model& model, Visitor&& visitor)
     {

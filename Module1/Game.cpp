@@ -64,9 +64,7 @@ bool Game::init()
                     })
             );
         }
-
-        // 1b. Fetch asset references from futures
-        //
+        // BLOCK and wait
         // - get() blocks until the task is done
         // - wait_for() checks & waits for a period of time without blocking
         EENG_LOG(ctx, "[Game::init()] Wait for imports...");
@@ -98,9 +96,15 @@ bool Game::init()
             // }
         }
 
+        // 4 (NEW) Load a "level" 
+
+
         // 4. LOAD assets concurrently
+        //
+        // TODO: use load_async, if this test code remains
+        //
+        //
 #if 0
-//
         {
             EENG_LOG(ctx, "[Game::init()] Loading assets...");
             // for (auto& ref : refs) resource_manager.load(ref, *ctx);
@@ -218,7 +222,7 @@ bool Game::init()
 
         // 3) All tasks are done; ThreadPool destructor will shut down workers
 
-}
+    }
 #endif
 #if 0
     // Thread test 2
@@ -679,7 +683,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-}
+    }
 #endif
 
     // Draw shape batches

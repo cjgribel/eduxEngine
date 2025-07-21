@@ -96,7 +96,7 @@ namespace eeng
         {
             // EENG_LOG("[ResourceManager] Filing type: %s", typeid(T).name());
 
-            // Add contained assets
+            // Add contained assets, note that t is const
             auto _meta = meta;
             visit_assets(t, [&](const auto& ref)
                 {
@@ -135,6 +135,7 @@ namespace eeng
                 if (status.state == LoadState::Loaded || status.state == LoadState::Loading) {
                     ++status.ref_count;
                     //ref.handle = storage_->handle_for_guid(guid).value().cast<T>().value(); // Resolve existing handle
+                    // THIS HANDLE ONLY CAPTURED BY A TEMP IN the load_asset<> meta func.
                     ref.handle = storage_->handle_for_guid<T>(guid).value(); // Resolve existing handle
                     return;
                 }
