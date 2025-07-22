@@ -156,8 +156,8 @@ namespace eeng {
             // Just forward?
             // static_cast<ResourceManager&>(*ctx.resource_manager).load<T>(guid, ctx);
 
-            AssetRef<T> ref{ guid }; // skip
-            static_cast<ResourceManager&>(*ctx.resource_manager).load(ref, ctx);
+            // AssetRef<T> ref{ guid }; // skip
+            static_cast<ResourceManager&>(*ctx.resource_manager).load_asset<T>(guid, ctx);
         }
 
         // For meta-based unloading
@@ -166,16 +166,16 @@ namespace eeng {
         void unload_asset(const Guid& guid, EngineContext& ctx)
         {
             // Just forward?
-            // static_cast<ResourceManager&>(*ctx.resource_manager).unload<T>(guid, ctx);
+            static_cast<ResourceManager&>(*ctx.resource_manager).unload_asset<T>(guid, ctx);
             // -> make ref_for_guid private
 
-            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
-            if (auto ref_opt = resource_manager.ref_for_guid<T>(guid)) {
-                resource_manager.unload(*ref_opt, ctx);
-            }
-            else {
-                throw std::runtime_error("Failed to reconstruct AssetRef<T> for GUID: " + guid.to_string());
-            }
+            // auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+            // if (auto ref_opt = resource_manager.ref_for_guid<T>(guid)) {
+            //     resource_manager.unload(*ref_opt, ctx);
+            // }
+            // else {
+            //     throw std::runtime_error("Failed to reconstruct AssetRef<T> for GUID: " + guid.to_string());
+            // }
         }
 
         template<class T>

@@ -338,9 +338,20 @@ namespace eeng
         {
 #if 1
             // load_async - tracks load status of guid:s
+            // TODO: Check futures
+            std::vector<std::future<bool>> futures;
             for (auto& guid : ctx.asset_selection->get_all()) {
                 if (content_tree.is_root(guid))
-                    resource_manager.load_async(guid, ctx);
+                    futures.emplace_back(resource_manager.load_async(guid, ctx));
+            }
+            for (auto& f : futures)
+            {
+                if (!f.get()) // 👈 Child failed to load
+                    throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
+            }
+            for (auto& guid : ctx.asset_selection->get_all()) {
+                if (content_tree.is_root(guid)) // ????
+                    resource_manager.bind_asset_async(guid, ctx);
             }
 #endif
 #if 0
@@ -369,7 +380,7 @@ namespace eeng
                     resource_manager.load(selected_guid, ctx);
             }
 #endif
-        }
+            }
         ImGui::SameLine();
         if (ImGui::Button("Unload"))
         {
@@ -398,7 +409,7 @@ namespace eeng
         ImGui::EndChild();
 
         ImGui::End();
-    }
+        }
 
     void GuiManager::draw_content_tree(EngineContext& ctx) const
     {
@@ -425,6 +436,7 @@ namespace eeng
             draw_node_recursive = [&](size_t node_idx)
                 {
                     const Guid& guid = tree.get_payload_at(node_idx);
+                    auto guid_status = resource_manager.get_status(guid);
 
                     // Get asset entry = meta data + paths
                     auto it = index_data->by_guid.find(guid);
@@ -434,6 +446,7 @@ namespace eeng
                     // Asset loaded status
                     // TODO: This is REFERENCED status, not LOADED status
                     //      Use resource_manager.get_status(guid)
+//                    bool is_loaded = guid_status.state == LoadState::Loaded ? true : false;
                     bool is_loaded = false;
                     if (auto maybe_handle = storage.handle_for_guid(guid))
                     {
@@ -478,15 +491,16 @@ namespace eeng
                         ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
                         ImGui::Text("File: %s", entry.relative_path.string().c_str());
 
-                        auto status = resource_manager.get_status(guid);
-                        ImGui::Text("Ref. Count %i", status.ref_count);
-                        switch (status.state) {
+                        ImGui::Text("Ref. Count %i", guid_status.ref_count);
+                        switch (guid_status.state) {
                         case LoadState::Unloaded: ImGui::Text("Not loaded"); break;
                         case LoadState::Unloading: ImGui::Text("Unloading"); break;
                         case LoadState::Loading:  ImGui::Text("Loading"); break;
                         case LoadState::Loaded:   ImGui::Text("Loaded"); break;
                         case LoadState::Failed:   ImGui::Text("Failed"); break;
                         }
+                        ImGui::SameLine();
+                        ImGui::Text("(%s)", guid_status.error_message.c_str());
 
                         tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
                             {
@@ -605,4 +619,4 @@ namespace eeng
         return it != flags.end() ? it->second : false;
     }
 
-} // namespace eeng
+    } // namespace eeng

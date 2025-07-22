@@ -24,92 +24,104 @@ namespace eeng
         return AssetStatus{};
     }
 
-    std::future<void> ResourceManager::load_async(const Guid& guid, EngineContext& ctx)
+    std::future<bool> ResourceManager::load_async(const Guid& guid, EngineContext& ctx)
     {
-        // {
-        //     std::lock_guard lock(status_mutex_);
-        //     auto& status = statuses_[guid];
+        {
+            std::lock_guard lock(status_mutex_);
+            auto& status = statuses_[guid];
 
-        //     if (status.state == LoadState::Loaded || status.state == LoadState::Loading)
-        //     {
-        //         ++status.ref_count;
-        //         return std::async(std::launch::deferred, [] {});
-        //     }
-        //     status.state = LoadState::Loading;
-        //     status.ref_count = 1;
-        // }
+            if (status.state == LoadState::Loaded || status.state == LoadState::Loading)
+            {
+                // ++status.ref_count;
+                return std::async(std::launch::deferred, [] { return false; });
+            }
+            status.state = LoadState::Loading;
+            // status.ref_count = 1;
+        }
 
         return ctx.thread_pool->queue_task([=, this, &ctx]() {
             try {
                 // std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
                 this->load(guid, ctx); // loads recursively
-                // std::lock_guard lock(status_mutex_);
-                // statuses_[guid].state = LoadState::Loaded;
+                std::lock_guard lock(status_mutex_);
+                statuses_[guid].state = LoadState::Loaded;
+                return true;
             }
             catch (const std::exception& ex) {
                 std::lock_guard lock(status_mutex_);
                 statuses_[guid].state = LoadState::Failed;
                 statuses_[guid].error_message = ex.what();
+                return false;
             }
             });
     }
 
-    std::future<void> ResourceManager::unload_async(const Guid& guid, EngineContext& ctx)
+    std::future<bool> ResourceManager::unload_async(const Guid& guid, EngineContext& ctx)
     {
-        // {
-        //     std::lock_guard lock(status_mutex_);
-        //     auto& status = statuses_[guid];
+        {
+            std::lock_guard lock(status_mutex_);
+            auto& status = statuses_[guid];
 
-        //     if (status.ref_count == 0) {
-        //         EENG_LOG(&ctx, "unload_async: ref_count already 0");
-        //         return std::async(std::launch::deferred, [] {});
-        //     }
+            // if (status.ref_count == 0) {
+            //     EENG_LOG(&ctx, "unload_async: ref_count already 0");
+            //     return std::async(std::launch::deferred, [] {});
+            // }
 
-        //     if (status.state == LoadState::Loading) {
-        //         EENG_LOG(&ctx, "unload_async: can't unload asset while it's loading");
-        //         return std::async(std::launch::deferred, [] {});
-        //     }
+            if (status.state != LoadState::Loaded) {
+                // EENG_LOG(&ctx, "unload_async: can't unload asset while it's loading");
+                return std::async(std::launch::deferred, [] { return false; });
+            }
 
-        //     if (--status.ref_count > 0) {
-        //         return std::async(std::launch::deferred, [] {});
-        //     }
-        // }
+            // if (--status.ref_count > 0) {
+            //     return std::async(std::launch::deferred, [] {});
+            // }
+
+            status.state = LoadState::Unloading;
+        }
 
         return ctx.thread_pool->queue_task([guid, this, &ctx]() {
             try {
                 // std::this_thread::sleep_for(std::chrono::milliseconds(500)); // DELAY
                 this->unload(guid, ctx); // unloads recursively
-                // std::lock_guard lock(status_mutex_);
-                // statuses_.erase(guid); // or set state = Unloaded
+                std::lock_guard lock(status_mutex_);
+                statuses_.erase(guid); // or set state = Unloaded
+                return true;
             }
             catch (const std::exception& ex) {
                 std::lock_guard lock(status_mutex_);
                 statuses_[guid].state = LoadState::Failed;
                 statuses_[guid].error_message = ex.what();
+                return false;
             }
             });
     }
 
-    std::future<void> ResourceManager::bind_asset_async(const Guid& guid, EngineContext& ctx)
+    std::future<bool> ResourceManager::bind_asset_async(const Guid& guid, EngineContext& ctx)
     {
         return ctx.thread_pool->queue_task([=, this, &ctx]() {
             try {
                 this->bind_asset(guid, ctx);
+                return true;
             }
             catch (const std::exception& ex)
             {
+                std::cout << ex.what() << std::endl;
+                return false;
             }
             });
     }
 
-    std::future<void> ResourceManager::unbind_asset_async(const Guid& guid, EngineContext& ctx)
+    std::future<bool> ResourceManager::unbind_asset_async(const Guid& guid, EngineContext& ctx)
     {
         return ctx.thread_pool->queue_task([=, this, &ctx]() {
             try {
                 this->unbind_asset(guid, ctx);
+                return true;
             }
             catch (const std::exception& ex)
             {
+                std::cout << ex.what() << std::endl;
+                return false;
             }
             });
     }

@@ -695,6 +695,13 @@ namespace eeng
 
         // ---------------------------------------------------------------------
 
+        template<typename T>
+        bool has_storage() const noexcept
+        {
+            entt::id_type meta_id = get_id_type<T>();
+            return pools.find(meta_id) != pools.end();
+        }
+
         /// Make sure a pool exists. Used by meta types. Not thread-safe.
         template<typename T>
         entt::id_type assure_storage()
@@ -959,6 +966,7 @@ namespace eeng
         std::optional<Handle<T>> handle_for_guid(const Guid& guid) const noexcept
         {
             std::lock_guard lock(storage_mutex);
+            if (!has_storage<T>()) return std::nullopt;
             return get_pool<T>().typed_handle_for_guid(guid);
         }
 

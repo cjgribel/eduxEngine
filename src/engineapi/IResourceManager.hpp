@@ -44,8 +44,8 @@ namespace eeng
 
 #if 1
         virtual AssetStatus get_status(const Guid& guid) const = 0;
-        virtual std::future<void> load_async(const Guid& guid, EngineContext& ctx) = 0;
-        virtual std::future<void> unload_async(const Guid& guid, EngineContext& ctx) = 0;
+        virtual std::future<bool> load_async(const Guid& guid, EngineContext& ctx) = 0;
+        virtual std::future<bool> unload_async(const Guid& guid, EngineContext& ctx) = 0;
 
         virtual void retain_guid(const Guid& guid) = 0;
         virtual void release_guid(const Guid& guid, EngineContext& ctx) = 0;
