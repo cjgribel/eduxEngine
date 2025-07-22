@@ -336,60 +336,45 @@ namespace eeng
         auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         if (ImGui::Button("Load"))
         {
-#if 1
             // load_async - tracks load status of guid:s
-            // TODO: Check futures
             std::vector<std::future<bool>> futures;
             for (auto& guid : ctx.asset_selection->get_all()) {
                 if (content_tree.is_root(guid))
-                    futures.emplace_back(resource_manager.load_async(guid, ctx));
+                    futures.emplace_back(resource_manager.load_asset_async(guid, ctx));
             }
             for (auto& f : futures)
             {
                 if (!f.get()) // 👈 Child failed to load
                     throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
             }
+            // Bind
             for (auto& guid : ctx.asset_selection->get_all()) {
                 if (content_tree.is_root(guid)) // ????
                     resource_manager.bind_asset_async(guid, ctx);
             }
-#endif
-#if 0
-            // NOTE
-            // - Avoid capturing references
-            // - Spamming the button causes multiple load commands
-            // - Need to: track guid:s and their load status
-            std::vector<std::future<void>> load_futures;
-            for (auto& guid : ctx.asset_selection->get_all()) {
-                load_futures.emplace_back(
-                    ctx.thread_pool->queue_task([&]() {
-                        if (content_tree.is_root(guid)) {
-                            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                            resource_manager.load(guid, ctx);
-                        }
-                        })
-                );
-            }
-            //for (auto& future : load_futures) future.get(); // BLOCK AND WAIT
-#endif
-#if 0
-            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
-            if (ctx.asset_selection->size() == 1) {
-                auto& selected_guid = ctx.asset_selection->first();
-                if (!resource_manager.storage().handle_for_guid(selected_guid))
-                    resource_manager.load(selected_guid, ctx);
-            }
-#endif
-            }
+            // Todo: Track futures
+        }
         ImGui::SameLine();
         if (ImGui::Button("Unload"))
         {
 #if 1
+            // Unbind
+            std::vector<std::future<bool>> futures;
+            for (auto& guid : ctx.asset_selection->get_all()) {
+                if (content_tree.is_root(guid))
+                    futures.emplace_back(resource_manager.unbind_asset_async(guid, ctx));
+            }
+            for (auto& f : futures)
+            {
+                if (!f.get()) // 👈 Child failed to load
+                    throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
+            }
             // load_async - tracks load status of guid:s
             for (auto& guid : ctx.asset_selection->get_all()) {
                 if (content_tree.is_root(guid))
-                    resource_manager.unload_async(guid, ctx);
+                    resource_manager.unload_asset_async(guid, ctx);
             }
+            // Todo: Track futures
 #endif
 #if 0
             // Unloads ONLY IF ONE (1) IS SELECTED
@@ -409,7 +394,7 @@ namespace eeng
         ImGui::EndChild();
 
         ImGui::End();
-        }
+    }
 
     void GuiManager::draw_content_tree(EngineContext& ctx) const
     {
@@ -499,8 +484,10 @@ namespace eeng
                         case LoadState::Loaded:   ImGui::Text("Loaded"); break;
                         case LoadState::Failed:   ImGui::Text("Failed"); break;
                         }
-                        ImGui::SameLine();
-                        ImGui::Text("(%s)", guid_status.error_message.c_str());
+                        if (guid_status.error_message.size()) {
+                            ImGui::SameLine();
+                            ImGui::Text("[%s]", guid_status.error_message.c_str());
+                        }
 
                         tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
                             {
@@ -619,4 +606,4 @@ namespace eeng
         return it != flags.end() ? it->second : false;
     }
 
-    } // namespace eeng
+} // namespace eeng

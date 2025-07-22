@@ -24,7 +24,7 @@ namespace eeng
         return AssetStatus{};
     }
 
-    std::future<bool> ResourceManager::load_async(const Guid& guid, EngineContext& ctx)
+    std::future<bool> ResourceManager::load_asset_async(const Guid& guid, EngineContext& ctx)
     {
         {
             std::lock_guard lock(status_mutex_);
@@ -56,7 +56,7 @@ namespace eeng
             });
     }
 
-    std::future<bool> ResourceManager::unload_async(const Guid& guid, EngineContext& ctx)
+    std::future<bool> ResourceManager::unload_asset_async(const Guid& guid, EngineContext& ctx)
     {
         {
             std::lock_guard lock(status_mutex_);
@@ -137,9 +137,10 @@ namespace eeng
         std::lock_guard lock(status_mutex_);
         auto& status = statuses_[guid];
         if (--status.ref_count <= 0) {
+            status.ref_count = 0;
             // unload when no more references
             // unload_async(guid, ctx);
-            statuses_.erase(guid);
+            // statuses_.erase(guid);
         }
     }
 

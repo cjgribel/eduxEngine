@@ -21,18 +21,6 @@
 
 namespace eeng
 {
-    /*
-    Avoid exposing Storage or AssetRegistry directly.
-    Instead, introduce a facade like ResourceManager or EngineAssets, that:
-    Encapsulates:
-    Storage
-    AssetRegistry
-    (maybe) a ThreadPool for loading
-
-    This layer should be thread-safe and asynchronous-aware
-    (i.e. return futures or use task submission when loading/importing).
-    */
-
     class Storage;
     class AssetIndex;
 
@@ -48,15 +36,14 @@ namespace eeng
         std::unordered_map<Guid, AssetStatus> statuses_;
 
     public:
-        ResourceManager(/* any ctor args */);
-        // Out-of-line dtor: ensures Storage & AssetIndex are complete when deleted
+        ResourceManager();
         ~ResourceManager();
 
 #if 1
         AssetStatus get_status(const Guid& guid) const override;
 
-        std::future<bool> load_async(const Guid& guid, EngineContext& ctx) override;
-        std::future<bool> unload_async(const Guid& guid, EngineContext& ctx) override;
+        std::future<bool> load_asset_async(const Guid& guid, EngineContext& ctx) override;
+        std::future<bool> unload_asset_async(const Guid& guid, EngineContext& ctx) override;
 
         std::future<bool> bind_asset_async(const Guid& guid, EngineContext& ctx);
         std::future<bool> unbind_asset_async(const Guid& guid, EngineContext& ctx);
@@ -157,7 +144,7 @@ namespace eeng
             // Load async
             std::vector<std::future<bool>> futures;
             visit_assets(asset, [&](auto& subref) {
-                futures.emplace_back(this->load_async(subref.guid, ctx));
+                futures.emplace_back(this->load_asset_async(subref.guid, ctx));
                 });
             // Wait for all children to finish loading
             // for (auto& f : futures) f.get();
@@ -237,7 +224,7 @@ namespace eeng
             std::vector<std::future<bool>> futures;
             storage_->modify(handle, [&](T& asset) {
                 visit_assets(asset, [&](auto& subref) {
-                    futures.emplace_back(this->unload_async(subref.guid, ctx));
+                    futures.emplace_back(this->unload_asset_async(subref.guid, ctx));
                     });
                 });
             // for (auto& f : futures) f.get();
