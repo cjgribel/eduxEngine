@@ -432,6 +432,8 @@ namespace eeng
                     const AssetEntry& entry = *it->second;
 
                     // Asset loaded status
+                    // TODO: This is REFERENCED status, not LOADED status
+                    //      Use resource_manager.get_status(guid)
                     bool is_loaded = false;
                     if (auto maybe_handle = storage.handle_for_guid(guid))
                     {

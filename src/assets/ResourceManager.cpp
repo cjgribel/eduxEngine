@@ -90,6 +90,30 @@ namespace eeng
             });
     }
 
+    std::future<void> ResourceManager::bind_asset_async(const Guid& guid, EngineContext& ctx)
+    {
+        return ctx.thread_pool->queue_task([=, this, &ctx]() {
+            try {
+                this->bind_asset(guid, ctx);
+            }
+            catch (const std::exception& ex)
+            {
+            }
+            });
+    }
+
+    std::future<void> ResourceManager::unbind_asset_async(const Guid& guid, EngineContext& ctx)
+    {
+        return ctx.thread_pool->queue_task([=, this, &ctx]() {
+            try {
+                this->unbind_asset(guid, ctx);
+            }
+            catch (const std::exception& ex)
+            {
+            }
+            });
+    }
+
     void ResourceManager::retain_guid(const Guid& guid)
     {
         std::lock_guard lock(status_mutex_);
@@ -163,7 +187,7 @@ namespace eeng
                 << entry.relative_path.string() << "\n";
         }
 #endif
-    }
+}
 
     ResourceManager::~ResourceManager() = default;
 
@@ -227,5 +251,51 @@ namespace eeng
 
         auto res = unload_fn.invoke({}, entt::forward_as_meta(guid), entt::forward_as_meta(ctx));
         assert(res && "Failed to invoke unload_asset");
+    }
+
+    void ResourceManager::bind_asset(const Guid& guid, EngineContext& ctx)
+    {
+        auto index_data = asset_index_->get_index_data();
+
+        auto it = index_data->by_guid.find(guid);
+        if (it == index_data->by_guid.end() || !it->second)
+            throw std::runtime_error("Asset not found for GUID: " + guid.to_string());
+
+        const auto& type_name = it->second->meta.type_name;
+
+        entt::meta_type type = entt::resolve(entt::hashed_string{ type_name.c_str() });
+        if (!type)
+            throw std::runtime_error("Type not registered: " + type_name);
+
+        auto bind_fn = type.func(literals::bind_asset_hs);
+        if (!bind_fn)
+            throw std::runtime_error("bind_refs function not registered for type: " + type_name);
+
+        auto result = bind_fn.invoke({}, entt::forward_as_meta(guid), entt::forward_as_meta(ctx));
+        if (!result)
+            throw std::runtime_error("Failed to invoke bind_asset for type: " + type_name);
+    }
+
+    void ResourceManager::unbind_asset(const Guid& guid, EngineContext& ctx)
+    {
+        auto index_data = asset_index_->get_index_data();
+
+        auto it = index_data->by_guid.find(guid);
+        if (it == index_data->by_guid.end() || !it->second)
+            throw std::runtime_error("Asset not found for GUID: " + guid.to_string());
+
+        const auto& type_name = it->second->meta.type_name;
+
+        entt::meta_type type = entt::resolve(entt::hashed_string{ type_name.c_str() });
+        if (!type)
+            throw std::runtime_error("Type not registered: " + type_name);
+
+        auto bind_fn = type.func(literals::unbind_asset_hs);
+        if (!bind_fn)
+            throw std::runtime_error("bind_refs function not registered for type: " + type_name);
+
+        auto result = bind_fn.invoke({}, entt::forward_as_meta(guid), entt::forward_as_meta(ctx));
+        if (!result)
+            throw std::runtime_error("Failed to invoke bind_asset for type: " + type_name);
     }
 }

@@ -54,8 +54,12 @@ namespace eeng
 
 #if 1
         AssetStatus get_status(const Guid& guid) const override;
+
         std::future<void> load_async(const Guid& guid, EngineContext& ctx) override;
         std::future<void> unload_async(const Guid& guid, EngineContext& ctx) override;
+
+        std::future<void> bind_asset_async(const Guid& guid, EngineContext& ctx);
+        std::future<void> unbind_asset_async(const Guid& guid, EngineContext& ctx);
 
         void retain_guid(const Guid& guid) override;
         void release_guid(const Guid& guid, EngineContext& ctx) override;
@@ -232,18 +236,81 @@ namespace eeng
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 storage_->remove_now(ref.handle);
                 ref.unload();
-                        }
+            }
 
             {
                 std::lock_guard lock(status_mutex_);
                 statuses_.erase(guid); // Optional: clean up status entry
             }
-                    }
+        }
+
+        // -----
+
+        template<class T>
+        void bind_asset(const Guid& guid, EngineContext& ctx)
+        {
+            auto maybe_ref = ref_for_guid<T>(guid);
+            if (!maybe_ref)
+                throw std::runtime_error("Asset not loaded: " + guid.to_string());
+
+            std::vector<std::future<void>> futures;
+
+            storage_->modify(maybe_ref->handle, [&](T& asset)
+                {
+                    visit_assets(asset, [&](auto& asset_ref)
+                        {
+                            using SubT = decltype(asset_ref.handle)::value_type;
+
+                            auto typed_handle = storage_->handle_for_guid<SubT>(asset_ref.guid);
+                            if (!typed_handle)
+                                throw std::runtime_error("Failed to resolve handle for: " + asset_ref.guid.to_string());
+
+                            asset_ref.handle = *typed_handle;
+
+                            // Retain and recursively bind child
+                            // retain_guid(asset_ref.guid);
+                            futures.emplace_back(this->bind_asset_async(asset_ref.guid, ctx));
+                        });
+                });
+
+            for (auto& f : futures) f.get(); // Wait for children to finish
+
+            retain_guid(guid);
+        }
+
+        template<class T>
+        void unbind_asset(const Guid& guid, EngineContext& ctx)
+        {
+            auto maybe_ref = ref_for_guid<T>(guid);
+            if (!maybe_ref)
+                return;
+
+            std::vector<std::future<void>> futures;
+
+            storage_->modify(maybe_ref->handle, [&](T& asset)
+                {
+                    visit_assets(asset, [&](auto& asset_ref)
+                        {
+                            // Clear handle (optional)
+                            asset_ref.handle = {};
+
+                            // Recurse
+                            futures.emplace_back(this->unbind_asset_async(asset_ref.guid, ctx));
+
+                            // Release
+                            // release_guid(asset_ref.guid, ctx);
+                        });
+                });
+
+            for (auto& f : futures) f.get();
+
+            release_guid(guid, ctx);
+        }
 
 #if 0
         // -----
 
-        // Probably never needed – assets are initially loaded on a meta basis
+// Probably never needed – assets are initially loaded on a meta basis
         template<typename T>
         void load_async(AssetRef<T>& ref, EngineContext& ctx)
         {
@@ -272,18 +339,22 @@ namespace eeng
                     statuses_[guid].state = LoadState::Failed;
                     statuses_[guid].error_message = ex.what();
                 }
-                });
-        }
+        });
+    }
 #endif
 
         // --- Meta based load / unload ----------------------------------------
 
+    private:
         void load(const Guid& guid, EngineContext& ctx);
-
         void unload(const Guid& guid, EngineContext& ctx);
+
+        void bind_asset(const Guid& guid, EngineContext& ctx);
+        void unbind_asset(const Guid& guid, EngineContext& ctx);
 
         // --- Helpers ---------------------------------------------------------
 
+    public: // <- make private
         template<typename T>
         std::optional<AssetRef<T>> ref_for_guid(const Guid& guid)
         {
@@ -294,5 +365,5 @@ namespace eeng
             return std::nullopt;
         }
 
-            };
-        } // namespace eeng
+};
+} // namespace eeng

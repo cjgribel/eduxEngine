@@ -27,9 +27,9 @@ namespace eeng
         }
 
         // Optional helpers
-        bool is_loaded() const { return bool(handle); }
-        void load(Handle<T> handle) { this->handle = handle; }
-        void unload() { handle.reset(); }
+        bool is_loaded() const { return bool(handle); }         // -> is_referant
+        void load(Handle<T> handle) { this->handle = handle; }  // -> set_reference
+        void unload() { handle.reset(); }                       // -> unreference
         Guid get_guid() const { return guid; }
         Handle<T> get_handle() const { return handle; }
     };

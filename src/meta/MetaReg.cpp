@@ -109,29 +109,39 @@ namespace eeng {
 #if 0
         // Resolve AssetRef<> for Assets or Components
         template<typename T>
-        void bind_refs(T& component, ResourceManager& resource_manager)
+        void bind_refs(T& t, ResourceManager& resource_manager)
         {
-            visit_assets(component, [&](auto& asset_ref) {
-                using AssetT = typename std::decay_t<decltype(asset_ref)>::asset_type;
+            visit_assets(t, [&](auto& asset_ref)
+                {
+                    using SubT = decltype(asset_ref.handle)::value_type;
+                    auto typed_handle = resource_manager.storage().handle_for_guid<SubT>(asset_ref.guid);
+                    if (!typed_handle)
+                        throw std::runtime_error("Failed to resolve handle for: " + asset_ref.guid.to_string());
 
-                auto meta_handle = resource_manager.storage().handle_for_guid(asset_ref.guid);
-                if (meta_handle) {
-                    auto handle = meta_handle->template cast<AssetT>();
-                    if (!handle)
-                        throw std::runtime_error("Failed to cast handle for asset type");
-                    asset_ref.handle = *handle;
-                }
-                else {
-                    throw std::runtime_error("Asset not loaded: " + asset_ref.guid.to_string());
-                }
+                    // Use modify
+                    asset_ref.handle = *typed_handle;
+                });
+        }
+
+        template<typename T>
+        void unbind_refs(T& t, ResourceManager& resource_manager)
+        {
+            visit_assets(t, [&](auto& asset_ref)
+                {
+                    using SubT = decltype(asset_ref.handle)::value_type;
+                    auto typed_handle = resource_manager.storage().handle_for_guid<SubT>(asset_ref.guid);
+                    if (!typed_handle)
+                        throw std::runtime_error("Failed to resolve handle for: " + asset_ref.guid.to_string());
+
+                    asset_ref.unload();
                 });
         }
 
         // Collect referenced GUIDs for Assets or Components
         template<typename T>
-        void collect_guids(T& component, std::unordered_set<Guid>& out_guids)
+        void collect_guids(T& t, std::unordered_set<Guid>& out_guids)
         {
-            visit_assets(component, [&](const auto& asset_ref) {
+            visit_assets(t, [&](const auto& asset_ref) {
                 out_guids.insert(asset_ref.guid);
                 });
         }
@@ -143,7 +153,10 @@ namespace eeng {
         template<class T>
         void load_asset(const Guid& guid, EngineContext& ctx)
         {
-            AssetRef<T> ref{ guid };
+            // Just forward?
+            // static_cast<ResourceManager&>(*ctx.resource_manager).load<T>(guid, ctx);
+
+            AssetRef<T> ref{ guid }; // skip
             static_cast<ResourceManager&>(*ctx.resource_manager).load(ref, ctx);
         }
 
@@ -152,6 +165,10 @@ namespace eeng {
         template<class T>
         void unload_asset(const Guid& guid, EngineContext& ctx)
         {
+            // Just forward?
+            // static_cast<ResourceManager&>(*ctx.resource_manager).unload<T>(guid, ctx);
+            // -> make ref_for_guid private
+
             auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
             if (auto ref_opt = resource_manager.ref_for_guid<T>(guid)) {
                 resource_manager.unload(*ref_opt, ctx);
@@ -159,6 +176,18 @@ namespace eeng {
             else {
                 throw std::runtime_error("Failed to reconstruct AssetRef<T> for GUID: " + guid.to_string());
             }
+        }
+
+        template<class T>
+        void bind_asset(const Guid& guid, EngineContext& ctx)
+        {
+            static_cast<ResourceManager&>(*ctx.resource_manager).bind_asset<T>(guid, ctx);
+        }
+
+        template<class T>
+        void unbind_asset(const Guid& guid, EngineContext& ctx)
+        {
+            static_cast<ResourceManager&>(*ctx.resource_manager).unbind_asset<T>(guid, ctx);
         }
 
         template<typename T>
@@ -170,12 +199,12 @@ namespace eeng {
             entt::meta_factory<T>()
                 // Assuring type storage
                 .template func<&assure_storage<T>>(eeng::literals::assure_storage_hs)
-                // Type-safe load
+                // Type-safe loading
                 .template func<&load_asset<T>>(eeng::literals::load_asset_hs)
-                // Type-safe unload
                 .template func<&unload_asset<T>>(eeng::literals::unload_asset_hs)
-                // Bind references
-                // .func<&bind_refs<T>>("bind_assets"_hs)
+                // Type-safe binding
+                .template func<&bind_asset<T>>(eeng::literals::bind_asset_hs)
+                .template func<&unbind_asset<T>>(eeng::literals::unbind_asset_hs)
                 //
                 //.func<&collect_guids<MeshRendererComponent>>("collect_asset_guids"_hs)
                 ;
