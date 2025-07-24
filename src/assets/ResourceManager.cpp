@@ -43,8 +43,7 @@ namespace eeng
             {
                 try
                 {
-                    invoke_meta_function(guid, ctx, literals::load_asset_hs, "load_asset");
-                    // invoke_meta_function(guid, ctx, literals::resolve_asset_hs, "resolve_asset");
+                    load_asset(guid, ctx);
 
                     std::lock_guard lock(status_mutex_);
                     statuses_[guid].state = LoadState::Loaded;
@@ -76,8 +75,7 @@ namespace eeng
             {
                 try
                 {
-                    // invoke_meta_function(guid, ctx, literals::unresolve_asset_hs, "unresolve_asset");
-                    invoke_meta_function(guid, ctx, literals::unload_asset_hs, "unload_asset");
+                    unload_asset(guid, ctx);
 
                     std::lock_guard lock(status_mutex_);
                     statuses_.erase(guid);
@@ -90,39 +88,6 @@ namespace eeng
                     statuses_[guid].error_message = ex.what();
                     return false;
                 }
-            });
-    }
-
-    // std::future<bool> ResourceManager::resolve_asset_async(const Guid& guid, EngineContext& ctx)
-    // {
-    //     return ctx.thread_pool->queue_task([=, this, &ctx]()
-    //         {
-    //             try
-    //             {
-    //                 invoke_meta_function(guid, ctx, literals::resolve_asset_hs, "resolve_asset");
-    //                 return true;
-    //             }
-    //             catch (const std::exception& ex)
-    //             {
-    //                 std::cout << ex.what() << std::endl;
-    //                 return false;
-    //             }
-    //         });
-    // }
-
-    std::future<bool> ResourceManager::unresolve_asset_async(const Guid& guid, EngineContext& ctx)
-    {
-        return ctx.thread_pool->queue_task([=, this, &ctx]() {
-            try {
-                // this->unbind_asset(guid, ctx);
-                invoke_meta_function(guid, ctx, literals::unresolve_asset_hs, "unresolve_asset");
-                return true;
-            }
-            catch (const std::exception& ex)
-            {
-                std::cout << ex.what() << std::endl;
-                return false;
-            }
             });
     }
 
@@ -202,27 +167,25 @@ namespace eeng
 #endif
     }
 
+    void ResourceManager::load_asset(const Guid& guid, EngineContext& ctx)
+    {
+        invoke_meta_function(guid, ctx, literals::load_asset_hs, "load_asset");
+    }
 
-
-    // void ResourceManager::load(const Guid& guid, EngineContext& ctx)
-    // {
-    //     invoke_meta_function(guid, ctx, literals::load_asset_hs, "load_asset");
-    // }
-
-    // void ResourceManager::unload(const Guid& guid, EngineContext& ctx)
-    // {
-    //     invoke_meta_function(guid, ctx, literals::unload_asset_hs, "unload_asset");
-    // }
+    void ResourceManager::unload_asset(const Guid& guid, EngineContext& ctx)
+    {
+        invoke_meta_function(guid, ctx, literals::unload_asset_hs, "unload_asset");
+    }
 
     void ResourceManager::resolve_asset(const Guid& guid, EngineContext& ctx)
     {
         invoke_meta_function(guid, ctx, literals::resolve_asset_hs, "resolve_asset");
     }
 
-    // void ResourceManager::unbind_asset(const Guid& guid, EngineContext& ctx)
-    // {
-    //     invoke_meta_function(guid, ctx, literals::unbind_asset_hs, "unbind_asset");
-    // }
+    void ResourceManager::unresolve_asset(const Guid& guid, EngineContext& ctx)
+    {
+        invoke_meta_function(guid, ctx, literals::unresolve_asset_hs, "unresolve_asset");
+    }
 
     void ResourceManager::invoke_meta_function(
         const Guid& guid,

@@ -326,6 +326,7 @@ namespace eeng
 
         // ─── BOTTOM PANE ───────────────────────────────────────────
         ImGui::BeginChild("##BottomPane", ImVec2(0, bottom_pane_height), true);
+
         if (ImGui::Button("Import")) { /* Import a batch of mock assets (META)  */ }
         ImGui::SameLine();
         if (ImGui::Button("Unimport")) { /* ... */ }
@@ -336,60 +337,26 @@ namespace eeng
         auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         if (ImGui::Button("Load"))
         {
-            // load_async (asset realization)
-            std::vector<std::future<bool>> futures;
             for (auto& guid : ctx.asset_selection->get_all()) {
                 if (content_tree.is_root(guid))
-                    futures.emplace_back(resource_manager.load_asset_async(guid, ctx));
+                    resource_manager.load_asset_async(guid, ctx);
             }
-            // for (auto& f : futures)
-            // {
-            //     f.get();
-            //     // if (!f.get()) // Child failed to load
-            //     //     throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
-            // }
-            // // Bind = asset ownership
-            // for (auto& guid : ctx.asset_selection->get_all()) {
-            //     if (content_tree.is_root(guid)) // ????
-            //         resource_manager.resolve_asset_async(guid, ctx);
-            // }
-            // Todo: Track futures
         }
         ImGui::SameLine();
         if (ImGui::Button("Unload"))
         {
-#if 1
-            // Unbind
-            // std::vector<std::future<bool>> futures;
-            // for (auto& guid : ctx.asset_selection->get_all()) {
-            //     if (content_tree.is_root(guid))
-            //         futures.emplace_back(resource_manager.unresolve_asset_async(guid, ctx));
-            // }
-            // for (auto& f : futures)
-            // {
-            //     if (!f.get()) // Child failed to load
-            //         std::cout << "One or more dependencies failed to load" << std::endl;
-            //         // throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
-            // }
-            // load_async - tracks load status of guid:s
             for (auto& guid : ctx.asset_selection->get_all()) {
                 if (content_tree.is_root(guid))
                     resource_manager.unload_asset_async(guid, ctx);
             }
-            // Todo: Track futures
-#endif
-#if 0
-            // Unloads ONLY IF ONE (1) IS SELECTED
-            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
-            if (ctx.asset_selection->size() == 1) {
-                const Guid& guid = ctx.asset_selection->first();
-                if (resource_manager.storage().handle_for_guid(guid))
-                    resource_manager.unload(guid, ctx);
-            }
-#endif
         }
 
         // <-
+        // ImGui::Text("Thread utilization %zu/%zu, queued %zu",
+        //     ctx.thread_pool->nbr_working_threads(),
+        //     ctx.thread_pool->nbr_threds(),
+        //     ctx.thread_pool->task_queue_size());
+
         ImGui::Separator();
         ImGui::TextUnformatted("Inspection:");
         ImGui::TextWrapped("Select an asset above to see details here...");
@@ -431,15 +398,11 @@ namespace eeng
                     const AssetEntry& entry = *it->second;
 
                     // Asset loaded status
-                    // TODO: This is REFERENCED status, not LOADED status
-                    //      Use resource_manager.get_status(guid)
+                    // Via load state
 //                    bool is_loaded = guid_status.state == LoadState::Loaded ? true : false;
+                    // Via Storage
                     bool is_loaded = false;
-                    if (auto maybe_handle = storage.handle_for_guid(guid))
-                    {
-                        auto handle = *maybe_handle;
-                        is_loaded = storage.validate(handle);
-                    }
+                    if (storage.handle_for_guid(guid)) is_loaded = true;
 
                     const bool is_leaf = tree.get_nbr_children(guid) == 0;
                     const bool is_selected = selection.contains(guid);
