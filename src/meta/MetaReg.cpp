@@ -179,15 +179,15 @@ namespace eeng {
         }
 
         template<class T>
-        void bind_asset(const Guid& guid, EngineContext& ctx)
+        void resolve_asset(const Guid& guid, EngineContext& ctx)
         {
-            static_cast<ResourceManager&>(*ctx.resource_manager).bind_asset<T>(guid, ctx);
+            static_cast<ResourceManager&>(*ctx.resource_manager).resolve_asset<T>(guid, ctx);
         }
 
         template<class T>
-        void unbind_asset(const Guid& guid, EngineContext& ctx)
+        void unresolve_asset(const Guid& guid, EngineContext& ctx)
         {
-            static_cast<ResourceManager&>(*ctx.resource_manager).unbind_asset<T>(guid, ctx);
+            static_cast<ResourceManager&>(*ctx.resource_manager).unresolve_asset<T>(guid, ctx);
         }
 
         template<typename T>
@@ -203,8 +203,8 @@ namespace eeng {
                 .template func<&load_asset<T>>(eeng::literals::load_asset_hs)
                 .template func<&unload_asset<T>>(eeng::literals::unload_asset_hs)
                 // Type-safe binding
-                .template func<&bind_asset<T>>(eeng::literals::bind_asset_hs)
-                .template func<&unbind_asset<T>>(eeng::literals::unbind_asset_hs)
+                .template func<&resolve_asset<T>>(eeng::literals::resolve_asset_hs)
+                .template func<&unresolve_asset<T>>(eeng::literals::unresolve_asset_hs)
                 //
                 //.func<&collect_guids<MeshRendererComponent>>("collect_asset_guids"_hs)
                 ;

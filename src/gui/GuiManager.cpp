@@ -336,22 +336,23 @@ namespace eeng
         auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         if (ImGui::Button("Load"))
         {
-            // load_async - tracks load status of guid:s
+            // load_async (asset realization)
             std::vector<std::future<bool>> futures;
             for (auto& guid : ctx.asset_selection->get_all()) {
                 if (content_tree.is_root(guid))
                     futures.emplace_back(resource_manager.load_asset_async(guid, ctx));
             }
-            for (auto& f : futures)
-            {
-                if (!f.get()) // 👈 Child failed to load
-                    throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
-            }
-            // Bind
-            for (auto& guid : ctx.asset_selection->get_all()) {
-                if (content_tree.is_root(guid)) // ????
-                    resource_manager.bind_asset_async(guid, ctx);
-            }
+            // for (auto& f : futures)
+            // {
+            //     f.get();
+            //     // if (!f.get()) // Child failed to load
+            //     //     throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
+            // }
+            // // Bind = asset ownership
+            // for (auto& guid : ctx.asset_selection->get_all()) {
+            //     if (content_tree.is_root(guid)) // ????
+            //         resource_manager.resolve_asset_async(guid, ctx);
+            // }
             // Todo: Track futures
         }
         ImGui::SameLine();
@@ -359,16 +360,17 @@ namespace eeng
         {
 #if 1
             // Unbind
-            std::vector<std::future<bool>> futures;
-            for (auto& guid : ctx.asset_selection->get_all()) {
-                if (content_tree.is_root(guid))
-                    futures.emplace_back(resource_manager.unbind_asset_async(guid, ctx));
-            }
-            for (auto& f : futures)
-            {
-                if (!f.get()) // 👈 Child failed to load
-                    throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
-            }
+            // std::vector<std::future<bool>> futures;
+            // for (auto& guid : ctx.asset_selection->get_all()) {
+            //     if (content_tree.is_root(guid))
+            //         futures.emplace_back(resource_manager.unresolve_asset_async(guid, ctx));
+            // }
+            // for (auto& f : futures)
+            // {
+            //     if (!f.get()) // Child failed to load
+            //         std::cout << "One or more dependencies failed to load" << std::endl;
+            //         // throw std::runtime_error("One or more dependencies failed to load for asset: " /*+ guid.to_string()*/);
+            // }
             // load_async - tracks load status of guid:s
             for (auto& guid : ctx.asset_selection->get_all()) {
                 if (content_tree.is_root(guid))
