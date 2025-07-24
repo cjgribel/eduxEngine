@@ -352,10 +352,10 @@ namespace eeng
         }
 
         // <-
-        // ImGui::Text("Thread utilization %zu/%zu, queued %zu",
-        //     ctx.thread_pool->nbr_working_threads(),
-        //     ctx.thread_pool->nbr_threds(),
-        //     ctx.thread_pool->task_queue_size());
+        ImGui::Text("Thread utilization %zu/%zu, queued %zu",
+            ctx.thread_pool->nbr_working_threads(),
+            ctx.thread_pool->nbr_threds(),
+            ctx.thread_pool->task_queue_size());
 
         ImGui::Separator();
         ImGui::TextUnformatted("Inspection:");

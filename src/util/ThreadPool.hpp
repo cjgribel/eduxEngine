@@ -22,14 +22,24 @@ public:
     template <typename Func>
     auto queue_task(Func task) -> std::future<std::invoke_result_t<Func>>;
 
+    size_t nbr_threds() const;
+    size_t nbr_working_threads() const;
+    size_t nbr_idle_threads() const;
+    size_t task_queue_size() const;
     bool is_task_queue_empty() const;
 
 private:
+
     std::vector<std::thread> workers;
+    std::condition_variable cv;
+
     std::queue<std::function<void()>> task_queue;
     mutable std::mutex queue_mutex;
-    std::condition_variable cv;
-    std::atomic<bool> stop{false};
+
+    std::atomic<bool> stop{ false };
+    std::atomic<size_t> working_count{ 0 };
+
+    const size_t thread_count;
 };
 
 // Template definition remains in the header
@@ -44,9 +54,9 @@ auto ThreadPool::queue_task(Func task) -> std::future<std::invoke_result_t<Func>
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
         task_queue.emplace([packaged_task]()
-        {
-            std::invoke(*packaged_task);
-        });
+            {
+                std::invoke(*packaged_task);
+            });
     }
     cv.notify_one();
     return future;
