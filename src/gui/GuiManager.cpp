@@ -338,7 +338,7 @@ namespace eeng
         if (ImGui::Button("Load"))
         {
             for (auto& guid : ctx.asset_selection->get_all()) {
-                if (content_tree.is_root(guid))
+                // if (content_tree.is_root(guid))
                     resource_manager.load_asset_async(guid, ctx);
             }
         }
@@ -346,8 +346,23 @@ namespace eeng
         if (ImGui::Button("Unload"))
         {
             for (auto& guid : ctx.asset_selection->get_all()) {
-                if (content_tree.is_root(guid))
+                // if (content_tree.is_root(guid))
                     resource_manager.unload_asset_async(guid, ctx);
+            }
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Unload unbound"))
+        {
+            resource_manager.unload_unbound_assets_async(ctx);
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Reload"))
+        {
+            for (auto& guid : ctx.asset_selection->get_all()) {
+                // if (content_tree.is_root(guid))
+                    resource_manager.reload_asset_async(guid, ctx);
             }
         }
 

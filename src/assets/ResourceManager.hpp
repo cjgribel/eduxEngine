@@ -104,8 +104,6 @@ namespace eeng
             //unload(ref); // optional: remove from memory too
         }
 
-        // --- Typed load / unload ---------------------------------------------
-
         template<typename T>
         void load_asset(const Guid& guid, EngineContext& ctx)
         {
@@ -171,12 +169,15 @@ namespace eeng
             storage_->remove_now(handle);
         }
 
+        std::future<void> reload_asset_async(const Guid& guid, EngineContext& ctx);
+        
+        void unload_unbound_assets_async(EngineContext& ctx);
+
     private:
 
         template<class T>
         void resolve_asset(AssetRef<T> ref, EngineContext& ctx)
         {
-            // Serial
             storage_->modify(ref.handle, [&](T& asset)
                 {
                     visit_assets(asset, [&](auto& ref)
@@ -205,6 +206,15 @@ namespace eeng
             resolve_asset<T>(maybe_ref.value(), ctx);
         }
 
+        // template<class T>
+        // void rebind_assets()
+        // {
+        //     // unbind all
+        //     unresolve_asset()
+
+        //     // bind all
+        // }
+
     private:
         template<class T>
         void unresolve_asset(AssetRef<T> ref, EngineContext& ctx)
@@ -229,8 +239,6 @@ namespace eeng
                 throw std::runtime_error("Asset not loaded: " + guid.to_string());
             unresolve_asset<T>(maybe_ref.value(), ctx);
         }
-
-        // --- Meta based load / unload ----------------------------------------
 
     private:
         void load_asset(const Guid& guid, EngineContext& ctx);

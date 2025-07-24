@@ -91,6 +91,23 @@ namespace eeng
             });
     }
 
+    void ResourceManager::unload_unbound_assets_async(EngineContext& ctx)
+    {
+        std::vector<Guid> to_unload;
+        {
+            std::lock_guard lock(status_mutex_);
+            for (const auto& [guid, status] : statuses_)
+            {
+                if (status.ref_count == 0 && status.state == LoadState::Loaded)
+                    to_unload.push_back(guid);
+            }
+        }
+        for (const auto& guid : to_unload)
+        {
+            unload_asset_async(guid, ctx);
+        }
+    }
+
     void ResourceManager::retain_guid(const Guid& guid)
     {
         std::lock_guard lock(status_mutex_);
@@ -103,9 +120,6 @@ namespace eeng
         auto& status = statuses_[guid];
         if (--status.ref_count <= 0) {
             status.ref_count = 0;
-            // unload when no more references
-            // unload_async(guid, ctx);
-            // statuses_.erase(guid);
         }
     }
 
@@ -175,6 +189,35 @@ namespace eeng
     void ResourceManager::unload_asset(const Guid& guid, EngineContext& ctx)
     {
         invoke_meta_function(guid, ctx, literals::unload_asset_hs, "unload_asset");
+    }
+
+    // public
+    std::future<void> ResourceManager::reload_asset_async(const Guid& guid, EngineContext& ctx)
+    {
+        {
+            std::lock_guard lock(status_mutex_);
+            statuses_[guid].error_message.clear();
+        }
+
+        return ctx.thread_pool->queue_task([=, this, &ctx]() {
+            try
+            {
+                // Wait for unload to complete inside thread
+                this->unload_asset_async(guid, ctx).get();
+
+                // Wait for load to complete
+                this->load_asset_async(guid, ctx).get();
+
+                std::lock_guard lock(status_mutex_);
+                statuses_[guid].state = LoadState::Loaded;
+            }
+            catch (const std::exception& ex)
+            {
+                std::lock_guard lock(status_mutex_);
+                statuses_[guid].state = LoadState::Failed;
+                statuses_[guid].error_message = ex.what();
+            }
+            });
     }
 
     void ResourceManager::resolve_asset(const Guid& guid, EngineContext& ctx)

@@ -107,36 +107,6 @@ namespace eeng {
         }
 
 #if 0
-        // Resolve AssetRef<> for Assets or Components
-        template<typename T>
-        void bind_refs(T& t, ResourceManager& resource_manager)
-        {
-            visit_assets(t, [&](auto& asset_ref)
-                {
-                    using SubT = decltype(asset_ref.handle)::value_type;
-                    auto typed_handle = resource_manager.storage().handle_for_guid<SubT>(asset_ref.guid);
-                    if (!typed_handle)
-                        throw std::runtime_error("Failed to resolve handle for: " + asset_ref.guid.to_string());
-
-                    // Use modify
-                    asset_ref.handle = *typed_handle;
-                });
-        }
-
-        template<typename T>
-        void unbind_refs(T& t, ResourceManager& resource_manager)
-        {
-            visit_assets(t, [&](auto& asset_ref)
-                {
-                    using SubT = decltype(asset_ref.handle)::value_type;
-                    auto typed_handle = resource_manager.storage().handle_for_guid<SubT>(asset_ref.guid);
-                    if (!typed_handle)
-                        throw std::runtime_error("Failed to resolve handle for: " + asset_ref.guid.to_string());
-
-                    asset_ref.unload();
-                });
-        }
-
         // Collect referenced GUIDs for Assets or Components
         template<typename T>
         void collect_guids(T& t, std::unordered_set<Guid>& out_guids)
@@ -145,53 +115,45 @@ namespace eeng {
                 out_guids.insert(asset_ref.guid);
                 });
         }
-
 #endif
 
-        // For meta-based loading
-        // Will bypass any existing owners of the asset guid
         template<class T>
         void load_asset(const Guid& guid, EngineContext& ctx)
         {
-            // Just forward?
-            // static_cast<ResourceManager&>(*ctx.resource_manager).load<T>(guid, ctx);
-
-            // AssetRef<T> ref{ guid }; // skip
-            static_cast<ResourceManager&>(*ctx.resource_manager).load_asset<T>(guid, ctx);
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            rm.load_asset<T>(guid, ctx);
         }
 
-        // For meta-based unloading
-        // Will bypass any existing owners of the asset guid
         template<class T>
         void unload_asset(const Guid& guid, EngineContext& ctx)
         {
-            // Just forward?
-            static_cast<ResourceManager&>(*ctx.resource_manager).unload_asset<T>(guid, ctx);
-            // -> make ref_for_guid private
-
-            // auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
-            // if (auto ref_opt = resource_manager.ref_for_guid<T>(guid)) {
-            //     resource_manager.unload(*ref_opt, ctx);
-            // }
-            // else {
-            //     throw std::runtime_error("Failed to reconstruct AssetRef<T> for GUID: " + guid.to_string());
-            // }
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            rm.unload_asset<T>(guid, ctx);
         }
+
+        // template<class T>
+        // void reload_asset(const Guid& guid, EngineContext& ctx)
+        // {
+        //     unload_asset<T>(guid, ctx);
+        //     load_asset<T>(guid, ctx);
+        // }
 
         template<class T>
         void resolve_asset(const Guid& guid, EngineContext& ctx)
         {
-            static_cast<ResourceManager&>(*ctx.resource_manager).resolve_asset<T>(guid, ctx);
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            rm.resolve_asset<T>(guid, ctx);
         }
 
         template<class T>
         void unresolve_asset(const Guid& guid, EngineContext& ctx)
         {
-            static_cast<ResourceManager&>(*ctx.resource_manager).unresolve_asset<T>(guid, ctx);
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            rm.unresolve_asset<T>(guid, ctx);
         }
 
         template<typename T>
-        void register_resource(/*const std::string& name*/)
+        void register_resource()
         {
             // constexpr auto alias = entt::type_name<T>::value();  // e.g. "ResourceTest"
             // constexpr auto id    = entt::type_hash<T>::value();
@@ -202,6 +164,7 @@ namespace eeng {
                 // Type-safe loading
                 .template func<&load_asset<T>>(eeng::literals::load_asset_hs)
                 .template func<&unload_asset<T>>(eeng::literals::unload_asset_hs)
+                // .template func<&reload_asset<T>>(eeng::literals::reload_asset_hs)
                 // Type-safe binding
                 .template func<&resolve_asset<T>>(eeng::literals::resolve_asset_hs)
                 .template func<&unresolve_asset<T>>(eeng::literals::unresolve_asset_hs)
