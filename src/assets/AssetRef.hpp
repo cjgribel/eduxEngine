@@ -9,6 +9,15 @@
 
 namespace eeng
 {
+    template<typename T, typename Visitor>
+    void visit_assets(T&, Visitor&&)
+    {
+        // No-op for types with no AssetRef dependencies
+    }
+}
+
+namespace eeng
+{
     template<class T>
     struct AssetRef
     {

@@ -9,7 +9,7 @@
 #include "Handle.h"
 #include "EngineContext.hpp"
 #include "AssetRef.hpp"    // AssetRef<T>
-#include "ResourceTypes.h" // mock types
+#include "ResourceTypes.hpp" // mock types
 #include <string>
 #include <vector>
 #include <memory>

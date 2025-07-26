@@ -12,7 +12,7 @@
 // #include "Guid.h"
 #include "LogGlobals.hpp"
 // #include "hash_combine.h"
-#include "IResourceManager.hpp" // For AssetRef<T>
+//#include "IResourceManager.hpp" // For AssetRef<>, visit_assets<>
 
 // Placeholder resources
 namespace eeng

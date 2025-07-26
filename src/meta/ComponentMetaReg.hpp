@@ -12,4 +12,4 @@ namespace eeng
 
 } // namespace eeng
 
-#endif // MetaReg_hpp
+#endif // ComponentMetaReg_hpp

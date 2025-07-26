@@ -11,15 +11,6 @@
 
 namespace eeng
 {
-    template<typename T, typename Visitor>
-    void visit_assets(T&, Visitor&&)
-    {
-        // No-op for asset types with no AssetRef dependencies
-    }
-}
-
-namespace eeng
-{
     struct EngineContext;
 
     enum class LoadState {
@@ -60,7 +51,7 @@ namespace eeng
 
         /* 
         https://chatgpt.com/s/t_687b79b6a15881918c2a19bbb73ec609
-        
+
         --- Accessed via cast to ResourceManager
         [meta functions]            (MetaReg)
         file                        (MockImporter)

@@ -7,92 +7,13 @@
 #include <nlohmann/json.hpp>
 #include "config.h"
 #include "AssetMetaReg.hpp"
-#include "ResourceTypes.h"
+#include "ResourceTypes.hpp"
 #include "MetaLiterals.h"
 #include "Storage.hpp"
 #include "MetaInfo.h"
-// #include "IResourceManager.hpp" 
-#include "ResourceManager.hpp" // For AssetRef<T>, AssetMetaData, ResourceManager::load<>/unload
-
-#include "MockImporter.hpp" // For mock types
+#include "ResourceManager.hpp"
 
 namespace eeng {
-
-    // + EngineContext for serialization & deserialization
-
-#if 0
-    void BehaviorScript_to_json(nlohmann::json& j, const void* ptr)
-    {
-        std::cout << "BehaviorScript_to_json\n";
-
-        auto script = static_cast<const BehaviorScript*>(ptr);
-
-        // self sol::table
-        nlohmann::json self_json;
-        table_to_json(self_json, script->self);
-        j["self"] = self_json;
-
-        j["identifier"] = script->identifier;
-        j["path"] = script->path;
-    }
-
-    void BehaviorScript_from_json(
-        const nlohmann::json& j,
-        void* ptr,
-        const Entity& entity,
-        Editor::Context& context)
-    {
-        std::cout << "BehaviorScript_from_json\n";
-
-        auto script = static_cast<BehaviorScript*>(ptr);
-        std::string identifier = j["identifier"];
-        std::string path = j["path"];
-
-        // self sol::table
-        // LOAD + copy Lua meta fields
-        *script = BehaviorScriptFactory::create_from_file(
-            *context.registry,
-            entity,
-            *context.lua, // self.lua_state() <- nothing here
-            path,
-            identifier);
-
-        table_from_json(script->self, j["self"]);
-    }
-#endif
-
-#if 0
-    entt::meta<BehaviorScript>()
-        .type("BehaviorScript"_hs).prop(display_name_hs, "BehaviorScript")
-
-        .data<&BehaviorScript::identifier>("identifier"_hs)
-        .prop(display_name_hs, "identifier")
-        .prop(readonly_hs, true)
-
-        .data<&BehaviorScript::path>("path"_hs)
-        .prop(display_name_hs, "path")
-        .prop(readonly_hs, true)
-
-        // sol stuff
-        .data<&BehaviorScript::self/*, entt::as_ref_t*/>("self"_hs).prop(display_name_hs, "self")
-        .data<&BehaviorScript::update/*, entt::as_ref_t*/>("update"_hs).prop(display_name_hs, "update")
-        .data<&BehaviorScript::on_collision/*, entt::as_ref_t*/>("on_collision"_hs).prop(display_name_hs, "on_collision")
-
-        // inspect_hs
-        // We have this, and not one for sol::table, so that when a sol::table if edited,
-        // a deep copy of BehaviorScript is made, and not just the sol::table
-        .func < [](void* ptr, Editor::InspectorState& inspector) {return Editor::inspect_type(*static_cast<BehaviorScript*>(ptr), inspector); } > (inspect_hs)
-
-        // clone
-        .func<&copy_BehaviorScript>(clone_hs)
-
-        // to_json
-        .func<&BehaviorScript_to_json>(to_json_hs)
-
-        // from_json
-        .func<&BehaviorScript_from_json>(from_json_hs)
-        ;
-#endif
 
     namespace
     {
@@ -131,13 +52,6 @@ namespace eeng {
             rm.unload_asset<T>(guid, ctx);
         }
 
-        // template<class T>
-        // void reload_asset(const Guid& guid, EngineContext& ctx)
-        // {
-        //     unload_asset<T>(guid, ctx);
-        //     load_asset<T>(guid, ctx);
-        // }
-
         template<class T>
         void resolve_asset(const Guid& guid, EngineContext& ctx)
         {
@@ -167,7 +81,7 @@ namespace eeng {
         }
 
         template<typename T>
-        void register_resource()
+        void register_asset()
         {
             // constexpr auto alias = entt::type_name<T>::value();  // e.g. "ResourceTest"
             // constexpr auto id    = entt::type_hash<T>::value();
@@ -190,7 +104,7 @@ namespace eeng {
                 ;
 
             // Caution: this name will include namespaces
-            auto name = std::string{ entt::resolve<T>().info().name() };
+            // auto name = std::string{ entt::resolve<T>().info().name() };
 
             // Handle<T>
             // NOTE: Is not exposed via AssetRef<T>
@@ -275,7 +189,7 @@ namespace eeng {
         // === RESOURCES ===
 
         // mock::Mesh
-        register_resource<mock::Mesh>();
+        register_asset<mock::Mesh>();
         entt::meta_factory<mock::Mesh>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Mesh", "This is a mock mesh type." })
             .data<&mock::Mesh::vertices>("vertices"_hs)
@@ -284,7 +198,7 @@ namespace eeng {
             ;
 
         // mock::Texture
-        register_resource<mock::Texture>();
+        register_asset<mock::Texture>();
         entt::meta_factory<mock::Texture>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Texture", "This is a mock Texture type." })
             .data<&mock::Texture::name>("name"_hs)
@@ -293,7 +207,7 @@ namespace eeng {
             ;
 
         // mock::Model
-        register_resource<mock::Model>();
+        register_asset<mock::Model>();
         entt::meta_factory<mock::Model>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Model", "This is a mock model type." })
 
@@ -315,7 +229,7 @@ namespace eeng {
         // assure_fn.invoke({}, registry);
 
         // mock::MockResource1
-        register_resource<mock::MockResource1>();
+        register_asset<mock::MockResource1>();
         entt::meta_factory<mock::MockResource1>{}
         // .type("MockResource1"_hs)
         .custom<TypeMetaInfo>(TypeMetaInfo{ "MockResource1", "This is a mock resource type." })
@@ -347,7 +261,7 @@ namespace eeng {
 
             ;
 
-        register_resource<mock::MockResource2>();
+        register_asset<mock::MockResource2>();
     }
 
 } // namespace eeng

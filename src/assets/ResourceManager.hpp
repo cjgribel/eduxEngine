@@ -6,7 +6,7 @@
 #include "EngineContext.hpp"
 #include "Storage.hpp" // Can't pimpl-away since class is templated
 #include "AssetIndex.hpp"
-#include "ResourceTypes.h" // For AssetRef<T>, visit_assets
+#include "ResourceTypes.hpp" // For AssetRef<T>, visit_assets
 #include "AssetMetaData.hpp"
 #include "AssetRef.hpp"
 #include "MetaLiterals.h" // load_asset_hs, unload_asset_hs

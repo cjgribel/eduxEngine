@@ -10,7 +10,7 @@
 // FOR TESTS ->
 #include "AssimpImporter.hpp" // --> ENGINE API
 #include "MockImporter.hpp" // --> ENGINE API
-#include "ResourceTypes.h"
+#include "ResourceTypes.hpp"
 #include "ResourceManager.hpp" // eeng::ResourceManager
 #include <filesystem>
 // <-
