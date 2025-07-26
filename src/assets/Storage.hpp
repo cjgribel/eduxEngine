@@ -506,13 +506,16 @@ namespace eeng
             bool valid(const Handle<T>& h) const noexcept
             {
                 std::lock_guard lock{ m_mutex };
-                return validate_handle_no_lock(h);
+                return validate_handle_no_lock(h) && m_handle_to_guid.contains(h);
             }
 
             bool valid(const MetaHandle& mh) const noexcept override
             {
                 std::lock_guard lock{ m_mutex };
-                return static_cast<bool>(validate_handle_no_lock(mh));
+                if (auto typed_handle = mh.template cast<T>()) {
+                    return validate_handle_no_lock(*typed_handle) && m_handle_to_guid.contains(*typed_handle);
+                }
+                return false;
             }
 
             void clear() noexcept override
@@ -938,6 +941,7 @@ namespace eeng
         bool validate(const Handle<T>& h) const noexcept
         {
             std::lock_guard lock{ storage_mutex };
+            if (!has_storage<T>()) return false;
             const auto& pool = get_pool<T>();
             return pool.valid(h);
         }

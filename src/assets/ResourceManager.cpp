@@ -33,7 +33,8 @@ namespace eeng
         {
             std::lock_guard lock(status_mutex_);
             auto& status = statuses_[guid];
-            if (status.state == LoadState::Loaded || status.state == LoadState::Loading) {
+            // if (status.state == LoadState::Loaded || status.state == LoadState::Loading) {
+            if (status.state == LoadState::Loading) {
                 return std::async(std::launch::deferred, [] { return false; });
             }
             status.state = LoadState::Loading;
@@ -65,7 +66,7 @@ namespace eeng
             std::lock_guard lock(status_mutex_);
             auto& status = statuses_[guid];
 
-            if (status.state != LoadState::Loaded) {
+            if (status.state == LoadState::Loading /*|| status.ref_count > 0*/) {
                 return std::async(std::launch::deferred, [] { return false; });
             }
             status.state = LoadState::Unloading;
@@ -230,7 +231,23 @@ namespace eeng
         invoke_meta_function(guid, ctx, literals::unresolve_asset_hs, "unresolve_asset");
     }
 
-    void ResourceManager::invoke_meta_function(
+    bool ResourceManager::validate_asset(const Guid& guid, EngineContext& ctx)
+    {
+        auto res_any = invoke_meta_function(guid, ctx, literals::validate_asset_hs, "validate_asset");
+        if (auto res_ptr = res_any.try_cast<bool>())
+            return *res_ptr;
+        throw std::runtime_error("Unexpected return type form meta function validate_asset");
+    }
+
+    bool ResourceManager::validate_asset_recursive(const Guid& guid, EngineContext& ctx)
+    {
+        auto res_any = invoke_meta_function(guid, ctx, literals::validate_asset_recursive_hs, "validate_asset_recursive");
+        if (auto res_ptr = res_any.try_cast<bool>())
+            return *res_ptr;
+        throw std::runtime_error("Unexpected return type form meta function validate_asset_recursive");
+    }
+
+    entt::meta_any ResourceManager::invoke_meta_function(
         const Guid& guid,
         EngineContext& ctx,
         entt::hashed_string function_id,
@@ -256,5 +273,7 @@ namespace eeng
         auto result = fn.invoke({}, entt::forward_as_meta(guid), entt::forward_as_meta(ctx));
         if (!result)
             throw std::runtime_error("Failed to invoke " + std::string(function_label) + " for type: " + type_name);
+
+        return result;
     }
 }

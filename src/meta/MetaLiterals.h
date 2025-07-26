@@ -21,5 +21,8 @@ namespace eeng::literals
     constexpr entt::hashed_string resolve_asset_hs = "resolve_asset"_hs;
     constexpr entt::hashed_string unresolve_asset_hs = "unresolve_asset"_hs;
     // constexpr entt::hashed_string reload_asset_hs = "rebind_asset"_hs;
+
+    constexpr entt::hashed_string validate_asset_hs = "validate_asset"_hs;
+    constexpr entt::hashed_string validate_asset_recursive_hs = "validate_asset_recursive"_hs;
 }
 #endif // MetaLiterals_h

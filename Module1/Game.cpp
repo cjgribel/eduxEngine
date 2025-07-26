@@ -96,20 +96,21 @@ bool Game::init()
             // }
         }
 
-        // 4 (NEW) Load a "level" 
-
+        /*
+        TODO
+        0 Introduce DUMMY COMPONENTS, e.g. one with a AssetRef<Model>
+            Instead of the 'refs' vector above
+        1 Track futures for loaded assets
+        2 In update(), when all are loaded: bind to components ()
+        */
 
         // 4. LOAD assets concurrently
-        //
-        // TODO: use load_async, if this test code remains
-        //
-        //
 #if 0
         {
             EENG_LOG(ctx, "[Game::init()] Loading assets...");
             // for (auto& ref : refs) resource_manager.load(ref, *ctx);
             // CONCURRENTLY
-            std::vector<std::future<void>> load_futures;
+            std::vector<std::future<bool>> load_futures;
             for (auto& ref : refs) {
                 load_futures.emplace_back(
                     ctx->thread_pool->queue_task([this, &resource_manager, &ref]() {
@@ -139,8 +140,8 @@ bool Game::init()
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
                 }
-            }
-        }
+    }
+}
 #endif
 
         // 5. UNLOAD assets (concurrently)
@@ -683,7 +684,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-    }
+}
 #endif
 
     // Draw shape batches

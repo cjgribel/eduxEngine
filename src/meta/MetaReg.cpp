@@ -152,6 +152,20 @@ namespace eeng {
             rm.unresolve_asset<T>(guid, ctx);
         }
 
+        template<class T>
+        bool validate_asset(const Guid& guid, EngineContext& ctx)
+        {
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            return rm.validate_asset<T>(guid);
+        }
+
+        template<class T>
+        bool validate_asset_recursive(const Guid& guid, EngineContext& ctx)
+        {
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            return rm.validate_asset_recursive<T>(guid);
+        }
+
         template<typename T>
         void register_resource()
         {
@@ -160,14 +174,17 @@ namespace eeng {
 
             entt::meta_factory<T>()
                 // Assuring type storage
-                .template func<&assure_storage<T>>(eeng::literals::assure_storage_hs)
+                .template func<&assure_storage<T>, entt::as_void_t>(eeng::literals::assure_storage_hs)
                 // Type-safe loading
-                .template func<&load_asset<T>>(eeng::literals::load_asset_hs)
-                .template func<&unload_asset<T>>(eeng::literals::unload_asset_hs)
+                .template func<&load_asset<T>, entt::as_void_t>(eeng::literals::load_asset_hs)
+                .template func<&unload_asset<T>, entt::as_void_t>(eeng::literals::unload_asset_hs)
                 // .template func<&reload_asset<T>>(eeng::literals::reload_asset_hs)
                 // Type-safe binding
-                .template func<&resolve_asset<T>>(eeng::literals::resolve_asset_hs)
-                .template func<&unresolve_asset<T>>(eeng::literals::unresolve_asset_hs)
+                .template func<&resolve_asset<T>, entt::as_void_t>(eeng::literals::resolve_asset_hs)
+                .template func<&unresolve_asset<T>, entt::as_void_t>(eeng::literals::unresolve_asset_hs)
+                // Asset validation
+                .template func<&validate_asset<T>>(eeng::literals::validate_asset_hs)
+                .template func<&validate_asset_recursive<T>>(eeng::literals::validate_asset_recursive_hs)
                 //
                 //.func<&collect_guids<MeshRendererComponent>>("collect_asset_guids"_hs)
                 ;

@@ -339,7 +339,7 @@ namespace eeng
         {
             for (auto& guid : ctx.asset_selection->get_all()) {
                 // if (content_tree.is_root(guid))
-                    resource_manager.load_asset_async(guid, ctx);
+                resource_manager.load_asset_async(guid, ctx);
             }
         }
         ImGui::SameLine();
@@ -347,7 +347,7 @@ namespace eeng
         {
             for (auto& guid : ctx.asset_selection->get_all()) {
                 // if (content_tree.is_root(guid))
-                    resource_manager.unload_asset_async(guid, ctx);
+                resource_manager.unload_asset_async(guid, ctx);
             }
         }
 
@@ -362,7 +362,7 @@ namespace eeng
         {
             for (auto& guid : ctx.asset_selection->get_all()) {
                 // if (content_tree.is_root(guid))
-                    resource_manager.reload_asset_async(guid, ctx);
+                resource_manager.reload_asset_async(guid, ctx);
             }
         }
 
@@ -452,22 +452,40 @@ namespace eeng
                     }
                     if (opened)
                     {
-                        ImGui::Text("Type: %s", entry.meta.type_name.c_str());
-                        ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
-                        ImGui::Text("File: %s", entry.relative_path.string().c_str());
-
-                        ImGui::Text("Ref. Count %i", guid_status.ref_count);
-                        switch (guid_status.state) {
-                        case LoadState::Unloaded: ImGui::Text("Not loaded"); break;
-                        case LoadState::Unloading: ImGui::Text("Unloading"); break;
-                        case LoadState::Loading:  ImGui::Text("Loading"); break;
-                        case LoadState::Loaded:   ImGui::Text("Loaded"); break;
-                        case LoadState::Failed:   ImGui::Text("Failed"); break;
-                        }
-                        if (guid_status.error_message.size()) {
+                        bool valid = resource_manager.validate_asset(entry.meta.guid, ctx);
+                        bool valid_rec = resource_manager.validate_asset_recursive(entry.meta.guid, ctx);
+                        // --- Line 1: Status indicators ---
+                        {
+                            ImGui::TextColored(valid ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "%s", valid ? "Valid" : "Invalid");
                             ImGui::SameLine();
-                            ImGui::Text("[%s]", guid_status.error_message.c_str());
+                            ImGui::TextColored(valid_rec ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.5f, 0.2f, 1.0f), "%s", valid_rec ? "Recursive" : "Recursive");
+                            ImGui::SameLine();
+                            ImVec4 state_color;
+                            const char* state_str = nullptr;
+                            switch (guid_status.state) {
+                            case LoadState::Unloaded:  state_str = "Unloaded";  state_color = ImVec4(0.6f, 0.6f, 0.6f, 1.0f); break;
+                            case LoadState::Unloading: state_str = "Unloading"; state_color = ImVec4(1.0f, 0.7f, 0.2f, 1.0f); break;
+                            case LoadState::Loading:   state_str = "Loading";   state_color = ImVec4(0.6f, 0.8f, 1.0f, 1.0f); break;
+                            case LoadState::Loaded:    state_str = "Loaded";    state_color = ImVec4(0.4f, 1.0f, 0.4f, 1.0f); break;
+                            case LoadState::Failed:    state_str = "Failed";    state_color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); break;
+                            }
+                            ImGui::TextColored(state_color, "%s", state_str);
+                            if (!guid_status.error_message.empty())
+                            {
+                                ImGui::SameLine();
+                                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[%s]", guid_status.error_message.c_str());
+                            }
                         }
+                        // --- Line 2: Type + Ref count ---
+                        {
+                            ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                            ImGui::SameLine();
+                            ImGui::Text("Ref Count: %d", guid_status.ref_count);
+                        }
+                        // --- Line 3: GUID ---
+                        ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
+                        // --- Line 4: Path ---
+                        ImGui::Text("Path: %s", entry.relative_path.string().c_str());
 
                         tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
                             {

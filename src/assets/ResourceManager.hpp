@@ -108,8 +108,14 @@ namespace eeng
         void load_asset(const Guid& guid, EngineContext& ctx)
         {
             // Throw if already loaded
+            // if (storage_->handle_for_guid<T>(guid))
+            //     throw std::runtime_error("Asset already loaded for " + guid.to_string());
             if (storage_->handle_for_guid<T>(guid))
-                throw std::runtime_error("Asset already loaded for " + guid.to_string());
+            {
+                // Already loaded — just ensure resolution
+                resolve_asset<T>(AssetRef<T>{ guid, * storage_->handle_for_guid<T>(guid) }, ctx);
+                return;
+            }
 
             // Derserialize
             /* add delay */ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -141,9 +147,11 @@ namespace eeng
         void unload_asset(const Guid& guid, EngineContext& ctx)
         {
             auto maybe_handle = storage_->handle_for_guid<T>(guid);
-            if (!maybe_handle)
-                // return;
-                throw std::runtime_error("Asset not loaded for " + guid.to_string());
+            if (!maybe_handle) {
+                //unresolve_asset(AssetRef<T> {guid, handle}, ctx);
+                return;
+            }
+            //throw std::runtime_error("Asset not loaded for " + guid.to_string());
             auto handle = *maybe_handle;
 
             // unresolve_asset<T>(guid, ctx);
@@ -153,6 +161,7 @@ namespace eeng
             std::vector<std::future<bool>> futures;
             storage_->modify(handle, [&](T& asset)
                 {
+                    //if (!storage_->validate(handle)) return;
                     visit_assets(asset, [&](auto& subref)
                         {
                             futures.emplace_back(this->unload_asset_async(subref.guid, ctx));
@@ -170,7 +179,7 @@ namespace eeng
         }
 
         std::future<void> reload_asset_async(const Guid& guid, EngineContext& ctx);
-        
+
         void unload_unbound_assets_async(EngineContext& ctx);
 
     private:
@@ -182,6 +191,8 @@ namespace eeng
                 {
                     visit_assets(asset, [&](auto& ref)
                         {
+                            if (storage_->validate(ref.handle)) return;
+
                             using CT = decltype(ref.handle)::value_type;
                             auto handle = storage_->handle_for_guid<CT>(ref.guid);
                             if (!handle)
@@ -219,6 +230,7 @@ namespace eeng
         template<class T>
         void unresolve_asset(AssetRef<T> ref, EngineContext& ctx)
         {
+            if (!storage_->validate(ref.handle)) return;
             storage_->modify(ref.handle, [&](T& asset)
                 {
                     visit_assets(asset, [&](auto& ref)
@@ -240,6 +252,54 @@ namespace eeng
             unresolve_asset<T>(maybe_ref.value(), ctx);
         }
 
+        // ---
+
+        // IResourceManager?
+        bool validate_asset(const Guid& guid, EngineContext& ctx);
+        bool validate_asset_recursive(const Guid& guid, EngineContext& ctx);
+
+        template<class T>
+        bool validate_asset(const Handle<T>& handle)
+        {
+            return storage_->validate(handle);
+        }
+
+        template<class T>
+        bool validate_asset(const Guid& guid)
+        {
+            if (auto handle_opt = storage_->handle_for_guid<T>(guid))
+                return true;
+            return false;
+        }
+
+        template<class T>
+        bool validate_asset_recursive(const Handle<T>& handle)
+        {
+            bool valid = validate_asset(handle);
+            if (!valid) return false;
+
+            storage_->modify(handle, [&](const T& asset)
+                {
+                    visit_assets(asset, [&](const auto& asset_ref)
+                        {
+                            using SubT = typename std::decay_t<decltype(asset_ref.handle)>::value_type;
+                            // valid &= validate_asset_recursive<SubT>(asset_ref.handle);
+                            if (!validate_asset_recursive<SubT>(asset_ref.handle))
+                                valid = false;
+
+                        });
+                });
+            return valid;
+        }
+
+        template<class T>
+        bool validate_asset_recursive(const Guid& guid)
+        {
+            if (auto handle_opt = storage_->handle_for_guid<T>(guid))
+                return validate_asset_recursive(handle_opt.value());
+            return false;
+        }
+
     private:
         void load_asset(const Guid& guid, EngineContext& ctx);
         void unload_asset(const Guid& guid, EngineContext& ctx);
@@ -253,16 +313,12 @@ namespace eeng
         template<typename T>
         std::optional<AssetRef<T>> ref_for_guid(const Guid& guid)
         {
-            if (auto handle = storage_->handle_for_guid<T>(guid))
-                return AssetRef<T>{ guid, * handle };
-            // if (auto meta_handle = storage_->handle_for_guid(guid)) {
-            //     if (auto handle = meta_handle->cast<T>())
-            //         return AssetRef<T>{ guid, * handle };
-            // }
+            if (auto handle_opt = storage_->handle_for_guid<T>(guid))
+                return AssetRef<T>{ guid, handle_opt.value() };
             return std::nullopt;
         }
 
-        void invoke_meta_function(
+        entt::meta_any invoke_meta_function(
             const Guid& guid,
             EngineContext& ctx,
             entt::hashed_string function_id,
