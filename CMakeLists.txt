@@ -230,7 +230,8 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/MockImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/Profiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/ThreadPool.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaReg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/AssetMetaReg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/ComponentMetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp

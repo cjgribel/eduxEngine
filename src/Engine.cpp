@@ -9,7 +9,8 @@
 #include "InputManager.hpp"
 #include "LogMacros.h"
 #include "LogGlobals.hpp"
-#include "MetaReg.hpp"
+#include "AssetMetaReg.hpp"
+#include "ComponentMetaReg.hpp"
 
 #include "ImGuiBackendSDL.hpp"
 #include "EventQueue.h"
@@ -94,7 +95,8 @@ namespace eeng
             EENG_LOG_INFO(ctx, "Anisotropic samples %i (requested), %i (max))", EENG_ANISO_SAMPLES, (int)maxAniso);
         }
 #endif
-        register_meta_types();
+        register_asset_meta_types();
+        register_component_meta_types();
 
         // Event subscriptions
         ctx->event_queue->register_callback([&](const SetVsyncEvent& event) { this->on_set_vsync(event); });

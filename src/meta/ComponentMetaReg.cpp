@@ -6,7 +6,7 @@
 #include <entt/meta/pointer.hpp>
 #include <nlohmann/json.hpp>
 #include "config.h"
-#include "MetaReg.hpp"
+#include "AssetMetaReg.hpp"
 #include "ResourceTypes.h"
 #include "MetaLiterals.h"
 #include "Storage.hpp"
@@ -232,122 +232,9 @@ namespace eeng {
         }
     } // namespace
 
-    void register_meta_types()
+    void register_component_meta_types()
     {
-        // === Guid ===
-
-        entt::meta_factory<Guid>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "Guid", "A globally unique identifier." })
-            .func<&serialize_Guid>(eeng::literals::serialize_hs)
-            .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
-            ;
-
-        // === AssetMetaData ===
-
-        entt::meta_factory<AssetMetaData>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "AssetMetaData", "Metadata for an asset." })
-
-            .data<&AssetMetaData::guid>("guid"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
-            .traits(MetaFlags::read_only)
-
-            .data<&AssetMetaData::guid_parent>("guid_parent"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "parent_guid", "Parent Guid", "The GUID of the parent asset." })
-            .traits(MetaFlags::read_only)
-
-            .data<&AssetMetaData::name>("name"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the asset." })
-            .traits(MetaFlags::read_only)
-
-            .data<&AssetMetaData::type_name>("type_name"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "type_name", "Type Name", "The type name of the asset." })
-            .traits(MetaFlags::read_only)
-
-            .data<&AssetMetaData::contained_assets>("contained_assets"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "contained_assets", "Contained Assets", "Contained assets." })
-            .traits(MetaFlags::read_only)
-
-            // .data<&AssetMetaData::file_path>("file_path"_hs)
-            // .custom<DataMetaInfo>(DataMetaInfo{ "file_path", "File Path", "The file path of the asset." })
-            // .traits(MetaFlags::read_only)
-            ;
-
-        // === RESOURCES ===
-
-        // mock::Mesh
-        register_resource<mock::Mesh>();
-        entt::meta_factory<mock::Mesh>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "Mesh", "This is a mock mesh type." })
-            .data<&mock::Mesh::vertices>("vertices"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "vertices", "Vertices", "A vector of vertex positions." })
-            .traits(MetaFlags::read_only)
-            ;
-
-        // mock::Texture
-        register_resource<mock::Texture>();
-        entt::meta_factory<mock::Texture>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "Texture", "This is a mock Texture type." })
-            .data<&mock::Texture::name>("name"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the texture." })
-            .traits(MetaFlags::read_only)
-            ;
-
-        // mock::Model
-        register_resource<mock::Model>();
-        entt::meta_factory<mock::Model>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "Model", "This is a mock model type." })
-
-            .data<&mock::Model::meshes>("meshes"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "meshes", "Meshes", "A vector of mesh references." })
-            .traits(MetaFlags::read_only)
-
-            .data<&mock::Model::textures>("textures"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "textures", "Textures", "A vector of texture references." })
-            .traits(MetaFlags::read_only)
-            ;
-
-        // entt::meta<Texture>()
-        //     .type("Texture"_hs)
-        //     .func<&assure_storage<Texture>>("assure_storage"_hs);
-        //
-        // + forward_as_meta
-        // auto assure_fn = entt::resolve<Texture>().func("assure_storage"_hs);
-        // assure_fn.invoke({}, registry);
-
-        // mock::MockResource1
-        register_resource<mock::MockResource1>();
-        entt::meta_factory<mock::MockResource1>{}
-        // .type("MockResource1"_hs)
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "MockResource1", "This is a mock resource type." })
-
-            // Register member 'x' with DisplayInfo and DataFlags
-            .data<&mock::MockResource1::x>("x"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "An integer member 'x'" })
-            .traits(MetaFlags::read_only)
-
-            // Register member 'y' with DisplayInfo and multiple DataFlags
-            .data<&mock::MockResource1::y>("y"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "A float member 'y'" })
-            .traits(MetaFlags::hidden | MetaFlags::read_only)
-
-            // Required for all resource types
-            .template func<&assure_storage<mock::MockResource1>>(eeng::literals::assure_storage_hs)
-
-            // Required only if resource has recursive references
-            //.func<&visit_assets<MockResource1>>("visit_refs"_hs);
-                // Usage:
-                //entt::meta_type type = entt::resolve<MockResource1>();
-                // auto visit_fn = type.func("visit_refs"_hs);
-                // if (visit_fn) {
-                //     visit_fn.invoke({}, entt::forward_as_meta(model), visitor_fn);
-                // }
-
-        //.func < [](eeng::Storage& storage) { } > (inspect_hs)
-        //.data<&BehaviorScript::on_collision/*, entt::as_ref_t*/>("on_collision"_hs).prop(display_name_hs, "on_collision")
-
-            ;
-
-        register_resource<mock::MockResource2>();
+        
     }
 
 } // namespace eeng
