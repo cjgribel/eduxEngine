@@ -405,7 +405,7 @@ namespace eeng
             draw_node_recursive = [&](size_t node_idx)
                 {
                     const Guid& guid = tree.get_payload_at(node_idx);
-                    auto guid_status = resource_manager.get_status(guid);
+                    auto guid_status = ctx.resource_manager->get_status(guid);
 
                     // Get asset entry = meta data + paths
                     auto it = index_data->by_guid.find(guid);

@@ -22,6 +22,7 @@ namespace eeng
     Engine context facilities:
     - Entity manager
     - Resource manager
+    - (TODO) GPU Resource manager
     - Thread pool
     - Event dispatcher
     - Logger
