@@ -22,6 +22,13 @@ namespace eeng {
         // Standard component meta functions
         //
 
+        // template<typename T>
+        // void resolve_component_meta(entt::meta_any& any, ResourceManager& rm)
+        // {
+        //     T& obj = any.cast<T&>();
+        //     rm.resolve_component(obj);
+        // }
+
 #if 0
         // Collect referenced GUIDs for Assets or Components
         template<typename T>
@@ -40,6 +47,7 @@ namespace eeng {
             // constexpr auto id    = entt::type_hash<T>::value();
 
             entt::meta_factory<T>()
+                // .func<&resolve_component_meta<T>>(hashed_string("resolve_component"))
                 ;
 
             // AssetRef<T>
@@ -68,7 +76,7 @@ namespace eeng {
             assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
             *ptr = Guid{ j.get<uint64_t>() };
         }
-    } // namespace
+} // namespace
 #endif
 
     void register_component_meta_types()
@@ -76,4 +84,4 @@ namespace eeng {
         // register_component<>();
     }
 
-} // namespace eeng
+    } // namespace eeng
