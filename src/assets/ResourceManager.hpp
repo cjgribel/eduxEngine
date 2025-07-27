@@ -10,14 +10,9 @@
 #include "AssetMetaData.hpp"
 #include "AssetRef.hpp"
 #include "MetaLiterals.h" // load_asset_hs, unload_asset_hs
+#include "LogMacros.h"
 #include <string>
 #include <mutex> // std::mutex - > maybe AssetIndex
-
-// -> AssetIndex ???
-#include "MetaSerialize.hpp"
-#include "LogMacros.h"
-#include <nlohmann/json.hpp> // <nlohmann/json_fwd.hpp>
-#include <fstream>
 
 namespace eeng
 {
@@ -37,32 +32,26 @@ namespace eeng
         ResourceManager();
         ~ResourceManager();
 
+        // --- IResourceManager API --------------------------------------------
+
         AssetStatus get_status(const Guid& guid) const override;
 
-        std::future<void> load_branch_async(std::deque<Guid> branch_guids, EngineContext& ctx);
-        std::future<void> unload_branch_async(std::deque<Guid> branch_guids, EngineContext& ctx);
-        //
-        std::future<bool> load_asset_async(const Guid& guid, EngineContext& ctx) override;
-        std::future<bool> unload_asset_async(const Guid& guid, EngineContext& ctx) override;
-
-    private:
-        // std::future<bool> resolve_asset_async(const Guid& guid, EngineContext& ctx);
-        // std::future<bool> unresolve_asset_async(const Guid& guid, EngineContext& ctx);
+        std::future<void> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override;
+        std::future<void> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override;
+        std::future<void> reload_and_rebind_async(std::deque<Guid> guids, EngineContext& ctx) override;
 
         void retain_guid(const Guid& guid) override;
         void release_guid(const Guid& guid, EngineContext& ctx) override;
 
-    public:
-
         bool is_scanning() const override;
-
-        /// @brief Get a snapshot of the asset index
-        /// @return std::vector<AssetEntry>
-        // std::vector<AssetEntry> get_asset_entries_snapshot() const override;
+        
+        /// @brief Get a snapshot of asset index
         AssetIndexDataPtr get_index_data() const override;
-
+        
         std::string to_string() const override;
-
+        
+        // --- Local API -------------------------------------------------------
+        
         const Storage& storage() const;
         Storage& storage();
 
@@ -186,11 +175,13 @@ namespace eeng
             storage_->remove_now(handle);
         }
 
-        std::future<void> reload_asset_async(const Guid& guid, EngineContext& ctx);
-
-        void unload_unbound_assets_async(EngineContext& ctx);
-
     private:
+
+        void load_asset(const Guid& guid, EngineContext& ctx);
+        void unload_asset(const Guid& guid, EngineContext& ctx);
+
+        void resolve_asset(const Guid& guid, EngineContext& ctx);
+        void unresolve_asset(const Guid& guid, EngineContext& ctx);
 
         template<class T>
         void resolve_asset(AssetRef<T> ref, EngineContext& ctx)
@@ -316,11 +307,6 @@ namespace eeng
         }
 
     private:
-        void load_asset(const Guid& guid, EngineContext& ctx);
-        void unload_asset(const Guid& guid, EngineContext& ctx);
-
-        void resolve_asset(const Guid& guid, EngineContext& ctx);
-        void unresolve_asset(const Guid& guid, EngineContext& ctx);
 
         // --- Helpers ---------------------------------------------------------
 

@@ -50,8 +50,9 @@ namespace
     {
 #if 1
         AssetStatus get_status(const Guid& guid) const override { return AssetStatus{}; }
-        std::future<bool> load_asset_async(const Guid& guid, eeng::EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return false; }); }
-        std::future<bool> unload_asset_async(const Guid& guid, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return false; }); }
+        std::future<void> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { }); }
+        std::future<void> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { }); }
+        std::future<void> reload_and_rebind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { }); }
 
         void retain_guid(const Guid& guid) override {}
         void release_guid(const Guid& guid, eeng::EngineContext& ctx) override {}

@@ -17,6 +17,48 @@
 
 namespace eeng
 {
+    using AssetBatch = std::deque<Guid>;
+
+    namespace
+    {
+        // top-up, breadth-first
+        AssetBatch get_branch_topdown(const Guid& guid, const EngineContext& ctx)
+        {
+            AssetBatch stack;
+            auto& tree = ctx.resource_manager->get_index_data()->trees->content_tree;
+            tree.traverse_breadthfirst(guid, [&](const Guid& guid, size_t) { stack.push_back(guid);  });
+            return stack;
+        }
+
+        // bottom-up, breadth-first
+        AssetBatch get_branch_bottomup(const Guid& guid, const EngineContext& ctx)
+        {
+            AssetBatch stack;
+            auto& tree = ctx.resource_manager->get_index_data()->trees->content_tree;
+            tree.traverse_breadthfirst(guid, [&](const Guid& guid, size_t) { stack.push_front(guid);  });
+            return stack;
+        }
+
+        std::deque<Guid> compute_selected_bottomup_closure(const EngineContext& ctx)
+        {
+            std::deque<Guid> merged;
+            std::unordered_set<Guid> seen;
+
+            for (const Guid& guid : ctx.asset_selection->get_all())
+            {
+                auto branch = get_branch_bottomup(guid, ctx);
+
+                for (const Guid& g : branch)
+                {
+                    if (seen.insert(g).second)
+                        merged.push_back(g);
+                }
+            }
+
+            return merged;
+        }
+    }
+
     void GuiManager::init()
     {
         // ImGui::StyleColorsClassic();
@@ -172,24 +214,6 @@ namespace eeng
 
     }
 
-    using AssetBranch = std::deque<Guid>;
-    namespace {
-        AssetBranch get_branch_bottomup(const Guid& guid, EngineContext& ctx)
-        {
-            // BranchQueue stack;
-            AssetBranch stack;
-
-            auto& tree = ctx.resource_manager->get_index_data()->trees->content_tree;
-
-            tree.traverse_breadthfirst(guid, [&](const Guid& entity, size_t)
-                {
-                    stack.push_front(entity);
-                });
-
-            return stack;
-        }
-    }
-
     // Window content
     void draw_asset_flat_list(EngineContext& ctx)
     {
@@ -274,7 +298,7 @@ namespace eeng
                 draw_asset_flat_list(ctx);
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("By Dependency"))
+            if (ImGui::BeginTabItem("(By Dependency)"))
             {
                 // Selection
                 ImGui::TextDisabled("Selected: ");
@@ -345,6 +369,11 @@ namespace eeng
         // ─── BOTTOM PANE ───────────────────────────────────────────
         ImGui::BeginChild("##BottomPane", ImVec2(0, bottom_pane_height), true);
 
+        // Async busy flag
+        bool busy = ctx.asset_async_future.valid() &&
+            ctx.asset_async_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
+        ImGui::BeginDisabled(busy);
+
         if (ImGui::Button("Import")) { /* Import a batch of mock assets (META)  */ }
         ImGui::SameLine();
         if (ImGui::Button("Unimport")) { /* ... */ }
@@ -365,45 +394,71 @@ namespace eeng
                 std::cout << std::endl;
             }
 #endif
-#if 1
+            // TODO: filter selection to roots
             for (auto& guid : ctx.asset_selection->get_all())
-                resource_manager.load_branch_async(get_branch_bottomup(guid, ctx), ctx);
+                resource_manager.load_and_bind_async(get_branch_bottomup(guid, ctx), ctx);
+#if 0
             // Don't allow parent + child to be selected here.
-            // for (auto& guid : ctx.asset_selection->get_all()) {
-            //     if (content_tree.is_root(guid))
-            //         resource_manager.load_asset_async(guid, ctx);
-            // }
-#endif
+            for (auto& guid : ctx.asset_selection->get_all()) {
+                if (content_tree.is_root(guid))
+                    resource_manager.load_asset_async(guid, ctx);
         }
+#endif
+    }
         ImGui::SameLine();
         if (ImGui::Button("Unload"))
         {
+            // TODO: filter selection to roots
             for (auto& guid : ctx.asset_selection->get_all())
-                resource_manager.unload_branch_async(get_branch_bottomup(guid, ctx), ctx);
+                resource_manager.unbind_and_unload_async(get_branch_bottomup(guid, ctx), ctx);
 #if 0
             // Don't allow parent + child to be selected here.
             for (auto& guid : ctx.asset_selection->get_all()) {
                 // if (content_tree.is_root(guid))
                 resource_manager.unload_asset_async(guid, ctx);
-            }
+        }
 #endif
-        }
+}
 
-        ImGui::SameLine();
-        if (ImGui::Button("Unload unbound"))
-        {
-            resource_manager.unload_unbound_assets_async(ctx);
-        }
+        // ImGui::SameLine();
+        // if (ImGui::Button("Unload unbound"))
+        // {
+        //     resource_manager.unload_unbound_assets_async(ctx);
+        // }
 
         ImGui::SameLine();
         if (ImGui::Button("Reload"))
         {
+#if 1
+            std::deque<Guid> to_reload = compute_selected_bottomup_closure(ctx);
+
+            // for (const auto& guid : ctx.asset_selection->get_all())
+            // {
+            //     auto branch = get_branch_bottomup(guid, ctx);
+            //     to_reload.insert(to_reload.end(), branch.begin(), branch.end());
+            // }
+
+            // // Optional: remove duplicates (recommended)
+            // std::unordered_set<Guid> seen;
+            // std::erase_if(to_reload, [&](const Guid& g) {
+            //     return !seen.insert(g).second;
+            //     });
+
+            // Track the future to block or disable reload UI if needed
+            ctx.asset_async_future = resource_manager.reload_and_rebind_async(to_reload, ctx);
+#else
+            // TODO: filter selection to roots
+            for (auto& guid : ctx.asset_selection->get_all())
+                resource_manager.reload_and_rebind_async(get_branch_bottomup(guid, ctx), ctx);
+#endif
             // Don't allow parent + child to be selected here.
-            for (auto& guid : ctx.asset_selection->get_all()) {
-                if (content_tree.is_root(guid))
-                    resource_manager.reload_asset_async(guid, ctx);
-            }
+            // for (auto& guid : ctx.asset_selection->get_all()) {
+            //     if (content_tree.is_root(guid))
+            //         resource_manager.reload_asset_async(guid, ctx);
+            // }
         }
+
+        ImGui::EndDisabled();
 
         // <-
         ImGui::Text("Thread utilization %zu/%zu, queued %zu",

@@ -73,7 +73,7 @@ namespace eeng
         , gui_manager(std::move(gui_manager))
         , input_manager(std::move(input_manager))
         , log_manager(log_manager)
-        , thread_pool(std::make_unique<ThreadPool>())
+        , thread_pool(std::make_unique<ThreadPool>(2))
         , event_queue(std::make_unique<EventQueue>())
         , asset_selection(std::make_unique<editor::SelectionManager<Guid>>())
         , entity_selection(std::make_unique<editor::SelectionManager<Entity>>())
