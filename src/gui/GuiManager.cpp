@@ -172,6 +172,24 @@ namespace eeng
 
     }
 
+    using AssetBranch = std::deque<Guid>;
+    namespace {
+        AssetBranch get_branch_bottomup(const Guid& guid, EngineContext& ctx)
+        {
+            // BranchQueue stack;
+            AssetBranch stack;
+
+            auto& tree = ctx.resource_manager->get_index_data()->trees->content_tree;
+
+            tree.traverse_breadthfirst(guid, [&](const Guid& entity, size_t)
+                {
+                    stack.push_front(entity);
+                });
+
+            return stack;
+        }
+    }
+
     // Window content
     void draw_asset_flat_list(EngineContext& ctx)
     {
@@ -337,18 +355,38 @@ namespace eeng
         auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         if (ImGui::Button("Load"))
         {
+#if 1
+            // auto& guid = ctx.asset_selection->first();
             for (auto& guid : ctx.asset_selection->get_all()) {
-                // if (content_tree.is_root(guid))
-                resource_manager.load_asset_async(guid, ctx);
+                auto asset_branch = get_branch_bottomup(guid, ctx);
+                std::cout << "Branch for GUID " << guid.to_string() << ": ";
+                for (auto& guid : asset_branch)
+                    std::cout << guid.to_string() << ", ";
+                std::cout << std::endl;
             }
+#endif
+#if 1
+            for (auto& guid : ctx.asset_selection->get_all())
+                resource_manager.load_branch_async(get_branch_bottomup(guid, ctx), ctx);
+            // Don't allow parent + child to be selected here.
+            // for (auto& guid : ctx.asset_selection->get_all()) {
+            //     if (content_tree.is_root(guid))
+            //         resource_manager.load_asset_async(guid, ctx);
+            // }
+#endif
         }
         ImGui::SameLine();
         if (ImGui::Button("Unload"))
         {
+            for (auto& guid : ctx.asset_selection->get_all())
+                resource_manager.unload_branch_async(get_branch_bottomup(guid, ctx), ctx);
+#if 0
+            // Don't allow parent + child to be selected here.
             for (auto& guid : ctx.asset_selection->get_all()) {
                 // if (content_tree.is_root(guid))
                 resource_manager.unload_asset_async(guid, ctx);
             }
+#endif
         }
 
         ImGui::SameLine();
@@ -360,9 +398,10 @@ namespace eeng
         ImGui::SameLine();
         if (ImGui::Button("Reload"))
         {
+            // Don't allow parent + child to be selected here.
             for (auto& guid : ctx.asset_selection->get_all()) {
-                // if (content_tree.is_root(guid))
-                resource_manager.reload_asset_async(guid, ctx);
+                if (content_tree.is_root(guid))
+                    resource_manager.reload_asset_async(guid, ctx);
             }
         }
 

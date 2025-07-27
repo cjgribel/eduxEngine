@@ -60,6 +60,121 @@ namespace eeng
             });
     }
 
+    //
+    // NEW
+    //
+    std::future<void> ResourceManager::load_branch_async(
+        std::deque<Guid> branch_guids,  // bottom-up order
+        EngineContext& ctx)
+    {
+        // Use shared_ptr to safely share future list with the final join task
+        auto futures = std::make_shared<std::vector<std::shared_future<bool>>>();
+
+        auto begin_load_status = [&](const Guid& guid)
+            {
+                std::lock_guard lock(status_mutex_);
+                auto& status = statuses_[guid];
+                if (status.state == LoadState::Loading || status.state == LoadState::Loaded)
+                    return false;
+
+                status.state = LoadState::Loading;
+                return true;
+            };
+
+        for (const Guid& guid : branch_guids)
+        {
+            futures->emplace_back(
+                ctx.thread_pool->queue_task([=, this, &ctx]() -> bool
+                    {
+                        if (!begin_load_status(guid)) return false;  // Already loading or loaded
+
+                        try {
+                            this->load_asset(guid, ctx);  // no recursion inside
+                            std::lock_guard lock(status_mutex_);
+                            statuses_[guid].state = LoadState::Loaded;
+                            return true;
+                        }
+                        catch (const std::exception& ex) {
+                            std::lock_guard lock(status_mutex_);
+                            statuses_[guid].state = LoadState::Failed;
+                            statuses_[guid].error_message = ex.what();
+                            return false;
+                        }
+                    })
+            );
+        }
+
+        // Join task: wait for all, then resolve in top-down order
+        return ctx.thread_pool->queue_task([=, this, &ctx]() {
+            for (auto& f : *futures)
+                f.get(); // wait for all loads to complete
+
+            for (const Guid& guid : branch_guids | std::views::reverse) {
+                // std::cout << guid.to_string() << " is valid: " << storage_->handle_for_guid(guid).has_value() << std::endl;
+                this->resolve_asset(guid, ctx);
+            }
+            });
+    }
+
+    //
+    // NEW
+    //
+
+    std::future<void> ResourceManager::unload_branch_async(
+        std::deque<Guid> branch_guids,
+        EngineContext& ctx)
+    {
+        // Step 1: Unresolve assets in the branch (before launching unloads)
+        for (const Guid& guid : branch_guids)
+        {
+            // std::lock_guard lock(status_mutex_);
+            // auto& status = statuses_[guid];
+            // if (status.state == LoadState::Loaded)
+                unresolve_asset(guid, ctx); // drops references, decrements ref counts
+        }
+
+        // Step 2: Launch unloads (if ref_count == 0)
+        auto futures = std::make_shared<std::vector<std::future<bool>>>();
+
+        for (const Guid& guid : branch_guids)
+        {
+            {
+                std::lock_guard lock(status_mutex_);
+                auto& status = statuses_[guid];
+
+                // Only unload if it’s loaded and no one else is using it
+                if (status.state != LoadState::Loaded || status.ref_count > 0)
+                {
+                    continue; // skip it
+                }
+
+                status.state = LoadState::Unloading;
+            }
+
+            futures->emplace_back(ctx.thread_pool->queue_task([=, this, &ctx]() {
+                try {
+                    this->unload_asset(guid, ctx);  // dispatches to unload<T>
+                    std::lock_guard lock(status_mutex_);
+                    statuses_.erase(guid); // completely gone
+                    return true;
+                }
+                catch (const std::exception& ex) {
+                    std::lock_guard lock(status_mutex_);
+                    statuses_[guid].state = LoadState::Failed;
+                    statuses_[guid].error_message = ex.what();
+                    return false;
+                }
+                }));
+        }
+
+        // Step 3: Wait for all unloads to complete
+        return ctx.thread_pool->queue_task([futures]() {
+            for (auto& f : *futures)
+                f.get(); // safe to call now
+            });
+    }
+
+
     std::future<bool> ResourceManager::unload_asset_async(const Guid& guid, EngineContext& ctx)
     {
         {
@@ -203,11 +318,14 @@ namespace eeng
         return ctx.thread_pool->queue_task([=, this, &ctx]() {
             try
             {
+                this->unload_asset(guid, ctx);
+                this->load_asset(guid, ctx);
+
                 // Wait for unload to complete inside thread
-                this->unload_asset_async(guid, ctx).get();
+                // this->unload_asset_async(guid, ctx).get();
 
                 // Wait for load to complete
-                this->load_asset_async(guid, ctx).get();
+                // this->load_asset_async(guid, ctx).get();
 
                 std::lock_guard lock(status_mutex_);
                 statuses_[guid].state = LoadState::Loaded;

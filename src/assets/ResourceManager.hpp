@@ -39,6 +39,9 @@ namespace eeng
 
         AssetStatus get_status(const Guid& guid) const override;
 
+        std::future<void> load_branch_async(std::deque<Guid> branch_guids, EngineContext& ctx);
+        std::future<void> unload_branch_async(std::deque<Guid> branch_guids, EngineContext& ctx);
+        //
         std::future<bool> load_asset_async(const Guid& guid, EngineContext& ctx) override;
         std::future<bool> unload_asset_async(const Guid& guid, EngineContext& ctx) override;
 
@@ -113,7 +116,7 @@ namespace eeng
             if (storage_->handle_for_guid<T>(guid))
             {
                 // Already loaded — just ensure resolution
-                resolve_asset<T>(AssetRef<T>{ guid, * storage_->handle_for_guid<T>(guid) }, ctx);
+                //resolve_asset<T>(AssetRef<T>{ guid, * storage_->handle_for_guid<T>(guid) }, ctx);
                 return;
             }
 
@@ -122,9 +125,11 @@ namespace eeng
             T asset = asset_index_->deserialize_from_file<T>(guid, ctx);
 
             // Async load child assets
+#if 0
             std::vector<std::future<bool>> futures;
             visit_assets(asset, [&](auto& subref)
                 {
+                    if (storage_->validate(subref.handle)) return;
                     futures.emplace_back(this->load_asset_async(subref.guid, ctx));
                 });
             // Check results
@@ -133,6 +138,7 @@ namespace eeng
                 if (!f.get()) // Child failed to load
                     throw std::runtime_error("One or more dependencies failed to load for asset: " + guid.to_string());
             }
+#endif
 
             // Add to storage
             // The handle is fetched when the asset is bound
@@ -140,7 +146,7 @@ namespace eeng
 
             // -- resolve now???  --
             // resolve_asset<T>(guid, ctx);
-            resolve_asset(AssetRef<T> {guid, handle}, ctx);
+            // resolve_asset(AssetRef<T> {guid, handle}, ctx);
         }
 
         template<typename T>
@@ -154,9 +160,10 @@ namespace eeng
             //throw std::runtime_error("Asset not loaded for " + guid.to_string());
             auto handle = *maybe_handle;
 
+#if 0
             // unresolve_asset<T>(guid, ctx);
             unresolve_asset(AssetRef<T> {guid, handle}, ctx);
-
+            // auto& tree = get_index_data()->trees->content_tree;
             // Async unload child assets
             std::vector<std::future<bool>> futures;
             storage_->modify(handle, [&](T& asset)
@@ -173,6 +180,7 @@ namespace eeng
                 if (!f.get()) // Child failed to load
                     throw std::runtime_error("One or more dependencies failed to unload for asset: " + guid.to_string());
             }
+#endif
 
             /* add delay */ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             storage_->remove_now(handle);
@@ -200,7 +208,7 @@ namespace eeng
 
                             ref.handle = handle.value();
                             retain_guid(ref.guid);
-                            resolve_asset(ref, ctx);
+                            // resolve_asset(ref, ctx);
                         });
                 });
         }
@@ -217,13 +225,20 @@ namespace eeng
             resolve_asset<T>(maybe_ref.value(), ctx);
         }
 
-        // template<class T>
-        // void rebind_assets()
+        // template<typename T>
+        // void resolve_component(T& component)
         // {
-        //     // unbind all
-        //     unresolve_asset()
+        //     visit_assets(component, [&](auto& ref)
+        //         {
+        //             using AssetT = typename std::decay_t<decltype(ref)>::asset_type;
 
-        //     // bind all
+        //             auto handle = storage_->handle_for_guid<AssetT>(ref.guid);
+        //             if (!handle)
+        //                 throw std::runtime_error("Unresolved reference: " + ref.guid.to_string());
+
+        //             ref.handle = *handle;
+        //             retain_guid(ref.guid); // ❗Component owns this asset
+        //         });
         // }
 
     private:
@@ -235,7 +250,7 @@ namespace eeng
                 {
                     visit_assets(asset, [&](auto& ref)
                         {
-                            unresolve_asset(ref, ctx);
+                            // unresolve_asset(ref, ctx);
                             release_guid(ref.guid, ctx);
                             ref.handle = {};
                         });
@@ -248,7 +263,7 @@ namespace eeng
         {
             auto maybe_ref = ref_for_guid<T>(guid);
             if (!maybe_ref)
-                throw std::runtime_error("Asset not loaded: " + guid.to_string());
+                return; //throw std::runtime_error("Asset not loaded: " + guid.to_string());
             unresolve_asset<T>(maybe_ref.value(), ctx);
         }
 
