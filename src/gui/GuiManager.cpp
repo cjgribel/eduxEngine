@@ -384,41 +384,15 @@ namespace eeng
         auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         if (ImGui::Button("Load"))
         {
-#if 1
-            // auto& guid = ctx.asset_selection->first();
-            for (auto& guid : ctx.asset_selection->get_all()) {
-                auto asset_branch = get_branch_bottomup(guid, ctx);
-                std::cout << "Branch for GUID " << guid.to_string() << ": ";
-                for (auto& guid : asset_branch)
-                    std::cout << guid.to_string() << ", ";
-                std::cout << std::endl;
-            }
-#endif
-            // TODO: filter selection to roots
-            for (auto& guid : ctx.asset_selection->get_all())
-                resource_manager.load_and_bind_async(get_branch_bottomup(guid, ctx), ctx);
-#if 0
-            // Don't allow parent + child to be selected here.
-            for (auto& guid : ctx.asset_selection->get_all()) {
-                if (content_tree.is_root(guid))
-                    resource_manager.load_asset_async(guid, ctx);
+            auto to_reload = compute_selected_bottomup_closure(ctx);
+            ctx.asset_async_future = resource_manager.load_and_bind_async(to_reload, ctx);
         }
-#endif
-    }
         ImGui::SameLine();
         if (ImGui::Button("Unload"))
         {
-            // TODO: filter selection to roots
-            for (auto& guid : ctx.asset_selection->get_all())
-                resource_manager.unbind_and_unload_async(get_branch_bottomup(guid, ctx), ctx);
-#if 0
-            // Don't allow parent + child to be selected here.
-            for (auto& guid : ctx.asset_selection->get_all()) {
-                // if (content_tree.is_root(guid))
-                resource_manager.unload_asset_async(guid, ctx);
+            auto to_reload = compute_selected_bottomup_closure(ctx);
+            ctx.asset_async_future = resource_manager.unbind_and_unload_async(to_reload, ctx);
         }
-#endif
-}
 
         // ImGui::SameLine();
         // if (ImGui::Button("Unload unbound"))
@@ -434,7 +408,7 @@ namespace eeng
             ctx.asset_async_future = resource_manager.reload_and_rebind_async(to_reload, ctx);
         }
 
-        ImGui::EndDisabled();
+        ImGui::EndDisabled(); // busy
 
         // <-
         ImGui::Text("Thread utilization %zu/%zu, queued %zu",
