@@ -22,7 +22,7 @@ public:
     template <typename Func>
     auto queue_task(Func task) -> std::future<std::invoke_result_t<Func>>;
 
-    size_t nbr_threds() const;
+    size_t nbr_threads() const;
     size_t nbr_working_threads() const;
     size_t nbr_idle_threads() const;
     size_t task_queue_size() const;

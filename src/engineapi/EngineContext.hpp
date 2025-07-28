@@ -82,7 +82,7 @@ namespace eeng
         ~EngineContext();
 
         std::unique_ptr<IEntityManager>     entity_manager;
-        std::unique_ptr<IResourceManager>   resource_manager; // NOTE: is cast to ResourceManager by client
+        std::unique_ptr<IResourceManager>   resource_manager;
         std::unique_ptr<IGuiManager>        gui_manager;
         std::unique_ptr<IInputManager>      input_manager;
         std::shared_ptr<ILogManager>        log_manager;

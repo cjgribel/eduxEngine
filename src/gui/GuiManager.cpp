@@ -429,33 +429,9 @@ namespace eeng
         ImGui::SameLine();
         if (ImGui::Button("Reload"))
         {
-#if 1
-            std::deque<Guid> to_reload = compute_selected_bottomup_closure(ctx);
-
-            // for (const auto& guid : ctx.asset_selection->get_all())
-            // {
-            //     auto branch = get_branch_bottomup(guid, ctx);
-            //     to_reload.insert(to_reload.end(), branch.begin(), branch.end());
-            // }
-
-            // // Optional: remove duplicates (recommended)
-            // std::unordered_set<Guid> seen;
-            // std::erase_if(to_reload, [&](const Guid& g) {
-            //     return !seen.insert(g).second;
-            //     });
-
-            // Track the future to block or disable reload UI if needed
+            assert(ctx.thread_pool->nbr_threads() > 1);
+            auto to_reload = compute_selected_bottomup_closure(ctx);
             ctx.asset_async_future = resource_manager.reload_and_rebind_async(to_reload, ctx);
-#else
-            // TODO: filter selection to roots
-            for (auto& guid : ctx.asset_selection->get_all())
-                resource_manager.reload_and_rebind_async(get_branch_bottomup(guid, ctx), ctx);
-#endif
-            // Don't allow parent + child to be selected here.
-            // for (auto& guid : ctx.asset_selection->get_all()) {
-            //     if (content_tree.is_root(guid))
-            //         resource_manager.reload_asset_async(guid, ctx);
-            // }
         }
 
         ImGui::EndDisabled();
@@ -463,7 +439,7 @@ namespace eeng
         // <-
         ImGui::Text("Thread utilization %zu/%zu, queued %zu",
             ctx.thread_pool->nbr_working_threads(),
-            ctx.thread_pool->nbr_threds(),
+            ctx.thread_pool->nbr_threads(),
             ctx.thread_pool->task_queue_size());
 
         ImGui::Separator();

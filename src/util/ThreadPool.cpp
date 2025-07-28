@@ -58,7 +58,7 @@ ThreadPool::~ThreadPool()
     }
 }
 
-size_t ThreadPool::nbr_threds() const
+size_t ThreadPool::nbr_threads() const
 {
     return thread_count;
 }
