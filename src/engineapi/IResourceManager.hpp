@@ -49,43 +49,5 @@ namespace eeng
         virtual std::string to_string() const = 0;
 
         virtual ~IResourceManager() = default;
-
-        /* 
-        https://chatgpt.com/s/t_687b79b6a15881918c2a19bbb73ec609
-
-        --- Accessed via cast to ResourceManager
-        [meta functions]            (MetaReg)
-        file                        (MockImporter)
-        unfile                      (...)
-        validate_asset              (GuiManager)
-        validate_asset_recursive    (GuiManager)
-        .
-        start_async_scan            (Game) Maybe closed off from Game & called from Engine
-        is_scanning                 (Game)
-
-        Possible approach:
-            Free functions in helper header, which cast to ResourceManager
-            
-            Usage:
-                resource::load(ctx.resource_manager, my_ref, ctx);
-                - instead of -
-                static_cast<ResourceManager*>(ctx.resource_manager.get())->load(...);
-
-            In resource_helpers.hpp:
-
-            namespace resources {
-
-                template<typename T>
-                void file(IResourceManager& iface, const T& asset, const std::string& file_path,
-                        const AssetMetaData& meta, const std::string& meta_file_path)
-                {
-                    auto* impl = dynamic_cast<ResourceManager*>(&iface);
-                    assert(impl && "Expected ResourceManager");
-                    impl->file(asset, file_path, meta, meta_file_path);
-                }
-
-                // ...
-            }
-        */
     };
 } // namespace eeng

@@ -42,6 +42,102 @@ namespace eeng
     // using ModelHandle = Handle<Model>;
 
 
+    // struct GpuModel {
+    //     std::vector<Handle<GpuMesh>> gpu_meshes;
+    // };
+
+#if 0
+
+    // COMPONENTS
+
+    struct ModelComponent {
+        AssetRef<GpuModel> gpu_model_ref;  // shared
+    };
+
+    struct AnimationComponent {
+        AnimationFSM animation_state;      // per-instance
+        std::vector<Bone> bone_transforms; // per-instance
+    };
+
+    // ASSET
+    struct GpuModel {
+        /* NOTE */ AssetRef<Model> model_ref;
+        GLuint vao;               // Single VAO
+        GLuint vertex_buffer;     // All vertices packed
+        GLuint index_buffer;      // All indices packed
+        struct SubMesh {
+            size_t index_offset;
+            size_t index_count;
+            size_t base_vertex;
+            Handle<GpuMaterial> material;
+        };
+        std::vector<SubMesh> submeshes;
+    };
+
+#endif
+    /*
+    1. GpuModel CREATION
+        --> ??? ALWAYS create a GpuModel asset for ModelAsset (made by importer)
+        ??? Create lazily, when a ModelComponent is set to reference a Model asset
+        ??? INCLUDE the GpuModel inside the Model?
+        !!! Take instance-unique data into consideration:
+            (transform), animation stuff, bone array etc (maybe shared)
+
+    2. GpuModel IO: just serialize/deserialize AssetRef<Model> (i.e. its GUID)
+
+    2. LEVEL LOAD
+        Load & bind assets as usual
+        GpuModel now references a Model asset
+
+    3. GPU PHASE
+        For all GpuModel assets: initialize GL handles etc via AssetRef<Model>
+        * If needed: append to shared GL buffers
+
+    4. RENDERING
+        entt view over ModelComponent
+
+    ModelAsset(Persistent)
+        ↑ references
+        GpuModel(Persistent, but serialized as reference - only)
+        ↑ references
+        ModelComponent(Persistent)
+    */
+#if 0
+    void render_gpu_model(const GpuModel& gpu_model) // glDrawElementsBaseVertex
+    {
+        glBindVertexArray(gpu_model.vao);
+
+        for (const auto& submesh : gpu_model.submeshes)
+        {
+            bind_material(submesh.material);
+            glDrawElementsBaseVertex(
+                GL_TRIANGLES,
+                submesh.index_count,
+                GL_UNSIGNED_INT,
+                reinterpret_cast<void*>(submesh.index_offset * sizeof(uint32_t)),
+                submesh.base_vertex);
+        }
+
+        glBindVertexArray(0);
+    }
+#endif
+
+#if 0
+    // RENDER SYSTEM
+    void RenderSystem::render(const RenderableComponent& renderable, const GpuResourceManager& gpu_mgr) {
+        const auto& gpu_mesh = gpu_mgr.get(renderable.mesh_handle);
+
+        glBindVertexArray(gpu_mesh.vao);
+        bind_material(gpu_mesh.material, gpu_mgr);
+
+        set_shader_uniforms(renderable.transform);
+
+        glDrawElements(GL_TRIANGLES, gpu_mesh.index_count, GL_UNSIGNED_INT, nullptr);
+
+        glBindVertexArray(0);
+    }
+#endif
+
 } // namespace eeng
 
 

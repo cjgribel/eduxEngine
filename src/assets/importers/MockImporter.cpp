@@ -65,7 +65,7 @@ namespace eeng::mock {
             mesh_guid,
             model_guid, // Parent GUID
             std::string("MockMesh") + std::to_string(value), // name
-            std::string(entt::resolve<Mesh>().info().name()) // type name
+            std::string(entt::resolve<Mesh>().info().name()) // type name, alt. entt::type_name<T>
         };
         resource_manager.file(
             mesh,
