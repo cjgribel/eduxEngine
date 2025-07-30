@@ -16,7 +16,7 @@
 #include "MetaClone.hpp"
 #include "MetaInspect.hpp"
 #include "InspectType.hpp"
-#include "EditComponentCommand.hpp"
+//#include "editor/EditComponentCommand.hpp"
 
 namespace Editor {
 

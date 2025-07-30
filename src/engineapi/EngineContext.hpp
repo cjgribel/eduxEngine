@@ -10,10 +10,12 @@
 #include "IInputManager.hpp"
 #include "ILogManager.hpp"
 #include "Guid.h"
+
 class ThreadPool;
 class EventQueue;
 namespace eeng:: editor {
     template<typename T> class SelectionManager;
+    class CommandQueue;
 }
 
 namespace eeng
@@ -22,12 +24,12 @@ namespace eeng
     Engine context facilities:
     - Entity manager
     - Resource manager
-    - (TODO) GPU Resource manager
+    - (TODO?) GPU Resource manager
     - Thread pool
     - Event dispatcher
     - Logger
     - Selection manager for assets & entities
-    - (TODO) CommandQueue
+    - CommandQueue
     - (TODO?) Scene manager
     */
 
@@ -81,13 +83,14 @@ namespace eeng
 
         ~EngineContext();
 
-        std::unique_ptr<IEntityManager>     entity_manager;
-        std::unique_ptr<IResourceManager>   resource_manager;
-        std::unique_ptr<IGuiManager>        gui_manager;
-        std::unique_ptr<IInputManager>      input_manager;
-        std::shared_ptr<ILogManager>        log_manager;
-        std::unique_ptr<ThreadPool>         thread_pool;
-        std::unique_ptr<EventQueue>         event_queue;
+        std::unique_ptr<IEntityManager>         entity_manager;
+        std::unique_ptr<IResourceManager>       resource_manager;
+        std::unique_ptr<IGuiManager>            gui_manager;
+        std::unique_ptr<IInputManager>          input_manager;
+        std::shared_ptr<ILogManager>            log_manager;
+        std::unique_ptr<ThreadPool>             thread_pool;
+        std::unique_ptr<EventQueue>             event_queue;
+        std::unique_ptr<editor::CommandQueue>   command_queue;
         std::unique_ptr<editor::SelectionManager<Guid>>     asset_selection;
         std::unique_ptr<editor::SelectionManager<Entity>>   entity_selection;
         std::unique_ptr<EngineConfig>       engine_config;
