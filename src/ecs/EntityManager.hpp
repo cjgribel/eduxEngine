@@ -8,8 +8,8 @@ namespace eeng
 {
     class EntityManager : public IEntityManager
     {
-        Entity create_entity() override { return Entity {}; }
-        void destroy_entity(Entity entity) override {}
+        ecs::Entity create_entity() override { return ecs::Entity {}; }
+        void destroy_entity(ecs::Entity entity) override {}
     };
 
 

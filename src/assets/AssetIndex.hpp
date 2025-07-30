@@ -94,7 +94,7 @@ namespace eeng
 
             entt::meta_any t = T{};
             // entt::meta_any any = entt::resolve<T>().construct(); // meta based
-            meta::deserialize_any(j, t, Entity{}, ctx);
+            meta::deserialize_any(j, t, ecs::Entity{}, ctx);
             return t.cast<T>();
             //T result;
             // meta::deserialize_any(j, entt::forward_as_meta(result), Entity{}, ctx);

@@ -41,8 +41,8 @@ namespace
 {
     struct MockEntityRegistry : eeng::IEntityManager
     {
-        Entity create_entity() override { return Entity{ }; }
-        void destroy_entity(Entity entity) override {}
+        eeng::ecs::Entity create_entity() override { return eeng::ecs::Entity{ }; }
+        void destroy_entity(eeng::ecs::Entity entity) override {}
     };
 
 
@@ -128,7 +128,7 @@ namespace
     void deserialize_vec2(
         const nlohmann::json& j,
         entt::meta_any& any,
-        const Entity& entity,
+        const ecs::Entity& entity,
         eeng::EngineContext& ctx
     )
     {
@@ -322,7 +322,7 @@ namespace
 #endif
         // Deserialize
         entt::meta_any deserialized_any = T{};
-        meta::deserialize_any(j, deserialized_any, Entity{}, ctx);
+        meta::deserialize_any(j, deserialized_any, ecs::Entity{}, ctx);
         T& deserialized_ref = deserialized_any.cast<T&>();
 
         // Compare
@@ -487,7 +487,7 @@ TEST_F(MetaSerializationTest, ConcurrentDeserializeAny) {
         threads.emplace_back([&, t]() {
             for (int i = 0; i < ITERATIONS; ++i) {
                 try {
-                    meta::deserialize_any(j, any, Entity{}, ctx);
+                    meta::deserialize_any(j, any, ecs::Entity{}, ctx);
                     auto& vv = any.cast<vec2&>();
                     // All threads write the same values, so vv.x/y should always match j
                     if (vv.x != j["x"].get<float>()

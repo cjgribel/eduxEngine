@@ -10,15 +10,15 @@
 #include <sstream>
 #include <cassert>
 #include "imgui.h"
-#include "meta_literals.h"
-#include "meta_aux.h"
+#include "MetaLiterals.h"
+#include "MetaAux.h"
 
-#include "MetaClone.hpp"
-#include "MetaInspect.hpp"
-#include "InspectType.hpp"
+#include "meta/MetaClone.hpp"
+#include "meta/MetaInspect.hpp"
+#include "editor/InspectType.hpp"
 //#include "editor/EditComponentCommand.hpp"
 
-namespace Editor {
+namespace eeng::editor {
 
     namespace
     {

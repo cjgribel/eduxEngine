@@ -225,12 +225,13 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Storage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AssetIndex.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ResourceManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/EntityManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/AssimpImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/MockImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/Entity.cpp
-    #     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands.cpp
-    #     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/EditComponentCommand.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/EntityManager.cpp
+    #${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/SceneGraph.cpp
+    #${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/EditComponentCommand.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/Profiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/ThreadPool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/AssetMetaReg.cpp

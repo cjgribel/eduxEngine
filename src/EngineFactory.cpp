@@ -1,6 +1,6 @@
 #include "EngineFactory.hpp"
 #include "Engine.hpp"
-#include "EntityManager.hpp"
+#include "ecs/EntityManager.hpp"
 #include "ResourceManager.hpp"
 #include "GuiManager.hpp"
 #include "InputManager.hpp"

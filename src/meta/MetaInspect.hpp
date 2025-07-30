@@ -11,9 +11,10 @@
 
 #include <entt/entt.hpp>
 #include "config.h"
-#include "EditComponentCommand.hpp"
+#include "editor/EditComponentCommand.hpp"
+#include "ecs/Entity.hpp"
 
-namespace Editor {
+namespace eeng::meta {
 
     class ComponentCommandBuilder;
 
@@ -39,7 +40,7 @@ namespace Editor {
         ComponentCommandBuilder& cmd_builder);
 
     bool inspect_entity(
-        const Entity& entity,
+        const eeng::ecs::Entity& entity,
         InspectorState& inspector);
 
 #if 0

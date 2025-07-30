@@ -91,8 +91,8 @@ namespace eeng
         std::unique_ptr<ThreadPool>             thread_pool;
         std::unique_ptr<EventQueue>             event_queue;
         std::unique_ptr<editor::CommandQueue>   command_queue;
-        std::unique_ptr<editor::SelectionManager<Guid>>     asset_selection;
-        std::unique_ptr<editor::SelectionManager<Entity>>   entity_selection;
+        std::unique_ptr<editor::SelectionManager<Guid>>         asset_selection;
+        std::unique_ptr<editor::SelectionManager<ecs::Entity>>  entity_selection;
         std::unique_ptr<EngineConfig>       engine_config;
 
         std::future<void> asset_async_future;

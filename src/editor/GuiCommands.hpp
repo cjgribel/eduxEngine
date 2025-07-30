@@ -8,27 +8,27 @@
 #ifndef GuiCommands_hpp
 #define GuiCommands_hpp
 
-#include <deque>
+//#include "Context.hpp"
+#include "EngineContext.hpp"
 // #include <entt/entt.hpp>
 // #include "Scene.hpp"
 #include "Command.hpp"
 #include "EditComponentCommand.hpp"
-
 #include "MetaSerialize.hpp"
-#include "Context.hpp"
+#include <deque>
 
-namespace Editor {
+namespace eeng::editor {
 
     class CreateEntityCommand : public Command
     {
-        Entity created_entity;
-        Entity parent_entity;
-        Context context;
+        ecs::Entity created_entity;
+        ecs::Entity parent_entity;
+        std::weak_ptr<EngineContext> ctx;
         std::string display_name;
 
     public:
         CreateEntityCommand(
-            const Entity& parent_entity,
+            const ecs::Entity& parent_entity,
             const Context& context);
 
         void execute() override;
@@ -42,14 +42,14 @@ namespace Editor {
 
     class DestroyEntityCommand : public Command
     {
-        Entity entity;
+        ecs::Entity entity;
         nlohmann::json entity_json{};
         Context context;
         std::string display_name;
 
     public:
         DestroyEntityCommand(
-            const Entity& entity,
+            const ecs::Entity& entity,
             const Context& context
         );
 
@@ -64,14 +64,14 @@ namespace Editor {
 
     class CopyEntityCommand : public Command
     {
-        Entity entity_source;
-        Entity entity_copy;
+        ecs::Entity entity_source;
+        ecs::Entity entity_copy;
         Context context;
         std::string display_name;
 
     public:
         CopyEntityCommand(
-            const Entity& entity,
+            const ecs::Entity& entity,
             const Context& context);
 
         void execute() override;
@@ -85,15 +85,15 @@ namespace Editor {
 
     class CopyEntityBranchCommand : public Command
     {
-        Entity root_entity;
-        std::deque<Entity> source_entities; // top-down
-        std::deque<Entity> copied_entities; // top-down
+        ecs::Entity root_entity;
+        std::deque<ecs::Entity> source_entities; // top-down
+        std::deque<ecs::Entity> copied_entities; // top-down
         Context context;
         std::string display_name;
 
     public:
         CopyEntityBranchCommand(
-            const Entity& entity,
+            const ecs::Entity& entity,
             const Context& context);
 
         void execute() override;
@@ -107,16 +107,16 @@ namespace Editor {
 
     class ReparentEntityBranchCommand : public Command
     {
-        Entity entity;
-        Entity prev_parent_entity;
-        Entity new_parent_entity;
+        ecs::Entity entity;
+        ecs::Entity prev_parent_entity;
+        ecs::Entity new_parent_entity;
         Context context;
         std::string display_name;
 
     public:
         ReparentEntityBranchCommand(
-            const Entity& entity,
-            const Entity& parent_entity,
+            const ecs::Entity& entity,
+            const ecs::Entity& parent_entity,
             const Context& context);
 
         void execute() override;
@@ -153,14 +153,14 @@ namespace Editor {
 
     class AddComponentToEntityCommand : public Command
     {
-        Entity entity;
+        ecs::Entity entity;
         entt::id_type comp_id;
         Context context;
         std::string display_name;
 
     public:
         AddComponentToEntityCommand(
-            const Entity& entity,
+            const ecs::Entity& entity,
             entt::id_type comp_id,
             const Context& context);
 
@@ -175,7 +175,7 @@ namespace Editor {
 
     class RemoveComponentFromEntityCommand : public Command
     {
-        Entity entity;
+        ecs::Entity entity;
         entt::id_type comp_id;
         nlohmann::json comp_json{};
         Context context;
@@ -183,7 +183,7 @@ namespace Editor {
 
     public:
         RemoveComponentFromEntityCommand(
-            const Entity& entity,
+            const ecs::Entity& entity,
             entt::id_type comp_id,
             const Context& context);
 

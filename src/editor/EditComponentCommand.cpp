@@ -8,7 +8,7 @@
 #include <iostream>
 #include <cassert>
 //#include <nlohmann/json.hpp>
-#include "meta_literals.h"
+#include "MetaLiterals.h"
 #include "MetaSerialize.hpp"
 #include "EditComponentCommand.hpp"
 
@@ -18,7 +18,7 @@ namespace
 
     bool is_ref(const entt::meta_any& any)
     {
-        return any.policy() == entt::meta_any_policy::ref; // as_ref_t::value(); // entt::meta_any::policy::reference;
+        return any.base().policy() == entt::any_policy::ref; // as_ref_t::value(); // entt::meta_any::policy::reference;
 
         // // DOOES NOT WORK
         // // Create a reference-based meta_any from the original
@@ -29,7 +29,7 @@ namespace
     }
 }
 
-namespace Editor {
+namespace eeng::editor {
 
     void ComponentCommand::traverse_and_set_meta_type(entt::meta_any& value_any)
     {
@@ -212,10 +212,11 @@ namespace Editor {
         std::cout << "Done executing command" << std::endl;
 #endif
 
+#if 0
         // Call data field callback if present
         {
             // meta_data is the actual data field that was edited
-            using TypeModifiedCallbackType = std::function<void(entt::meta_any, const Entity&)>;
+            using TypeModifiedCallbackType = std::function<void(entt::meta_any, const ecs::Entity&)>;
             if (auto prop = meta_data0.prop("callback"_hs); prop)
             {
                 if (auto ptr = prop.value().try_cast<TypeModifiedCallbackType>(); ptr)
@@ -223,6 +224,7 @@ namespace Editor {
                 else { assert(0); }
             }
         }
+#endif
     }
 
     void ComponentCommand::execute()
@@ -242,7 +244,7 @@ namespace Editor {
 
     ComponentCommandBuilder& ComponentCommandBuilder::registry(std::weak_ptr<entt::registry> registry) { command.registry = registry; return *this; }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::entity(const Entity& entity) { command.entity = entity; return *this; }
+    ComponentCommandBuilder& ComponentCommandBuilder::entity(const ecs::Entity& entity) { command.entity = entity; return *this; }
 
     ComponentCommandBuilder& ComponentCommandBuilder::component(entt::id_type id) { command.component_id = id; return *this; }
 
@@ -333,14 +335,14 @@ namespace Editor {
                     command.display_name += "[" + std::to_string(entry.index) + "]";
                 }
                 else if (entry.type == MetaPath::Entry::Type::Key) {
-                    if (auto j_new = Meta::serialize_any(entry.key_any); !j_new.is_null())
+                    if (auto j_new = meta::serialize_any(entry.key_any); !j_new.is_null())
                         command.display_name += "[" + j_new.dump() + "]";
                     else
                         command.display_name += "[]";
                 }
             }
             // Serialize new value
-            if (auto j_new = Meta::serialize_any(command.new_value); !j_new.is_null())
+            if (auto j_new = meta::serialize_any(command.new_value); !j_new.is_null())
                 command.display_name += " = " + j_new.dump();
         }
 

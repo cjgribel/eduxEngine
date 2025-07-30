@@ -92,7 +92,7 @@ namespace eeng
 
             // Deserialize into AssetMetaData
             entt::meta_any any = AssetMetaData{};
-            meta::deserialize_any(json, any, Entity{}, ctx);
+            meta::deserialize_any(json, any, ecs::Entity{}, ctx);
             AssetMetaData meta = any.cast<AssetMetaData>();
 
             // Derive the resource .json file path from the meta path

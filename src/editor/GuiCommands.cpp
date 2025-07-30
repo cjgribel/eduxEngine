@@ -15,7 +15,7 @@
 // Used by Copy command
 #include "SceneGraph.hpp"
 
-namespace Editor {
+namespace eeng::editor {
 
     CreateEntityCommand::CreateEntityCommand(
         // const CreateEntityFunc&& create_func,

@@ -11,7 +11,7 @@
 #include <entt/entt.hpp>
 #include "Command.hpp"
 
-namespace Editor {
+namespace eeng::editor {
 
     struct MetaPath
     {
@@ -31,7 +31,7 @@ namespace Editor {
     class ComponentCommand : public Command
     {
         std::weak_ptr<entt::registry>   registry;
-        Entity                          entity;
+        ecs::Entity                     entity;
         entt::id_type                   component_id = 0;
         MetaPath                        meta_path{};
         entt::meta_any                  prev_value{}, new_value{};
@@ -56,7 +56,7 @@ namespace Editor {
     public:
         ComponentCommandBuilder& registry(std::weak_ptr<entt::registry> registry);
 
-        ComponentCommandBuilder& entity(const Entity& entity);
+        ComponentCommandBuilder& entity(const ecs::Entity& entity);
 
         ComponentCommandBuilder& component(entt::id_type id);
 
@@ -77,6 +77,6 @@ namespace Editor {
         ComponentCommand build();
     };
 
-} // namespace Editor
+} // namespace eeng::editor
 
 #endif /* EditComponentCommand_hpp */

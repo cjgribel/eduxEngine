@@ -278,7 +278,7 @@ namespace eeng::meta
     void deserialize_any(
         const nlohmann::json& json,
         entt::meta_any& any,
-        const Entity& entity, // SKIP THIS SOMEHOW?
+        const ecs::Entity& entity, // SKIP THIS SOMEHOW?
         EngineContext& context)
     {
         assert(any);

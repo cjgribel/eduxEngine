@@ -7,7 +7,7 @@
 #include "AssetTreeViews.hpp"
 #include "engineapi/SelectionManager.hpp"
 #include "ThreadPool.hpp" // remove
-//#include "MetaInspect.hpp"
+#include "MetaInspect.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -652,8 +652,10 @@ namespace eeng
     }
 
     // TODO
-    void asset_inspector()
+    void entity_inspector()
     {
+        // Scene graph + entity inspector
+
         // renderUI()
 #if 0
         static Editor::InspectorState inspector{};
@@ -667,80 +669,7 @@ namespace eeng
         if (Inspector::inspect_entity(inspector, *dispatcher)) {}
 #endif
 
-#if 0
-        bool inspect_entity(
-            const Entity & entity,
-            InspectorState & inspector)
-        {
-            bool mod = false;
-            ComponentCommandBuilder cmd_builder;
 
-            auto& registry = inspector.context.registry;
-            assert(!entity.is_null());
-            assert(registry->valid(entity));
-
-            for (auto&& [id, type] : registry->storage())
-            {
-                if (!type.contains(entity)) continue;
-
-                if (entt::meta_type meta_type = entt::resolve(id); meta_type)
-                {
-                    auto type_name = meta_type_name(meta_type);
-
-                    if (inspector.begin_node(type_name.c_str()))
-                    {
-#ifdef USE_COMMANDS
-                        // Reset meta command for component type
-                        cmd_builder.reset().
-                            registry(inspector.context.registry)
-                            .entity(entity)
-                            .component(id);
-#endif
-                        auto comp_any = meta_type.from_void(type.value(entity)); // ref
-                        mod |= inspect_any(comp_any, inspector, cmd_builder);
-
-                        inspector.end_node();
-    }
-}
-                else
-                {
-                    //All types exposed to Lua are going to have a meta type
-                    assert(false && "Meta-type required");
-                }
-        }
-
-            return mod;
-    }
-#endif
-
-#if 0
-        // Component inspector
-        ImGui::SetNextItemOpen(true);
-        if (ImGui::TreeNode("Components"))
-        {
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-            const ImGuiTableFlags flags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody;
-            //        const ImGuiTableFlags flags = ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInner | ImGuiTableFlags_Resizable;
-            if (ImGui::BeginTable("InspectorTable", 2, flags))
-            {
-
-                // entt::id_type of HeaderComponent, to obtain names for entities with those
-                auto header_meta = entt::resolve<HeaderComponent>();
-
-                if (selected_entity_valid)
-                {
-                    mod |= Editor::inspect_entity(selected_entity, inspector);
-                }
-                else
-                    ImGui::Text("Selected entity is null or invalid");
-
-                ImGui::EndTable();
-            }
-            ImGui::TreePop(); // Entities node
-            ImGui::PopStyleVar();
-        }
-        ImGui::End(); // Window
-#endif
     }
 
 } // namespace eeng

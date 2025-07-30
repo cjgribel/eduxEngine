@@ -39,7 +39,7 @@ namespace eeng::meta
     void deserialize_any(
         const nlohmann::json& json,
         entt::meta_any& meta_any,
-        const Entity& entity,
+        const ecs::Entity& entity,
         EngineContext& context);
 #if 0
     Entity deserialize_entity(
