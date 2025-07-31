@@ -2,8 +2,15 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "EntityManager.hpp"
+#include <entt/entt.hpp>
 
 namespace eeng
 {
+    EntityManager::EntityManager()
+    : registry_(std::make_unique<entt::registry>())
+    {
+    }
+
+    EntityManager::~EntityManager() = default;
 
 } // namespace eeng
