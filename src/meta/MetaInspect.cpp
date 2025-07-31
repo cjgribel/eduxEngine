@@ -2,29 +2,33 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "meta/MetaInspect.hpp"
+#include "MetaClone.hpp"
 #include "editor/InspectorState.hpp"
 #include "editor/InspectType.hpp"
 #include "editor/CommandQueue.hpp"
 #include "editor/EditComponentCommand.hpp"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
+#include "engineapi/SelectionManager.hpp"
 
 #include "imgui.h"
 #include <iostream>
 #include <sstream>
 #include <cassert>
 
-// #define USE_COMMANDS
+#define USE_COMMANDS
 
 namespace eeng::meta {
 
     namespace
     {
-        void generate_command(auto& cmd_queue_wptr, auto& cmd_builder)
+        void generate_command(auto& cmd_queue, auto& cmd_builder)
         {
-            assert(!cmd_queue_wptr.expired());
-            auto cmd_queue_sptr = cmd_queue_wptr.lock();
-            cmd_queue_sptr->add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
+            // assert(!cmd_queue_wptr.expired());
+            // auto cmd_queue_sptr = cmd_queue_wptr.lock();
+            // cmd_queue_sptr->add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
+
+            cmd_queue.add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
         }
     }
 
@@ -119,7 +123,8 @@ namespace eeng::meta {
     bool inspect_any(
         entt::meta_any& any,
         editor::InspectorState& inspector,
-        editor::ComponentCommandBuilder& cmd_builder)
+        editor::ComponentCommandBuilder& cmd_builder,
+        EngineContext& ctx)
     {
         assert(any);
         bool mod = false; // TODO: not used yet
@@ -138,9 +143,9 @@ namespace eeng::meta {
 #ifdef USE_COMMANDS
                 // Invoke inspection meta function on a copy of the object
 
-                auto copy_any = Editor::clone_any(any, inspector.entity_selection.first());
+                auto copy_any = meta::clone_any(any, ctx.entity_selection->first());
                 //auto copy_any = any;
-                auto res_any = meta_func.invoke({}, copy_any.data(), entt::forward_as_meta(inspector));
+                auto res_any = meta_func.invoke({}, copy_any.base().data(), entt::forward_as_meta(inspector));
                 assert(res_any && "Failed to invoke inspect meta function");
 
                 // Issue command if a change is detected
@@ -150,7 +155,7 @@ namespace eeng::meta {
                 {
                     // Build & issue command
                     cmd_builder.prev_value(any).new_value(copy_any);
-                    generate_command(inspector.cmd_queue, cmd_builder);
+                    generate_command(*ctx.command_queue, cmd_builder);
 
                     mod = true;
                 }
@@ -171,7 +176,7 @@ namespace eeng::meta {
                 {
                     // Build & issue command
                     cmd_builder.prev_value(any).new_value(copy_any);
-                    generate_command(inspector.cmd_queue, cmd_builder);
+                    generate_command(*ctx.command_queue, cmd_builder);
 
                     mod = true;
                 }
@@ -211,7 +216,7 @@ namespace eeng::meta {
                         if (readonly) inspector.begin_disabled();
 
                         // Inspect
-                        mod |= inspect_any(data_any, inspector, cmd_builder);
+                        mod |= inspect_any(data_any, inspector, cmd_builder, ctx);
 #ifndef USE_COMMANDS
                         // Update data of the current object
                         meta_data.set(any, data_any);
@@ -252,7 +257,7 @@ namespace eeng::meta {
                     cmd_builder.push_path_index(count, std::to_string(count));
 
                     // ImGui::SetNextItemWidth(-FLT_MIN);
-                    mod |= inspect_any(v, inspector, cmd_builder);
+                    mod |= inspect_any(v, inspector, cmd_builder, ctx);
 
                     // Pop command meta path
                     cmd_builder.pop_path();
@@ -291,7 +296,7 @@ namespace eeng::meta {
                         // modified).
                         // Workaround: disable all key inspections explicitly
                         inspector.begin_disabled();
-                        inspect_any(key_any, inspector, cmd_builder); // key_any holds a const object
+                        inspect_any(key_any, inspector, cmd_builder, ctx); // key_any holds a const object
                         inspector.end_disabled();
                         inspector.end_node();
                     }
@@ -305,7 +310,7 @@ namespace eeng::meta {
                         ImGui::SetNextItemOpen(true);
                         if (inspector.begin_node("[value]"))
                         {
-                            mod |= inspect_any(mapped_any, inspector, cmd_builder);
+                            mod |= inspect_any(mapped_any, inspector, cmd_builder, ctx);
                             inspector.end_node();
                         }
 #ifdef USE_COMMANDS
@@ -336,11 +341,11 @@ namespace eeng::meta {
                 // std::remove_reference_t<decltype(value)> v;
                 //decltype(value) v;
 
-                if (Editor::inspect_type(value_copy, inspector))
+                if (editor::inspect_type(value_copy, inspector))
                 {
                     // Build & issue command
                     cmd_builder.prev_value(any).new_value(value_copy);
-                    generate_command(inspector.cmd_queue, cmd_builder);
+                    generate_command(*ctx.command_queue, cmd_builder);
 
                     mod = true;
                 }
@@ -387,12 +392,12 @@ namespace eeng::meta {
 #ifdef USE_COMMANDS
                     // Reset meta command for component type
                     cmd_builder.reset().
-                        registry(inspector.context.registry)
+                        registry(ctx.entity_manager->registry_wptr())
                         .entity(entity)
                         .component(id);
 #endif
                     auto comp_any = meta_type.from_void(type.value(entity)); // ref
-                    mod |= inspect_any(comp_any, inspector, cmd_builder);
+                    mod |= inspect_any(comp_any, inspector, cmd_builder, ctx);
 
                     inspector.end_node();
                 }
@@ -450,7 +455,7 @@ namespace eeng::meta {
 #endif
         }
         return mod;
-    }
+}
 #endif
 
 } // namespace Editor

@@ -6,7 +6,7 @@
 
 #include "config.h"
 #include "EngineContext.hpp"
-#include "editor/EditComponentCommand.hpp"
+// #include "editor/EditComponentCommand.hpp"
 #include <entt/entt.hpp>
 
 namespace eeng::editor {
@@ -34,7 +34,8 @@ namespace eeng::meta {
     bool inspect_any(
         entt::meta_any& any,
         eeng::editor::InspectorState& inspector,
-        editor::ComponentCommandBuilder& cmd_builder);
+        editor::ComponentCommandBuilder& cmd_builder,
+        EngineContext& ctx);
 
     bool inspect_entity(
         const eeng::ecs::Entity& entity,

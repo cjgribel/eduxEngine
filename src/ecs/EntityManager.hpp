@@ -20,9 +20,11 @@ namespace eeng
 
         entt::registry& registry() noexcept override { return *registry_; }
         const entt::registry& registry() const noexcept override { return *registry_; }
+        std::weak_ptr<entt::registry> registry_wptr() noexcept override { return registry_; }
+        std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
     private:
-        std::unique_ptr<entt::registry> registry_;
+        std::shared_ptr<entt::registry> registry_;
         std::unique_ptr<ecs::SceneGraph> scene_graph_;
         // + scene graph
     };

@@ -19,6 +19,8 @@ namespace eeng
 
         virtual entt::registry& registry() noexcept = 0;
         virtual const entt::registry& registry() const noexcept = 0;
+        virtual std::weak_ptr<entt::registry> registry_wptr() noexcept = 0;
+        virtual std::weak_ptr<const entt::registry> registry_wptr() const noexcept = 0;
 
     };
 } // namespace eeng

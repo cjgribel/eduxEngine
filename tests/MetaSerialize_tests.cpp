@@ -44,11 +44,13 @@ namespace
         eeng::ecs::Entity create_entity() override { return eeng::ecs::Entity{ }; }
         void destroy_entity(eeng::ecs::Entity entity) override {}
 
-        entt::registry& registry() noexcept override { return registry_; }
-        const entt::registry& registry() const noexcept override { return registry_; }
+        entt::registry& registry() noexcept override { return *registry_; }
+        const entt::registry& registry() const noexcept override { return *registry_; }
+        std::weak_ptr<entt::registry> registry_wptr() noexcept override { return registry_; }
+        std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
     private:
-        entt::registry registry_;
+        std::shared_ptr<entt::registry> registry_;
     };
 
 
@@ -335,7 +337,7 @@ namespace
         EXPECT_EQ(t, deserialized_ref);
 
         return { j, deserialized_ref };
-}
+    }
 }
 
 TEST_F(MetaSerializationTest, SerializePrimitiveTypes)

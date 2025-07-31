@@ -113,6 +113,8 @@ namespace eeng
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowLogWindow, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowStorageWindow, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowResourceBrowser, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowSceneGraph, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEntityInspector, true);
 
         EENG_LOG(ctx, "Engine initialized successfully.");
         return true;

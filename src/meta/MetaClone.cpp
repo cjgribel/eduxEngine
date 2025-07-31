@@ -11,11 +11,12 @@
 #include <cassert>
 #include "imgui.h"
 #include "MetaInspect.hpp"
-#include "InspectorState.hpp"
-#include "meta_literals.h"
-#include "meta_aux.h"
+// #include "InspectorState.hpp"
+#include "MetaLiterals.h"
+#include "MetaAux.h"
 
-namespace Editor {
+namespace eeng::meta 
+{
 
     /*
 
@@ -26,11 +27,11 @@ namespace Editor {
     {
         if (entt::meta_type meta_type = entt::resolve(any.type().id()); meta_type)
         {
-            if (entt::meta_func meta_func = meta_type.func(clone_hs); meta_func)
+            if (entt::meta_func meta_func = meta_type.func(literals::clone_hs); meta_func)
             {
                 // std::cout << "clone_any: invoking clone() for " << any.type().info().name() << std::endl;
 
-                auto copy_any = meta_func.invoke({}, any.data() /*src_ptr*/, dst_entity);
+                auto copy_any = meta_func.invoke({}, any.base().data() /*src_ptr*/, dst_entity);
                 assert(copy_any && "Failed to invoke clone() for type ");
 
                 //type.push(dst_entity, copy_any.data());
@@ -58,7 +59,7 @@ namespace Editor {
                 // mod |= inspect_any(comp_any, inspector, cmd_builder);
                 auto copy_any = clone_any(comp_any, dst_entity); assert(copy_any);
 
-                type.push(dst_entity, copy_any.data());
+                type.push(dst_entity, copy_any.base().data());
             }
             else
             {

@@ -13,8 +13,9 @@ namespace eeng
         ShowEngineInfo,
         ShowLogWindow,
         ShowStorageWindow,
-        ShowResourceBrowser
-        // ShowSceneGraph,
+        ShowResourceBrowser,
+        ShowSceneGraph,
+        ShowEntityInspector
         // ShowRenderStats,
         // ShowInputDebugger,
         // ...

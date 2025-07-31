@@ -11,7 +11,7 @@
 
 #include <entt/entt.hpp>
 
-namespace Editor {
+namespace eeng::meta {
 
     /// @brief Clone a meta object by value or, if available, using a meta function
     /// @param any 

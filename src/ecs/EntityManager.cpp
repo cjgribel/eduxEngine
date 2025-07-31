@@ -7,7 +7,7 @@
 namespace eeng
 {
     EntityManager::EntityManager()
-        : registry_(std::make_unique<entt::registry>())
+        : registry_(std::make_shared<entt::registry>())
         , scene_graph_(std::make_unique<ecs::SceneGraph>())
     {
     }

@@ -239,6 +239,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/ComponentMetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaInspect.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaClone.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogGlobals.cpp
