@@ -1,30 +1,15 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
 #ifndef InspectorState_hpp
 #define InspectorState_hpp
 
-// #include <entt/entt.hpp>
-// #include <entt/fwd.hpp>
-// #include <sol/forward.hpp>
 #include "imgui.h"
-#include "misc/cpp/imgui_stdlib.h" // ImGui widgets for std::string
 
-#include "Context.hpp"
-#include "CommandQueue.hpp"
-#include "SelectionManager.hpp"
-
-namespace Editor {
-
-    /// @brief 
+namespace eeng::editor 
+{
     struct InspectorState
     {
-        Context context; // <- should use weak_ptr so this class does not have ownership
-        std::weak_ptr<CommandQueue> cmd_queue;
-        // + dispatcher (perhaps all that is needed)
-        //entt::entity selected_entity = entt::null;
-
-        // std::deque<entt::entity> selected_entities;
-
-        Editor::SelectionManager<Entity> entity_selection;
-
         bool imgui_disabled = false;
 
         void begin_disabled()

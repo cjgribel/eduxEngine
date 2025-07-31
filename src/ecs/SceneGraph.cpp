@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include "SceneGraph.hpp"
 //#include "transform.hpp"
-// #include "CoreComponents.hpp"
+// #include "CoreComponents.hpp" // <- need this
 
 namespace eeng::ecs
 {
@@ -167,7 +167,7 @@ namespace eeng::ecs
         tree.traverse_depthfirst([&](const Entity& entity, size_t index, size_t level)
             {
                 //auto entity = node.m_payload;
-                auto entity_name = Editor::get_entity_name(registry, entity, meta_type_with_name);
+                auto entity_name = meta::get_entity_name(registry, entity, meta_type_with_name);
 
                 auto [nbr_children, branch_stride, parent_ofs] = tree.get_node_info(entity);
 

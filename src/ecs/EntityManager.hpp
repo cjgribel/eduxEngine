@@ -4,7 +4,6 @@
 #pragma once
 #include "IEntityManager.hpp"
 #include "ecs/SceneGraph.hpp"
-#include <entt/fwd.hpp>
 
 namespace eeng
 {
@@ -19,8 +18,8 @@ namespace eeng
 
         void destroy_entity(ecs::Entity entity) override {}
 
-        // entt::registry& registry() noexcept override  { return *_registry; }
-        // const entt::registry& registry() const noexcept override { return *_registry; }
+        entt::registry& registry() noexcept override { return *registry_; }
+        const entt::registry& registry() const noexcept override { return *registry_; }
 
     private:
         std::unique_ptr<entt::registry> registry_;

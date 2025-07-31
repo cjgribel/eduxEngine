@@ -211,6 +211,7 @@ add_executable(Module1
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp # ImGui widgets for std::string
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EngineFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GLDebugMessageCallback.cc
@@ -237,6 +238,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/AssetMetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/ComponentMetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaInspect.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogGlobals.cpp

@@ -1,12 +1,15 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
 #ifndef InspectType_hpp
 #define InspectType_hpp
 
 #include "InspectorState.hpp"
 #include "misc/cpp/imgui_stdlib.h" // ImGui widgets for std::string
 
-namespace Editor {
+namespace eeng::editor {
 
-    struct InspectorState;
+    // struct InspectorState;
 
     /// General type inspection template
     template<class T>

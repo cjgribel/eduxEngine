@@ -3,6 +3,7 @@
 
 #pragma once
 #include "ecs/Entity.hpp"
+#include <entt/fwd.hpp>
 #include <cstddef>
 
 namespace eeng
@@ -16,8 +17,8 @@ namespace eeng
 
         virtual void destroy_entity(ecs::Entity entity) = 0;
 
-        // virtual entt::registry& registry() noexcept = 0;
-        // virtual const entt::registry& registry() const noexcept = 0;
+        virtual entt::registry& registry() noexcept = 0;
+        virtual const entt::registry& registry() const noexcept = 0;
 
     };
 } // namespace eeng

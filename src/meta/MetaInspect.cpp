@@ -1,24 +1,22 @@
-//
-//  MetaInspect.cpp
-//  engine_core_2024
-//
-//  Created by Carl Johan Gribel on 2024-08-08.
-//  Copyright © 2024 Carl Johan Gribel. All rights reserved.
-//
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
-#include <iostream>
-#include <sstream>
-#include <cassert>
-#include "imgui.h"
+#include "meta/MetaInspect.hpp"
+#include "editor/InspectorState.hpp"
+#include "editor/InspectType.hpp"
+#include "editor/CommandQueue.hpp"
+#include "editor/EditComponentCommand.hpp"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
 
-#include "meta/MetaClone.hpp"
-#include "meta/MetaInspect.hpp"
-#include "editor/InspectType.hpp"
-//#include "editor/EditComponentCommand.hpp"
+#include "imgui.h"
+#include <iostream>
+#include <sstream>
+#include <cassert>
 
-namespace eeng::editor {
+// #define USE_COMMANDS
+
+namespace eeng::meta {
 
     namespace
     {
@@ -26,7 +24,7 @@ namespace eeng::editor {
         {
             assert(!cmd_queue_wptr.expired());
             auto cmd_queue_sptr = cmd_queue_wptr.lock();
-            cmd_queue_sptr->add(CommandFactory::Create<ComponentCommand>(cmd_builder.build()));
+            cmd_queue_sptr->add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
         }
     }
 
@@ -75,7 +73,7 @@ namespace eeng::editor {
 
     bool inspect_enum_any(
         entt::meta_any& any,
-        InspectorState& inspector)
+        editor::InspectorState& inspector)
     {
         entt::meta_type meta_type = entt::resolve(any.type().id());
         assert(meta_type);
@@ -120,8 +118,8 @@ namespace eeng::editor {
 
     bool inspect_any(
         entt::meta_any& any,
-        InspectorState& inspector,
-        ComponentCommandBuilder& cmd_builder)
+        editor::InspectorState& inspector,
+        editor::ComponentCommandBuilder& cmd_builder)
     {
         assert(any);
         bool mod = false; // TODO: not used yet
@@ -131,7 +129,7 @@ namespace eeng::editor {
 
         if (entt::meta_type meta_type = entt::resolve(any.type().id()); meta_type)
         {
-            if (entt::meta_func meta_func = meta_type.func(inspect_hs); meta_func)
+            if (entt::meta_func meta_func = meta_type.func(literals::inspect_hs); meta_func)
             {
                 // Inspection meta function signatures:
                 //      bool(void* ptr, Editor::InspectorState& inspector)
@@ -158,7 +156,7 @@ namespace eeng::editor {
                 }
 #else
                 // Invoke the inspection meta function on the object
-                auto res_any = meta_func.invoke({}, any.data(), entt::forward_as_meta(inspector));
+                auto res_any = meta_func.invoke({}, any.base().data(), entt::forward_as_meta(inspector));
                 assert(res_any && "Failed to invoke inspect meta function");
                 auto res_ptr = res_any.try_cast<bool>();
                 assert(res_ptr && "inspect meta function expected to return bool");
@@ -209,7 +207,7 @@ namespace eeng::editor {
                         entt::meta_any data_any = meta_data.get(any); //.as_ref() will yield REF to a TEMP VALUE if entt::as_ref_t is not used
                         //std::cout << key_name << ": is_ref " << (any.policy() == entt::meta_any_policy::ref) << ", " << (data_any.policy() == entt::meta_any_policy::ref) << std::endl;
                         // Check & set readonly
-                        bool readonly = get_meta_data_prop<bool, ReadonlyDefault>(meta_data, readonly_hs);
+                        bool readonly = true; // get_meta_data_prop<bool, ReadonlyDefault>(meta_data, readonly_hs);
                         if (readonly) inspector.begin_disabled();
 
                         // Inspect
@@ -348,7 +346,7 @@ namespace eeng::editor {
                 }
 #else
                 // Inspect the value
-                Editor::inspect_type(value, inspector);
+                editor::inspect_type(value, inspector);
 #endif
                 });
             if (!res)
@@ -363,17 +361,20 @@ namespace eeng::editor {
     }
 
     bool inspect_entity(
-        const Entity& entity,
-        InspectorState& inspector)
+        const ecs::Entity& entity,
+        editor::InspectorState& inspector,
+        EngineContext& ctx)
     {
         bool mod = false;
-        ComponentCommandBuilder cmd_builder;
+        editor::ComponentCommandBuilder cmd_builder;
 
-        auto& registry = inspector.context.registry;
+        // TODO: Take ctx directly as an argument
+        // auto context_sp = inspector.ctx.lock();
+        auto& registry = ctx.entity_manager->registry();
         assert(!entity.is_null());
-        assert(registry->valid(entity));
+        assert(registry.valid(entity));
 
-        for (auto&& [id, type] : registry->storage())
+        for (auto&& [id, type] : registry.storage())
         {
             if (!type.contains(entity)) continue;
 

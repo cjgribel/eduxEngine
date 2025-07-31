@@ -10,6 +10,7 @@
 
 #include <entt/entt.hpp>
 #include "Command.hpp"
+#include "ecs/Entity.hpp"
 
 namespace eeng::editor {
 
@@ -31,7 +32,7 @@ namespace eeng::editor {
     class ComponentCommand : public Command
     {
         std::weak_ptr<entt::registry>   registry;
-        ecs::Entity                     entity;
+        eeng::ecs::Entity                     entity;
         entt::id_type                   component_id = 0;
         MetaPath                        meta_path{};
         entt::meta_any                  prev_value{}, new_value{};

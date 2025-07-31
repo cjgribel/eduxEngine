@@ -1,22 +1,21 @@
-//
-//  MetaInspect.hpp
-//  engine_core_2024
-//
-//  Created by Carl Johan Gribel on 2024-08-08.
-//  Copyright © 2024 Carl Johan Gribel. All rights reserved.
-//
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
 #ifndef MetaInspect_hpp
 #define MetaInspect_hpp
 
-#include <entt/entt.hpp>
 #include "config.h"
+#include "EngineContext.hpp"
 #include "editor/EditComponentCommand.hpp"
-#include "ecs/Entity.hpp"
+#include <entt/entt.hpp>
+
+namespace eeng::editor {
+    struct InspectorState;
+    class ComponentCommandBuilder;
+}
 
 namespace eeng::meta {
 
-    class ComponentCommandBuilder;
 
     /// @brief Create a name for an entity suitable for imgui widgets
     /// @param registry 
@@ -28,20 +27,19 @@ namespace eeng::meta {
         entt::entity entity,
         entt::meta_type meta_type_with_name);
 
-    struct InspectorState;
-
     bool inspect_enum_any(
         entt::meta_any& any,
-        InspectorState& inspector);
+        eeng::editor::InspectorState& inspector);
 
     bool inspect_any(
         entt::meta_any& any,
-        InspectorState& inspector,
-        ComponentCommandBuilder& cmd_builder);
+        eeng::editor::InspectorState& inspector,
+        editor::ComponentCommandBuilder& cmd_builder);
 
     bool inspect_entity(
         const eeng::ecs::Entity& entity,
-        InspectorState& inspector);
+        eeng::editor::InspectorState& inspector,
+        EngineContext& ctx);
 
 #if 0
     bool inspect_registry(

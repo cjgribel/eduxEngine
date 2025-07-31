@@ -43,6 +43,12 @@ namespace
     {
         eeng::ecs::Entity create_entity() override { return eeng::ecs::Entity{ }; }
         void destroy_entity(eeng::ecs::Entity entity) override {}
+
+        entt::registry& registry() noexcept override { return registry_; }
+        const entt::registry& registry() const noexcept override { return registry_; }
+
+    private:
+        entt::registry registry_;
     };
 
 
@@ -50,9 +56,9 @@ namespace
     {
 #if 1
         AssetStatus get_status(const Guid& guid) const override { return AssetStatus{}; }
-        std::future<void> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { }); }
-        std::future<void> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { }); }
-        std::future<void> reload_and_rebind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { }); }
+        std::future<void> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] {}); }
+        std::future<void> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] {}); }
+        std::future<void> reload_and_rebind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] {}); }
 
         void retain_guid(const Guid& guid) override {}
         void release_guid(const Guid& guid, eeng::EngineContext& ctx) override {}
@@ -329,7 +335,7 @@ namespace
         EXPECT_EQ(t, deserialized_ref);
 
         return { j, deserialized_ref };
-    }
+}
 }
 
 TEST_F(MetaSerializationTest, SerializePrimitiveTypes)
