@@ -418,6 +418,9 @@ bool Game::init()
     }
 #endif
 
+    // ECS
+    // ...
+
     // Do some entt stuff
     entity_registry = std::make_shared<entt::registry>();
     entity_registry->storage<int>();

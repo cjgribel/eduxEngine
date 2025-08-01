@@ -1,76 +1,24 @@
 #ifndef CoreComponents_hpp
 #define CoreComponents_hpp
 
-#include <cassert>
-#include <array>
-#include <queue>
+// #include <cassert>
+// #include <array>
+// #include <queue>
 
 //#include "meta_reg.h"
 
-#include "vec.h"
-#include "Entity.hpp"
-#include "SparseSet.hpp"
-#include "BehaviorScript.hpp"
+// #include "vec.h"
+// #include "Guid.h"
+// #include "Entity.hpp"
+// #include "SparseSet.hpp"
+// #include "BehaviorScript.hpp"
+// #include <string>
 
-using linalg::v2f;
-#define GridSize 64
-using GridSparseSet = SparseSet<unsigned char, GridSize>;
+// using linalg::v2f;
+// #define GridSize 64
+// using GridSparseSet = SparseSet<unsigned char, GridSize>;
 
-// === Transform ==============================================================
-
-struct Transform
-{
-    // If stable pointers to Transform are needed, e.g. in scene graph nodes
-    // https://github.com/skypjack/entt/blob/master/docs/md/entity.md
-    //static constexpr auto in_place_delete = true;
-
-    float x{ 0.0f }, y{ 0.0f }, angle{ 0.0f };
-
-    // Not meta-registered
-    float x_parent{ 0.0f }, y_parent{ 0.0f }, angle_parent{ 0.0f };
-    float x_global{ 0.0f }, y_global{ 0.0f }, angle_global{ 0.0f };
-
-    // void compute_global_transform()
-    // {
-    //     x_global = x * cos(angle_parent) - y * sin(angle_parent) + x_parent;
-    //     y_global = x * sin(angle_parent) + y * cos(angle_parent) + y_parent;
-    //     angle_global = angle + angle_parent;
-    // }
-
-    std::string to_string() const;
-};
-
-
-// === HeaderComponent ========================================================
-
-struct HeaderComponent
-{
-    std::string name;
-    std::string chunk_tag;
-    uint32_t guid;
-    Entity entity_parent;
-
-    HeaderComponent() = default;
-    HeaderComponent(
-        const std::string& name,
-        const std::string& chunk_tag,
-        uint32_t guid,
-        const Entity& entity_parent) : 
-        name(name), 
-        chunk_tag(chunk_tag), 
-        guid(guid),
-        entity_parent(entity_parent)
-    {}
-
-    std::string to_string() const;
-};
-
-struct ChunkModifiedEvent 
-{ 
-    Entity entity; 
-    std::string chunk_tag;
-};
-
+#if 0
 // === CircleColliderGridComponent ============================================
 
 struct CircleColliderGridComponent
@@ -197,27 +145,6 @@ namespace sol
 }
 void serialization_test(std::shared_ptr<sol::state>& lua);
 
-// === Meta registration ======================================================
-
-template<>
-void register_meta<Transform>(Editor::Context& context);
-
-template<>
-void register_meta<HeaderComponent>(Editor::Context& context);
-
-template<>
-void register_meta<CircleColliderGridComponent>(Editor::Context& context);
-
-template<>
-void register_meta<IslandFinderComponent>(Editor::Context& context);
-
-template<>
-void register_meta<QuadGridComponent>(Editor::Context& context);
-
-template<>
-void register_meta<DataGridComponent>(Editor::Context& context);
-
-template<>
-void register_meta<ScriptedBehaviorComponent>(Editor::Context& context);
+#endif
 
 #endif // CoreComponents_hpp

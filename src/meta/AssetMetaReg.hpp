@@ -8,7 +8,8 @@
 
 namespace eeng
 {
-    void register_asset_meta_types();
+    struct EngineContext;
+    void register_asset_meta_types(EngineContext& ctx);
 
 } // namespace eeng
 

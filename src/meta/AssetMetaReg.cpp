@@ -3,10 +3,12 @@
 
 // #include <iostream>
 #include <entt/entt.hpp>
-#include <entt/meta/pointer.hpp>
+// #include <entt/meta/pointer.hpp>
 #include <nlohmann/json.hpp>
 #include "config.h"
 #include "AssetMetaReg.hpp"
+#include "EngineContext.hpp"
+
 #include "ResourceTypes.hpp"
 #include "MetaLiterals.h"
 #include "Storage.hpp"
@@ -146,8 +148,10 @@ namespace eeng {
         }
     } // namespace
 
-    void register_asset_meta_types()
+    void register_asset_meta_types(EngineContext& ctx)
     {
+        EENG_LOG_INFO(&ctx, "Registering resource meta types...");
+
         // === Guid ===
 
         entt::meta_factory<Guid>{}

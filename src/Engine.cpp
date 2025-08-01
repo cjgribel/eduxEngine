@@ -95,8 +95,8 @@ namespace eeng
             EENG_LOG_INFO(ctx, "Anisotropic samples %i (requested), %i (max))", EENG_ANISO_SAMPLES, (int)maxAniso);
         }
 #endif
-        register_asset_meta_types();
-        register_component_meta_types();
+        register_asset_meta_types(*ctx);
+        register_component_meta_types(*ctx);
 
         // Event subscriptions
         ctx->event_queue->register_callback([&](const SetVsyncEvent& event) { this->on_set_vsync(event); });
@@ -136,13 +136,31 @@ namespace eeng
             time_ms = now_ms;
             time_s = now_s;
 
-            process_events(running);
-            begin_frame();
+            process_events(running); // input etc
+            begin_frame(); // imgui_backend::show_demo_window(); ctx->gui_manager->draw(*ctx); GL setup
+            // =================================================================
 
+            // update_input_lua(lua, SceneBase::axes, SceneBase::buttons);
+            
+            // Scripts may queue entities for destruction
+            // ??? if (play_state == GamePlayState::Play) update_scripts(*registry, deltaTime_s);
+            
+            // ??? destroy_pending_entities();
+            // -> std::deque<Entity> entities_pending_destruction;
+
+            // ??? scenegraph->traverse(registry);
+
+            // ??? collisions
+
+            // Game systems
             game->update(time_s, deltaTime_s);
+
+            // ??? dispatcher->dispatch_all_events();
+
             game->render(time_s, window_width, window_height);
 
-            end_frame();
+            // =================================================================
+            end_frame(); // ImGui::Render(); ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             SDL_GL_SwapWindow(window_);
 
@@ -230,7 +248,7 @@ namespace eeng
     {
         if (!imgui_backend::init(window_, gl_context_))
         {
-            std::cerr <<  "Failed to initialize ImGui backend" << std::endl;
+            std::cerr << "Failed to initialize ImGui backend" << std::endl;
             return false;
         }
         ctx->gui_manager->init();

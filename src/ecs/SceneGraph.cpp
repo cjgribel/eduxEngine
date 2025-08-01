@@ -1,18 +1,29 @@
-//
-//  SceneGraph.cpp
-//  assimp1
-//
-//  Created by Carl Johan Gribel on 2021-05-18.
-//  Copyright © 2021 Carl Johan Gribel. All rights reserved.
-//
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
-#include <stdio.h>
 #include "SceneGraph.hpp"
-//#include "transform.hpp"
-// #include "CoreComponents.hpp" // <- need this
+#include "VecTree.h"
+#include "MetaInspect.hpp"
+#include "ecs/TransformComponent.hpp"
+
+#include <entt/entt.hpp>
+#include <stdio.h>
+
+using Transform = eeng::ecs::TransformComponent;
 
 namespace eeng::ecs
 {
+    SceneGraph::SceneGraph()
+        : tree(std::make_unique<VecTree<Entity>>())
+    {
+    }
+
+    SceneGraph::~SceneGraph() = default;
+
+    const VecTree<Entity>& SceneGraph::get_tree() const { return *tree;
+     }
+    VecTree<Entity>& SceneGraph::get_tree() { return *tree; }
+
     bool SceneGraph::insert_node(
         const Entity& entity,
         const Entity& parent_entity
@@ -20,46 +31,46 @@ namespace eeng::ecs
     {
         if (parent_entity.is_null())
         {
-            tree.insert_as_root(entity);
+            tree->insert_as_root(entity);
             return true;
         }
         else
-            return tree.insert(entity, parent_entity);
+            return tree->insert(entity, parent_entity);
     }
 
     bool SceneGraph::erase_node(const Entity& entity)
     {
         // assert(tree.is_leaf(entity));
-        if (!tree.is_leaf(entity))
+        if (!tree->is_leaf(entity))
             std::cout << "WARNING: erase_node: non-leaf node erased " << entity.to_integral() << std::endl;
 
-        return tree.erase_branch(entity);
+        return tree->erase_branch(entity);
     }
 
     bool SceneGraph::is_root(const Entity& entity)
     {
-        return tree.is_root(entity);
+        return tree->is_root(entity);
     }
 
     bool SceneGraph::is_leaf(const Entity& entity)
     {
-        return tree.is_leaf(entity);
+        return tree->is_leaf(entity);
     }
 
     unsigned SceneGraph::get_nbr_children(const Entity& entity)
     {
-        return tree.get_nbr_children(entity);
+        return tree->get_nbr_children(entity);
     }
 
     Entity SceneGraph::get_parent(const Entity& entity)
     {
         assert(!is_root(entity));
-        return tree.get_parent(entity);
+        return tree->get_parent(entity);
     }
 
     bool SceneGraph::is_descendant_of(const Entity& entity, const Entity& parent_entity)
     {
-        return tree.is_descendant_of(entity, parent_entity);
+        return tree->is_descendant_of(entity, parent_entity);
     }
 
     void SceneGraph::reparent(const Entity& entity, const Entity& parent_entity)
@@ -70,7 +81,7 @@ namespace eeng::ecs
         //      Command?
         //      tree will throw if operation is not valid
 
-        assert(tree.contains(entity));
+        assert(tree->contains(entity));
 
         if (parent_entity.is_null())
         {
@@ -78,18 +89,18 @@ namespace eeng::ecs
             return;
         }
 
-        assert(tree.contains(parent_entity));
-        tree.reparent(entity, parent_entity);
+        assert(tree->contains(parent_entity));
+        tree->reparent(entity, parent_entity);
     }
 
     void SceneGraph::unparent(const Entity& entity)
     {
-        tree.unparent(entity);
+        tree->unparent(entity);
     }
 
     size_t SceneGraph::size()
     {
-        return tree.size();
+        return tree->size();
     }
 
     // void SceneGraph::reset()
@@ -100,7 +111,7 @@ namespace eeng::ecs
     void SceneGraph::traverse(std::shared_ptr<entt::registry>& registry)
     {
         // std::cout << "traverse:" << std::endl;
-        tree.traverse_depthfirst([&](Entity* entity_ptr, Entity* entity_parent_ptr, size_t, size_t) {
+        tree->traverse_depthfirst([&](Entity* entity_ptr, Entity* entity_parent_ptr, size_t, size_t) {
             //tree.traverse_progressive([&](Entity* entity_ptr, Entity* entity_parent_ptr) {
                 // + Transform = parent tfm + tfm (+ maybe their aggregate)
 
@@ -141,7 +152,7 @@ namespace eeng::ecs
     {
         BranchQueue stack;
 
-        tree.traverse_breadthfirst(entity, [&](const Entity& entity, size_t index) {
+        tree->traverse_breadthfirst(entity, [&](const Entity& entity, size_t index) {
             stack.push_back(entity);
             });
 
@@ -152,7 +163,7 @@ namespace eeng::ecs
     {
         BranchQueue stack;
 
-        tree.traverse_breadthfirst(entity, [&](const Entity& entity, size_t index) {
+        tree->traverse_breadthfirst(entity, [&](const Entity& entity, size_t index) {
             stack.push_front(entity);
             });
 
@@ -164,12 +175,12 @@ namespace eeng::ecs
         const entt::meta_type meta_type_with_name) const
     {
         //std::cout << "Scene graph nodes:" << std::endl;
-        tree.traverse_depthfirst([&](const Entity& entity, size_t index, size_t level)
+        tree->traverse_depthfirst([&](const Entity& entity, size_t index, size_t level)
             {
                 //auto entity = node.m_payload;
                 auto entity_name = meta::get_entity_name(registry, entity, meta_type_with_name);
 
-                auto [nbr_children, branch_stride, parent_ofs] = tree.get_node_info(entity);
+                auto [nbr_children, branch_stride, parent_ofs] = tree->get_node_info(entity);
 
                 for (int i = 0; i < level; i++) std::cout << "\t";
                 std::cout << " [node " << index << "]";

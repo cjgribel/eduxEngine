@@ -1,230 +1,21 @@
 
-#include <entt/entt.hpp>
+// #include <entt/entt.hpp>
 
-#define SOL_ALL_SAFETIES_ON 1
-#include <sol/sol.hpp>
+// #define SOL_ALL_SAFETIES_ON 1
+// #include <sol/sol.hpp>
 
-#include "nlohmann/json.hpp"
+// #include "nlohmann/json.hpp"
 
-#include "imgui.h" // If GUI code is here
+// #include "imgui.h" // If GUI code is here
 
-#include "meta_literals.h" // for entt literals
-#include "meta_aux.h"
+// #include "meta_literals.h" // for entt literals
+// #include "meta_aux.h"
 #include "CoreComponents.hpp"
-#include "InspectType.hpp"
-
+// #include "editor/InspectType.hpp"
+// #include <sstream>
 //#include <iostream>
 
-using TypeModifiedCallbackType = std::function<void(entt::meta_any, const Entity&)>;
-
-// === Transform ==============================================================
-
-std::string Transform::to_string() const
-{
-    std::stringstream ss;
-    ss << "Transform { x = " << std::to_string(x)
-        << ", y = " << std::to_string(y)
-        << ", angle = " << std::to_string(angle) << " }";
-    return ss.str();
-}
-
-// + const (e.g. when used as key) ?
-bool inspect_Transform(void* ptr, Editor::InspectorState& inspector)
-{
-    Transform* t = static_cast<Transform*>(ptr);
-    bool mod = false;
-
-    inspector.begin_leaf("x");
-    mod |= Editor::inspect_type(t->x, inspector);
-    inspector.end_leaf();
-
-    inspector.begin_leaf("y");
-    mod |= Editor::inspect_type(t->y, inspector);
-    inspector.end_leaf();
-
-    inspector.begin_leaf("angle");
-    mod |= Editor::inspect_type(t->angle, inspector);
-    inspector.end_leaf();
-
-    return mod;
-}
-
-template<>
-void register_meta<Transform>(Editor::Context& context)
-{
-    assert(context.lua);
-
-    entt::meta<Transform>()
-        //.type("Transform"_hs)                 // <- this hashed string is used implicitly
-        .prop(display_name_hs, "Transform")  // <- Can be used without .type()
-
-        .data<&Transform::x>("x"_hs).prop(display_name_hs, "x")
-        .data<&Transform::y>("y"_hs).prop(display_name_hs, "y")
-        .data<&Transform::angle>("angle"_hs).prop(display_name_hs, "angle")
-        .data<&Transform::x_global>("x_global"_hs).prop(display_name_hs, "x_global").prop(readonly_hs, true)
-        .data<&Transform::y_global>("y_global"_hs).prop(display_name_hs, "y_global").prop(readonly_hs, true)
-        .data<&Transform::angle_global>("angle_global"_hs).prop(display_name_hs, "angle_global").prop(readonly_hs, true)
-
-        // Inspection function (optional)
-        // Sign: bool(void* ptr, Editor::InspectorState& inspector)
-        // .func<&...>(inspect_hs)
-
-        // Clone (optional)
-        // Sign: Type(void* src)
-        // .func<&...>(clone_hs)
-
-        //.func<&vec3_to_json>(to_json_hs)
-        //.func < [](nlohmann::json& j, const void* ptr) { to_json(j, *static_cast<const vec3*>(ptr)); }, entt::as_void_t > (to_json_hs)
-        //.func < [](const nlohmann::json& j, void* ptr) { from_json(j, *static_cast<vec3*>(ptr)); }, entt::as_void_t > (from_json_hs)
-        //        .func<&vec3::to_string>(to_string_hs)
-        //.func<&vec3_to_string>(to_string_hs)
-        ;
-
-    assert("Transform"_hs == entt::resolve<Transform>().id());
-
-    context.lua->new_usertype<Transform>("Transform",
-
-        sol::call_constructor,
-        sol::factories([](float x, float y, float angle) {
-            return Transform{
-                .x = x, .y = y, .angle = angle
-            };
-            }),
-
-        // type_id is required for component types, copying and inspection
-        "type_id", &entt::type_hash<Transform>::value,
-
-        // Default construction
-        // Needed to copy userdata
-        "construct",
-        []() { return Transform{}; },
-
-        "x", &Transform::x,
-        "y", &Transform::y,
-        "angle", &Transform::angle,
-        "x_global", &Transform::x_global,
-        "y_global", &Transform::y_global,
-        "angle_global", &Transform::angle_global,
-
-        sol::meta_function::to_string, &Transform::to_string
-    );
-}
-
-// === HeaderComponent ========================================================
-
-std::string HeaderComponent::to_string() const
-{
-    std::stringstream ss;
-    ss << "HeaderComponent { name = " << name << " }";
-    return  ss.str();
-}
-
-namespace {
-    bool HeaderComponent_inspect(void* ptr, Editor::InspectorState& inspector)
-    {
-        return false;
-    }
-}
-
-template<>
-void register_meta<HeaderComponent>(Editor::Context& context)
-{
-
-    // chunk_tag callback
-    // struct ChunkModifiedEvent { std::string chunk_tag; Entity entity; };
-    const TypeModifiedCallbackType chunk_tag_cb = [context](entt::meta_any any, const Entity& entity)
-        {
-            const auto& new_tag = any.cast<std::string>();
-            // std::cout << new_tag << ", " << entity.to_integral() << std::endl;
-
-            // Dispatch immediately since entity may be in an invalid state
-            assert(!context.dispatcher.expired());
-            context.dispatcher.lock()->dispatch(ChunkModifiedEvent{ entity, new_tag });
-        };
-
-    entt::meta<HeaderComponent>()
-        .type("HeaderComponent"_hs).prop(display_name_hs, "Header")
-
-        .data<&HeaderComponent::name>("name"_hs).prop(display_name_hs, "name")
-        .data<&HeaderComponent::chunk_tag>("chunk_tag"_hs).prop(display_name_hs, "chunk_tag") //.prop(readonly_hs, true)
-        .prop("callback"_hs, chunk_tag_cb)
-
-        .data<&HeaderComponent::guid>("guid"_hs).prop(display_name_hs, "guid").prop(readonly_hs, true)
-        .data<&HeaderComponent::entity_parent>("entity_parent"_hs).prop(display_name_hs, "entity_parent").prop(readonly_hs, true)
-
-        // Optional meta functions
-
-        // to_string, member version
-            //.func<&DebugClass::to_string>(to_string_hs)
-        // to_string, lambda version
-        .func < [](const void* ptr) {
-        return static_cast<const HeaderComponent*>(ptr)->name;
-        } > (to_string_hs)
-            // inspect
-                // .func<&inspect_Transform>(inspect_hs)
-            // clone
-                //.func<&cloneDebugClass>(clone_hs)
-            ;
-
-        // Register to sol
-
-        assert(context.lua);
-        context.lua->new_usertype<HeaderComponent>("HeaderComponent",
-            //sol::constructors<HeaderComponent(), HeaderComponent(const std::string&)>(),
-
-            // If the type has defined ctors
-            //sol::constructors<HeaderComponent(), HeaderComponent(const std::string&)>(),
-
 #if 0
-            sol::call_constructor,
-            sol::factories(
-                []() -> HeaderComponent {  // Default constructor
-                    return HeaderComponent{};
-                },
-                [](const std::string& name) {
-                    return HeaderComponent{
-                        .name = name,
-                        .chunk_tag = "default_chunk",
-                        .guid = 0
-                    };
-                }),
-#endif
-
-            "type_id", &entt::type_hash<HeaderComponent>::value,
-
-            "name", &HeaderComponent::name,
-            "chunk_tag", &HeaderComponent::chunk_tag,
-            "guid", &HeaderComponent::guid,
-            "entity_parent", &HeaderComponent::entity_parent,
-
-#if 0
-            // clone
-            "copy",
-            [](sol::userdata userdata)
-            {
-                // TODO: check fields
-                return HeaderComponent{ userdata.get<std::string>("name") };
-            },
-#endif
-
-            // Needed for value-copying
-            "construct",
-            []() { return HeaderComponent{}; },
-
-            sol::meta_function::to_string, &HeaderComponent::to_string
-        );
-
-        // TEST
-        // struct ABC { int x; };
-
-        // lua.new_usertype<ABC>("ABC",
-        //     sol::meta_function::construct,
-        //     sol::factories([] { return ABC{}; }),
-
-        //     "x", &ABC::x
-        // );
-}
-
 // === CircleColliderGridComponent ============================================
 
 std::string CircleColliderGridComponent::to_string() const
@@ -1840,3 +1631,4 @@ void register_meta<ScriptedBehaviorComponent>(Editor::Context& context)
         &ScriptedBehaviorComponent::to_string
     );
 }
+#endif

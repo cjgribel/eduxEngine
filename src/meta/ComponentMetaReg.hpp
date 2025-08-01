@@ -8,7 +8,9 @@
 
 namespace eeng
 {
-    void register_component_meta_types();
+    struct EngineContext;
+
+    void register_component_meta_types(EngineContext& ctx);
 
 } // namespace eeng
 

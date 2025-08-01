@@ -1,69 +1,31 @@
-//
-//  SceneGraph.hpp
-//  assimp1
-//
-//  Created by Carl Johan Gribel on 2021-05-18.
-//  Copyright © 2021 Carl Johan Gribel. All rights reserved.
-//
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
 #ifndef SceneGraph_hpp
 #define SceneGraph_hpp
 
 #include <stdio.h>
 #include <sstream>
-// #include <entt/entt.hpp>
 #include "Entity.hpp"
-#include "VecTree.h"
-#include "MetaInspect.hpp"
+
+template <class PayloadType>
+    requires requires(PayloadType a, PayloadType b) { { a == b } -> std::convertible_to<bool>; }
+class VecTree;
 
 namespace eeng::ecs
 {
-    struct Transform
-    {
-        // If stable pointers to Transform are needed, e.g. in scene graph nodes
-        // https://github.com/skypjack/entt/blob/master/docs/md/entity.md
-        //static constexpr auto in_place_delete = true;
-
-        float x{ 0.0f }, y{ 0.0f }, angle{ 0.0f };
-
-        // Not meta-registered
-        float x_parent{ 0.0f }, y_parent{ 0.0f }, angle_parent{ 0.0f };
-        float x_global{ 0.0f }, y_global{ 0.0f }, angle_global{ 0.0f };
-
-        // void compute_global_transform()
-        // {
-        //     x_global = x * cos(angle_parent) - y * sin(angle_parent) + x_parent;
-        //     y_global = x * sin(angle_parent) + y * cos(angle_parent) + y_parent;
-        //     angle_global = angle + angle_parent;
-        // }
-
-        std::string to_string() const;
-    };
-
     class SceneGraph
     {
-        // public:
-
-        // private:
-            // struct SceneGraphNode
-            // {
-            //     entt::entity entity;
-            //     std::string name;
-
-            //     bool operator==(const SceneGraphNode& node) const
-            //     {
-            //         return entity == node.entity;
-            //     }
-
-            //     SceneGraphNode(entt::entity entity, const std::string& name)
-            //         : entity(entity), name(name) {}
-            // };
+        std::unique_ptr<VecTree<Entity>> tree;
 
     public: // TODO: don't expose directly
-        VecTree<Entity> tree;
         using BranchQueue = std::deque<Entity>;
 
-        SceneGraph() = default;
+        SceneGraph();
+        ~SceneGraph();
+
+        const VecTree<Entity>& get_tree() const;
+        VecTree<Entity>& get_tree();
 
         bool insert_node(
             const Entity&,

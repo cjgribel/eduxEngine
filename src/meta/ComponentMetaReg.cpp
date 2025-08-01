@@ -1,138 +1,127 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-// #include <iostream>
-#include <entt/entt.hpp>
-#include <entt/meta/pointer.hpp>
-#include <nlohmann/json.hpp>
 #include "config.h"
 #include "ComponentMetaReg.hpp"
-#include "ResourceTypes.hpp"
+#include "EngineContext.hpp"
+
+//#include "ResourceTypes.hpp"
+#include "ecs/TransformComponent.hpp"
+#include "ecs/HeaderComponent.hpp"
+#include "ecs/CoreComponents.hpp"
 #include "MetaLiterals.h"
 //#include "Storage.hpp"
 #include "MetaInfo.h"
 // #include "IResourceManager.hpp" 
 //#include "ResourceManager.hpp" // For AssetRef<T>, AssetMetaData, ResourceManager::load<>/unload
+#include "LogMacros.h"
 
-namespace eeng {
+// #include <iostream>
+#include <entt/entt.hpp>
+// #include <entt/meta/pointer.hpp>
+#include <nlohmann/json.hpp>
 
+namespace eeng
+{
     namespace
     {
         //
         // Standard component meta functions
         //
-
-#if 0
-        // "BIND COMPONENT / TYPE"
-        // -> ResourceManager
-        
-        // - CALLER collects component closure (e.g. nested references)
-        //      Set of meta_any? Safe if comp type is registered?
-        // - NO RECURSION in the bind function
-
         template<typename T>
-        void resolve_component_meta(entt::meta_any& any, ResourceManager& rm)
+        void register_component()
         {
-            T& obj = any.cast<T&>();
-            rm.resolve_component(obj);
+            entt::meta_factory<T>()
+                // .func<&resolve_component_meta<T>>(hashed_string("resolve_component"))
+                ;
+
+            // AssetRef<T>
+            // entt::meta_factory<AssetRef<T>>{}
+            // .template data<&AssetRef<T>::guid>("guid"_hs)
+            //     .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
+            //     .traits(MetaFlags::read_only)
+            //     ;
         }
-        // Calls ...
-        template<typename T>
-        void resolve_component(T& component)
-        {
-            visit_assets(component, [&](auto& ref)
-                {
-                    using AssetT = typename std::decay_t<decltype(ref)>::asset_type;
-
-                    auto handle = storage_->handle_for_guid<AssetT>(ref.guid);
-                    if (!handle)
-                        throw std::runtime_error("Unresolved reference: " + ref.guid.to_string());
-
-                    ref.handle = *handle;
-                    retain_guid(ref.guid); // ❗Component owns this asset
-                });
-#endif
-
-            // "FOR ALL COMPONENTS OF AN ENTITY"
-            // -> EntityManager
-#if 0
-            void resolve_all_components_for_entity(entt::registry & registry, entt::entity entity, ResourceManager & rm)
-            {
-                for (auto&& [id, storage] : registry.storage())
-                {
-                    if (!storage.contains(entity))
-                        continue;
-
-                    entt::meta_type type = entt::resolve(id);
-                    if (!type)
-                        continue;
-
-                    entt::meta_func resolve_func = type.func("resolve_component"_hs);
-                    if (!resolve_func)
-                        continue;
-
-                    entt::meta_any instance = type.from_void(storage.value(entity));
-                    if (!instance)
-                        continue;
-
-                    resolve_func.invoke({}, instance, std::ref(rm));
-                }
-            }
-#endif
-
-#if 0
-            // Collect referenced GUIDs for Assets or Components
-            template<typename T>
-            void collect_guids(T & t, std::unordered_set<Guid>&out_guids)
-            {
-                visit_assets(t, [&](const auto& asset_ref) {
-                    out_guids.insert(asset_ref.guid);
-                    });
-            }
-#endif
-
-            template<typename T>
-            void register_component()
-            {
-                // constexpr auto alias = entt::type_name<T>::value();  // e.g. "ResourceTest"
-                // constexpr auto id    = entt::type_hash<T>::value();
-
-                entt::meta_factory<T>()
-                    // .func<&resolve_component_meta<T>>(hashed_string("resolve_component"))
-                    ;
-
-                // AssetRef<T>
-                // entt::meta_factory<AssetRef<T>>{}
-                // .template data<&AssetRef<T>::guid>("guid"_hs)
-                //     .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
-                //     .traits(MetaFlags::read_only)
-                //     ;
-            }
     } // namespace
 
 #if 0
-        namespace
+    namespace
+    {
+        // Guid to and from json
+        void serialize_Guid(nlohmann::json& j, const entt::meta_any& any)
         {
-            // Guid to and from json
-            void serialize_Guid(nlohmann::json& j, const entt::meta_any& any)
-            {
-                auto ptr = any.try_cast<Guid>();
-                assert(ptr && "serialize_Guid: could not cast meta_any to Guid");
-                j = ptr->raw();
-            }
+            auto ptr = any.try_cast<Guid>();
+            assert(ptr && "serialize_Guid: could not cast meta_any to Guid");
+            j = ptr->raw();
+        }
 
-            void deserialize_Guid(const nlohmann::json& j, entt::meta_any& any)
-            {
-                auto ptr = any.try_cast<Guid>();
-                assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
-                *ptr = Guid{ j.get<uint64_t>() };
-            }
-        } // namespace
+        void deserialize_Guid(const nlohmann::json& j, entt::meta_any& any)
+        {
+            auto ptr = any.try_cast<Guid>();
+            assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
+            *ptr = Guid{ j.get<uint64_t>() };
+        }
+    } // namespace
 #endif
 
-        void register_component_meta_types()
-        {
-            // register_component<>();
-        }
+    void register_component_meta_types(EngineContext& ctx)
+    {
+        EENG_LOG_INFO(&ctx, "Registering component meta types...");
+
+#if 0
+        register_component<ecs::Transform>();
+        entt::meta<ecs::Transform>()
+            //.type("Transform"_hs)                 // <- this hashed string is used implicitly
+            //.prop(display_name_hs, "Transform")  // <- Can be used without .type()
+
+            .data<&Transform::x>("x"_hs).prop(display_name_hs, "x")
+            .data<&Transform::y>("y"_hs).prop(display_name_hs, "y")
+            .data<&Transform::angle>("angle"_hs).prop(display_name_hs, "angle")
+            .data<&Transform::x_global>("x_global"_hs).prop(display_name_hs, "x_global").prop(readonly_hs, true)
+            .data<&Transform::y_global>("y_global"_hs).prop(display_name_hs, "y_global").prop(readonly_hs, true)
+            .data<&Transform::angle_global>("angle_global"_hs).prop(display_name_hs, "angle_global").prop(readonly_hs, true)
+            ;
+#endif
+
+#if 0
+        register_component<ecs::HeaderComponent>();
+        // chunk_tag callback
+// struct ChunkModifiedEvent { std::string chunk_tag; Entity entity; };
+        using TypeModifiedCallbackType = std::function<void(entt::meta_any, const eeng::ecs::Entity&)>;
+        const TypeModifiedCallbackType chunk_tag_cb = [context](entt::meta_any any, const Entity& entity)
+            {
+                const auto& new_tag = any.cast<std::string>();
+                // std::cout << new_tag << ", " << entity.to_integral() << std::endl;
+
+                // Dispatch immediately since entity may be in an invalid state
+                assert(!context.dispatcher.expired());
+                context.dispatcher.lock()->dispatch(ChunkModifiedEvent{ entity, new_tag });
+            };
+
+        entt::meta<HeaderComponent>()
+            .type("HeaderComponent"_hs).prop(display_name_hs, "Header")
+
+            .data<&HeaderComponent::name>("name"_hs).prop(display_name_hs, "name")
+            .data<&HeaderComponent::chunk_tag>("chunk_tag"_hs).prop(display_name_hs, "chunk_tag") //.prop(readonly_hs, true)
+            .prop("callback"_hs, chunk_tag_cb)
+
+            .data<&HeaderComponent::guid>("guid"_hs).prop(display_name_hs, "guid").prop(readonly_hs, true)
+            .data<&HeaderComponent::entity_parent>("entity_parent"_hs).prop(display_name_hs, "entity_parent").prop(readonly_hs, true)
+
+            // Optional meta functions
+
+            // to_string, member version
+                //.func<&DebugClass::to_string>(to_string_hs)
+            // to_string, lambda version
+            .func < [](const void* ptr) {
+            return static_cast<const HeaderComponent*>(ptr)->name;
+            } > (to_string_hs)
+                // inspect
+                    // .func<&inspect_Transform>(inspect_hs)
+                // clone
+                    //.func<&cloneDebugClass>(clone_hs)
+                ;
+#endif
+    }
 
 } // namespace eeng
