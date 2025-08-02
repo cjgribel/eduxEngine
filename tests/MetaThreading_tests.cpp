@@ -20,6 +20,7 @@ struct MyStruct {
 namespace {
     static const auto metaRegistration = []() {
         entt::meta_factory<MyStruct>()
+            // omit.type(...) so the meta ID stays as entt::type_hash<MyStruct>(), which the test expects
             //.type("MyStruct"_hs)
             .ctor<int>()
             .data<&MyStruct::value>("value"_hs)
@@ -34,6 +35,11 @@ constexpr int ITERATIONS = 1000;
 TEST(ThreadSafetyMeta, ConcurrentResolve) {
     std::atomic<bool> error{ false };
     std::vector<std::thread> threads;
+
+    auto base = entt::resolve<MyStruct>();
+    ASSERT_TRUE(base);
+    ASSERT_EQ(base.id(), entt::type_hash<MyStruct>());
+
     for (int i = 0; i < THREAD_COUNT; ++i) {
         threads.emplace_back([&]() {
             for (int j = 0; j < ITERATIONS; ++j) {

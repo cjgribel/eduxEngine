@@ -25,6 +25,16 @@ namespace eeng
 {
     namespace
     {
+        template<class T>
+        void warm_start_meta_type()
+        {
+            if (!entt::resolve<T>())
+                throw std::runtime_error("entt::resolve() failed for component type");
+        }
+    }
+
+    namespace
+    {
         //
         // Standard component meta functions
         //
@@ -41,6 +51,8 @@ namespace eeng
             //     .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
             //     .traits(MetaFlags::read_only)
             //     ;
+
+            warm_start_meta_type<T>();
         }
     } // namespace
 
@@ -68,8 +80,8 @@ namespace eeng
     {
         EENG_LOG_INFO(&ctx, "Registering component meta types...");
 
+        register_component<ecs::TransformComponent>();
 #if 0
-        register_component<ecs::Transform>();
         entt::meta<ecs::Transform>()
             //.type("Transform"_hs)                 // <- this hashed string is used implicitly
             //.prop(display_name_hs, "Transform")  // <- Can be used without .type()
@@ -83,8 +95,8 @@ namespace eeng
             ;
 #endif
 
-#if 0
         register_component<ecs::HeaderComponent>();
+#if 0
         // chunk_tag callback
 // struct ChunkModifiedEvent { std::string chunk_tag; Entity entity; };
         using TypeModifiedCallbackType = std::function<void(entt::meta_any, const eeng::ecs::Entity&)>;

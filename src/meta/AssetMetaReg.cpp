@@ -19,6 +19,16 @@ namespace eeng {
 
     namespace
     {
+        template<class T>
+        void warm_start_meta_type()
+        {
+            if (!entt::resolve<T>())
+                throw std::runtime_error("entt::resolve() failed for asset type");
+        }
+    }
+
+    namespace
+    {
         //
         // Standard asset meta functions
         //
@@ -104,6 +114,7 @@ namespace eeng {
                 //
                 //.func<&collect_guids<MeshRendererComponent>>("collect_asset_guids"_hs)
                 ;
+            warm_start_meta_type<T>();
 
             // Caution: this name will include namespaces
             // auto name = std::string{ entt::resolve<T>().info().name() };
@@ -127,6 +138,7 @@ namespace eeng {
                 .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
                 .traits(MetaFlags::read_only)
                 ;
+            warm_start_meta_type<AssetRef<T>>();
         }
     } // namespace
 
@@ -159,6 +171,7 @@ namespace eeng {
             .func<&serialize_Guid>(eeng::literals::serialize_hs)
             .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
             ;
+        warm_start_meta_type<Guid>();
 
         // === AssetMetaData ===
 
@@ -189,6 +202,7 @@ namespace eeng {
             // .custom<DataMetaInfo>(DataMetaInfo{ "file_path", "File Path", "The file path of the asset." })
             // .traits(MetaFlags::read_only)
             ;
+        warm_start_meta_type<AssetMetaData>();
 
         // === RESOURCES ===
 
