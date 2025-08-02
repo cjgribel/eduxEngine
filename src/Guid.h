@@ -2,9 +2,11 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #pragma once
-#include <cstdint>      // uint64_t
-#include <atomic>       // std::atomic
-#include <functional>   // std::hash
+#include <cstdint>       // uint64_t
+#include <random>        // std::random_device, std::mt19937_64
+#include <string>        // std::string, std::to_string
+#include <sstream>
+#include <iomanip>
 
 namespace eeng
 {
@@ -16,8 +18,8 @@ namespace eeng
 
         static Guid generate()
         {
-            static std::atomic<uint64_t> counter{ 1 }; // 0 = invalid
-            return Guid(counter.fetch_add(1, std::memory_order_relaxed));
+            static thread_local std::mt19937_64 rng(std::random_device{}());
+            return Guid(rng());
         }
 
         static Guid invalid() { return Guid(0); }
@@ -29,7 +31,17 @@ namespace eeng
         bool operator<(const Guid& other) const { return value < other.value; }
 
         uint64_t raw() const { return value; }
-        std::string to_string() const { return std::to_string(value); }
+
+        // std::string to_string() const { return std::to_string(value); }
+        std::string to_string() const
+        {
+            std::ostringstream oss;
+            oss << std::hex << std::setfill('0')
+                << std::setw(8) << ((value >> 32) & 0xFFFFFFFF) << '-'
+                << std::setw(4) << ((value >> 16) & 0xFFFF) << '-'
+                << std::setw(4) << (value & 0xFFFF);
+            return oss.str();
+        }
 
     private:
         uint64_t value;
