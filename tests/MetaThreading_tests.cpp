@@ -20,7 +20,7 @@ struct MyStruct {
 namespace {
     static const auto metaRegistration = []() {
         entt::meta_factory<MyStruct>()
-            .type("MyStruct"_hs)
+            //.type("MyStruct"_hs)
             .ctor<int>()
             .data<&MyStruct::value>("value"_hs)
             .func<&MyStruct::getValue>("getValue"_hs);
