@@ -6,6 +6,7 @@
 #include "AssetIndexData.hpp"
 #include <string>
 #include <future>
+#include <deque>
 
 #pragma once
 

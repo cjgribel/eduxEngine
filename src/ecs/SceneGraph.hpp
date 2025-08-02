@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <sstream>
+#include <deque>
 #include "Entity.hpp"
 
 template <class PayloadType>

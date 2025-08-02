@@ -46,7 +46,8 @@ bool Game::init()
         // https://chatgpt.com/s/t_68630dc8597881918ffd0e6db8a8c57e
         // - Use helper free function for loading etc?
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
-        std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/";
+        //std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/";
+        std::filesystem::path asset_root = "C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/";
 
         // 1.   IMPORT resources concurrently
         //
@@ -75,7 +76,8 @@ bool Game::init()
         //
         {
             EENG_LOG(ctx, "[Game::init()] Scanning assets...");
-            resource_manager.start_async_scan("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
+            //resource_manager.start_async_scan("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
+            resource_manager.start_async_scan("C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/", *ctx);
             // Wait for scanning to finish
             while (resource_manager.is_scanning())
             {

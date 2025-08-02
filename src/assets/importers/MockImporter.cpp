@@ -69,9 +69,9 @@ namespace eeng::mock {
         };
         resource_manager.file(
             mesh,
-            mesh_file_path,
+            mesh_file_path.string(),
             mesh_meta,
-            mesh_meta_file_path); // Serialize to file
+            mesh_meta_file_path.string()); // Serialize to file
         // Add mesh reference to model
         model.meshes.push_back(mesh_ref);
 
@@ -88,9 +88,9 @@ namespace eeng::mock {
         };
         resource_manager.file(
             texture,
-            texture_file_path,
+            texture_file_path.string(),
             texture_meta,
-            texture_meta_file_path); // Serialize to file
+            texture_meta_file_path.string()); // Serialize to file
         // Add mesh reference to model
         model.textures.push_back(texture_ref);
 
@@ -105,9 +105,9 @@ namespace eeng::mock {
         };
         resource_manager.file(
             model,
-            model_file_path,
+            model_file_path.string(),
             model_meta,
-            model_meta_file_path); // Serialize to file
+            model_meta_file_path.string()); // Serialize to file
         //auto model_ref = resource_manager.file(model, model_path);
 
         return model_ref;

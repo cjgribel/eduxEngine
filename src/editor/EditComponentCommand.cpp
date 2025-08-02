@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <cassert>
+#include <stack>
 //#include <nlohmann/json.hpp>
 #include "MetaLiterals.h"
 #include "MetaSerialize.hpp"
