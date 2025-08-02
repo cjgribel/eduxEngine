@@ -38,6 +38,43 @@ namespace eeng
         //
         // Standard component meta functions
         //
+
+#if 0
+        template<class T>
+        void bind_component(const Guid& guid, EngineContext& ctx)
+        {
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            rm.resolve_asset<T>(guid, ctx);
+
+            // + bind entity references via entity_manager
+        }
+
+        template<class T>
+        void unbind_component(const Guid& guid, EngineContext& ctx)
+        {
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            rm.unresolve_asset<T>(guid, ctx);
+
+            // + unbind entity references via entity_manager
+        }
+
+        // Validates references?
+        template<class T>
+        bool validate_component(const Guid& guid, EngineContext& ctx)
+        {
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            return rm.validate_asset<T>(guid);
+        }
+
+        // Validates references recursively?
+        template<class T>
+        bool validate_asset_recursive(const Guid& guid, EngineContext& ctx)
+        {
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            return rm.validate_asset_recursive<T>(guid);
+        }
+#endif
+
         template<typename T>
         void register_component()
         {

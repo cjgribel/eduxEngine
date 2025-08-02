@@ -31,6 +31,10 @@ namespace eeng::ecs
 
     std::string to_string(const TransformComponent& t);
 
+    template<typename Visitor> void visit_assets(TransformComponent& t, Visitor&& visitor) {}
+
+    template<typename Visitor> void visit_entities(TransformComponent& t, Visitor&& visitor) {}
+
 #if 0
 
     // -> bool inspect(Transform& t, Editor::InspectorState& inspector)
@@ -55,7 +59,7 @@ namespace eeng::ecs
         inspector.end_leaf();
 
         return mod;
-    }
+}
 #endif
 }
 

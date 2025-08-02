@@ -47,6 +47,11 @@ namespace eeng::ecs
         return tree->erase_branch(entity);
     }
 
+    bool SceneGraph::contains(const Entity& entity)
+    {
+        return tree->contains(entity);
+    }
+
     bool SceneGraph::is_root(const Entity& entity)
     {
         return tree->is_root(entity);

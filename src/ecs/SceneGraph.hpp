@@ -35,6 +35,8 @@ namespace eeng::ecs
 
         bool erase_node(const Entity& entity);
 
+        bool contains(const Entity& entity);
+
         bool is_root(const Entity& entity);
 
         bool is_leaf(const Entity& entity);

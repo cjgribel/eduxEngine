@@ -60,6 +60,7 @@ namespace eeng
     };
 
     // ASSET
+    // * ser/deser function that only write/read model_ref ... or, only reg. model_ref to entt::meta
     struct GpuModel {
         /* NOTE */ AssetRef<Model> model_ref;
         GLuint vao;               // Single VAO
@@ -140,8 +141,6 @@ namespace eeng
 
 } // namespace eeng
 
-
-
 namespace eeng::mock
 {
     struct Mesh
@@ -149,10 +148,16 @@ namespace eeng::mock
         std::vector<float> vertices;
     };
 
+    template<typename Visitor> void visit_assets(Mesh&, Visitor&&) {}
+    /* try to remove */ template<typename Visitor> void visit_assets(const Mesh&, Visitor&&) {}
+
     struct Texture
     {
         std::string name;
     };
+
+    template<typename Visitor> void visit_assets(Texture&, Visitor&&) {}
+    /* try to remove */ template<typename Visitor> void visit_assets(const Texture&, Visitor&&) {}
 
     struct Model
     {
@@ -245,6 +250,9 @@ namespace eeng::mock
         }
     };
 
+    template<typename Visitor> void visit_assets(MockResource1&, Visitor&&) {}
+    /* try to remove */ template<typename Visitor> void visit_assets(const MockResource1&, Visitor&&) {}
+
     struct MockResource2
     {
         size_t y = 0;
@@ -255,6 +263,9 @@ namespace eeng::mock
             return y == other.y && ref1 == other.ref1;
         }
     };
+
+    template<typename Visitor> void visit_assets(MockResource2&, Visitor&&) {}
+    /* try to remove */ template<typename Visitor> void visit_assets(const MockResource2&, Visitor&&) {}
 
 } // namespace eeng
 

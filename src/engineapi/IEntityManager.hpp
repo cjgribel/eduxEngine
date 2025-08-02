@@ -17,56 +17,8 @@ namespace eeng
         // virtual void destroy_entity(ecs::Entity entity) = 0;
 
         virtual bool entity_valid(const ecs::Entity& entity) const = 0;
-        
-        #if 0
-        bool Scene::entity_parent_registered(const Entity& entity)
-        {
-            assert(registry->all_of<HeaderComponent>(entity));
-            auto& header = registry->get<HeaderComponent>(entity);
-            auto entity_parent = Entity{ entt::entity{header.entity_parent} };
-            // auto entity_parent = get_entity_parent(entity);
 
-            if (entity_parent.is_null()) return true;
-            return scenegraph->tree.contains(entity_parent);
-        }
-
-        void Scene::reparent_entity(const Entity& entity, const Entity& parent_entity)
-        {
-            assert(registry->all_of<HeaderComponent>(entity));
-            registry->get<HeaderComponent>(entity).entity_parent = parent_entity;
-
-            scenegraph->reparent(entity, parent_entity);
-        }
-
-        void Scene::set_entity_header_parent(const Entity& entity, const Entity& entity_parent)
-        {
-            assert(registry->all_of<HeaderComponent>(entity));
-            registry->get<HeaderComponent>(entity).entity_parent = entity_parent;
-
-            // register_entity(entity);
-        }
-
-        void Scene::register_entity(const Entity& entity)
-        {
-            assert(registry->all_of<HeaderComponent>(entity));
-
-            auto& header = registry->get<HeaderComponent>(entity);
-            auto& chunk_tag = header.chunk_tag;
-            auto entity_parent = Entity{ entt::entity{header.entity_parent} };
-
-            chunk_registry.add_entity(header.chunk_tag, entity);
-
-            if (entity_parent.is_null())
-            {
-                scenegraph->insert_node(entity);
-            }
-            else
-            {
-                assert(scenegraph->tree.contains(entity_parent));
-                scenegraph->insert_node(entity, entity_parent);
-            }
-        }
-
+#if 0
         Entity Scene::create_empty_entity(const Entity& entity_hint)
         {
             if (entity_hint.is_null())
@@ -110,6 +62,35 @@ namespace eeng
             std::cout << "Scene::create_entity " << entity.to_integral() << std::endl;
             return entity;
         }
+
+        bool Scene::entity_parent_registered(const Entity& entity)
+        {
+            assert(registry->all_of<HeaderComponent>(entity));
+            auto& header = registry->get<HeaderComponent>(entity);
+            auto entity_parent = Entity{ entt::entity{header.entity_parent} };
+            // auto entity_parent = get_entity_parent(entity);
+
+            if (entity_parent.is_null()) return true;
+            return scenegraph->tree.contains(entity_parent);
+        }
+
+        void Scene::reparent_entity(const Entity& entity, const Entity& parent_entity)
+        {
+            assert(registry->all_of<HeaderComponent>(entity));
+            registry->get<HeaderComponent>(entity).entity_parent = parent_entity;
+
+            scenegraph->reparent(entity, parent_entity);
+        }
+
+        void Scene::set_entity_header_parent(const Entity& entity, const Entity& entity_parent)
+        {
+            assert(registry->all_of<HeaderComponent>(entity));
+            registry->get<HeaderComponent>(entity).entity_parent = entity_parent;
+
+            // register_entity(entity);
+        }
+
+
 
         // entt::entity Scene::create_entity_hint(
         //     entt::entity hint_entity,
@@ -163,6 +144,9 @@ namespace eeng
         virtual const entt::registry& registry() const noexcept = 0;
         virtual std::weak_ptr<entt::registry> registry_wptr() noexcept = 0;
         virtual std::weak_ptr<const entt::registry> registry_wptr() const noexcept = 0;
+
+    private:
+        virtual void register_entity(const ecs::Entity& entity) = 0;
 
     };
 } // namespace eeng

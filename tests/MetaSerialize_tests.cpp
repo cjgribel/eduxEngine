@@ -52,6 +52,8 @@ namespace
         std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
     private:
+        void register_entity(const ecs::Entity& entity) override {}
+
         std::shared_ptr<entt::registry> registry_;
     };
 

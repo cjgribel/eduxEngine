@@ -3,12 +3,11 @@
 
 #pragma once
 #include "IEntityManager.hpp"
+#include "Guid.h"
 #include "ecs/SceneGraph.hpp"
 
 namespace eeng
 {
-    using ecs::Entity;
-
     class EntityManager : public IEntityManager
     {
     public:
@@ -16,7 +15,7 @@ namespace eeng
 
         ~EntityManager();
 
-        bool entity_valid(const Entity& entity) const override;
+        bool entity_valid(const ecs::Entity& entity) const override;
 
         // ecs::Entity create_entity() override { return ecs::Entity{}; }
         // void destroy_entity(ecs::Entity entity) override {}
@@ -31,15 +30,18 @@ namespace eeng
         // destroy_pending_entities
 
     private:
+
+        void register_entity(const ecs::Entity& entity) override;
+
         std::shared_ptr<entt::registry> registry_;
-        // std::unordered_map<Guid, entt::entity> guid_to_entity_map_;
+        std::unordered_map<Guid, entt::entity> guid_to_entity_map_;
         // On create:
         // guid_to_entity_map[guid] = entity;
         // On destroy:
         // guid_to_entity_map.erase(guid);
 
         std::unique_ptr<ecs::SceneGraph> scene_graph_;
-        std::deque<Entity> entities_pending_destruction;
+        std::deque<ecs::Entity> entities_pending_destruction;
     };
 
 
