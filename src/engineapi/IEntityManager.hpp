@@ -13,15 +13,12 @@ namespace eeng
     public:
         virtual ~IEntityManager() = default;
 
-        virtual ecs::Entity create_entity() = 0;
-        virtual void destroy_entity(ecs::Entity entity) = 0;
+        // virtual ecs::Entity create_entity() = 0;
+        // virtual void destroy_entity(ecs::Entity entity) = 0;
 
-#if 0
-        bool Scene::entity_valid(const Entity& entity)
-        {
-            return registry->valid(entity);
-        }
-
+        virtual bool entity_valid(const ecs::Entity& entity) const = 0;
+        
+        #if 0
         bool Scene::entity_parent_registered(const Entity& entity)
         {
             assert(registry->all_of<HeaderComponent>(entity));

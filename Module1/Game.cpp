@@ -420,6 +420,7 @@ bool Game::init()
 
     // ECS
     // ...
+    // (test all functions)
 
     // Do some entt stuff
     entity_registry = std::make_shared<entt::registry>();

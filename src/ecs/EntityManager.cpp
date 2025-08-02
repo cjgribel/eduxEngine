@@ -14,4 +14,9 @@ namespace eeng
 
     EntityManager::~EntityManager() = default;
 
+    bool EntityManager::entity_valid(const Entity& entity) const
+    {
+        return registry_->valid(entity);
+    }
+
 } // namespace eeng

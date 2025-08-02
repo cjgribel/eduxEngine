@@ -41,8 +41,10 @@ namespace
 {
     struct MockEntityRegistry : eeng::IEntityManager
     {
-        eeng::ecs::Entity create_entity() override { return eeng::ecs::Entity{ }; }
-        void destroy_entity(eeng::ecs::Entity entity) override {}
+        bool entity_valid(const ecs::Entity& entity) const override { return false; }
+
+        // eeng::ecs::Entity create_entity() override { return eeng::ecs::Entity{ }; }
+        // void destroy_entity(eeng::ecs::Entity entity) override {}
 
         entt::registry& registry() noexcept override { return *registry_; }
         const entt::registry& registry() const noexcept override { return *registry_; }

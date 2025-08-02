@@ -7,6 +7,8 @@
 
 namespace eeng
 {
+    using ecs::Entity;
+
     class EntityManager : public IEntityManager
     {
     public:
@@ -14,19 +16,30 @@ namespace eeng
 
         ~EntityManager();
 
-        ecs::Entity create_entity() override { return ecs::Entity{}; }
+        bool entity_valid(const Entity& entity) const override;
 
-        void destroy_entity(ecs::Entity entity) override {}
+        // ecs::Entity create_entity() override { return ecs::Entity{}; }
+        // void destroy_entity(ecs::Entity entity) override {}
 
         entt::registry& registry() noexcept override { return *registry_; }
         const entt::registry& registry() const noexcept override { return *registry_; }
         std::weak_ptr<entt::registry> registry_wptr() noexcept override { return registry_; }
         std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
+        // Not part of public API
+
+        // destroy_pending_entities
+
     private:
         std::shared_ptr<entt::registry> registry_;
+        // std::unordered_map<Guid, entt::entity> guid_to_entity_map_;
+        // On create:
+        // guid_to_entity_map[guid] = entity;
+        // On destroy:
+        // guid_to_entity_map.erase(guid);
+
         std::unique_ptr<ecs::SceneGraph> scene_graph_;
-        // + scene graph
+        std::deque<Entity> entities_pending_destruction;
     };
 
 

@@ -141,12 +141,11 @@ namespace eeng
             // =================================================================
 
             // update_input_lua(lua, SceneBase::axes, SceneBase::buttons);
-            
+
             // Scripts may queue entities for destruction
             // ??? if (play_state == GamePlayState::Play) update_scripts(*registry, deltaTime_s);
-            
-            // ??? destroy_pending_entities();
-            // -> std::deque<Entity> entities_pending_destruction;
+
+            // ??? entity_manage->destroy_pending_entities();
 
             // ??? scenegraph->traverse(registry);
 
@@ -175,7 +174,9 @@ namespace eeng
 
     void Engine::shutdown()
     {
+        // Todo: release all context managers etc here?
         ctx->gui_manager->release();
+
         imgui_backend::shutdown();
 
         if (gl_context_)
