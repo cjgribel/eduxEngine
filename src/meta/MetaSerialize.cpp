@@ -505,6 +505,7 @@ namespace eeng::meta
             assert(entity_json.contains("entity"));
             Entity entity_hint{ entity_json["entity"].get<entt::entity>() };
 
+            // 250803: Entity value does not matter anymore: GUIDs are used for references
             Entity entity;
             if (context.registry->valid(entity_hint))
                 entity = Entity{ context.registry->create() };
