@@ -38,46 +38,71 @@ bool Game::init()
     shapeRenderer = std::make_shared<ShapeRendering::ShapeRenderer>();
     shapeRenderer->init();
 
-    // RESOURCE MANAGER API TESTS
+    // LEVEL CYCLE API TESTS
     {
+        /*
+        Potential design:
+        - One function does all of the below
+        - 
+
+        1. Load a SET OF ENTITIES given by a batch / level file etc
+            Use some dummy component that tests inspectble types & references another entity
+        2. Bind component ENTITY references
+        One function to load & bind all entities in the set
+        This is probably serial; maybe file IO & parsing is done async
+
+        3. Collect ASSET GUIDs from entities
+
+        4. Load & bind ASSETS (ASYNC)
+
+        5. Bind component ASSET references (SERIAL)
+        */
+
+        // === ECS PHASE ===
+
+        std::cout << "ECS API TESTS..." << std::endl;
+
+
+
+        // === RESOURCE PHASE ===
+
         std::cout << "RESOURCE MANAGER API TESTS..." << std::endl;
 
         // TODO: Ugly cast to concrete type from interface
-        // https://chatgpt.com/s/t_68630dc8597881918ffd0e6db8a8c57e
-        // - Use helper free function for loading etc?
+        // - Use interface for parts of ResourceManager not part of IResourceManager (load etc)
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
-        //std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/";
-        std::filesystem::path asset_root = "C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/";
+        std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/";
+        //std::filesystem::path asset_root = "C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/";
 
         // 1.   IMPORT resources concurrently
         //
         using ModelRef = eeng::AssetRef<eeng::mock::Model>;
-        // Requires ResourceManager to be TS
-        std::cout << "Importing assets recursively..." << std::endl;
-        const int numTasks = 10;
         std::vector<std::future<ModelRef>> futures;
-        for (int i = 0; i < numTasks; ++i)
         {
-            futures.emplace_back(
-                ctx->thread_pool->queue_task([this, &asset_root]()
-                    {
-                        return eeng::mock::ModelImporter::import(asset_root, ctx);
-                    })
-            );
+            // Requires ResourceManager to be TS
+            std::cout << "Importing assets recursively..." << std::endl;
+            const int numTasks = 10;
+            for (int i = 0; i < numTasks; ++i)
+            {
+                futures.emplace_back(
+                    ctx->thread_pool->queue_task([this, &asset_root]()
+                        {
+                            return eeng::mock::ModelImporter::import(asset_root, ctx);
+                        })
+                );
+            }
+            // BLOCK and wait for imports
+            EENG_LOG(ctx, "[Game::init()] Wait for imports...");
+            std::vector<ModelRef> refs;
+            for (auto& f : futures) refs.push_back(f.get());
         }
-        // BLOCK and wait
-        // - get() blocks until the task is done
-        // - wait_for() checks & waits for a period of time without blocking
-        EENG_LOG(ctx, "[Game::init()] Wait for imports...");
-        std::vector<ModelRef> refs;
-        for (auto& f : futures) refs.push_back(f.get());
 
         // 3. SCAN assets from disk concurrently
         //
         {
             EENG_LOG(ctx, "[Game::init()] Scanning assets...");
-            //resource_manager.start_async_scan("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
-            resource_manager.start_async_scan("C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/", *ctx);
+            resource_manager.start_async_scan("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
+            //resource_manager.start_async_scan("C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/", *ctx);
             // Wait for scanning to finish
             while (resource_manager.is_scanning())
             {
@@ -107,6 +132,7 @@ bool Game::init()
         */
 
         // 4. LOAD assets concurrently
+        // -> "collected asset GUIDs" -> auto fut = ctx->resource_manager->load_and_bind_async();
 #if 0
         {
             EENG_LOG(ctx, "[Game::init()] Loading assets...");
@@ -142,8 +168,8 @@ bool Game::init()
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
                 }
+            }
     }
-}
 #endif
 
         // 5. UNLOAD assets (concurrently)
@@ -165,7 +191,7 @@ bool Game::init()
             }
             // Wait for all loads to finish
             for (auto& future : load_futures) future.get();
-        }
+}
 #endif
 
         // GUI: import. load, unload, unimport ...
@@ -419,10 +445,6 @@ bool Game::init()
         logRegisteredResourceTypes(registry);
     }
 #endif
-
-    // ECS
-    // ...
-    // (test all functions)
 
     // Do some entt stuff
     entity_registry = std::make_shared<entt::registry>();
