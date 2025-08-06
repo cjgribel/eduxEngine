@@ -533,14 +533,14 @@ namespace eeng
                         ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
                         // --- Line 4: Path ---
                         ImGui::Text("Path: %s", entry.relative_path.string().c_str());
-                        //
+                        // -- Line 5: Debug print content of certain types (if loaded) --
                         if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value()) {
                             if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
                             {
-                                auto mesh = resource_manager.storage().get_ref<mock::Mesh>(*h_opt);
+                                auto mesh = resource_manager.storage().get_ref(*h_opt);
                                 ImGui::Text("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
                             }
-                            else ImGui::Text("Not a mock::Mesh");
+                            //else ImGui::Text("Not a mock::Mesh");
                         }
                         // --- Line 5: Contained assets ---
                         tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
