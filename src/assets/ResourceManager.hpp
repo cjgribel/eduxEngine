@@ -44,14 +44,14 @@ namespace eeng
         void release_guid(const Guid& guid, EngineContext& ctx) override;
 
         bool is_scanning() const override;
-        
+
         /// @brief Get a snapshot of asset index
         AssetIndexDataPtr get_index_data() const override;
-        
+
         std::string to_string() const override;
-        
+
         // --- Local API -------------------------------------------------------
-        
+
         const Storage& storage() const;
         Storage& storage();
 
@@ -89,6 +89,8 @@ namespace eeng
         template<typename T>
         void unfile(AssetRef<T>& ref)
         {
+            assert(0);
+
             // For now: require that asset being removed is not loaded
             assert(!ref.is_loaded());
 
@@ -99,80 +101,28 @@ namespace eeng
         template<typename T>
         void load_asset(const Guid& guid, EngineContext& ctx)
         {
-            // Throw if already loaded
-            // if (storage_->handle_for_guid<T>(guid))
-            //     throw std::runtime_error("Asset already loaded for " + guid.to_string());
-            if (storage_->handle_for_guid<T>(guid))
-            {
-                // Already loaded — just ensure resolution
-                //resolve_asset<T>(AssetRef<T>{ guid, * storage_->handle_for_guid<T>(guid) }, ctx);
-                return;
-            }
+            // Silently return if already loaded
+            if (storage_->handle_for_guid<T>(guid)) return;
 
             // Derserialize
             /* add delay */ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             T asset = asset_index_->deserialize_from_file<T>(guid, ctx);
 
-            // Async load child assets
-#if 0
-            std::vector<std::future<bool>> futures;
-            visit_assets(asset, [&](auto& subref)
-                {
-                    if (storage_->validate(subref.handle)) return;
-                    futures.emplace_back(this->load_asset_async(subref.guid, ctx));
-                });
-            // Check results
-            for (auto& f : futures)
-            {
-                if (!f.get()) // Child failed to load
-                    throw std::runtime_error("One or more dependencies failed to load for asset: " + guid.to_string());
-            }
-#endif
-
             // Add to storage
-            // The handle is fetched when the asset is bound
             auto handle = storage_->add<T>(std::move(asset), guid);
-
-            // -- resolve now???  --
-            // resolve_asset<T>(guid, ctx);
-            // resolve_asset(AssetRef<T> {guid, handle}, ctx);
         }
 
         template<typename T>
         void unload_asset(const Guid& guid, EngineContext& ctx)
         {
-            auto maybe_handle = storage_->handle_for_guid<T>(guid);
-            if (!maybe_handle) {
-                //unresolve_asset(AssetRef<T> {guid, handle}, ctx);
-                return;
-            }
-            //throw std::runtime_error("Asset not loaded for " + guid.to_string());
-            auto handle = *maybe_handle;
+            auto handle_opt = storage_->handle_for_guid<T>(guid);
 
-#if 0
-            // unresolve_asset<T>(guid, ctx);
-            unresolve_asset(AssetRef<T> {guid, handle}, ctx);
-            // auto& tree = get_index_data()->trees->content_tree;
-            // Async unload child assets
-            std::vector<std::future<bool>> futures;
-            storage_->modify(handle, [&](T& asset)
-                {
-                    //if (!storage_->validate(handle)) return;
-                    visit_assets(asset, [&](auto& subref)
-                        {
-                            futures.emplace_back(this->unload_asset_async(subref.guid, ctx));
-                        });
-                });
-            // Check results
-            for (auto& f : futures)
-            {
-                if (!f.get()) // Child failed to load
-                    throw std::runtime_error("One or more dependencies failed to unload for asset: " + guid.to_string());
-            }
-#endif
+            // Silently return if not loaded
+            if (!handle_opt) return;
 
+            // Remove from storage
             /* add delay */ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            storage_->remove_now(handle);
+            storage_->remove_now(*handle_opt);
         }
 
     private:
@@ -180,11 +130,11 @@ namespace eeng
         void load_asset(const Guid& guid, EngineContext& ctx);
         void unload_asset(const Guid& guid, EngineContext& ctx);
 
-        void resolve_asset(const Guid& guid, EngineContext& ctx);
-        void unresolve_asset(const Guid& guid, EngineContext& ctx);
+        void bind_asset(const Guid& guid, EngineContext& ctx);
+        void unbind_asset(const Guid& guid, EngineContext& ctx);
 
         template<class T>
-        void resolve_asset(AssetRef<T> ref, EngineContext& ctx)
+        void bind_asset(AssetRef<T> ref, EngineContext& ctx)
         {
             storage_->modify(ref.handle, [&](T& asset)
                 {
@@ -199,7 +149,6 @@ namespace eeng
 
                             ref.handle = handle.value();
                             retain_guid(ref.guid);
-                            // resolve_asset(ref, ctx);
                         });
                 });
         }
@@ -208,33 +157,17 @@ namespace eeng
 
         // Called via meta
         template<class T>
-        void resolve_asset(const Guid& guid, EngineContext& ctx)
+        void bind_asset(const Guid& guid, EngineContext& ctx)
         {
             auto maybe_ref = ref_for_guid<T>(guid);
             if (!maybe_ref)
                 throw std::runtime_error("Asset not loaded: " + guid.to_string());
-            resolve_asset<T>(maybe_ref.value(), ctx);
+            bind_asset<T>(maybe_ref.value(), ctx);
         }
-
-        // template<typename T>
-        // void resolve_component(T& component)
-        // {
-        //     visit_assets(component, [&](auto& ref)
-        //         {
-        //             using AssetT = typename std::decay_t<decltype(ref)>::asset_type;
-
-        //             auto handle = storage_->handle_for_guid<AssetT>(ref.guid);
-        //             if (!handle)
-        //                 throw std::runtime_error("Unresolved reference: " + ref.guid.to_string());
-
-        //             ref.handle = *handle;
-        //             retain_guid(ref.guid); // ❗Component owns this asset
-        //         });
-        // }
 
     private:
         template<class T>
-        void unresolve_asset(AssetRef<T> ref, EngineContext& ctx)
+        void unbind_asset(AssetRef<T> ref, EngineContext& ctx)
         {
             if (!storage_->validate(ref.handle)) return;
             storage_->modify(ref.handle, [&](T& asset)
@@ -250,12 +183,15 @@ namespace eeng
 
     public:
         template<class T>
-        void unresolve_asset(const Guid& guid, EngineContext& ctx)
+        void unbind_asset(const Guid& guid, EngineContext& ctx)
         {
-            auto maybe_ref = ref_for_guid<T>(guid);
-            if (!maybe_ref)
-                return; //throw std::runtime_error("Asset not loaded: " + guid.to_string());
-            unresolve_asset<T>(maybe_ref.value(), ctx);
+            auto ref_opt = ref_for_guid<T>(guid);
+
+            // Silently return if not loaded
+            if (!ref_opt) return;
+            
+            // Unbind asset
+            unbind_asset<T>(ref_opt.value(), ctx);
         }
 
         // ---
@@ -289,7 +225,6 @@ namespace eeng
                     visit_assets(asset, [&](const auto& asset_ref)
                         {
                             using SubT = typename std::decay_t<decltype(asset_ref.handle)>::value_type;
-                            // valid &= validate_asset_recursive<SubT>(asset_ref.handle);
                             if (!validate_asset_recursive<SubT>(asset_ref.handle))
                                 valid = false;
 

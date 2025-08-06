@@ -67,7 +67,7 @@ namespace eeng
             [this, futures, guids, &ctx]()
             {
                 for (auto& f : *futures) f.get();
-                for (const Guid& guid : guids) { this->resolve_asset(guid, ctx); }
+                for (const Guid& guid : guids) { this->bind_asset(guid, ctx); }
             });
     }
 
@@ -83,7 +83,7 @@ namespace eeng
             {
                 for (const Guid& guid : guids)
                 {
-                    this->unresolve_asset(guid, ctx);
+                    this->unbind_asset(guid, ctx);
                 }
             }).share(); // now copyable to threads
 
@@ -258,14 +258,14 @@ namespace eeng
     //         });
     // }
 
-    void ResourceManager::resolve_asset(const Guid& guid, EngineContext& ctx)
+    void ResourceManager::bind_asset(const Guid& guid, EngineContext& ctx)
     {
-        invoke_meta_function(guid, ctx, literals::resolve_asset_hs, "resolve_asset");
+        invoke_meta_function(guid, ctx, literals::bind_asset_hs, "resolve_asset");
     }
 
-    void ResourceManager::unresolve_asset(const Guid& guid, EngineContext& ctx)
+    void ResourceManager::unbind_asset(const Guid& guid, EngineContext& ctx)
     {
-        invoke_meta_function(guid, ctx, literals::unresolve_asset_hs, "unresolve_asset");
+        invoke_meta_function(guid, ctx, literals::unbind_asset_hs, "unresolve_asset");
     }
 
     bool ResourceManager::validate_asset(const Guid& guid, EngineContext& ctx)

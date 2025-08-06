@@ -65,17 +65,17 @@ namespace eeng {
         }
 
         template<class T>
-        void resolve_asset(const Guid& guid, EngineContext& ctx)
+        void bind_asset(const Guid& guid, EngineContext& ctx)
         {
             auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
-            rm.resolve_asset<T>(guid, ctx);
+            rm.bind_asset<T>(guid, ctx);
         }
 
         template<class T>
-        void unresolve_asset(const Guid& guid, EngineContext& ctx)
+        void unbind_asset(const Guid& guid, EngineContext& ctx)
         {
             auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
-            rm.unresolve_asset<T>(guid, ctx);
+            rm.unbind_asset<T>(guid, ctx);
         }
 
         template<class T>
@@ -106,8 +106,8 @@ namespace eeng {
                 .template func<&unload_asset<T>, entt::as_void_t>(eeng::literals::unload_asset_hs)
                 // .template func<&reload_asset<T>>(eeng::literals::reload_asset_hs)
                 // Type-safe binding
-                .template func<&resolve_asset<T>, entt::as_void_t>(eeng::literals::resolve_asset_hs)
-                .template func<&unresolve_asset<T>, entt::as_void_t>(eeng::literals::unresolve_asset_hs)
+                .template func<&bind_asset<T>, entt::as_void_t>(eeng::literals::bind_asset_hs)
+                .template func<&unbind_asset<T>, entt::as_void_t>(eeng::literals::unbind_asset_hs)
                 // Asset validation
                 .template func<&validate_asset<T>>(eeng::literals::validate_asset_hs)
                 .template func<&validate_asset_recursive<T>>(eeng::literals::validate_asset_recursive_hs)
