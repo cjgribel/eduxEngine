@@ -42,6 +42,7 @@ namespace
     struct MockEntityRegistry : eeng::IEntityManager
     {
         bool entity_valid(const ecs::Entity& entity) const override { return false; }
+        void register_entity(const ecs::Entity& entity) override {}
 
         // eeng::ecs::Entity create_entity() override { return eeng::ecs::Entity{ }; }
         // void destroy_entity(eeng::ecs::Entity entity) override {}
@@ -52,7 +53,6 @@ namespace
         std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
     private:
-        void register_entity(const ecs::Entity& entity) override {}
 
         std::shared_ptr<entt::registry> registry_;
     };
