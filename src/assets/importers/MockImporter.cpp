@@ -67,7 +67,7 @@ namespace eeng::mock {
             std::string("MockMesh") + std::to_string(value), // name
             std::string(entt::resolve<Mesh>().info().name()) // type name, alt. entt::type_name<T>
         };
-        resource_manager.file(
+        resource_manager.import(
             mesh,
             mesh_file_path.string(),
             mesh_meta,
@@ -86,7 +86,7 @@ namespace eeng::mock {
             std::string("MockTexture") + std::to_string(value), // name
             std::string(entt::resolve<Texture>().info().name()) // type name
         };
-        resource_manager.file(
+        resource_manager.import(
             texture,
             texture_file_path.string(),
             texture_meta,
@@ -103,7 +103,7 @@ namespace eeng::mock {
             std::string(entt::resolve<Model>().info().name()) // type name
             // model_file_path // desired filepath
         };
-        resource_manager.file(
+        resource_manager.import(
             model,
             model_file_path.string(),
             model_meta,

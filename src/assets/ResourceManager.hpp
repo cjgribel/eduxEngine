@@ -52,6 +52,22 @@ namespace eeng
 
         // --- Local API -------------------------------------------------------
 
+#if 0
+        template<typename T>
+        T& get_asset_ref(const Handle& handle)
+        {
+            return storage_->get_ref<T>(handle);
+        }
+
+        template<typename T>
+        std::optional<T&> try_get_asset_ref(const Handle& handle)
+        {
+            if (!storage_->validate<T>(handle))
+                return std::nullopt;
+            return storage_->get_ref<T>(handle);
+        }
+#endif
+
         const Storage& storage() const;
         Storage& storage();
 
@@ -66,7 +82,7 @@ namespace eeng
         /// @param t 
         /// @return 
         template<class T>
-        void file(
+        void import(
             const T& t,
             const std::string& file_path,
             const AssetMetaData& meta,
@@ -87,7 +103,7 @@ namespace eeng
 
         // TS?
         template<typename T>
-        void unfile(AssetRef<T>& ref)
+        void unimport(AssetRef<T>& ref)
         {
             assert(0);
 
@@ -189,7 +205,7 @@ namespace eeng
 
             // Silently return if not loaded
             if (!ref_opt) return;
-            
+
             // Unbind asset
             unbind_asset<T>(ref_opt.value(), ctx);
         }
