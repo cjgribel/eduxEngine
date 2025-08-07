@@ -15,10 +15,32 @@ namespace eeng
 
         ~EntityManager();
 
-        bool entity_valid(const ecs::Entity& entity) const override;
+        bool entity_valid(
+            const ecs::Entity& entity) const override;
 
-        // ecs::Entity create_entity() override { return ecs::Entity{}; }
-        // void destroy_entity(ecs::Entity entity) override {}
+        ecs::Entity create_empty_entity(
+            const ecs::Entity& entity_hint) override;
+
+        ecs::Entity create_entity(
+            const std::string& chunk_tag,
+            const std::string& name,
+            const ecs::Entity& entity_parent,
+            const ecs::Entity& entity_hint) override;
+
+        bool entity_parent_registered(
+            const ecs::Entity& entity) const override;
+
+        void reparent_entity(
+            const ecs::Entity& entity, const ecs::Entity& parent_entity) override;
+
+        void set_entity_header_parent(
+            const ecs::Entity& entity, 
+            const ecs::Entity& entity_parent) override;
+
+        void queue_entity_for_destruction(
+            const ecs::Entity& entity) override;
+
+        int destroy_pending_entities() override;
 
         entt::registry& registry() noexcept override { return *registry_; }
         const entt::registry& registry() const noexcept override { return *registry_; }
@@ -41,7 +63,7 @@ namespace eeng
         // guid_to_entity_map.erase(guid);
 
         std::unique_ptr<ecs::SceneGraph> scene_graph_;
-        std::deque<ecs::Entity> entities_pending_destruction;
+        std::deque<ecs::Entity> entities_pending_destruction_;
     };
 
 

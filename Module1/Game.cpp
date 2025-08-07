@@ -43,7 +43,7 @@ bool Game::init()
         /*
         Potential design:
         - One function does all of the below
-        - 
+        -
 
         1. Load a SET OF ENTITIES given by a batch / level file etc
             Use some dummy component that tests inspectble types & references another entity
@@ -62,7 +62,15 @@ bool Game::init()
 
         std::cout << "ECS API TESTS..." << std::endl;
 
-
+        // Create entities
+        std::vector<eeng::ecs::Entity> entities;
+        for (int i = 0; i < 5; ++i)
+        {
+            auto entity = ctx->entity_manager->create_entity("", "Entity " + std::to_string(i), eeng::ecs::Entity::EntityNull, eeng::ecs::Entity{});
+            //std::cout << "Created entity: " << entity.to_integral() << std::endl;
+            EENG_LOG(ctx, "[Game::init()] Created entity: %i", entity.to_integral());
+            entities.push_back(entity);
+        }
 
         // === RESOURCE PHASE ===
 
@@ -169,8 +177,17 @@ bool Game::init()
                         EENG_LOG(ctx, "    - Vertex: %f", v);
                 }
             }
-    }
+        }
 #endif
+
+        // Destroy entities
+        for (const auto& entity : entities)
+        {
+            assert(ctx->entity_manager->entity_valid(entity));
+            ctx->entity_manager->queue_entity_for_destruction(entity);
+        }
+        auto nbr_destroyed = ctx->entity_manager->destroy_pending_entities();
+        EENG_LOG(ctx, "[Game::init()] Destroyed %i entities", nbr_destroyed);
 
         // 5. UNLOAD assets (concurrently)
         //      CAN BE MADE TS // storage->get_ref - NOT TS
@@ -191,7 +208,7 @@ bool Game::init()
             }
             // Wait for all loads to finish
             for (auto& future : load_futures) future.get();
-}
+        }
 #endif
 
         // GUI: import. load, unload, unimport ...
@@ -447,14 +464,14 @@ bool Game::init()
 #endif
 
     // Do some entt stuff
-    entity_registry = std::make_shared<entt::registry>();
-    entity_registry->storage<int>();
-    auto ent1 = entity_registry->create();
-    struct Tfm
-    {
-        float x, y, z;
-    };
-    entity_registry->emplace<Tfm>(ent1, Tfm{});
+    // entity_registry = std::make_shared<entt::registry>();
+    // entity_registry->storage<int>();
+    // auto ent1 = entity_registry->create();
+    // struct Tfm
+    // {
+    //     float x, y, z;
+    // };
+    // entity_registry->emplace<Tfm>(ent1, Tfm{});
 
     // Grass
     grassMesh = std::make_shared<eeng::RenderableMesh>();
@@ -712,7 +729,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-}
+    }
 #endif
 
     // Draw shape batches

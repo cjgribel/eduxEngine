@@ -42,10 +42,30 @@ namespace
     struct MockEntityRegistry : eeng::IEntityManager
     {
         bool entity_valid(const ecs::Entity& entity) const override { return false; }
-        void register_entity(const ecs::Entity& entity) override {}
 
-        // eeng::ecs::Entity create_entity() override { return eeng::ecs::Entity{ }; }
-        // void destroy_entity(eeng::ecs::Entity entity) override {}
+        ecs::Entity create_empty_entity(
+            const ecs::Entity& entity_hint) override { return ecs::Entity{}; }
+
+        ecs::Entity create_entity(
+            const std::string& chunk_tag,
+            const std::string& name,
+            const ecs::Entity& entity_parent,
+            const ecs::Entity& entity_hint) override { return ecs::Entity{}; }
+
+        bool entity_parent_registered(
+            const ecs::Entity& entity) const override { return false; }
+
+        void reparent_entity(
+            const ecs::Entity& entity, const ecs::Entity& parent_entity) override {}
+
+        void set_entity_header_parent(
+            const ecs::Entity& entity,
+            const ecs::Entity& entity_parent) override {}
+
+        void queue_entity_for_destruction(
+            const ecs::Entity& entity) override {}
+
+        int destroy_pending_entities() override { return 0; }
 
         entt::registry& registry() noexcept override { return *registry_; }
         const entt::registry& registry() const noexcept override { return *registry_; }
@@ -53,6 +73,7 @@ namespace
         std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
     private:
+        void register_entity(const ecs::Entity& entity) override {}
 
         std::shared_ptr<entt::registry> registry_;
     };
