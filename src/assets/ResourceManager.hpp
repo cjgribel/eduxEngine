@@ -28,7 +28,12 @@ namespace eeng
         mutable std::mutex status_mutex_;
         std::unordered_map<Guid, AssetStatus> statuses_;
 
+        //
+        std::shared_future<TaskResult> current_task_;
+        mutable std::mutex task_mutex_;
+
     public:
+
         ResourceManager();
         ~ResourceManager();
 
@@ -36,21 +41,26 @@ namespace eeng
 
         AssetStatus get_status(const Guid& guid) const override;
 
-        std::future<void> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override;
-        std::future<void> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override;
-        std::future<void> reload_and_rebind_async(std::deque<Guid> guids, EngineContext& ctx) override;
+        std::shared_future<TaskResult> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override;
+        std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override;
+        std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> guids, EngineContext& ctx) override;
 
         void retain_guid(const Guid& guid) override;
         void release_guid(const Guid& guid, EngineContext& ctx) override;
 
-        bool is_scanning() const override;
+        bool is_scanning() const override; // <- TaskResult + is_busy
+
+        bool is_busy() const override;
+        void wait_until_idle() const override;
+        std::optional<TaskResult> last_task_result() const override;
+        std::shared_future<TaskResult> active_task() const override;
 
         /// @brief Get a snapshot of asset index
         AssetIndexDataPtr get_index_data() const override;
 
         std::string to_string() const override;
 
-        // --- Local API -------------------------------------------------------
+        // --- Non-inherited API -------------------------------------------------------
 
 #if 0
         template<typename T>
@@ -161,7 +171,7 @@ namespace eeng
                             using CT = decltype(ref.handle)::value_type;
                             auto handle = storage_->handle_for_guid<CT>(ref.guid);
                             if (!handle)
-                                throw std::runtime_error("Failed to resolve handle for: " + ref.guid.to_string());
+                                throw std::runtime_error("Bind failed: referenced asset GUID not loaded " + ref.guid.to_string());
 
                             ref.handle = handle.value();
                             retain_guid(ref.guid);
@@ -177,7 +187,7 @@ namespace eeng
         {
             auto maybe_ref = ref_for_guid<T>(guid);
             if (!maybe_ref)
-                throw std::runtime_error("Asset not loaded: " + guid.to_string());
+                throw std::runtime_error("Bind failed: asset GUID not loaded " + guid.to_string());
             bind_asset<T>(maybe_ref.value(), ctx);
         }
 
@@ -277,5 +287,5 @@ namespace eeng
             std::string_view function_label
         );
 
-    };
-} // namespace eeng
+        };
+    } // namespace eeng

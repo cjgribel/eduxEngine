@@ -95,7 +95,7 @@ namespace eeng
         std::unique_ptr<editor::SelectionManager<ecs::Entity>>  entity_selection;
         std::unique_ptr<EngineConfig>       engine_config;
 
-        std::future<void> asset_async_future;
+        // std::shared_future<TaskResult> asset_async_future;
     };
 
     using EngineContextPtr = std::shared_ptr<EngineContext>;

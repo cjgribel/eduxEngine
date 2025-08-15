@@ -79,7 +79,7 @@ namespace eeng
                 });
 
             if (it == entries.end())
-                throw std::runtime_error("AssetIndex: Failed to find asset file for guid " + guid.to_string());
+                throw std::runtime_error("No asset entry found for GUID " + guid.to_string());
 
             const auto& path = it->absolute_path;
             //
@@ -87,7 +87,7 @@ namespace eeng
             //
             std::ifstream file(path);
             if (!file)
-                throw std::runtime_error("AssetIndex: Failed to open asset file: " + path.string());
+                throw std::runtime_error("Failed to open asset file: " + path.string());
 
             nlohmann::json j;
             file >> j;

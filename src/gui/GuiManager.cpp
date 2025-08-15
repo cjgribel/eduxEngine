@@ -373,28 +373,30 @@ namespace eeng
         ImGui::BeginChild("##BottomPane", ImVec2(0, bottom_pane_height), true);
 
         // Async busy flag
-        bool busy = ctx.asset_async_future.valid() &&
-            ctx.asset_async_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
-        ImGui::BeginDisabled(busy);
-
+        auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+        auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
+        // bool busy_ = ctx.asset_async_future.valid() &&
+        //     ctx.asset_async_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
+        bool busy = resource_manager.is_busy();
+        // assert(busy == busy_); // ensure consistency
+        // ImGui::BeginDisabled(resource_manager.is_busy());
+        if (busy) ImGui::BeginDisabled();
+        // 
         if (ImGui::Button("Import")) { /* Import a batch of mock assets (META)  */ }
         ImGui::SameLine();
         if (ImGui::Button("Unimport")) { /* ... */ }
         ImGui::SameLine();
         // ->
-
-        auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
-        auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         if (ImGui::Button("Load"))
         {
             auto to_reload = compute_selected_bottomup_closure(ctx);
-            ctx.asset_async_future = resource_manager.load_and_bind_async(to_reload, ctx);
+            /*ctx.asset_async_future =*/ resource_manager.load_and_bind_async(to_reload, ctx);
         }
         ImGui::SameLine();
         if (ImGui::Button("Unload"))
         {
             auto to_reload = compute_selected_bottomup_closure(ctx);
-            ctx.asset_async_future = resource_manager.unbind_and_unload_async(to_reload, ctx);
+            /*ctx.asset_async_future =*/ resource_manager.unbind_and_unload_async(to_reload, ctx);
         }
 
         // ImGui::SameLine();
@@ -408,10 +410,9 @@ namespace eeng
         {
             assert(ctx.thread_pool->nbr_threads() > 1);
             auto to_reload = compute_selected_bottomup_closure(ctx);
-            ctx.asset_async_future = resource_manager.reload_and_rebind_async(to_reload, ctx);
+            /*ctx.asset_async_future =*/ resource_manager.reload_and_rebind_async(to_reload, ctx);
         }
-
-        ImGui::EndDisabled(); // busy
+        if (busy) ImGui::EndDisabled();
 
         // <-
         ImGui::Text("Thread utilization %zu/%zu, queued %zu",

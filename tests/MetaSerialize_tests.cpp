@@ -44,26 +44,35 @@ namespace
         bool entity_valid(const ecs::Entity& entity) const override { return false; }
 
         ecs::Entity create_empty_entity(
-            const ecs::Entity& entity_hint) override { return ecs::Entity{}; }
+            const ecs::Entity& entity_hint) override {
+            return ecs::Entity{};
+        }
 
         ecs::Entity create_entity(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent,
-            const ecs::Entity& entity_hint) override { return ecs::Entity{}; }
+            const ecs::Entity& entity_hint) override {
+            return ecs::Entity{};
+        }
 
         bool entity_parent_registered(
-            const ecs::Entity& entity) const override { return false; }
+            const ecs::Entity& entity) const override {
+            return false;
+        }
 
         void reparent_entity(
-            const ecs::Entity& entity, const ecs::Entity& parent_entity) override {}
+            const ecs::Entity& entity, const ecs::Entity& parent_entity) override {
+        }
 
         void set_entity_header_parent(
             const ecs::Entity& entity,
-            const ecs::Entity& entity_parent) override {}
+            const ecs::Entity& entity_parent) override {
+        }
 
         void queue_entity_for_destruction(
-            const ecs::Entity& entity) override {}
+            const ecs::Entity& entity) override {
+        }
 
         int destroy_pending_entities() override { return 0; }
 
@@ -83,13 +92,18 @@ namespace
     {
 #if 1
         AssetStatus get_status(const Guid& guid) const override { return AssetStatus{}; }
-        std::future<void> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] {}); }
-        std::future<void> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] {}); }
-        std::future<void> reload_and_rebind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] {}); }
+        std::shared_future<TaskResult> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
+        std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
+        std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
 
         void retain_guid(const Guid& guid) override {}
         void release_guid(const Guid& guid, eeng::EngineContext& ctx) override {}
 #endif
+
+        bool is_busy() const override { return false; }
+        void wait_until_idle() const override {}
+        std::optional<TaskResult> last_task_result() const override { return std::nullopt; }
+        std::shared_future<TaskResult> active_task() const override { return {}; }
 
         bool is_scanning() const override { return false; }
         AssetIndexDataPtr get_index_data() const override { return nullptr; }
@@ -362,7 +376,7 @@ namespace
         EXPECT_EQ(t, deserialized_ref);
 
         return { j, deserialized_ref };
-    }
+}
 }
 
 TEST_F(MetaSerializationTest, SerializePrimitiveTypes)

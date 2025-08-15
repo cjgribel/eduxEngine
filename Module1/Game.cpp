@@ -56,22 +56,34 @@ bool Game::init()
         4. Load & bind ASSETS (ASYNC)
 
         5. Bind component ASSET references (SERIAL)
+
+        6. Use entities & assets "in game"
+
+        7. Detroy entities & assets
         */
 
         // === ECS PHASE ===
 
         std::cout << "ECS API TESTS..." << std::endl;
 
-        // Create entities
+        // 1. Create entities
         std::vector<eeng::ecs::Entity> entities;
         for (int i = 0; i < 5; ++i)
         {
             auto entity = ctx->entity_manager->create_entity("", "Entity " + std::to_string(i), eeng::ecs::Entity::EntityNull, eeng::ecs::Entity{});
-            //std::cout << "Created entity: " << entity.to_integral() << std::endl;
+            // Add components. Leave GUIDs empty.
+
             EENG_LOG(ctx, "[Game::init()] Created entity: %i", entity.to_integral());
             entities.push_back(entity);
         }
 
+        // 2. ...
+
+        // 3.
+        // We cannot bind asset references yet
+        // Fetch asset GUIDs once they are loaded
+
+        // 4.
         // === RESOURCE PHASE ===
 
         std::cout << "RESOURCE MANAGER API TESTS..." << std::endl;
@@ -85,6 +97,7 @@ bool Game::init()
         // 1.   IMPORT resources concurrently
         //
         using ModelRef = eeng::AssetRef<eeng::mock::Model>;
+        std::vector<ModelRef> refs;
         std::vector<std::future<ModelRef>> futures;
         {
             // Requires ResourceManager to be TS
@@ -101,7 +114,6 @@ bool Game::init()
             }
             // BLOCK and wait for imports
             EENG_LOG(ctx, "[Game::init()] Wait for imports...");
-            std::vector<ModelRef> refs;
             for (auto& f : futures) refs.push_back(f.get());
         }
 
@@ -141,8 +153,45 @@ bool Game::init()
 
         // 4. LOAD assets concurrently
         // -> "collected asset GUIDs" -> auto fut = ctx->resource_manager->load_and_bind_async();
-#if 0
+        std::deque<eeng::Guid> branch_guids;
+        for (const auto& ref : refs) branch_guids.push_back(ref.get_guid());
         {
+#if 1
+            // CREATE DEQUE AND LOAD USING load_and_bind_async
+            EENG_LOG(ctx, "[Game::init()] Loading assets asynchronously...");
+            auto fut = resource_manager.load_and_bind_async(branch_guids, *ctx);
+            // Wait for all assets to load
+            // try {
+            //     fut.get(); // Blocks until all assets are loaded and bound
+            // } catch (const std::exception& ex) {
+            //     EENG_LOG(ctx, "[Game::init()] Error loading assets: %s", ex.what());
+            //     //return false; // Handle error appropriately
+            // }
+            auto result = fut.get(); // Blocks until all assets are loaded and bound
+            // Log result
+            for (const auto& op : result.results)
+            {
+                if (!op.success)
+                    EENG_LOG(ctx, "Load error: GUID %s: %s", op.guid.to_string().c_str(), op.error_message.c_str());
+            }
+            // EENG_LOG(ctx, "[Game::init()] Assets loaded and bound.");
+#endif
+#if 1
+        // UNLOAD (NOT HERE)
+            {
+                EENG_LOG(ctx, "[Game::init()] Unloading assets asynchronously...");
+                auto fut = resource_manager.unbind_and_unload_async(branch_guids, *ctx);
+                auto result = fut.get(); // Blocks until all assets are unbound & unloaded
+                // Log result
+                for (const auto& op : result.results)
+                {
+                    if (!op.success) {
+                        EENG_LOG(ctx, "Unload error: GUID %s: %s", op.guid.to_string().c_str(), op.error_message.c_str());
+                    }
+                }
+            }
+#endif
+#if 0
             EENG_LOG(ctx, "[Game::init()] Loading assets...");
             // for (auto& ref : refs) resource_manager.load(ref, *ctx);
             // CONCURRENTLY
@@ -175,12 +224,22 @@ bool Game::init()
                     assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
-                }
-            }
         }
+    }
 #endif
+}
 
-        // Destroy entities
+        // (3. When loading future is done - set entity asset GUIDs)
+
+        // 5. BIND entity asset references
+
+        // 6. USE entities:
+        //      - Use views and get() components
+        //      - Fetch referenced entities
+        //      - Fetch referenced assets
+
+
+        // 7. Destroy entities
         for (const auto& entity : entities)
         {
             assert(ctx->entity_manager->entity_valid(entity));
@@ -189,7 +248,7 @@ bool Game::init()
         auto nbr_destroyed = ctx->entity_manager->destroy_pending_entities();
         EENG_LOG(ctx, "[Game::init()] Destroyed %i entities", nbr_destroyed);
 
-        // 5. UNLOAD assets (concurrently)
+        // 7. UNLOAD assets (concurrently)
         //      CAN BE MADE TS // storage->get_ref - NOT TS
         //      
 #if 0
@@ -729,7 +788,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-    }
+}
 #endif
 
     // Draw shape batches
