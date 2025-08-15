@@ -122,7 +122,10 @@ namespace eeng
 
     void Engine::run(std::unique_ptr<GameBase> game)
     {
-        game->init();
+        if (!game->init())
+        {
+            throw std::runtime_error("Game initialization failed");
+        }
 
         bool running = true;
         float time_s = 0.0f, time_ms, deltaTime_s = 0.016f;
