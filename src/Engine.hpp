@@ -99,6 +99,8 @@ namespace eeng
         void on_set_vsync(const SetVsyncEvent& e);
         void on_set_wireframe(const SetWireFrameRenderingEvent& e);
         void on_set_min_frametime(const SetMinFrameTimeEvent& e);
+        void on_resource_task_completed(const ResourceTaskCompletedEvent& e);
+
     };
 
     using EnginePtr = std::unique_ptr<Engine>;

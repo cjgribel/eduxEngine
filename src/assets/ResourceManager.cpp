@@ -4,6 +4,7 @@
 #include "ResourceManager.hpp"
 #include "AssetIndex.hpp"
 #include "ThreadPool.hpp"
+#include "EventQueue.h"
 
 namespace eeng
 {
@@ -31,7 +32,7 @@ namespace eeng
 
         // Wait if a task in progress
         // With a more advanced tracking system, we could avoid this
-        wait_until_idle();
+        // wait_until_idle();
 
         // 1) Launch parallel load tasks that each return an OperationResult
         std::vector<std::shared_future<Op>> loads;
@@ -46,7 +47,7 @@ namespace eeng
                         std::lock_guard lk(status_mutex_);
                         auto& st = statuses_[guid];
                         if (st.state == LoadState::Loading || st.state == LoadState::Loaded)
-                            return Op{ guid, true, {} }; // Already in-flight/done -> treat as ok
+                            return Op{ guid, true, {"Load Ok"} }; // Already in-flight/done -> treat as ok
                         st.state = LoadState::Loading;
                         st.error_message.clear();
                     }
@@ -56,7 +57,7 @@ namespace eeng
                         this->load_asset(guid, ctx);
                         std::lock_guard lk(status_mutex_);
                         statuses_[guid].state = LoadState::Loaded;
-                        return Op{ guid, true, {} };
+                        return Op{ guid, true, {"Load Ok"} };
                     }
                     catch (const std::exception& ex)
                     {
@@ -85,7 +86,7 @@ namespace eeng
                 for (auto& f : loads)
                 {
                     Op op = f.get(); // Load workers return Op; never throws
-                    res.add_result(op.guid, op.success, op.error_message);
+                    res.add_result(op.guid, op.success, op.message);
                     if (!op.success) failed.insert(op.guid);
                 }
 
@@ -96,13 +97,16 @@ namespace eeng
 
                     try {
                         this->bind_asset(g, ctx);
-                        res.add_result(g, true);
+                        res.add_result(g, true, "Bind Ok");
                     }
                     catch (const std::exception& ex)
                     {
                         res.add_result(g, false, ex.what());
                     }
                 }
+
+                // Enqueue resource task completed event
+                ctx.event_queue->enqueue_event<ResourceTaskCompletedEvent>({ res });
 
                 return res;
             }
@@ -122,7 +126,7 @@ namespace eeng
     {
         using Op = TaskResult::OperationResult;
 
-        wait_until_idle();
+        // wait_until_idle();
 
         // 1) Unbind all GUIDs serially, return Op per GUID)
         auto unbind_fut = ctx.thread_pool->queue_task([this, guids, &ctx]() -> std::vector<Op>
@@ -134,7 +138,7 @@ namespace eeng
                 {
                     try {
                         this->unbind_asset(g, ctx);
-                        ops.push_back(Op{ g, true, {} });
+                        ops.push_back(Op{ g, true, {"Unbind ok"} });
                     }
                     catch (const std::exception& ex)
                     {
@@ -160,11 +164,11 @@ namespace eeng
                         std::lock_guard lk(status_mutex_);
                         auto it = statuses_.find(g);
                         if (it == statuses_.end())
-                            return Op{ g, true, {} }; // already gone -> ok
+                            return Op{ g, true, {"Not loaded"} }; // already gone -> ok
 
                         auto& st = it->second;
                         if (st.state != LoadState::Loaded || st.ref_count > 0)
-                            return Op{ g, true, {} }; // treat as no-op success
+                            return Op{ g, true, {"Not loaded"} }; // treat as no-op success
 
                         st.state = LoadState::Unloading;
                         st.error_message.clear();
@@ -175,7 +179,7 @@ namespace eeng
                         // Remove status entirely
                         std::lock_guard lk(status_mutex_);
                         statuses_.erase(g);
-                        return Op{ g, true, {} };
+                        return Op{ g, true, {"Unload Ok"} };
                     }
                     catch (const std::exception& ex) {
                         std::lock_guard lk(status_mutex_);
@@ -191,20 +195,23 @@ namespace eeng
 
         // 3) Join & aggregate to TaskResult
         auto final_future = ctx.thread_pool->queue_task(
-            [this, guids, unbind_fut, unloads = std::move(unloads)]() mutable -> TaskResult
+            [this, guids, unbind_fut, unloads = std::move(unloads), &ctx]() mutable -> TaskResult
             {
                 TaskResult res;
                 res.type = TaskResult::TaskType::Unload;
 
                 // Collect unbind results first (kept separate if you want to show both)
                 auto unbind_ops = unbind_fut.get();
-                for (auto& o : unbind_ops) res.add_result(o.guid, o.success, o.error_message);
+                for (auto& o : unbind_ops) res.add_result(o.guid, o.success, o.message);
 
                 // Collect unload results
                 for (auto& f : unloads) {
                     Op o = f.get();
-                    res.add_result(o.guid, o.success, o.error_message);
+                    res.add_result(o.guid, o.success, o.message);
                 }
+
+                // Enqueue resource task completed event
+                ctx.event_queue->enqueue_event<ResourceTaskCompletedEvent>({ res });
 
                 return res;
             }
@@ -232,12 +239,12 @@ namespace eeng
                 // Wait & gather unload & unbind results
                 TaskResult unload_res = unload_res_fut.get();
                 for (auto& r : unload_res.results)
-                    merged.add_result(r.guid, r.success, r.error_message);
+                    merged.add_result(r.guid, r.success, r.message);
 
                 // Wait & gather load & bind results
                 TaskResult load_res = load_and_bind_async(guids, ctx).get();
                 for (auto& r : load_res.results)
-                    merged.add_result(r.guid, r.success, r.error_message);
+                    merged.add_result(r.guid, r.success, r.message);
 
                 return merged;
             }
@@ -248,7 +255,6 @@ namespace eeng
 
         return final_future;
     }
-
 
     void ResourceManager::retain_guid(const Guid& guid)
     {
@@ -278,12 +284,18 @@ namespace eeng
 
     void ResourceManager::wait_until_idle() const
     {
-        for (;;) {
-            std::shared_future<TaskResult> f;
-            { std::lock_guard lk(task_mutex_); f = current_task_; }
-            if (!f.valid()) return;   // nothing in flight
-            f.wait();                 // wait outside the lock
-        }
+        std::shared_future<TaskResult> f;
+        { std::lock_guard lk(task_mutex_); f = current_task_; }
+        if (f.valid()) f.wait();   // returns immediately if already finished
+
+        // std::cout << "wait_until_idle() ..." << std::endl;
+        // for (;;) {
+        //     std::shared_future<TaskResult> f;
+        //     { std::lock_guard lk(task_mutex_); f = current_task_; }
+        //     if (!f.valid()) return;   // nothing in flight
+        //     f.wait();                 // wait outside the lock
+        // }
+        // std::cout << "wait_until_idle() ... done" << std::endl;
     }
 
     std::optional<TaskResult> ResourceManager::last_task_result() const {

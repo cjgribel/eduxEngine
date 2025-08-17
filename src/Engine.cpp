@@ -102,6 +102,7 @@ namespace eeng
         ctx->event_queue->register_callback([&](const SetVsyncEvent& event) { this->on_set_vsync(event); });
         ctx->event_queue->register_callback([&](const SetWireFrameRenderingEvent& event) { this->on_set_wireframe(event); });
         ctx->event_queue->register_callback([&](const SetMinFrameTimeEvent& event) { this->on_set_min_frametime(event); });
+        ctx->event_queue->register_callback([&](const ResourceTaskCompletedEvent& event) { this->on_resource_task_completed(event); });
 
         // Engine config
         ctx->engine_config->set_flag(EngineFlag::VSync, true);
@@ -154,11 +155,16 @@ namespace eeng
 
             // ??? collisions
 
-            // Game systems
+            // (Where?) Game thread tasks
+            // (Where?) Physics step
+
+            // --- Game systems ---
             game->update(time_s, deltaTime_s);
 
-            // ??? dispatcher->dispatch_all_events();
+            // --- Event dispatch ---
+            ctx->event_queue->dispatch_all_events();
 
+            // --- Render ---
             game->render(time_s, window_width, window_height);
 
             // =================================================================
@@ -352,6 +358,63 @@ namespace eeng
     void Engine::on_set_min_frametime(const SetMinFrameTimeEvent& e)
     {
         min_frametime_ms = e.dt;
+    }
+
+    void Engine::on_resource_task_completed(const ResourceTaskCompletedEvent& e)
+    {
+        // Handle resource task completion
+        // std::cout << "Resource task completed: " << e.result << std::endl;
+
+        std::string task_name;
+        switch (e.result.type)
+        {
+        case TaskResult::TaskType::Load:
+            task_name = "Load";
+            break;
+        case TaskResult::TaskType::Unload:
+            task_name = "Unload";
+            break;
+        case TaskResult::TaskType::Reload:
+            task_name = "Reload";
+            break;
+        case TaskResult::TaskType::Scan:
+            task_name = "Scan";
+            break;
+        default:
+            task_name = "Unknown";
+        }
+
+        if (e.result.success)
+            EENG_LOG_INFO(ctx, "%s task completed successfully", task_name.c_str());
+        else
+        {
+            EENG_LOG_ERROR(ctx, "%s task failed:", task_name.c_str());
+            for (const auto& op : e.result.results)
+            {
+                if (op.success)
+                    EENG_LOG_INFO(ctx, "Operation for GUID %s succeeded: %s", op.guid.to_string().c_str(), op.message.c_str());
+                else
+                {
+                    EENG_LOG_INFO(ctx, "Operation for GUID %s failed: %s", op.guid.to_string().c_str(), op.message.c_str());
+                }
+            }
+        }
+
+        // EENG_LOG_INFO(ctx, "%s task completed with status: %s", task_name.c_str(), e.result.success ? "Success" : "Failure");
+        // if (!e.result.success)
+        // {
+        //     for (const auto& op : e.result.results)
+        //     {
+        //         if (!op.success)
+        //         {
+        //             EENG_LOG_ERROR(ctx, "Operation failed for GUID %s: %s", op.guid.to_string().c_str(), op.error_message.c_str());
+        //         }
+        //     }
+        // }
+        // else
+        // {
+        //     EENG_LOG_INFO(ctx, "All operations completed successfully.");
+        // }
     }
 
 } // namespace eeng

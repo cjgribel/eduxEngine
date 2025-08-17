@@ -52,12 +52,21 @@ class EventQueue
 
 public:
 
-    /// Thread‑safe: enqueue from any thread
+    /// Thread‑safe
     template<typename EventType>
-    void enqueue_event(EventType&& event)
+    bool enqueue_event(EventType&& event) noexcept
     {
-        std::lock_guard lock(events_mutex);
-        events.emplace_back(std::make_any<EventType>(std::forward<EventType>(event)));
+        try {
+            std::lock_guard lk(events_mutex);
+            events.emplace_back(
+                std::in_place_type<std::decay_t<EventType>>,
+                std::forward<EventType>(event)
+            );
+            return true;
+        }
+        catch (...) {
+            return false;
+        }
     }
 
     /// Dispatches an event immediately.
@@ -166,6 +175,6 @@ public:
 
         callback_map[typeid(EventType)].push_back(wrapped_callback);
     }
-};
+        };
 
 #endif

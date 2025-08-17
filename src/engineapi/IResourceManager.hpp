@@ -22,6 +22,7 @@ namespace eeng
         Failed
     };
 
+    // Load status and reference counting for an asset
     struct AssetStatus
     {
         LoadState state = LoadState::Unloaded;
@@ -31,13 +32,14 @@ namespace eeng
         std::string error_message;
     };
 
+    // Result of a task (load/unload/reload)
     struct TaskResult
     {
         struct OperationResult
         {
             Guid guid{};
             bool success{ true };
-            std::string error_message{};
+            std::string message{};
         };
 
         enum class TaskType { None, Load, Unload, Reload, Scan };

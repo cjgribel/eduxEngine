@@ -127,6 +127,7 @@ bool Game::init()
             while (resource_manager.is_scanning())
             {
                 // Wait for scanning to finish
+                std::cout << "Scanning assets..." << std::endl;
                 EENG_LOG(ctx, "[Game::init()] Waiting for asset scan to finish...");
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
@@ -172,11 +173,11 @@ bool Game::init()
             for (const auto& op : result.results)
             {
                 if (!op.success)
-                    EENG_LOG(ctx, "Load error: GUID %s: %s", op.guid.to_string().c_str(), op.error_message.c_str());
+                    EENG_LOG(ctx, "Load error: GUID %s: %s", op.guid.to_string().c_str(), op.message.c_str());
             }
             // EENG_LOG(ctx, "[Game::init()] Assets loaded and bound.");
 #endif
-#if 1
+#if 0
         // UNLOAD (NOT HERE)
             {
                 EENG_LOG(ctx, "[Game::init()] Unloading assets asynchronously...");
@@ -186,7 +187,7 @@ bool Game::init()
                 for (const auto& op : result.results)
                 {
                     if (!op.success) {
-                        EENG_LOG(ctx, "Unload error: GUID %s: %s", op.guid.to_string().c_str(), op.error_message.c_str());
+                        EENG_LOG(ctx, "Unload error: GUID %s: %s", op.guid.to_string().c_str(), op.message.c_str());
                     }
                 }
             }

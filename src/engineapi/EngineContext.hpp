@@ -13,7 +13,7 @@
 
 class ThreadPool;
 class EventQueue;
-namespace eeng:: editor {
+namespace eeng::editor {
     template<typename T> class SelectionManager;
     class CommandQueue;
 }
@@ -36,6 +36,7 @@ namespace eeng
     struct SetVsyncEvent { bool enabled; };
     struct SetWireFrameRenderingEvent { bool enabled; };
     struct SetMinFrameTimeEvent { float dt; };
+    struct ResourceTaskCompletedEvent { TaskResult result; };
 
     enum class EngineFlag : uint8_t
     {
