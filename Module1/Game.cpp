@@ -160,7 +160,8 @@ bool Game::init()
 #if 1
             // CREATE DEQUE AND LOAD USING load_and_bind_async
             EENG_LOG(ctx, "[Game::init()] Loading assets asynchronously...");
-            auto fut = resource_manager.load_and_bind_async(branch_guids, *ctx);
+            auto batch_id = eeng::Guid::generate();
+            auto fut = resource_manager.load_and_bind_async(branch_guids, batch_id, *ctx);
             // Wait for all assets to load
             // try {
             //     fut.get(); // Blocks until all assets are loaded and bound
@@ -168,13 +169,13 @@ bool Game::init()
             //     EENG_LOG(ctx, "[Game::init()] Error loading assets: %s", ex.what());
             //     //return false; // Handle error appropriately
             // }
-            auto result = fut.get(); // Blocks until all assets are loaded and bound
+            //auto result = fut.get(); // Blocks until all assets are loaded and bound
             // Log result
-            for (const auto& op : result.results)
-            {
-                if (!op.success)
-                    EENG_LOG(ctx, "Load error: GUID %s: %s", op.guid.to_string().c_str(), op.message.c_str());
-            }
+            // for (const auto& op : result.results)
+            // {
+            //     if (!op.success)
+            //         EENG_LOG(ctx, "Load error: GUID %s: %s", op.guid.to_string().c_str(), op.message.c_str());
+            // }
             // EENG_LOG(ctx, "[Game::init()] Assets loaded and bound.");
 #endif
 #if 0

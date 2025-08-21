@@ -65,18 +65,32 @@ namespace eeng {
         }
 
         template<class T>
-        void bind_asset(const Guid& guid, EngineContext& ctx)
+        void bind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
         {
             auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
-            rm.bind_asset<T>(guid, ctx);
+            rm.bind_asset<T>(guid, batch_id, ctx);
         }
 
         template<class T>
-        void unbind_asset(const Guid& guid, EngineContext& ctx)
+        void unbind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
         {
             auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
-            rm.unbind_asset<T>(guid, ctx);
+            rm.unbind_asset<T>(guid, batch_id, ctx);
         }
+
+        // template<class T>
+        // void bind_asset_with_leases(const Guid& guid, EngineContext& ctx, const BatchId& batch)
+        // {
+        //     auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+        //     rm.bind_asset_with_leases<T>(guid, ctx, batch);
+        // }
+
+        // template<class T>
+        // void unbind_asset_with_leases(const Guid& guid, EngineContext& ctx, const BatchId& batch)
+        // {
+        //     auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+        //     rm.unbind_asset_with_leases<T>(guid, ctx, batch);
+        // }
 
         template<class T>
         bool validate_asset(const Guid& guid, EngineContext& ctx)
@@ -106,8 +120,11 @@ namespace eeng {
                 .template func<&unload_asset<T>, entt::as_void_t>(eeng::literals::unload_asset_hs)
                 // .template func<&reload_asset<T>>(eeng::literals::reload_asset_hs)
                 // Type-safe binding
+                // .template func<&bind_asset<T>, entt::as_void_t>(eeng::literals::bind_asset_hs)
+                // .template func<&unbind_asset<T>, entt::as_void_t>(eeng::literals::unbind_asset_hs)
                 .template func<&bind_asset<T>, entt::as_void_t>(eeng::literals::bind_asset_hs)
                 .template func<&unbind_asset<T>, entt::as_void_t>(eeng::literals::unbind_asset_hs)
+
                 // Asset validation
                 .template func<&validate_asset<T>>(eeng::literals::validate_asset_hs)
                 .template func<&validate_asset_recursive<T>>(eeng::literals::validate_asset_recursive_hs)

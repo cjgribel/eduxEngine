@@ -9,19 +9,21 @@ using namespace entt::literals;
 
 namespace eeng::literals
 {
-    constexpr entt::hashed_string to_string_hs          = "to_string"_hs;
-    constexpr entt::hashed_string clone_hs              = "clone"_hs;
-    constexpr entt::hashed_string serialize_hs          = "serialize"_hs;
-    constexpr entt::hashed_string deserialize_hs        = "deserialize"_hs;
-    constexpr entt::hashed_string inspect_hs            = "inspect"_hs;
-    constexpr entt::hashed_string assure_storage_hs     = "assure_storage"_hs;
+    constexpr entt::hashed_string to_string_hs = "to_string"_hs;
+    constexpr entt::hashed_string clone_hs = "clone"_hs;
+    constexpr entt::hashed_string serialize_hs = "serialize"_hs;
+    constexpr entt::hashed_string deserialize_hs = "deserialize"_hs;
+    constexpr entt::hashed_string inspect_hs = "inspect"_hs;
+    constexpr entt::hashed_string assure_storage_hs = "assure_storage"_hs;
 
-    constexpr entt::hashed_string load_asset_hs         = "load_asset"_hs;
-    constexpr entt::hashed_string unload_asset_hs       = "unload_asset"_hs;
-    constexpr entt::hashed_string bind_asset_hs      = "resolve_asset"_hs;
-    constexpr entt::hashed_string unbind_asset_hs    = "unresolve_asset"_hs;
+    constexpr entt::hashed_string load_asset_hs = "load_asset"_hs;
+    constexpr entt::hashed_string unload_asset_hs = "unload_asset"_hs;
+    constexpr entt::hashed_string bind_asset_hs = "bind_asset"_hs;
+    constexpr entt::hashed_string unbind_asset_hs = "unbind_asset"_hs;
+    // constexpr entt::hashed_string bind_asset_with_leases_hs = "bind_asset_with_leases"_hs;
+    // constexpr entt::hashed_string unbind_asset_with_leases_hs = "unbind_asset_with_leases"_hs;
 
-    constexpr entt::hashed_string validate_asset_hs             = "validate_asset"_hs;
-    constexpr entt::hashed_string validate_asset_recursive_hs   = "validate_asset_recursive"_hs;
+    constexpr entt::hashed_string validate_asset_hs = "validate_asset"_hs;
+    constexpr entt::hashed_string validate_asset_recursive_hs = "validate_asset_recursive"_hs;
 }
 #endif // MetaLiterals_h

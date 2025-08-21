@@ -92,9 +92,9 @@ namespace
     {
 #if 1
         AssetStatus get_status(const Guid& guid) const override { return AssetStatus{}; }
-        std::shared_future<TaskResult> load_and_bind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
-        std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
-        std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> branch_guids, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
+        std::shared_future<TaskResult> load_and_bind_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
+        std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
+        std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
 
         void retain_guid(const Guid& guid) override {}
         void release_guid(const Guid& guid, eeng::EngineContext& ctx) override {}
@@ -102,8 +102,9 @@ namespace
 
         bool is_busy() const override { return false; }
         void wait_until_idle() const override {}
-        std::optional<TaskResult> last_task_result() const override { return std::nullopt; }
-        std::shared_future<TaskResult> active_task() const override { return {}; }
+        int tasks_in_flight() const noexcept override { return 0; }
+        // std::optional<TaskResult> last_task_result() const override { return std::nullopt; }
+        // std::shared_future<TaskResult> active_task() const override { return {}; }
 
         bool is_scanning() const override { return false; }
         AssetIndexDataPtr get_index_data() const override { return nullptr; }
