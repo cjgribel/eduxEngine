@@ -377,7 +377,7 @@ namespace eeng
         auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         // bool busy_ = ctx.asset_async_future.valid() &&
         //     ctx.asset_async_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
-        bool busy = resource_manager.is_busy();
+        bool busy = false; //resource_manager.is_busy();
         // assert(busy == busy_); // ensure consistency
         // ImGui::BeginDisabled(resource_manager.is_busy());
         if (busy) ImGui::BeginDisabled();
@@ -387,34 +387,55 @@ namespace eeng
         if (ImGui::Button("Unimport")) { /* ... */ }
         ImGui::SameLine();
         // ->
-        if (ImGui::Button("Load"))
+        static auto batch_id1 = Guid::generate();
+        static auto batch_id2 = Guid::generate();
+
+        if (ImGui::Button("Load (Batch 1)"))
         {
+            // auto batch_id = Guid::generate();
             auto to_reload = compute_selected_bottomup_closure(ctx);
-            /*ctx.asset_async_future =*/ resource_manager.load_and_bind_async(to_reload, ctx);
+            /*ctx.asset_async_future =*/ resource_manager.load_and_bind_async(to_reload, batch_id1, ctx);
         }
         ImGui::SameLine();
-        if (ImGui::Button("Unload"))
+        if (ImGui::Button("Unload (Batch 1)"))
         {
+            // auto batch_id = Guid::generate();
             auto to_reload = compute_selected_bottomup_closure(ctx);
-            /*ctx.asset_async_future =*/ resource_manager.unbind_and_unload_async(to_reload, ctx);
+            /*ctx.asset_async_future =*/ resource_manager.unbind_and_unload_async(to_reload, batch_id1, ctx);
+        }
+        // ---
+        if (ImGui::Button("Import##batch2")) { /* Import a batch of mock assets (META)  */ }
+        ImGui::SameLine();
+        if (ImGui::Button("Unimport##batch2")) { /* ... */ }
+        ImGui::SameLine();
+        if (ImGui::Button("Load (Batch 2)"))
+        {
+            // auto batch_id = Guid::generate();
+            auto to_reload = compute_selected_bottomup_closure(ctx);
+            /*ctx.asset_async_future =*/ resource_manager.load_and_bind_async(to_reload, batch_id2, ctx);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Unload (Batch 2)"))
+        {
+            // auto batch_id = Guid::generate();
+            auto to_reload = compute_selected_bottomup_closure(ctx);
+            /*ctx.asset_async_future =*/ resource_manager.unbind_and_unload_async(to_reload, batch_id2, ctx);
         }
 
         // ImGui::SameLine();
-        // if (ImGui::Button("Unload unbound"))
+        // if (ImGui::Button("Reload"))
         // {
-        //     resource_manager.unload_unbound_assets_async(ctx);
+        //     assert(ctx.thread_pool->nbr_threads() > 1);
+        //     // auto batch_id = Guid::generate();
+        //     auto to_reload = compute_selected_bottomup_closure(ctx);
+        //     /*ctx.asset_async_future =*/ resource_manager.reload_and_rebind_async(to_reload, batch_id1, ctx);
         // }
-
-        ImGui::SameLine();
-        if (ImGui::Button("Reload"))
-        {
-            assert(ctx.thread_pool->nbr_threads() > 1);
-            auto to_reload = compute_selected_bottomup_closure(ctx);
-            /*ctx.asset_async_future =*/ resource_manager.reload_and_rebind_async(to_reload, ctx);
-        }
         if (busy) ImGui::EndDisabled();
 
         // <-
+
+        ImGui::Text("Tasks in flight: %d", resource_manager.tasks_in_flight());
+
         ImGui::Text("Thread utilization %zu/%zu, queued %zu",
             ctx.thread_pool->nbr_working_threads(),
             ctx.thread_pool->nbr_threads(),
@@ -528,21 +549,24 @@ namespace eeng
                         {
                             ImGui::Text("Type: %s", entry.meta.type_name.c_str());
                             ImGui::SameLine();
-                            ImGui::Text("Ref Count: %d", guid_status.ref_count);
+                            // ImGui::Text("Ref Count: %d", guid_status.ref_count);
+                            ImGui::Text("Nbr Leases: %d", resource_manager.total_leases(entry.meta.guid));
                         }
                         // --- Line 3: GUID ---
                         ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
                         // --- Line 4: Path ---
                         ImGui::Text("Path: %s", entry.relative_path.string().c_str());
                         // -- Line 5: Debug print content of certain types (if loaded) --
+#if 0
                         if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value()) {
                             if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
                             {
                                 auto mesh = resource_manager.storage().get_ref(*h_opt);
                                 ImGui::Text("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
-                            }
+                    }
                             //else ImGui::Text("Not a mock::Mesh");
-                        }
+                }
+#endif
                         // --- Line 5: Contained assets ---
                         tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
                             {
@@ -550,8 +574,8 @@ namespace eeng
                             });
 
                         ImGui::TreePop();
-                    }
-                };
+        }
+    };
 
             for (size_t root_idx : tree.get_roots())
             {
@@ -559,7 +583,7 @@ namespace eeng
             }
 
             ImGui::EndTable();
-        }
+}
     }
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
@@ -674,7 +698,7 @@ namespace eeng
         inspector.entity_selection.remove_invalid([&](const Entity& entity)
             {
                 return !entity.is_null() && registry->valid(entity);
-            });
+    });
 
         if (Inspector::inspect_entity(inspector, *dispatcher)) {}
 #endif

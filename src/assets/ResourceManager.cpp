@@ -38,15 +38,26 @@ namespace eeng
         return AssetStatus{};
     }
 
+    /// @brief  Initiates an asynchronous load and bind operation for the specified assets.
+    /// @param guids The unique identifiers of the assets to load and bind.
+    /// @param batch The batch identifier for the operation.
+    /// @param ctx The engine context.
+    /// @return A future representing the result of the operation.
+    /// @note The provided GUIDs must form a closure over references
     std::shared_future<TaskResult>
-        ResourceManager::load_and_bind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
+        ResourceManager::load_and_bind_async(
+            std::deque<Guid> guids,
+            const BatchId& batch,
+            EngineContext& ctx)
     {
+        // Launch load-and-bind task
         auto fut = ctx.thread_pool->queue_task(
             [this, guids = std::move(guids), &ctx, batch]() mutable -> TaskResult
             {
                 detail::TaskFlightGuard guard(tasks_in_flight_);
                 TaskResult res;
                 {
+                    // Prevent concurrent tasks on the same batch
                     std::lock_guard batch_lock(mutex_for_batch(batch));
                     res = this->load_and_bind_impl(std::move(guids), batch, ctx);
                 }
@@ -54,19 +65,32 @@ namespace eeng
                 return res;
             }
         ).share();
-        { std::lock_guard lk(tasks_mutex_); active_tasks_.push_back(fut); }
+
+        // Track active tasks
+        { std::lock_guard task_lock(tasks_mutex_); active_tasks_.push_back(fut); }
+
         return fut;
     }
 
+    /// @brief  Initiates an asynchronous unbind and unload operation for the specified assets.
+    /// @param guids The unique identifiers of the assets to unbind and unload.
+    /// @param batch The batch identifier for the operation.
+    /// @param ctx The engine context.
+    /// @return A future representing the result of the operation.
+    /// @note The provided GUIDs must form a closure over references
     std::shared_future<TaskResult>
-        ResourceManager::unbind_and_unload_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
+        ResourceManager::unbind_and_unload_async(
+            std::deque<Guid> guids, 
+            const BatchId& batch, 
+            EngineContext& ctx)
     {
         auto fut = ctx.thread_pool->queue_task(
-            [this, guids = std::move(guids), &ctx, batch]() mutable -> TaskResult 
+            [this, guids = std::move(guids), &ctx, batch]() mutable -> TaskResult
             {
                 detail::TaskFlightGuard guard(tasks_in_flight_);
                 TaskResult res;
                 {
+                    // Prevent concurrent tasks on the same batch
                     std::lock_guard batch_lock(mutex_for_batch(batch));
                     res = this->unbind_and_unload_impl(std::move(guids), batch, ctx);
                 }
@@ -78,6 +102,7 @@ namespace eeng
         return fut;
     }
 
+    // Skip - not supported
     std::shared_future<TaskResult>
         ResourceManager::reload_and_rebind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
     {
@@ -100,7 +125,10 @@ namespace eeng
         return fut;
     }
 
-    TaskResult ResourceManager::load_and_bind_impl(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
+    TaskResult ResourceManager::load_and_bind_impl(
+        std::deque<Guid> guids, 
+        const BatchId& batch, 
+        EngineContext& ctx)
     {
         using Op = TaskResult::OperationResult;
         TaskResult res; res.type = TaskResult::TaskType::Load;
@@ -243,7 +271,6 @@ namespace eeng
 
         return res;
     }
-
 
     void ResourceManager::retain_guid(const Guid& guid)
     {
