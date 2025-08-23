@@ -222,7 +222,10 @@ namespace eeng
     {
         auto& index = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index();
         auto index_data = index.get_index_data();
-        if (!index_data) return;
+                if (!index_data) {
+            ImGui::Text("No asset index data available.");
+            return;
+        }
 
         const auto& entries = index_data->entries;
         const auto& by_guid = index_data->by_guid;
@@ -374,7 +377,7 @@ namespace eeng
 
         // Async busy flag
         auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
-        auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
+        //auto& content_tree = resource_manager.get_index_data()->trees->content_tree;
         // bool busy_ = ctx.asset_async_future.valid() &&
         //     ctx.asset_async_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
         bool busy = false; //resource_manager.is_busy();
@@ -453,7 +456,10 @@ namespace eeng
     {
         auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
         auto index_data = resource_manager.asset_index().get_index_data();
-        if (!index_data) return;
+        if (!index_data) {
+            ImGui::Text("No asset index data available.");
+            return;
+        }
         auto& storage = resource_manager.storage();
 
         const auto& tree = index_data->trees->content_tree;

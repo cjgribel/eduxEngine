@@ -30,13 +30,16 @@ namespace eeng
         AssetIndex() = default;
         ~AssetIndex() = default;
 
-        void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
+        AssetIndexDataPtr scan_assets(const std::filesystem::path& root, EngineContext& ctx);
+        // void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
+
+        void publish(AssetIndexDataPtr data);
 
         // std::vector<AssetEntry> get_entries_snapshot() const;
         //std::shared_ptr<const std::vector<AssetEntry>> get_entries_view() const;
         AssetIndexDataPtr get_index_data() const;
 
-        bool is_scanning() const;
+        // bool is_scanning() const; // remove
 
         /// @brief Serializes an asset to disk.
         template<typename T>
@@ -105,10 +108,10 @@ namespace eeng
 
         // std::vector<AssetEntry> entries_;
         //std::shared_ptr<const std::vector<AssetEntry>> entries_ = std::make_shared<std::vector<AssetEntry>>();
-        std::shared_ptr<const AssetIndexData> index_data_;
+        AssetIndexDataPtr index_data_;
         mutable std::mutex entries_mutex_;
 
-        std::atomic<bool> scanning_flag_{ false };
+        // std::atomic<bool> scanning_flag_{ false }; // remove
 
         std::vector<AssetEntry> scan_meta_files(
             const std::filesystem::path& root,

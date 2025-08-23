@@ -28,6 +28,8 @@ namespace eeng
         mutable std::mutex status_mutex_;
         std::unordered_map<Guid, AssetStatus> statuses_;
 
+        mutable std::mutex scan_mutex_; // serialize overlapping scans
+
         //
         // std::shared_future<TaskResult> current_task_;
         // mutable std::mutex task_mutex_;
@@ -101,6 +103,7 @@ namespace eeng
         std::shared_future<TaskResult> load_and_bind_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override;
         std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override;
         std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx) override;
+        std::shared_future<TaskResult> scan_assets_async(const std::filesystem::path& root, EngineContext& ctx) override;
 
     private:
         TaskResult load_and_bind_impl(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx);
@@ -110,7 +113,7 @@ namespace eeng
         void retain_guid(const Guid& guid) override;
         void release_guid(const Guid& guid, EngineContext& ctx) override;
 
-        bool is_scanning() const override; // <- TaskResult + is_busy
+        // bool is_scanning() const override; // <- TaskResult + is_busy
 
         bool is_busy() const override;
         void wait_until_idle() const override;
@@ -135,7 +138,7 @@ namespace eeng
         T& get_asset_ref(const Handle& handle)
         {
             return storage_->get_ref<T>(handle);
-    }
+        }
 
         template<typename T>
         std::optional<T&> try_get_asset_ref(const Handle& handle)
@@ -143,7 +146,7 @@ namespace eeng
             if (!storage_->validate<T>(handle))
                 return std::nullopt;
             return storage_->get_ref<T>(handle);
-        }
+    }
 #endif
 
         const Storage& storage() const;
@@ -152,7 +155,7 @@ namespace eeng
         const AssetIndex& asset_index() const;
         AssetIndex& asset_index();
 
-        void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
+        // void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
 
         // Must be thread-safe. Use static types, or lock meta paths.
         /// @brief Import new resource to resource index

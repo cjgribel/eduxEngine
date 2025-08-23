@@ -117,14 +117,17 @@ bool Game::init()
             for (auto& f : futures) refs.push_back(f.get());
         }
 
+#if 1
         // 3. SCAN assets from disk concurrently
         //
         {
             EENG_LOG(ctx, "[Game::init()] Scanning assets...");
-            resource_manager.start_async_scan("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
+            resource_manager.scan_assets_async("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
             //resource_manager.start_async_scan("C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/", *ctx);
             // Wait for scanning to finish
-            while (resource_manager.is_scanning())
+            // while (resource_manager.is_scanning())
+#if 0
+            while (resource_manager.is_busy())
             {
                 // Wait for scanning to finish
                 std::cout << "Scanning assets..." << std::endl;
@@ -132,6 +135,7 @@ bool Game::init()
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
             }
+#endif
             // Get asset index snapshot and log it
             // auto asset_index = resource_manager.get_asset_entries_snapshot();
             // EENG_LOG(ctx, "[Game::init()] Found %zu assets:", asset_index.size());
@@ -143,6 +147,7 @@ bool Game::init()
             //         entry.relative_path.string().c_str());
             // }
         }
+#endif
 
         /*
         TODO
@@ -157,7 +162,7 @@ bool Game::init()
         std::deque<eeng::Guid> branch_guids;
         for (const auto& ref : refs) branch_guids.push_back(ref.get_guid());
         {
-#if 1
+#if 0
             // CREATE DEQUE AND LOAD USING load_and_bind_async
             EENG_LOG(ctx, "[Game::init()] Loading assets asynchronously...");
             auto batch_id = eeng::Guid::generate();
@@ -191,7 +196,7 @@ bool Game::init()
                         EENG_LOG(ctx, "Unload error: GUID %s: %s", op.guid.to_string().c_str(), op.message.c_str());
                     }
                 }
-            }
+        }
 #endif
 #if 0
             EENG_LOG(ctx, "[Game::init()] Loading assets...");
@@ -226,7 +231,7 @@ bool Game::init()
                     assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
-        }
+                }
     }
 #endif
 }

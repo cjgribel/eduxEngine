@@ -11,42 +11,77 @@
 
 namespace eeng
 {
-    void AssetIndex::start_async_scan(
-        const std::filesystem::path& root,
-        EngineContext& ctx)
+    AssetIndexDataPtr
+        AssetIndex::scan_assets(
+            const std::filesystem::path& root,
+            EngineContext& ctx)
     {
-        scanning_flag_.store(true, std::memory_order_relaxed);
+        // 1) Scan files -> entries
+        auto entries = this->scan_meta_files(root, ctx);  // your existing function
 
-        ctx.thread_pool->queue_task([this, root, &ctx]()
-            {
-                auto result = this->scan_meta_files(root, ctx);
+        auto data = std::make_shared<AssetIndexData>();
+        data->entries = std::move(entries);
 
-                auto data = std::make_shared<AssetIndexData>();
-                data->entries = std::move(result);
+        // 2) Build aux maps
+        for (const auto& entry : data->entries) {
+            data->by_guid[entry.meta.guid] = &entry;
+            data->by_type[entry.meta.type_name].push_back(&entry);
+            data->by_parent[entry.meta.guid_parent].push_back(&entry);
+        }
 
-                // Build aux containers
-                for (const auto& entry : data->entries)
-                {
-                    data->by_guid[entry.meta.guid] = &entry;
-                    data->by_type[entry.meta.type_name].push_back(&entry);
-                    data->by_parent[entry.meta.guid_parent].push_back(&entry);
-                }
+        // 3) Build tree views
+        auto views = std::make_shared<AssetTreeViews>();
+        views->content_tree = asset::builders::build_content_tree(data->entries);
+        // ... build any other trees
+        data->trees = std::move(views);
 
-                // Build tree views
-                auto views = std::make_shared<AssetTreeViews>();
-                views->content_tree = asset::builders::build_content_tree(data->entries);
-                // other tree builds ...
-                data->trees = views;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 
-                // Lock and load
-                {
-                    std::lock_guard lock(entries_mutex_);
-                    index_data_ = std::move(data);
-                }
-
-                scanning_flag_.store(false, std::memory_order_release);
-            });
+        return data; // caller decides when to publish
     }
+
+    void AssetIndex::publish(AssetIndexDataPtr data)
+    {
+        std::lock_guard lk(entries_mutex_);
+        index_data_ = std::move(data);
+    }
+
+    // void AssetIndex::start_async_scan(
+    //     const std::filesystem::path& root,
+    //     EngineContext& ctx)
+    // {
+    //     scanning_flag_.store(true, std::memory_order_relaxed);
+
+    //     ctx.thread_pool->queue_task([this, root, &ctx]()
+    //         {
+    //             auto result = this->scan_meta_files(root, ctx);
+
+    //             auto data = std::make_shared<AssetIndexData>();
+    //             data->entries = std::move(result);
+
+    //             // Build aux containers
+    //             for (const auto& entry : data->entries)
+    //             {
+    //                 data->by_guid[entry.meta.guid] = &entry;
+    //                 data->by_type[entry.meta.type_name].push_back(&entry);
+    //                 data->by_parent[entry.meta.guid_parent].push_back(&entry);
+    //             }
+
+    //             // Build tree views
+    //             auto views = std::make_shared<AssetTreeViews>();
+    //             views->content_tree = asset::builders::build_content_tree(data->entries);
+    //             // other tree builds ...
+    //             data->trees = views;
+
+    //             // Lock and load
+    //             {
+    //                 std::lock_guard lock(entries_mutex_);
+    //                 index_data_ = std::move(data);
+    //             }
+
+    //             scanning_flag_.store(false, std::memory_order_release);
+    //         });
+    // }
 
     // std::vector<AssetEntry> AssetIndex::get_entries_snapshot() const
     // {
@@ -61,10 +96,10 @@ namespace eeng
         return index_data_;
     }
 
-    bool AssetIndex::is_scanning() const
-    {
-        return scanning_flag_.load(std::memory_order_acquire);
-    }
+    // bool AssetIndex::is_scanning() const
+    // {
+    //     return scanning_flag_.load(std::memory_order_acquire);
+    // }
 
     std::vector<AssetEntry> AssetIndex::scan_meta_files(
         const std::filesystem::path& root,
