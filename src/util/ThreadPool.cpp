@@ -58,6 +58,11 @@ ThreadPool::~ThreadPool()
     }
 }
 
+void ThreadPool::post(std::function<void()> fn)
+{
+    queue_task(std::move(fn));
+}
+
 size_t ThreadPool::nbr_threads() const
 {
     return thread_count;

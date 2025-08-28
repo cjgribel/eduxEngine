@@ -3,6 +3,7 @@
 
 #pragma once
 #include "IResourceManager.hpp"
+#include "SerialExecutor.hpp"
 #include "EngineContext.hpp"
 #include "Storage.hpp" // Can't pimpl-away since class is templated
 #include "AssetIndex.hpp"
@@ -28,15 +29,23 @@ namespace eeng
         mutable std::mutex status_mutex_;
         std::unordered_map<Guid, AssetStatus> statuses_;
 
+        // Not needed if tasks are serial?
         mutable std::mutex scan_mutex_; // serialize overlapping scans
+
+        // Serial queue for tasks
+          // ...
+        std::optional<SerialExecutor>   rm_strand_;   // constructed on first use
+        mutable std::mutex              strand_mutex_;
+        // ...
+        SerialExecutor& strand(EngineContext& ctx);   // helper for lazy initialization
 
         //
         // std::shared_future<TaskResult> current_task_;
         // mutable std::mutex task_mutex_;
             // -- Task tracking -----------------------------
-        std::atomic<int> tasks_in_flight_{ 0 }; // replaces current_task_
-        mutable std::mutex tasks_mutex_;
-        std::vector<std::shared_future<TaskResult>> active_tasks_;
+        // std::atomic<int> tasks_in_flight_{ 0 }; // replaces current_task_
+        // mutable std::mutex tasks_mutex_;
+        // std::vector<std::shared_future<TaskResult>> active_tasks_;
 
         // Lease
         struct AssetLease {
@@ -81,16 +90,16 @@ namespace eeng
         }
 
         // Asset-GUID Striping
-        static constexpr size_t kStripeCount = 64; // or 128
-        mutable std::array<std::mutex, kStripeCount> guid_stripes_;
-        size_t stripe_of(const Guid& g) const noexcept { return std::hash<Guid>{}(g)& (kStripeCount - 1); }
-        std::mutex& mutex_for(const Guid& g) const noexcept { return guid_stripes_[stripe_of(g)]; }
+        // static constexpr size_t kStripeCount = 64; // or 128
+        // mutable std::array<std::mutex, kStripeCount> guid_stripes_;
+        // size_t stripe_of(const Guid& g) const noexcept { return std::hash<Guid>{}(g)& (kStripeCount - 1); }
+        // std::mutex& mutex_for(const Guid& g) const noexcept { return guid_stripes_[stripe_of(g)]; }
 
         // Batch-GUID Striping
-        static constexpr size_t kBatchStripeCount = 64;
-        mutable std::array<std::mutex, kBatchStripeCount> batch_stripes_;
-        size_t batch_stripe_of(const BatchId& b) const noexcept { return std::hash<BatchId>{}(b)& (kBatchStripeCount - 1); }
-        std::mutex& mutex_for_batch(const BatchId& b) const noexcept { return batch_stripes_[batch_stripe_of(b)]; }
+        // static constexpr size_t kBatchStripeCount = 64;
+        // mutable std::array<std::mutex, kBatchStripeCount> batch_stripes_;
+        // size_t batch_stripe_of(const BatchId& b) const noexcept { return std::hash<BatchId>{}(b)& (kBatchStripeCount - 1); }
+        // std::mutex& mutex_for_batch(const BatchId& b) const noexcept { return batch_stripes_[batch_stripe_of(b)]; }
 
     public:
         ResourceManager();
@@ -100,10 +109,10 @@ namespace eeng
 
         AssetStatus get_status(const Guid& guid) const override;
 
+        std::shared_future<TaskResult> scan_assets_async(const std::filesystem::path& root, EngineContext& ctx) override;
         std::shared_future<TaskResult> load_and_bind_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override;
         std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override;
         std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx) override;
-        std::shared_future<TaskResult> scan_assets_async(const std::filesystem::path& root, EngineContext& ctx) override;
 
     private:
         TaskResult load_and_bind_impl(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx);
@@ -113,18 +122,9 @@ namespace eeng
         void retain_guid(const Guid& guid) override;
         void release_guid(const Guid& guid, EngineContext& ctx) override;
 
-        // bool is_scanning() const override; // <- TaskResult + is_busy
-
         bool is_busy() const override;
-        void wait_until_idle() const override;
-        int tasks_in_flight() const noexcept override;
-        // std::optional<TaskResult> last_task_result() const override;
-        // std::shared_future<TaskResult> active_task() const override;
-
-        // Lease-related inspection
-        uint32_t total_leases(const Guid& g) const noexcept;
-        bool held_by_any(const Guid& g) const noexcept;
-        bool held_by_batch(const Guid& g, const BatchId& b) const noexcept;
+        void wait_until_idle() override;
+        int  queued_tasks() const noexcept override;
 
         /// @brief Get a snapshot of asset index
         AssetIndexDataPtr get_index_data() const override;
@@ -132,6 +132,11 @@ namespace eeng
         std::string to_string() const override;
 
         // --- Non-inherited API -------------------------------------------------------
+
+        // Lease-related inspection
+        uint32_t total_leases(const Guid& g) const noexcept;
+        bool held_by_any(const Guid& g) const noexcept;
+        bool held_by_batch(const Guid& g, const BatchId& b) const noexcept;
 
 #if 0
         template<typename T>
@@ -146,7 +151,7 @@ namespace eeng
             if (!storage_->validate<T>(handle))
                 return std::nullopt;
             return storage_->get_ref<T>(handle);
-    }
+        }
 #endif
 
         const Storage& storage() const;
@@ -460,5 +465,5 @@ namespace eeng
             std::string_view function_label
         );
 
-};
+    };
 } // namespace eeng

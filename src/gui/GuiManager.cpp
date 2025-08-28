@@ -437,7 +437,10 @@ namespace eeng
 
         // <-
 
-        ImGui::Text("Tasks in flight: %d", resource_manager.tasks_in_flight());
+        //ImGui::Text("Tasks in flight: %d", resource_manager.tasks_in_flight());
+        ImGui::Text("%s", resource_manager.is_busy() ? "(busy)" : "(idle)");
+        ImGui::SameLine();
+        ImGui::Text("Tasks in flight: %d", resource_manager.queued_tasks());
 
         ImGui::Text("Thread utilization %zu/%zu, queued %zu",
             ctx.thread_pool->nbr_working_threads(),
@@ -563,7 +566,7 @@ namespace eeng
                         // --- Line 4: Path ---
                         ImGui::Text("Path: %s", entry.relative_path.string().c_str());
                         // -- Line 5: Debug print content of certain types (if loaded) --
-#if 0
+#if 1
                         if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value()) {
                             if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
                             {

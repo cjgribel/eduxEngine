@@ -8,21 +8,6 @@
 
 namespace eeng
 {
-    namespace detail
-    {
-        /// RAII guard for tracking in-flight tasks
-        struct TaskFlightGuard
-        {
-            std::atomic<int>& ctr;
-            explicit TaskFlightGuard(std::atomic<int>& c) : ctr(c) { ctr.fetch_add(1, std::memory_order_relaxed); }
-            ~TaskFlightGuard() { ctr.fetch_sub(1, std::memory_order_relaxed); }
-            TaskFlightGuard(const TaskFlightGuard&) = delete;
-            TaskFlightGuard& operator=(const TaskFlightGuard&) = delete;
-        };
-
-        struct ScopeDec { std::atomic<int>* c; ~ScopeDec(){ if(c) c->fetch_sub(1);} };
-    }
-
     ResourceManager::ResourceManager()
         : storage_(std::make_unique<Storage>())
         , asset_index_(std::make_unique<AssetIndex>())
@@ -30,6 +15,16 @@ namespace eeng
     }
 
     ResourceManager::~ResourceManager() = default;
+
+    SerialExecutor& ResourceManager::strand(EngineContext& ctx)
+    {
+        std::scoped_lock lk(strand_mutex_);
+        if (!rm_strand_) {
+            // thread_pool is owned by EngineContext; we just borrow it
+            rm_strand_.emplace(*ctx.thread_pool);
+        }
+        return *rm_strand_;
+    }
 
     AssetStatus ResourceManager::get_status(const Guid& guid) const
     {
@@ -40,98 +35,108 @@ namespace eeng
         return AssetStatus{};
     }
 
-    /// @brief  Initiates an asynchronous load and bind operation for the specified assets.
-    /// @param guids The unique identifiers of the assets to load and bind.
-    /// @param batch The batch identifier for the operation.
-    /// @param ctx The engine context.
-    /// @return A future representing the result of the operation.
-    /// @note The provided GUIDs must form a closure over references
     std::shared_future<TaskResult>
-        ResourceManager::load_and_bind_async(
-            std::deque<Guid> guids,
-            const BatchId& batch,
-            EngineContext& ctx)
+        ResourceManager::scan_assets_async(const std::filesystem::path& root, EngineContext& ctx)
     {
-        tasks_in_flight_.fetch_add(1);
+        // tasks_in_flight_.fetch_add(1, std::memory_order_relaxed);
 
-        // Launch load-and-bind task
-        auto fut = ctx.thread_pool->queue_task(
-            [this, guids = std::move(guids), &ctx, batch]() mutable -> TaskResult
-            {
-                // detail::TaskFlightGuard guard(tasks_in_flight_);
-                detail::ScopeDec dec{ &tasks_in_flight_ };
+        auto prom = std::make_shared<std::promise<TaskResult>>();
+        auto fut = prom->get_future().share();
 
-                TaskResult res;
+        strand(ctx).post([this, root, &ctx, prom]() mutable {
+            TaskResult res; res.type = TaskResult::TaskType::Scan;
+            try {
+                auto data = asset_index_->scan_assets(root, ctx);       // blocking scan (no RM locks)
+                const auto count = data ? data->entries.size() : 0;
                 {
-                    // Prevent concurrent tasks on the same batch
-                    std::lock_guard batch_lock(mutex_for_batch(batch));
-                    res = this->load_and_bind_impl(std::move(guids), batch, ctx);
+                    std::unique_lock lk(scan_mutex_);                   // (if you keep one)
+                    asset_index_->publish(std::move(data));             // atomic snapshot swap
                 }
-                (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
-                return res;
+                res.add_result(Guid{}, true, "Scan OK: " + std::to_string(count) + " assets");
             }
-        ).share();
-
-        // Track active tasks
-        { std::lock_guard task_lock(tasks_mutex_); active_tasks_.push_back(fut); }
+            catch (const std::exception& ex) {
+                res.add_result(Guid{}, false, ex.what());
+            }
+            (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
+            prom->set_value(std::move(res));
+            });
 
         return fut;
     }
 
-    /// @brief  Initiates an asynchronous unbind and unload operation for the specified assets.
-    /// @param guids The unique identifiers of the assets to unbind and unload.
-    /// @param batch The batch identifier for the operation.
-    /// @param ctx The engine context.
-    /// @return A future representing the result of the operation.
-    /// @note The provided GUIDs must form a closure over references
     std::shared_future<TaskResult>
-        ResourceManager::unbind_and_unload_async(
-            std::deque<Guid> guids,
-            const BatchId& batch,
-            EngineContext& ctx)
+        ResourceManager::load_and_bind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
     {
-        tasks_in_flight_.fetch_add(1);
-        
-        auto fut = ctx.thread_pool->queue_task(
-            [this, guids = std::move(guids), &ctx, batch]() mutable -> TaskResult
-            {
-                // detail::TaskFlightGuard guard(tasks_in_flight_);
-                detail::ScopeDec dec{ &tasks_in_flight_ };
+        // tasks_in_flight_.fetch_add(1, std::memory_order_relaxed);
 
-                TaskResult res;
-                {
-                    // Prevent concurrent tasks on the same batch
-                    std::lock_guard batch_lock(mutex_for_batch(batch));
-                    res = this->unbind_and_unload_impl(std::move(guids), batch, ctx);
-                }
-                (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
-                return res;
+        auto prom = std::make_shared<std::promise<TaskResult>>();
+        auto fut = prom->get_future().share();
+
+        strand(ctx).post([this, guids = std::move(guids), batch, &ctx, prom]() mutable {
+            TaskResult res;
+            try {
+                res = this->load_and_bind_impl(std::move(guids), batch, ctx);
             }
-        ).share();
-        { std::lock_guard lk(tasks_mutex_); active_tasks_.push_back(fut); }
+            catch (const std::exception& ex) {
+                res.type = TaskResult::TaskType::Load;
+                res.add_result(Guid{}, false, ex.what());
+            }
+            (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
+            prom->set_value(std::move(res));
+            });
+
         return fut;
     }
 
-    // Skip - not supported
+    std::shared_future<TaskResult>
+        ResourceManager::unbind_and_unload_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
+    {
+        // tasks_in_flight_.fetch_add(1, std::memory_order_relaxed);
+
+        auto prom = std::make_shared<std::promise<TaskResult>>();
+        auto fut = prom->get_future().share();
+
+        strand(ctx).post([this, guids = std::move(guids), batch, &ctx, prom]() mutable {
+            TaskResult res;
+            try {
+                res = this->unbind_and_unload_impl(std::move(guids), batch, ctx);
+            }
+            catch (const std::exception& ex) {
+                res.type = TaskResult::TaskType::Unload;
+                res.add_result(Guid{}, false, ex.what());
+            }
+            (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
+            prom->set_value(std::move(res));
+            });
+
+        return fut;
+    }
+
     std::shared_future<TaskResult>
         ResourceManager::reload_and_rebind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
     {
-        auto fut = ctx.thread_pool->queue_task(
-            [this, guids = std::move(guids), &ctx, batch]() mutable -> TaskResult {
-                detail::TaskFlightGuard guard(tasks_in_flight_);
-                TaskResult merged; merged.type = TaskResult::TaskType::Reload;
+        // tasks_in_flight_.fetch_add(1, std::memory_order_relaxed);
 
+        auto prom = std::make_shared<std::promise<TaskResult>>();
+        auto fut = prom->get_future().share();
+
+        strand(ctx).post([this, guids = std::move(guids), batch, &ctx, prom]() mutable {
+            TaskResult merged; merged.type = TaskResult::TaskType::Reload;
+            try {
+                // serialize inside the same strand task
                 TaskResult r1 = this->unbind_and_unload_impl(guids, batch, ctx);
                 merged.results.insert(merged.results.end(), r1.results.begin(), r1.results.end());
 
-                TaskResult r2 = this->load_and_bind_impl(guids, batch, ctx);
+                TaskResult r2 = this->load_and_bind_impl(std::move(guids), batch, ctx);
                 merged.results.insert(merged.results.end(), r2.results.begin(), r2.results.end());
-
-                (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ merged });
-                return merged;
             }
-        ).share();
-        { std::lock_guard lk(tasks_mutex_); active_tasks_.push_back(fut); }
+            catch (const std::exception& ex) {
+                merged.add_result(Guid{}, false, ex.what());
+            }
+            (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ merged });
+            prom->set_value(std::move(merged));
+            });
+
         return fut;
     }
 
@@ -157,8 +162,8 @@ namespace eeng
             loads.emplace_back(
                 ctx.thread_pool->queue_task([this, g, &ctx]() -> Op
                     {
-                        auto& mx = mutex_for(g);
-                        std::lock_guard gguard(mx);
+                        // auto& mx = mutex_for(g);
+                        // std::lock_guard gguard(mx);
 
                         {   // status gate
                             std::lock_guard lk(status_mutex_);
@@ -227,8 +232,8 @@ namespace eeng
 
         for (const Guid& g : guids)
         {
-            auto& mx = mutex_for(g);
-            std::lock_guard gguard(mx);
+            // auto& mx = mutex_for(g);
+            // std::lock_guard gguard(mx);
 
             // 1) Drop this batch’s lease for g. Only proceed if we’re the last holder.
             const bool last = batch_release(batch, g);
@@ -302,24 +307,22 @@ namespace eeng
     //     return asset_index_->is_scanning();
     // }
 
-    bool ResourceManager::is_busy() const
-    {
-        return tasks_in_flight_.load(std::memory_order_relaxed) > 0;
+    bool ResourceManager::is_busy() const {
+        std::scoped_lock lk(strand_mutex_);
+        return rm_strand_ ? rm_strand_->is_busy() : false;
     }
 
-    void ResourceManager::wait_until_idle() const
-    {
-        // spin-sleep is fine; this is usually used at shutdown or tooling checkpoints
-        while (tasks_in_flight_.load(std::memory_order_relaxed) > 0)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            // cv.wait?
-        }
+    void ResourceManager::wait_until_idle() {
+        std::unique_lock lk(strand_mutex_);
+        if (!rm_strand_) return;
+        auto* s = &*rm_strand_;
+        lk.unlock();                // avoid holding RM lock while waiting
+        s->wait_idle();
     }
 
-    int ResourceManager::tasks_in_flight() const noexcept
-    {
-        return tasks_in_flight_.load(std::memory_order_relaxed);
+    int ResourceManager::queued_tasks() const noexcept {
+        std::scoped_lock lk(strand_mutex_);
+        return rm_strand_ ? static_cast<int>(rm_strand_->queued()) : 0;
     }
 
     uint32_t ResourceManager::total_leases(const Guid& g) const noexcept
@@ -387,49 +390,6 @@ namespace eeng
     AssetIndex& ResourceManager::asset_index()
     {
         return *asset_index_;
-    }
-
-    // ResourceManager.cpp
-    std::shared_future<TaskResult>
-        ResourceManager::scan_assets_async(const std::filesystem::path& root, EngineContext& ctx)
-    {
-        std::cout << "[ResourceManager] Scanning assets in: " << root.string() << "\n";
-        tasks_in_flight_.fetch_add(1);
-
-        auto fut = ctx.thread_pool->queue_task(
-            [this, root, &ctx]() -> TaskResult
-            {
-                // detail::TaskFlightGuard guard(tasks_in_flight_);
-                detail::ScopeDec dec{ &tasks_in_flight_ };
-
-                TaskResult res;
-                res.type = TaskResult::TaskType::Scan;
-                try {
-                    // 1) Do the actual scan (blocking, no RM locks)
-                    auto data = asset_index_->scan_assets(root, ctx);
-                    const std::size_t new_count = data ? data->entries.size() : 0;
-
-                    // 2) Publish atomically under the scan mutex, then release it
-                    {
-                        std::unique_lock lk(scan_mutex_);
-                        asset_index_->publish(std::move(data));
-                    }
-
-                    // 3) Fill result
-                    res.add_result(Guid{}, true, "Scan OK: " + std::to_string(new_count) + " assets indexed");
-                }
-                catch (const std::exception& ex) {
-                    res.add_result(Guid{}, false, ex.what());
-                }
-
-                // 4) Notify listeners (no locks held)
-                (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
-                return res;
-            }
-        ).share();
-
-        { std::lock_guard lk(tasks_mutex_); active_tasks_.push_back(fut); }
-        return fut;
     }
 
     void ResourceManager::load_asset(const Guid& guid, EngineContext& ctx)

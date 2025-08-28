@@ -1,6 +1,7 @@
 #ifndef THREADPOOL_HPP
 #define THREADPOOL_HPP
 
+#include "IExecutor.hpp"
 #include <future>
 #include <queue>
 #include <functional>
@@ -13,11 +14,14 @@
 #include <type_traits>
 #include <utility>
 
-class ThreadPool
+class ThreadPool : public IExecutor
 {
 public:
     explicit ThreadPool(size_t thread_count = std::thread::hardware_concurrency());
     ~ThreadPool();
+
+    // IExecutor
+    void post(std::function<void()> fn) override;
 
     template <typename Func>
     auto queue_task(Func task) -> std::future<std::invoke_result_t<Func>>;
