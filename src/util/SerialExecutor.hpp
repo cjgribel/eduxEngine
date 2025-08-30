@@ -9,23 +9,26 @@
 #include <condition_variable>
 #include <atomic>
 
-namespace eeng 
+namespace eeng
 {
     /// A strand/serializing adapter that runs posted tasks one-at-a-time in FIFO order,
     /// using an *upstream* executor for actual execution. Thread-safe.
-    class SerialExecutor : public IExecutor {
+    class SerialExecutor : public IExecutor
+    {
     public:
         using Fn = std::function<void()>;
 
         explicit SerialExecutor(IExecutor& upstream) noexcept
-            : upstream_(upstream) {
+            : upstream_(upstream)
+        {
         }
 
         SerialExecutor(const SerialExecutor&) = delete;
         SerialExecutor& operator=(const SerialExecutor&) = delete;
 
         // IExecutor
-        void post(Fn fn) override {
+        void post(Fn fn) override
+        {
             {
                 std::lock_guard<std::mutex> lk(mutex_);
                 task_queue_.push(std::move(fn));
@@ -34,57 +37,66 @@ namespace eeng
             schedule_worker_once();
         }
 
-        // --- Introspection (thread-safe) ------------------------------------------
+        // --- Introspection (thread-safe) -------------------------------------
 
-        /// True while the strand's worker loop is executing tasks.
-        bool running() const noexcept {
+        /// True while the strand's worker loop is executing tasks
+        bool running() const noexcept
+        {
             return running_.load(std::memory_order_relaxed);
         }
 
-        /// Number of queued tasks (not including the task currently executing)
-        std::size_t queued() const noexcept {
+        /// Number of queued tasks, not including the task currently executing
+        std::size_t queued() const noexcept
+        {
             return queued_count_.load(std::memory_order_relaxed);
         }
 
         /// True if a task is running or there are tasks queued
-        bool is_busy() const noexcept {
+        bool is_busy() const noexcept
+        {
             return running() || queued() > 0;
         }
 
         /// Block until no task is running and the queue is empty
-        void wait_idle() {
+        void wait_idle()
+        {
             std::unique_lock<std::mutex> lk(mutex_);
-            cv_idle_.wait(lk, [&] {
-                return !running_.load(std::memory_order_relaxed) && task_queue_.empty();
+            cv_idle_.wait(lk, [&]
+                {
+                    return !running_.load(std::memory_order_relaxed) && task_queue_.empty();
                 });
         }
 
     private:
-        void schedule_worker_once() 
+        void schedule_worker_once()
         {
             bool expect = false;
-            if (worker_scheduled_.compare_exchange_strong(expect, true, std::memory_order_acq_rel)) 
+            if (worker_scheduled_.compare_exchange_strong(expect, true, std::memory_order_acq_rel))
             {
                 // Schedule a single drain on the upstream executor
                 upstream_.post([this] { this->drain(); });
             }
         }
 
-        void drain() {
+        void drain()
+        {
             running_.store(true, std::memory_order_relaxed);
 
-            for (;;) {
+            for (;;)
+            {
                 Fn f;
                 {
                     std::lock_guard<std::mutex> lk(mutex_);
-                    if (task_queue_.empty()) {
-                        // We are about to go idle.
+                    if (task_queue_.empty()) 
+                    {
+                        // About to go idle
                         running_.store(false, std::memory_order_relaxed);
                         worker_scheduled_.store(false, std::memory_order_release);
                         cv_idle_.notify_all();
 
-                        // Race check: tasks may have been enqueued after we saw empty().
-                        if (!task_queue_.empty()) {
+                        // Race check: tasks may have been enqueued after we saw empty()
+                        if (!task_queue_.empty()) 
+                        {
                             // Try to re-schedule ourselves to continue draining.
                             bool expect = false;
                             if (worker_scheduled_.compare_exchange_strong(expect, true, std::memory_order_acq_rel)) {

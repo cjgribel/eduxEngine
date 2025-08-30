@@ -570,8 +570,9 @@ namespace eeng
                         if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value()) {
                             if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
                             {
+                                // Use resource_manager.get_asset_ref/try_get_asset_ref -->
                                 auto mesh = resource_manager.storage().get_ref(*h_opt);
-                                ImGui::Text("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
+                                ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
                     }
                             //else ImGui::Text("Not a mock::Mesh");
                 }

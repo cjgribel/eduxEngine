@@ -26,8 +26,8 @@ namespace eeng
     struct AssetStatus
     {
         LoadState state = LoadState::Unloaded;
-        int ref_count = 0;
-        bool resolved = false;
+        // int ref_count = 0;
+        // bool resolved = false;
         // std::optional<entt::meta_type> type;
         std::string error_message;
     };
@@ -70,8 +70,8 @@ namespace eeng
         virtual std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) = 0;
         virtual std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx) = 0;
 
-        virtual void retain_guid(const Guid& guid) = 0;
-        virtual void release_guid(const Guid& guid, EngineContext& ctx) = 0;
+        // virtual void retain_guid(const Guid& guid) = 0;
+        // virtual void release_guid(const Guid& guid, EngineContext& ctx) = 0;
 
         // virtual bool is_scanning() const = 0;
 

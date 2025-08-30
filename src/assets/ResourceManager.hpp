@@ -29,64 +29,50 @@ namespace eeng
         mutable std::mutex status_mutex_;
         std::unordered_map<Guid, AssetStatus> statuses_;
 
-        // Not needed if tasks are serial?
+        // TODO: not needed if tasks are serial ?
         mutable std::mutex scan_mutex_; // serialize overlapping scans
 
-        // Serial queue for tasks
-          // ...
-        std::optional<SerialExecutor>   rm_strand_;   // constructed on first use
+        // Serial task queue
+        std::optional<SerialExecutor>   rm_strand_;   // lazy initialization
         mutable std::mutex              strand_mutex_;
-        // ...
-        SerialExecutor& strand(EngineContext& ctx);   // helper for lazy initialization
+        SerialExecutor& strand(EngineContext& ctx);   // helper
 
-        //
-        // std::shared_future<TaskResult> current_task_;
-        // mutable std::mutex task_mutex_;
-            // -- Task tracking -----------------------------
-        // std::atomic<int> tasks_in_flight_{ 0 }; // replaces current_task_
-        // mutable std::mutex tasks_mutex_;
-        // std::vector<std::shared_future<TaskResult>> active_tasks_;
-
-        // Lease
-        struct AssetLease {
-            uint32_t total = 0;
-            std::unordered_map<BatchId, uint32_t> by_batch;
+        // Asset lease tracking
+        struct AssetLease 
+        {
+            std::unordered_set<BatchId> holders; // batches that currently hold this asset
         };
         mutable std::mutex lease_mutex_;
         std::unordered_map<Guid, AssetLease> leases_;
+
+        /// @brief Idempotently acquire a batch of assets
+        /// @param batch_id Batch ID
+        /// @param g The Asset GUID
+        /// @return True if the batch was successfully acquired
         bool batch_acquire(const BatchId& bid, const Guid& g)
         {
-            // std::lock_guard lk(lease_mutex_);
-            // auto& L = leases_[g];
-            // ++L.total;
-            // ++L.by_batch[bid];
             std::lock_guard lk(lease_mutex_);
-            auto& L = leases_[g];
-            auto& cnt = L.by_batch[bid];
-            if (cnt == 0) {
-                ++cnt;
-                ++L.total;
-                return true;
-            }
-            return false; // already held by this batch -> idempotent
+            auto& holders = leases_[g].holders;
+            // insert returns {iterator, inserted}; inserted == true if it wasn't present
+            //const bool inserted = holders.insert(bid).second;
+            // (Optionally erase empty AssetLease map entries elsewhere; not needed here.)
+            //return inserted; // true means "this batch newly acquired the asset"
+            return holders.insert(bid).second;
         }
 
-        // returns true if total becomes 0 (eligible for unload)
         bool batch_release(const BatchId& bid, const Guid& g)
         {
             std::lock_guard lk(lease_mutex_);
             auto it = leases_.find(g);
             if (it == leases_.end()) return false;
-            auto& L = it->second;
 
-            auto bit = L.by_batch.find(bid);
-            if (bit == L.by_batch.end() || bit->second == 0) return false;
-
-            --bit->second;
-            --L.total;
-            if (bit->second == 0) L.by_batch.erase(bit);
-            if (L.total == 0) { leases_.erase(it); return true; }
-            return false;
+            auto& holders = it->second.holders;
+            const size_t erased = holders.erase(bid); // 0 if this batch didn’t hold it
+            if (holders.empty()) {
+                leases_.erase(it);
+                return erased > 0;   // true = this release made it drop to zero
+            }
+            return false;            // still held by other batches
         }
 
         // Asset-GUID Striping
@@ -119,8 +105,8 @@ namespace eeng
         TaskResult unbind_and_unload_impl(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx);
 
     public:
-        void retain_guid(const Guid& guid) override;
-        void release_guid(const Guid& guid, EngineContext& ctx) override;
+        // void retain_guid(const Guid& guid) override;
+        // void release_guid(const Guid& guid, EngineContext& ctx) override;
 
         bool is_busy() const override;
         void wait_until_idle() override;

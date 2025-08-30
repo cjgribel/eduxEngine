@@ -287,26 +287,6 @@ namespace eeng
         return res;
     }
 
-    void ResourceManager::retain_guid(const Guid& guid)
-    {
-        std::lock_guard lock(status_mutex_);
-        statuses_[guid].ref_count++;
-    }
-
-    void ResourceManager::release_guid(const Guid& guid, EngineContext& ctx)
-    {
-        std::lock_guard lock(status_mutex_);
-        auto& status = statuses_[guid];
-        if (--status.ref_count <= 0) {
-            status.ref_count = 0;
-        }
-    }
-
-    // bool ResourceManager::is_scanning() const
-    // {
-    //     return asset_index_->is_scanning();
-    // }
-
     bool ResourceManager::is_busy() const {
         std::scoped_lock lk(strand_mutex_);
         return rm_strand_ ? rm_strand_->is_busy() : false;
@@ -325,26 +305,21 @@ namespace eeng
         return rm_strand_ ? static_cast<int>(rm_strand_->queued()) : 0;
     }
 
-    uint32_t ResourceManager::total_leases(const Guid& g) const noexcept
-    {
+    uint32_t ResourceManager::total_leases(const Guid& g) const noexcept {
         std::lock_guard lk(lease_mutex_);
         auto it = leases_.find(g);
-        return it == leases_.end() ? 0u : it->second.total;
+        return (it == leases_.end()) ? 0u : static_cast<uint32_t>(it->second.holders.size());
     }
 
-    bool ResourceManager::held_by_any(const Guid& g) const noexcept
-    {
+    bool ResourceManager::held_by_any(const Guid& g) const noexcept {
         std::lock_guard lk(lease_mutex_);
         return leases_.find(g) != leases_.end();
     }
 
-    bool ResourceManager::held_by_batch(const Guid& g, const BatchId& b) const noexcept
-    {
+    bool ResourceManager::held_by_batch(const Guid& g, const BatchId& b) const noexcept {
         std::lock_guard lk(lease_mutex_);
         auto it = leases_.find(g);
-        if (it == leases_.end()) return false;
-        auto bit = it->second.by_batch.find(b);
-        return bit != it->second.by_batch.end() && bit->second > 0;
+        return it != leases_.end() && it->second.holders.count(b) != 0;
     }
 
     // std::optional<TaskResult> ResourceManager::last_task_result() const {

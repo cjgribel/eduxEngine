@@ -97,8 +97,8 @@ namespace
         std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
         std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
 
-        void retain_guid(const Guid& guid) override {}
-        void release_guid(const Guid& guid, eeng::EngineContext& ctx) override {}
+        // void retain_guid(const Guid& guid) override {}
+        // void release_guid(const Guid& guid, eeng::EngineContext& ctx) override {}
 #endif
 
         bool is_busy() const override { return false; }
