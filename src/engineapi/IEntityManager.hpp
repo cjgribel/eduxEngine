@@ -4,6 +4,7 @@
 #pragma once
 #include "ecs/Entity.hpp"
 #include <entt/fwd.hpp>
+#include <string>
 #include <cstddef>
 
 namespace eeng
