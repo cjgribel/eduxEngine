@@ -47,7 +47,7 @@ namespace eeng
 
         /// @brief Idempotently acquire a batch of assets
         /// @param batch_id Batch ID
-        /// @param g The Asset GUID
+        /// @param g Asset GUID
         /// @return True if the batch was successfully acquired
         bool batch_acquire(const BatchId& bid, const Guid& g)
         {

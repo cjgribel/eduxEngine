@@ -222,6 +222,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ForwardRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ShapeRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ImGuiBackendSDL.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/BatchRegistry.cpp # where?
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi/EngineContext.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Storage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AssetIndex.cpp

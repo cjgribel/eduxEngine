@@ -78,6 +78,9 @@ namespace eeng
         template<typename T>
         void register_component()
         {
+            // Bind / Resolve
+            // Bind all AssetRef and EntityRef members
+            // (Meta is needed, if we iterate all components per entity (e.g. Batch load))
             entt::meta_factory<T>()
                 // .func<&resolve_component_meta<T>>(hashed_string("resolve_component"))
                 ;

@@ -66,11 +66,13 @@ namespace eeng
     EngineContext::EngineContext(
         std::unique_ptr<IEntityManager> entity_manager,
         std::unique_ptr<IResourceManager> resource_manager,
+        std::unique_ptr<IBatchRegistry> batch_registry,
         std::unique_ptr<IGuiManager> gui_manager,
         std::unique_ptr<IInputManager> input_manager,
         std::shared_ptr<ILogManager> log_manager)
         : entity_manager(std::move(entity_manager))
         , resource_manager(std::move(resource_manager))
+        , batch_registry(std::move(batch_registry))
         , gui_manager(std::move(gui_manager))
         , input_manager(std::move(input_manager))
         , log_manager(log_manager)

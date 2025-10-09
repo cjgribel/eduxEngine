@@ -155,11 +155,15 @@ namespace eeng
 
             // ??? collisions
 
-            // (Where?) Game thread tasks
-            // (Where?) Physics step
+            // ??? Game thread tasks
 
+            // ??? Physics step
+            
             // --- Game systems ---
             game->update(time_s, deltaTime_s);
+            
+            // ??? Execute tasks enqueued by worker threads (entity/component updates)
+            //ctx.main_thread_queue.execute_all();
 
             // --- Event dispatch ---
             ctx->event_queue->dispatch_all_events();

@@ -2,6 +2,7 @@
 #include "Engine.hpp"
 #include "ecs/EntityManager.hpp"
 #include "ResourceManager.hpp"
+#include "BatchRegistry.hpp"
 #include "GuiManager.hpp"
 #include "InputManager.hpp"
 #include "LogManager.hpp"
@@ -13,6 +14,7 @@ namespace eeng
         std::shared_ptr<EngineContext> ctx = std::make_shared<EngineContext>(
             std::make_unique<EntityManager>(),
             std::make_unique<ResourceManager>(),
+            std::make_unique<BatchRegistry>(),
             std::make_unique<GuiManager>(),
             std::make_unique<InputManager>(),
             std::make_shared<LogManager>()

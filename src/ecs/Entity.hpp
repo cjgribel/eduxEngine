@@ -1,6 +1,7 @@
 #ifndef ENTITY_HPP
 #define ENTITY_HPP
 
+#include "Guid.h"       // For Guid
 #include <entt/fwd.hpp> // Forward declarations for entt types
 #include <cstdint>      // For uint32_t
 #include <functional>   // For std::hash
@@ -83,6 +84,12 @@ namespace eeng::ecs
 
     private:
         entity_type id; ///< The internal integral representation of the entity.
+    };
+
+    struct EntityRef
+    {
+        Guid guid;
+        ecs::Entity entity;
     };
 } // namespace eeng::ecs
 

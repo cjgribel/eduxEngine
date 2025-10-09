@@ -37,7 +37,7 @@ namespace eeng
     {
         struct OperationResult
         {
-            Guid guid{};
+            Guid guid{}; // Asset GUID
             bool success{ true };
             std::string message{};
         };
@@ -56,7 +56,7 @@ namespace eeng
     };
 
     // Lease
-    using BatchId = Guid;              // reuse your Guid
+    using BatchId = Guid;             
     //    inline BatchId AdHocBatch() { return {}; } // or Guid::null()
 
     class IResourceManager

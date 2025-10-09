@@ -6,6 +6,7 @@
 #include <memory>
 #include "IEntityManager.hpp"
 #include "IResourceManager.hpp"
+#include "IBatchRegistry.hpp"
 #include "IGuiManager.hpp"
 #include "IInputManager.hpp"
 #include "ILogManager.hpp"
@@ -22,15 +23,16 @@ namespace eeng
 {
     /*
     Engine context facilities:
+    - (TODO?) Main thread queue
+    - (TODO?) GPU Resource manager
+    - (TODO?) Scene manager
     - Entity manager
     - Resource manager
-    - (TODO?) GPU Resource manager
     - Thread pool
     - Event dispatcher
     - Logger
     - Selection manager for assets & entities
     - CommandQueue
-    - (TODO?) Scene manager
     */
 
     struct SetVsyncEvent { bool enabled; };
@@ -76,16 +78,18 @@ namespace eeng
     struct EngineContext
     {
         EngineContext(
-            std::unique_ptr<IEntityManager> entity_manager,
-            std::unique_ptr<IResourceManager> resource_manager,
-            std::unique_ptr<IGuiManager> gui_manager,
-            std::unique_ptr<IInputManager> input_manager,
-            std::shared_ptr<ILogManager> log_manager);
+            std::unique_ptr<IEntityManager>     entity_manager,
+            std::unique_ptr<IResourceManager>   resource_manager,
+            std::unique_ptr<IBatchRegistry>     batch_registry,
+            std::unique_ptr<IGuiManager>        gui_manager,
+            std::unique_ptr<IInputManager>      input_manager,
+            std::shared_ptr<ILogManager>        log_manager);
 
         ~EngineContext();
 
         std::unique_ptr<IEntityManager>         entity_manager;
         std::unique_ptr<IResourceManager>       resource_manager;
+        std::unique_ptr<IBatchRegistry>         batch_registry;
         std::unique_ptr<IGuiManager>            gui_manager;
         std::unique_ptr<IInputManager>          input_manager;
         std::shared_ptr<ILogManager>            log_manager;
@@ -94,7 +98,7 @@ namespace eeng
         std::unique_ptr<editor::CommandQueue>   command_queue;
         std::unique_ptr<editor::SelectionManager<Guid>>         asset_selection;
         std::unique_ptr<editor::SelectionManager<ecs::Entity>>  entity_selection;
-        std::unique_ptr<EngineConfig>       engine_config;
+        std::unique_ptr<EngineConfig>           engine_config;
 
         // std::shared_future<TaskResult> asset_async_future;
     };

@@ -87,7 +87,6 @@ namespace
         std::shared_ptr<entt::registry> registry_;
     };
 
-
     struct MockResourceManager : eeng::IResourceManager
     {
 #if 1
@@ -107,6 +106,11 @@ namespace
 
         AssetIndexDataPtr get_index_data() const override { return nullptr; }
         std::string to_string() const override { return std::string{}; }
+    };
+
+    class MockBatchRegistry : public eeng::IBatchRegistry
+    {
+
     };
 
     struct MockGuiManager : eeng::IGuiManager
@@ -275,6 +279,7 @@ protected:
     eeng::EngineContext ctx{
         std::make_unique<MockEntityRegistry>(),
         std::make_unique<MockResourceManager>(),
+        std::make_unique<MockBatchRegistry>(),
         std::make_unique<MockGuiManager>(),
         std::make_unique<MockInputManager>(),
         std::make_unique<MockLogManager>()
