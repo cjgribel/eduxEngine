@@ -1,3 +1,6 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
 #ifndef EventQueue_h
 #define EventQueue_h
 
