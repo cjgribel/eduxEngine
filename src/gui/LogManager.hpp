@@ -4,6 +4,7 @@
 #pragma once
 #include "ILogManager.hpp"
 #include <memory>
+#include <mutex>
 
 namespace eeng
 {
@@ -22,5 +23,6 @@ namespace eeng
 
         struct Widget;
         std::unique_ptr<Widget> widget_ptr;
+        mutable std::mutex mutex_;
     };
 }

@@ -199,16 +199,21 @@ namespace eeng
         // Relative time stamp
         std::string with_prefix = relative_time_string() + " " + formatted + "\n";
 
-        widget_ptr->add_log(with_prefix);
+        {
+            std::lock_guard<std::mutex> lk(mutex_);
+            widget_ptr->add_log(with_prefix);
+        }
     }
 
     void LogManager::clear()
     {
+        std::lock_guard<std::mutex> lk(mutex_);
         widget_ptr->clear();
     }
 
     void LogManager::draw_gui_widget(const char* label, bool* p_open)
     {
+        std::lock_guard<std::mutex> lk(mutex_);
         widget_ptr->draw(label, p_open);
     }
 }
