@@ -8,6 +8,7 @@
 #include <entt/entt.hpp>
 
 // FOR TESTS ->
+#include "MainThreadQueue.hpp"
 #include "AssimpImporter.hpp" // --> ENGINE API
 #include "MockImporter.hpp" // --> ENGINE API
 #include "ResourceTypes.hpp"
@@ -29,6 +30,84 @@ namespace {
     }
 #endif
 }
+
+namespace eeng::dev
+{
+
+    void schedule_startup_import_and_scan(const std::filesystem::path& asset_root,
+        std::shared_ptr<eeng::EngineContext> ctx)
+    {
+        using ModelRef = eeng::AssetRef<eeng::mock::Model>;
+
+        // 1) define task
+        auto startup_task = [asset_root, ctx]() {
+            // If logging must be on main, do it here:
+            // ctx->main_thread_queue->push([ctx]() {
+                EENG_LOG(ctx.get(), "[startup] Begin startup import+scan task on main...");
+                // });
+
+            // 2) run orchestrator on worker pool
+            ctx->thread_pool->queue_task([asset_root, ctx]() {
+                try
+                {
+                    constexpr int num_tasks = 10;
+                    std::vector<std::future<ModelRef>> futures;
+                    futures.reserve(num_tasks);
+
+                    // worker-side log (safe?) – or push to main if needed
+                    // ctx->main_thread_queue->push([ctx]() {
+                        EENG_LOG(ctx.get(), "[startup] Importing models on worker...");
+                        // });
+
+                    // 2.1) launch import tasks
+                    for (int i = 0; i < num_tasks; ++i)
+                    {
+                        futures.emplace_back(
+                            ctx->thread_pool->queue_task([asset_root, ctx]()
+                                {
+                                    return eeng::mock::ModelImporter::import(asset_root, ctx);
+                                })
+                        );
+                    }
+
+                    // 2.2) wait
+                    std::vector<ModelRef> refs;
+                    refs.reserve(num_tasks);
+                    for (auto& f : futures) refs.push_back(f.get());
+
+                    // 3) run scan right here (still worker)
+                    // ctx->main_thread_queue->push([ctx]()
+                    //     {
+                            //EENG_LOG(ctx.get(), "[startup] Imports done: {} models. Scanning...", refs.size());
+
+                    auto nbr_assets = refs.size();
+                    // ctx->main_thread_queue->push([ctx, nbr_assets]() {
+                        EENG_LOG(ctx.get(), "[startup] Imported %zu models. Scanning...", nbr_assets);
+                        // });
+
+                    ctx->resource_manager->scan_assets_async(
+                        "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/",
+                        *ctx
+                    );
+                    // });
+                }
+                catch (const std::exception& ex)
+                {
+                    // push error log to main (safe)
+                    // ctx->main_thread_queue->push([ctx, msg = std::string(ex.what())]()
+                    //     {
+                            EENG_LOG(ctx.get(), "[startup] ERROR during import: %s", ex.what());
+                        // });
+                }
+                });
+            };
+
+        // 3) schedule on main
+        ctx->main_thread_queue->push(std::move(startup_task));
+    }
+
+} // namespace eeng::dev
+
 
 bool Game::init()
 {
@@ -96,33 +175,43 @@ bool Game::init()
 
         // 1.   IMPORT resources concurrently
         //
-        using ModelRef = eeng::AssetRef<eeng::mock::Model>;
-        std::vector<ModelRef> refs;
-        std::vector<std::future<ModelRef>> futures;
-        {
-            // Requires ResourceManager to be TS
-            std::cout << "Importing assets recursively..." << std::endl;
-            const int numTasks = 10;
-            for (int i = 0; i < numTasks; ++i)
-            {
-                futures.emplace_back(
-                    ctx->thread_pool->queue_task([this, &asset_root]()
-                        {
-                            return eeng::mock::ModelImporter::import(asset_root, ctx);
-                        })
-                );
-            }
-            // BLOCK and wait for imports
-            EENG_LOG(ctx, "[Game::init()] Wait for imports...");
-            for (auto& f : futures) refs.push_back(f.get());
-        }
+        // using ModelRef = eeng::AssetRef<eeng::mock::Model>;
+        // std::vector<ModelRef> refs;
+        // std::vector<std::future<ModelRef>> futures;
+        // {
+        //     // Requires ResourceManager to be TS
+        //     std::cout << "Importing assets recursively..." << std::endl;
+        //     const int numTasks = 10;
+        //     for (int i = 0; i < numTasks; ++i)
+        //     {
+        //         futures.emplace_back(
+        //             ctx->thread_pool->queue_task([this, &asset_root]()
+        //                 {
+        //                     return eeng::mock::ModelImporter::import(asset_root, ctx);
+        //                 })
+        //         );
+        //     }
+        //     // BLOCK and wait for imports
+        //     EENG_LOG(ctx, "[Game::init()] Wait for imports...");
+        //     for (auto& f : futures) refs.push_back(f.get());
+        // }
 
 #if 1
         // 3. SCAN assets from disk concurrently
         //
+
+        // Scan on the main thread later
+        // ctx->main_thread_queue->push([&]() {
+        //     EENG_LOG(ctx, "[MainThread] Scanning assets...");
+        //     resource_manager.scan_assets_async("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
+        //     });
+// eeng::dev::import_then_scan_async(asset_root, ctx);
+        eeng::dev::schedule_startup_import_and_scan(asset_root, ctx);
         {
+#if 0
             EENG_LOG(ctx, "[Game::init()] Scanning assets...");
             resource_manager.scan_assets_async("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
+#endif
             //resource_manager.start_async_scan("C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/", *ctx);
             // Wait for scanning to finish
             // while (resource_manager.is_scanning())
@@ -149,6 +238,22 @@ bool Game::init()
         }
 #endif
 
+#if 0
+        // Enqueue dummy tasks to main thread 
+        ctx->main_thread_queue->push([&]() {
+            EENG_LOG(ctx, "[MainThreadQueue] task executed on main thread.");
+            });
+        ctx->main_thread_queue->push([&]() {
+            EENG_LOG(ctx, "[MainThreadQueue] another task executed on main thread.");
+            });
+        // Enqueue dummy tasks to main thread - BLOCKING
+        ctx->main_thread_queue->push_and_wait([&]() -> void {
+            EENG_LOG(ctx, "[MainThreadQueue] blocking task executed on main thread.");
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            EENG_LOG(ctx, "[MainThreadQueue] blocking task finished.");
+            });
+#endif
+
         /*
         TODO
         0 Introduce DUMMY COMPONENTS, e.g. one with a AssetRef<Model>
@@ -159,6 +264,7 @@ bool Game::init()
 
         // 4. LOAD assets concurrently
         // -> "collected asset GUIDs" -> auto fut = ctx->resource_manager->load_and_bind_async();
+#if 0
         std::deque<eeng::Guid> branch_guids;
         for (const auto& ref : refs) branch_guids.push_back(ref.get_guid());
         {
@@ -196,7 +302,7 @@ bool Game::init()
                         EENG_LOG(ctx, "Unload error: GUID %s: %s", op.guid.to_string().c_str(), op.message.c_str());
                     }
                 }
-        }
+            }
 #endif
 #if 0
             EENG_LOG(ctx, "[Game::init()] Loading assets...");
@@ -232,9 +338,10 @@ bool Game::init()
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
                 }
-    }
+            }
 #endif
-}
+        }
+#endif
 
         // (3. When loading future is done - set entity asset GUIDs)
 
@@ -795,7 +902,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-}
+    }
 #endif
 
     // Draw shape batches
