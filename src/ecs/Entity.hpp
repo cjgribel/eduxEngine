@@ -90,6 +90,10 @@ namespace eeng::ecs
     {
         Guid guid;
         ecs::Entity entity;
+
+        // TODO:
+        // bool resolved() const { return entity.valid(); }
+        // void clear_runtime() { entity = {}; }
     };
 } // namespace eeng::ecs
 
