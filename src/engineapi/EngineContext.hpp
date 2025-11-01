@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <memory>
 #include "IEntityManager.hpp"
 #include "IResourceManager.hpp"
 #include "IBatchRegistry.hpp"
@@ -11,7 +10,9 @@
 #include "IInputManager.hpp"
 #include "ILogManager.hpp"
 #include "Guid.h"
+#include <memory>
 
+class MainThreadQueue;
 class ThreadPool;
 class EventQueue;
 namespace eeng::editor {
@@ -93,6 +94,7 @@ namespace eeng
         std::unique_ptr<IGuiManager>            gui_manager;
         std::unique_ptr<IInputManager>          input_manager;
         std::shared_ptr<ILogManager>            log_manager;
+        std::unique_ptr<MainThreadQueue>        main_thread_queue;
         std::unique_ptr<ThreadPool>             thread_pool;
         std::unique_ptr<EventQueue>             event_queue;
         std::unique_ptr<editor::CommandQueue>   command_queue;

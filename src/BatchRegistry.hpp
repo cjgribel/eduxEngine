@@ -89,23 +89,29 @@ namespace eeng {
         TaskResult last_result(const eeng::BatchId&) const;
 
         // --- Orchestration (serialized via strand) ---
-#if 0
+#if 1
 // Returns a future that completes when the full sequence is done.
         std::shared_future<TaskResult> queue_load(const eeng::BatchId& id, EngineContext& ctx);
+#endif
+#if 1
         std::shared_future<TaskResult> queue_unload(const eeng::BatchId& id, EngineContext& ctx);
         // std::shared_future<TaskResult> queue_reload(const eeng::BatchId& id);
 #endif
 
     private:
-#if 0
+#if 1
         // Steps (run by strand)
-        TaskResult do_load(BatchInfo& B);
-        TaskResult do_unload(BatchInfo& B);
+        TaskResult do_load(BatchInfo& B, EngineContext& ctx);
+#endif
+#if 1
+        TaskResult do_unload(BatchInfo& B, EngineContext& ctx);
 #endif
 
         // Helpers (main-thread work)
-#if 0
+#if 1
         void spawn_entities_on_main(BatchInfo& B, EngineContext& ctx);   // Step 1 (create/populate)
+#endif
+#if 1
         void despawn_entities_on_main(BatchInfo& B, EngineContext& ctx); // Step last (cleanup)
 #endif
 

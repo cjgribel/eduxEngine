@@ -26,7 +26,8 @@ namespace eeng
         SerialExecutor(const SerialExecutor&) = delete;
         SerialExecutor& operator=(const SerialExecutor&) = delete;
 
-        // IExecutor
+        // Implementes IExecutor
+        // Fire-and-forget (returns void)
         void post(Fn fn) override
         {
             {
@@ -35,6 +36,25 @@ namespace eeng
                 queued_count_.fetch_add(1, std::memory_order_relaxed);
             }
             schedule_worker_once();
+        }
+
+        // Returns shared_future<R>
+        template<class F>
+        auto submit(F&& f) -> std::shared_future<std::invoke_result_t<F&>>
+        {
+            using R = std::invoke_result_t<F&>;
+            auto prom = std::make_shared<std::promise<R>>();
+            auto fut = prom->get_future().share();
+
+            post([p = std::move(prom), fn = std::forward<F>(f)]() mutable {
+                try {
+                    if constexpr (std::is_void_v<R>) { fn(); p->set_value(); }
+                    else { p->set_value(fn()); }
+                }
+                catch (...) { p->set_exception(std::current_exception()); }
+                });
+
+            return fut;
         }
 
         // --- Introspection (thread-safe) -------------------------------------
@@ -87,7 +107,7 @@ namespace eeng
                 Fn f;
                 {
                     std::lock_guard<std::mutex> lk(mutex_);
-                    if (task_queue_.empty()) 
+                    if (task_queue_.empty())
                     {
                         // About to go idle
                         running_.store(false, std::memory_order_relaxed);
@@ -95,7 +115,7 @@ namespace eeng
                         cv_idle_.notify_all();
 
                         // Race check: tasks may have been enqueued after we saw empty()
-                        if (!task_queue_.empty()) 
+                        if (!task_queue_.empty())
                         {
                             // Try to re-schedule ourselves to continue draining.
                             bool expect = false;

@@ -6,6 +6,7 @@
 #include "GLDebugMessageCallback.h"
 #endif
 
+#include "MainThreadQueue.hpp"
 #include "InputManager.hpp"
 #include "LogMacros.h"
 #include "LogGlobals.hpp"
@@ -163,6 +164,7 @@ namespace eeng
             game->update(time_s, deltaTime_s);
             
             // ??? Execute tasks enqueued by worker threads (entity/component updates)
+            ctx->main_thread_queue->execute_all();
             //ctx.main_thread_queue.execute_all();
 
             // --- Event dispatch ---

@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "EngineContext.hpp"
+
+#include "MainThreadQueue.hpp"
 #include "ThreadPool.hpp"
 #include "EventQueue.h"
 #include "editor/CommandQueue.hpp"
@@ -76,6 +78,7 @@ namespace eeng
         , gui_manager(std::move(gui_manager))
         , input_manager(std::move(input_manager))
         , log_manager(log_manager)
+        , main_thread_queue(std::make_unique<MainThreadQueue>())
         , thread_pool(std::make_unique<ThreadPool>()) // 2+, reload async deadlocks for < 2 threads
         , event_queue(std::make_unique<EventQueue>())
         , command_queue(std::make_unique<editor::CommandQueue>())

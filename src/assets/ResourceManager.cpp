@@ -38,78 +38,88 @@ namespace eeng
     std::shared_future<TaskResult>
         ResourceManager::scan_assets_async(const std::filesystem::path& root, EngineContext& ctx)
     {
-        // tasks_in_flight_.fetch_add(1, std::memory_order_relaxed);
+        auto& s = strand(ctx);
+        auto* ctx_ptr = &ctx;            // avoid capturing a ref that could dangle
 
-        auto prom = std::make_shared<std::promise<TaskResult>>();
-        auto fut = prom->get_future().share();
+        // capture root by value so it’s safe after return
+        return s.submit([this, root, ctx_ptr]() mutable -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Scan;
 
-        strand(ctx).post([this, root, &ctx, prom]() mutable {
-            TaskResult res; res.type = TaskResult::TaskType::Scan;
-            try {
-                auto data = asset_index_->scan_assets(root, ctx);       // blocking scan (no RM locks)
-                const auto count = data ? data->entries.size() : 0;
+                try
                 {
-                    std::unique_lock lk(scan_mutex_);                   // (if you keep one)
-                    asset_index_->publish(std::move(data));             // atomic snapshot swap
-                }
-                res.add_result(Guid{}, true, "Scan OK: " + std::to_string(count) + " assets");
-            }
-            catch (const std::exception& ex) {
-                res.add_result(Guid{}, false, ex.what());
-            }
-            (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
-            prom->set_value(std::move(res));
-            });
+                    auto data = asset_index_->scan_assets(root, *ctx_ptr); // blocking scan (no RM locks)
+                    const auto count = data ? data->entries.size() : 0;
 
-        return fut;
+                    {
+                        std::unique_lock lk(scan_mutex_);                 // if you keep one
+                        asset_index_->publish(std::move(data));           // atomic snapshot swap
+                    }
+
+                    res.add_result(Guid{}, true, "Scan OK: " + std::to_string(count) + " assets");
+                }
+                catch (const std::exception& ex)
+                {
+                    res.add_result(Guid{}, false, ex.what());
+                }
+                // enqueue_event doesn't throw
+                (void)ctx_ptr->event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
+                return res;
+            });
     }
 
     std::shared_future<TaskResult>
         ResourceManager::load_and_bind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
     {
-        // tasks_in_flight_.fetch_add(1, std::memory_order_relaxed);
+        auto& s = strand(ctx);
+        auto* ctx_ptr = &ctx; // avoid capturing a reference that might dangle
 
-        auto prom = std::make_shared<std::promise<TaskResult>>();
-        auto fut = prom->get_future().share();
+        return s.submit([this, guids = std::move(guids), batch, ctx_ptr]() mutable -> TaskResult
+            {
+                TaskResult res;
+                try
+                {
+                    res = this->load_and_bind_impl(std::move(guids), batch, *ctx_ptr);
+                }
+                catch (const std::exception& ex)
+                {
+                    res.type = TaskResult::TaskType::Load;
+                    res.add_result(Guid{}, false, ex.what());
+                }
+                catch (...)
+                {
+                    res.type = TaskResult::TaskType::Load;
+                    res.add_result(Guid{}, false, "unknown exception in load_and_bind_impl");
+                }
 
-        strand(ctx).post([this, guids = std::move(guids), batch, &ctx, prom]() mutable {
-            TaskResult res;
-            try {
-                res = this->load_and_bind_impl(std::move(guids), batch, ctx);
-            }
-            catch (const std::exception& ex) {
-                res.type = TaskResult::TaskType::Load;
-                res.add_result(Guid{}, false, ex.what());
-            }
-            (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
-            prom->set_value(std::move(res));
+                (void)ctx_ptr->event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
+                return res;
             });
-
-        return fut;
     }
 
     std::shared_future<TaskResult>
         ResourceManager::unbind_and_unload_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx)
     {
-        // tasks_in_flight_.fetch_add(1, std::memory_order_relaxed);
+        auto& s = strand(ctx);
+        auto* ctx_ptr = &ctx;
 
-        auto prom = std::make_shared<std::promise<TaskResult>>();
-        auto fut = prom->get_future().share();
+        return s.submit([this, guids = std::move(guids), batch, ctx_ptr]() mutable -> TaskResult
+            {
+                TaskResult res;
+                try
+                {
+                    res = this->unbind_and_unload_impl(std::move(guids), batch, *ctx_ptr);
+                }
+                catch (const std::exception& ex)
+                {
+                    res.type = TaskResult::TaskType::Unload;
+                    res.add_result(Guid{}, false, ex.what());
+                }
 
-        strand(ctx).post([this, guids = std::move(guids), batch, &ctx, prom]() mutable {
-            TaskResult res;
-            try {
-                res = this->unbind_and_unload_impl(std::move(guids), batch, ctx);
-            }
-            catch (const std::exception& ex) {
-                res.type = TaskResult::TaskType::Unload;
-                res.add_result(Guid{}, false, ex.what());
-            }
-            (void)ctx.event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
-            prom->set_value(std::move(res));
+                (void)ctx_ptr->event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
+                return res;
             });
-
-        return fut;
     }
 
     std::shared_future<TaskResult>
@@ -152,7 +162,7 @@ namespace eeng
         std::sort(guids.begin(), guids.end());
         guids.erase(std::unique(guids.begin(), guids.end()), guids.end());
 
-        // Acquire parent leases up-front so overlapping unloads can't drop them
+        // [We don't do overlapping loads/unloads anymore] Acquire parent leases up-front so overlapping unloads can't drop them
         for (const Guid& g : guids) batch_acquire(batch, g);
 
         // Parallel loads (status-gated)

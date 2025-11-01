@@ -1,4 +1,5 @@
 #include "BatchRegistry.hpp"
+#include "MainThreadQueue.hpp"
 
 namespace eeng
 {
@@ -33,12 +34,37 @@ namespace eeng
     //     b.closure = std::move(closure);
     // }
 
-    void BatchRegistry::add_entity(const eeng::BatchId& id, const ecs::EntityRef& er) {
+    void BatchRegistry::add_entity(const eeng::BatchId& id, const ecs::EntityRef& er)
+    {
+        // TODO: Compute asset closures
+        // TODO: Compute entity closure ??? Or, treat entity refs as soft?
+        // TODO: Dedup entities
+
         std::lock_guard lk(mtx_);
         auto& b = batches_[id];
         b.id = id;
         b.entities.push_back(er);
     }
+
+    // TODO: visit_asset_refs, visit_entity_refs
+    //       Note: These can do other stuff, such as adding names or other props (see entt)
+    //             entt-style -> move this info to a central registry
+#if 0
+    void BatchRegistry::update_closures()
+    {
+        // std::lock_guard lk(mtx_);
+        // for (auto& [_, b] : batches_) {
+        //     std::unordered_set<Guid> closure_set;
+        //     for (const auto& er : b.entities) {
+        //         // Compute closure for each entity reference
+        //         const auto& entity = ctx->entity_manager->get_entity(er);
+        //         if (entity) {
+        //             // TODO: Compute asset closure for the entity
+        //         }
+        //     }
+        // }
+    }
+#endif
 
     // void BatchRegistry::set_entities(const BatchId& id, std::vector<EntityRef> ents) {
     //     std::lock_guard lk(mtx_);
@@ -64,12 +90,12 @@ namespace eeng
 
     // -------- Orchestration (serialized) --------
 
-#if 0
+#if 1
     std::shared_future<TaskResult> BatchRegistry::queue_load(
         const BatchId& id,
         EngineContext& ctx)
     {
-        return strand(ctx).post([this, id]() -> TaskResult {
+        return strand(ctx).submit([this, id, &ctx]() -> TaskResult {
             // locked only to fetch mut ref
             BatchInfo* B;
             {
@@ -77,7 +103,7 @@ namespace eeng
                 B = &batches_.at(id);
                 B->state = BatchInfo::Queued;
             }
-            auto res = do_load(*B);
+            auto res = do_load(*B, ctx);
             {
                 std::lock_guard lk(mtx_);
                 B->last_result = res;
@@ -89,24 +115,25 @@ namespace eeng
             return res;
             });
     }
-
+#endif
+#if 1
     std::shared_future<TaskResult> BatchRegistry::queue_unload(
         const BatchId& id,
         EngineContext& ctx)
     {
-        return strand(ctx).post([this, id]() -> TaskResult {
+        return strand(ctx).submit([this, id, &ctx]() -> TaskResult {
             BatchInfo* B;
             {
                 std::lock_guard lk(mtx_);
                 B = &batches_.at(id);
             }
-            auto res = do_unload(*B);
+            auto res = do_unload(*B, ctx);
             {
                 std::lock_guard lk(mtx_);
                 B->last_result = res;
-                B->last_error_count = int(std::count_if(B->last_result.results.begin(),
-                    B->last_result.results.end(),
-                    [](auto& r) { return !r.success; }));
+                // B->last_error_count = int(std::count_if(B->last_result.results.begin(),
+                //     B->last_result.results.end(),
+                //     [](auto& r) { return !r.success; }));
                 B->state = (res.success ? BatchInfo::Idle : BatchInfo::Error);
             }
             return res;
@@ -147,60 +174,55 @@ namespace eeng
 
 // -------- Steps --------
 
-#if 0
-    TaskResult BatchRegistry::do_load(BatchInfo& B)
+#if 1
+    TaskResult BatchRegistry::do_load(BatchInfo& B, EngineContext& ctx)
     {
         B.state = BatchInfo::Loading;
 
-        // 1) Main-thread: spawn/populate entities for this batch
-        // NOTE: do this last, once assets are loaded: entities should be "born completed"
-        spawn_entities_on_main(B);
-        //
-        // main.push_and_wait([&]{ spawn_entities(B); });
+        // 1) (optionally) deserialize JSON for this batch here if not already done
+        //    so we have the list of entity descriptions ready
 
-        // 2) Ask RM to load/bind assets for the closure
-        auto fut = ctx_.resource_manager->load_and_bind_async(
-            std::deque<Guid>(B.closure.begin(), B.closure.end()),
-            B.id, ctx_
-        );
-        TaskResult res = fut.get(); // serialized here; assets load in parallel inside RM
-        //
-        //auto loadRes = rm.load_and_bind_async(deque<Guid>(B.closure.begin(), B.closure.end()), B.id, ctx).get();
+        // 2) load/bind assets for the precomputed closure
+        TaskResult res{};
+#if 0 // Don't have closures yet
+        auto res = ctx.resource_manager
+            ->load_and_bind_async(std::deque<Guid>(B.closure.begin(), B.closure.end()),
+                B.id, ctx)
+            .get(); // ok to be serialized here; the RM fans out internally
+#endif
 
-        // 3) MT: component GUID→Handle binding
-        //main.push_and_wait([&] { bind_components_to_handles(B, rm.storage()); });
-        // i.e.
-        // main.push_and_wait([&] {
-        //     for (auto& er : B.entities) {
-        //         // For each component with AssetRef<T>:
-        //         // ref.handle = storage.handle_for_guid<T>(ref.guid).value_or(Handle<T>{});
-        //         // If missing: leave handle empty; set component.ready=false.
-        //     }
-        //     });
+        // 3) main-thread: create entt entities for this batch (phase 1)
+        spawn_entities_on_main(B, ctx); // just creates + registers guid→entity
 
-        // 4) Main-thread: finalize components / upload GPU if needed
-        //    (You can skip here if you bind handles during component creation.)
-        // ctx_.main_thread_queue->push([]{ ... });
-        //
-        //main.push_and_wait([&]{ finalize_gpu(B); });
+        // 4) main-thread: populate components, bind AssetRef<T>, resolve EntityRef (phase 2)
+        //    (can be folded into spawn_entities_on_main if you like)
+        //    bind_components_to_handles(B, ctx.resource_manager->storage());
+        //    resolve_entity_refs(B, global_guid_entity_map);
+
+        // 5) finalize GPU / post-load hooks if needed
+        // finalize_gpu(B);
 
         return res;
     }
 
-    TaskResult BatchRegistry::do_unload(BatchInfo& B) {
+#endif
+#if 1
+    TaskResult BatchRegistry::do_unload(BatchInfo& B, EngineContext& ctx)
+    {
         B.state = BatchInfo::Unloading;
 
         // 1) Main-thread: unhook components, despawn entities
-        despawn_entities_on_main(B);
+        despawn_entities_on_main(B, ctx);
         //
         // main.push_and_wait([&]{ unbind_and_despawn(B); });
 
         // 2) Tell RM to unbind/unload assets (RM will only unload GUIDs no longer held)
-        auto fut = ctx_.resource_manager->unbind_and_unload_async(
-            std::deque<Guid>(B.closure.begin(), B.closure.end()),
-            B.id, ctx_
-        );
-        TaskResult res = fut.get();
+        TaskResult res{};
+        // auto fut = ctx_.resource_manager->unbind_and_unload_async(
+        //     std::deque<Guid>(B.closure.begin(), B.closure.end()),
+        //     B.id, ctx_
+        // );
+        // TaskResult res = fut.get();
         //
         // auto res = rm.unbind_and_unload_async(deque<Guid>(B.closure.begin(), B.closure.end()), B.id, ctx).get();
 
@@ -220,33 +242,44 @@ namespace eeng
 
     // -------- Main-thread helpers (sketches) --------
 
-#if 0
-    void BatchRegistry::spawn_entities_on_main(BatchInfo& B, EngineContext& ctx) {
+#if 1
+    void BatchRegistry::spawn_entities_on_main(BatchInfo& B, EngineContext& ctx)
+    {
         // If your MainThreadQueue runs immediately on the main thread tick,
         // you can either push and block until processed, or just call directly if you’re already on main.
-        ctx.main_thread_queue->push([&, id = B.id]() {
-            // Example: for each EntityRef, if entity is null, create and attach components
-            // using the batch’s closure-driven data (your own format).
-            for (auto& er : batches_.at(id).entities) {
-                if (!er.entity.valid()) {
-                    er.entity = ctx.entity_manager->create();
-                    // populate components from your level JSON, etc.
+        ctx.main_thread_queue->push([&, id = B.id]()
+            {
+                // Example: for each EntityRef, if entity is null, create and attach components
+                // using the batch’s closure-driven data.
+                for (auto& er : batches_.at(id).entities)
+                {
+                    if (er.entity.is_null()) // is it an error if entity already exists?
+                    {
+                        er.entity = ctx.entity_manager->create_entity("default_chunk", "entity", ecs::Entity::EntityNull, ecs::Entity::EntityNull);
+                        // ... add components ...
+
+                        // populate components from level JSON, etc.
+                    }
                 }
-            }
             });
 
-        // wait until the work is actually done if you need strict sequencing:
+        // wait until the work is actually done if strict sequencing is needed:
         // (Provide a barrier or future-returning push in your MainThreadQueue.)
     }
-
-    void BatchRegistry::despawn_entities_on_main(BatchInfo& B, EngineContext& ctx) {
-        ctx.main_thread_queue->push([&, id = B.id]() {
-            for (auto& er : batches_.at(id).entities) {
-                if (er.entity.valid()) {
-                    ctx_.entity_manager->destroy(er.entity);
-                    er.entity = {}; // null it
+#endif
+#if 1
+    void BatchRegistry::despawn_entities_on_main(BatchInfo& B, EngineContext& ctx)
+    {
+        ctx.main_thread_queue->push([&, id = B.id]()
+            {
+                for (auto& er : batches_.at(id).entities)
+                {
+                    if (!er.entity.is_null()) // <- is it an error if entity is already null?
+                    {
+                        ctx.entity_manager->queue_entity_for_destruction(er.entity);
+                        er.entity = {}; // null it
+                    }
                 }
-            }
             });
     }
 #endif
