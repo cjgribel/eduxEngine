@@ -35,7 +35,7 @@ namespace eeng
         // ... build any other trees
         data->trees = std::move(views);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
         return data; // caller decides when to publish
     }

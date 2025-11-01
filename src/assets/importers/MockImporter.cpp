@@ -110,6 +110,9 @@ namespace eeng::mock {
             model_meta_file_path.string()); // Serialize to file
         //auto model_ref = resource_manager.file(model, model_path);
 
+        // DELAY
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
         return model_ref;
     }
 
