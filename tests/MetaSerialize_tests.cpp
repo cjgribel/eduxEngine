@@ -39,20 +39,31 @@ namespace eeng {
 
 namespace
 {
-    struct MockEntityRegistry : eeng::IEntityManager
+    struct MockEntityManager : eeng::IEntityManager
     {
-        bool entity_valid(const ecs::Entity& entity) const override { return false; }
+        MockEntityManager()
+            : registry_(std::make_shared<entt::registry>()) {
+        }
+        ~MockEntityManager() override = default;
 
-        ecs::Entity create_empty_entity(
-            const ecs::Entity& entity_hint) override {
-            return ecs::Entity{};
+        bool entity_valid(const ecs::Entity& entity) const override
+        {
+            return registry_->valid(entity);
+            // return false; 
+        }
+
+        ecs::Entity create_empty_entity(const ecs::Entity& /*hint*/) override
+        {
+            auto e = registry_->create();
+            return ecs::Entity{ e };
         }
 
         ecs::Entity create_entity(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent,
-            const ecs::Entity& entity_hint) override {
+            const ecs::Entity& entity_hint) override
+        {
             return ecs::Entity{};
         }
 
@@ -202,7 +213,13 @@ namespace
             return oss.str();
         }
     };
-}
+
+    template<typename T>
+    void assure_type_storage(entt::registry& registry)
+    {
+        (void)registry.storage<T>();
+    }
+} // namespace
 
 namespace std
 {
@@ -277,7 +294,7 @@ class MetaSerializationTest : public ::testing::Test
 {
 protected:
     eeng::EngineContext ctx{
-        std::make_unique<MockEntityRegistry>(),
+        std::make_unique<MockEntityManager>(),
         std::make_unique<MockResourceManager>(),
         std::make_unique<MockBatchRegistry>(),
         std::make_unique<MockGuiManager>(),
@@ -289,7 +306,7 @@ protected:
     {
         // Register vec2
         entt::meta_factory<vec2>()
-            .type("vec2"_hs)
+            // .type("vec2"_hs)
 
             .data<&vec2::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "n/a" })
@@ -300,11 +317,13 @@ protected:
 
             .template func<&serialize_vec2, entt::as_void_t>(literals::serialize_hs)
             .template func<&deserialize_vec2, entt::as_void_t >(literals::deserialize_hs)
+
+            .template func<&assure_type_storage<vec2>, entt::as_void_t>(literals::assure_component_storage_hs)
             ;
 
         // Register vec3
         entt::meta_factory<vec3>()
-            .type("vec3"_hs)
+            // .type("vec3"_hs)
 
             .data<&vec3::xy>("xy"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "xy", "XY", "n/a" })
@@ -313,6 +332,8 @@ protected:
             .data<&vec3::z>("z"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "z", "Z", "n/a" })
             .traits(MetaFlags::none)
+
+            .template func<&assure_type_storage<vec3>, entt::as_void_t>(literals::assure_component_storage_hs)
             ;
 
         // Register MockType2::AnEnum
@@ -322,7 +343,7 @@ protected:
             .underlying_type = entt::resolve<std::underlying_type_t<MockType2::AnEnum>>()
         };
         entt::meta_factory<MockType2::AnEnum>()
-            .type("MockType2::AnEnum"_hs)
+            // .type("MockType2::AnEnum"_hs)
             .custom<EnumTypeMetaInfo>(enum_info)
 
             .data<MockType2::AnEnum::Hello>("Hello"_hs)
@@ -335,12 +356,15 @@ protected:
 
             .data<MockType2::AnEnum::Hola>("Hola"_hs)
             .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hola", "Greeting in Spanish." })
-            .traits(MetaFlags::none);
+            .traits(MetaFlags::none)
+
+            .template func<&assure_type_storage<MockType2::AnEnum>, entt::as_void_t>(literals::assure_component_storage_hs)
+            ;
 
         // Register MockType2
         entt::meta_factory<MockType2>{}
-        .type("MockType2"_hs)
-            .custom<TypeMetaInfo>(TypeMetaInfo{ "MockType2", "A mock resource type." })
+        // .type("MockType2"_hs)
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "MockType2", "A mock resource type." })
             .traits(MetaFlags::none)
 
             .data<&MockType2::x>("x"_hs)
@@ -354,6 +378,8 @@ protected:
             .data<&MockType2::an_enum>("an_enum"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "an_enum", "AnEnum", "Enum member" })
             .traits(MetaFlags::read_only | MetaFlags::hidden)
+
+            .template func<&assure_type_storage<MockType2>, entt::as_void_t>(literals::assure_component_storage_hs)
             ;
     }
 };
@@ -588,4 +614,86 @@ TEST(MetaReadOnly, ManyThreadsDifferentMetaAny) {
 
     for (auto& th : threads) th.join();
     ASSERT_FALSE(error.load());
+}
+
+TEST_F(MetaSerializationTest, SerializeDeserialize_EntityRoundTrip)
+{
+    //
+    // 1) Use the fixture context as SOURCE
+    //
+    auto* src_em = ctx.entity_manager.get();
+    auto  src_reg_sp = src_em->registry_wptr().lock();
+    ASSERT_TRUE(src_reg_sp);
+    auto& src_reg = *src_reg_sp;
+
+    // create an entity in the source registry
+    Guid src_guid{ 0x12345678ULL };
+    ecs::Entity src_entity = src_em->create_empty_entity(ecs::Entity::EntityNull);
+
+    // attach components that were registered in SetUpTestSuite()
+    {
+        src_reg.emplace<vec2>(static_cast<entt::entity>(src_entity), vec2{ 1.0f, 2.5f });
+
+        MockType2 mt;
+        mt.x = 42;
+        mt.y = 3.14f;
+        mt.an_enum = MockType2::AnEnum::Hola;
+        src_reg.emplace<MockType2>(static_cast<entt::entity>(src_entity), mt);
+    }
+
+    // wrap as EntityRef
+    ecs::EntityRef src_entity_ref{ src_guid, src_entity };
+
+    //
+    // 2) serialize the entity from the SOURCE context
+    //
+    nlohmann::json json_entity = eeng::meta::serialize_entity(src_entity_ref, src_reg_sp);
+
+    // debug print
+    //std::cout << "Serialized entity JSON:\n" << json_entity.dump(4) << std::endl;
+
+    //
+    // 3) create a fresh DESTINATION context
+    //    (same mocks as fixture, but with its own registry)
+    //
+    eeng::EngineContext dst_ctx{
+        std::make_unique<MockEntityManager>(),
+        std::make_unique<MockResourceManager>(),
+        std::make_unique<MockBatchRegistry>(),
+        std::make_unique<MockGuiManager>(),
+        std::make_unique<MockInputManager>(),
+        std::make_unique<MockLogManager>()
+    };
+
+    auto* dst_em = dst_ctx.entity_manager.get();
+    auto  dst_reg_sp = dst_em->registry_wptr().lock();
+    ASSERT_TRUE(dst_reg_sp);
+    auto& dst_reg = *dst_reg_sp;
+
+    //
+    // 4) deserialize into the DESTINATION context
+    //
+    ecs::EntityRef dst_entity_ref = eeng::meta::deserialize_entity(json_entity, dst_ctx);
+
+    // basic GUID check
+    EXPECT_EQ(dst_entity_ref.get_guid().raw(), src_guid.raw());
+
+    entt::entity dst_entt_entity = static_cast<entt::entity>(dst_entity_ref.get_entity());
+    ASSERT_TRUE(dst_reg.valid(dst_entt_entity));
+
+    //
+    // 5) verify components were reconstructed
+    //
+    // vec2
+    ASSERT_TRUE(dst_reg.any_of<vec2>(dst_entt_entity));
+    const auto& v = dst_reg.get<vec2>(dst_entt_entity);
+    EXPECT_FLOAT_EQ(v.x, 1.0f);
+    EXPECT_FLOAT_EQ(v.y, 2.5f);
+
+    // MockType2
+    ASSERT_TRUE(dst_reg.any_of<MockType2>(dst_entt_entity));
+    const auto& m = dst_reg.get<MockType2>(dst_entt_entity);
+    EXPECT_EQ(m.x, 42);
+    EXPECT_FLOAT_EQ(m.y, 3.14f);
+    EXPECT_EQ(m.an_enum, MockType2::AnEnum::Hola);
 }

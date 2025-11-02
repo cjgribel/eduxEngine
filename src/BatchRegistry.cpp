@@ -27,7 +27,7 @@ namespace eeng
     // }
 
     // void BatchRegistry::set_closure(const BatchId& id, std::vector<Guid> closure) {
-    //     // Dedup (optional) – you said you already guarantee closure
+    //     // Dedup (optional) – already guarantee closure?
     //     std::lock_guard lk(mtx_);
     //     auto& b = batches_[id];
     //     b.id = id;
@@ -195,7 +195,7 @@ namespace eeng
         spawn_entities_on_main(B, ctx); // just creates + registers guid→entity
 
         // 4) main-thread: populate components, bind AssetRef<T>, resolve EntityRef (phase 2)
-        //    (can be folded into spawn_entities_on_main if you like)
+        //    (can be folded into spawn_entities_on_main)
         //    bind_components_to_handles(B, ctx.resource_manager->storage());
         //    resolve_entity_refs(B, global_guid_entity_map);
 
@@ -245,17 +245,17 @@ namespace eeng
 #if 1
     void BatchRegistry::spawn_entities_on_main(BatchInfo& B, EngineContext& ctx)
     {
-        // If your MainThreadQueue runs immediately on the main thread tick,
-        // you can either push and block until processed, or just call directly if you’re already on main.
+        // If MainThreadQueue runs immediately on the main thread tick,
+        // can either push and block until processed, or just call directly if already on main.
         ctx.main_thread_queue->push([&, id = B.id]()
             {
                 // Example: for each EntityRef, if entity is null, create and attach components
                 // using the batch’s closure-driven data.
                 for (auto& er : batches_.at(id).entities)
                 {
-                    if (er.entity.is_null()) // is it an error if entity already exists?
+                    if (!er.has_entity()) // is it an error if entity already exists?
                     {
-                        er.entity = ctx.entity_manager->create_entity("default_chunk", "entity", ecs::Entity::EntityNull, ecs::Entity::EntityNull);
+                        er.set_entity(ctx.entity_manager->create_entity("default_chunk", "entity", ecs::Entity::EntityNull, ecs::Entity::EntityNull));
                         // ... add components ...
 
                         // populate components from level JSON, etc.
@@ -274,10 +274,10 @@ namespace eeng
             {
                 for (auto& er : batches_.at(id).entities)
                 {
-                    if (!er.entity.is_null()) // <- is it an error if entity is already null?
+                    if (er.has_entity()) // <- is it an error if entity is already null?
                     {
-                        ctx.entity_manager->queue_entity_for_destruction(er.entity);
-                        er.entity = {}; // null it
+                        ctx.entity_manager->queue_entity_for_destruction(er.get_entity());
+                        er.clear_entity();
                     }
                 }
             });

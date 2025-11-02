@@ -152,7 +152,7 @@ namespace eeng
                     if (i % items_per_row != 0)
                         ImGui::SameLine();
 
-                    bool is_used = (i < used); // Replace if you track this precisely
+                    bool is_used = (i < used); // Replace tracked this precisely
                     ImVec4 color = is_used
                         ? ImVec4(0.2f, 1.0f, 0.2f, 1.0f)  // green
                         : ImVec4(0.4f, 0.4f, 0.4f, 1.0f); // gray

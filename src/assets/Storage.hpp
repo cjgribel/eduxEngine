@@ -798,8 +798,8 @@ namespace eeng
             return get_pool<T>().get_ref(h);
         }
 
-        /// @brief Reference‑returning, statically‑typed get (unsafe if you allow
-///        concurrent add/release on the same type).
+        /// @brief Reference‑returning, statically‑typed get (unsafe if allowing
+        /// concurrent add/release on the same type).
         template<typename T>
         T& get_ref(const Handle<T>& h)
         {

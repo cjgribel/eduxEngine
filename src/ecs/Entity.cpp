@@ -79,4 +79,22 @@ namespace eeng::ecs
 
     // Define the static null entity
     const Entity Entity::EntityNull = Entity();
-}
+
+    EntityRef::EntityRef(const Guid& guid, const ecs::Entity& entity)
+        : guid(guid), entity(entity) {
+    }
+
+    EntityRef::EntityRef(const Guid& guid)
+        : guid(guid), entity() {
+    }
+
+    const Guid& EntityRef::get_guid() const { return guid; }
+
+    const ecs::Entity& EntityRef::get_entity() const { return entity; }
+
+    void EntityRef::set_entity(const ecs::Entity& entity) { this->entity = entity; }
+
+    bool EntityRef::has_entity() const { return !entity.is_null(); }
+
+    void EntityRef::clear_entity() { entity = {}; }
+} 

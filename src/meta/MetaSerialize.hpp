@@ -6,6 +6,8 @@
 
 #include <entt/entt.hpp>
 #include <nlohmann/json.hpp>
+
+#include "ecs/Entity.hpp"
 #include "EngineContext.hpp"
 
 // Note: We're including the full nlohmann header and not just 
@@ -23,11 +25,12 @@ namespace eeng::meta
 #endif
     nlohmann::json serialize_any(
         const entt::meta_any& meta_any);
-#if 0
-    // nlohmann::json serialize_entity(
-    //     entt::entity,
-    //     std::shared_ptr<entt::registry>& registry);
 
+    nlohmann::json serialize_entity(
+        const ecs::EntityRef& entity_ref,
+        std::shared_ptr<entt::registry>& registry);
+
+#if 0
     nlohmann::json serialize_entities(
         Entity* entity_first,
         int count,
@@ -41,12 +44,12 @@ namespace eeng::meta
         entt::meta_any& meta_any,
         const ecs::Entity& entity,
         EngineContext& context);
-#if 0
-    Entity deserialize_entity(
-        const nlohmann::json& json,
-        Editor::Context& context
-    );
 
+    ecs::EntityRef deserialize_entity(
+        const nlohmann::json& json,
+        EngineContext& ctx);
+
+#if 0
     void deserialize_entities(
         const nlohmann::json& json,
         Editor::Context& context);

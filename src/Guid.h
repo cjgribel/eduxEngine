@@ -13,8 +13,10 @@ namespace eeng
     class Guid
     {
     public:
+        using underlying_type = uint64_t;
+
         Guid() : value(invalid().value) {}
-        explicit Guid(uint64_t val) : value(val) {}
+        explicit Guid(underlying_type val) : value(val) {}
 
         static Guid generate()
         {
@@ -30,7 +32,7 @@ namespace eeng
         bool operator!=(const Guid& other) const { return value != other.value; }
         bool operator<(const Guid& other) const { return value < other.value; }
 
-        uint64_t raw() const { return value; }
+        underlying_type raw() const { return value; }
 
         // std::string to_string() const { return std::to_string(value); }
         std::string to_string() const
@@ -44,7 +46,7 @@ namespace eeng
         }
 
     private:
-        uint64_t value;
+        underlying_type value;
     };
 }
 

@@ -436,7 +436,6 @@ bool Game::init()
                     --remaining;
                 }
             }
-            // (Optionally, you could skip polling every few frames to reduce overhead)
         }
 
         // 3) All tasks are done; ThreadPool destructor will shut down workers

@@ -13,6 +13,28 @@
 
 namespace eeng::meta
 {
+    void ensure_storage(entt::registry& registry, entt::id_type component_id)
+    {
+        if (!registry.storage(component_id))
+        {
+            auto meta_type = entt::resolve(component_id);
+            assert(meta_type);
+
+            auto assure_fn = meta_type.func(eeng::literals::assure_component_storage_hs);
+            assert(assure_fn);
+
+            // call: assure_component_storage<T>(registry)
+            //assure_fn.invoke({}, entt::forward_as_meta(registry));
+
+            auto result = assure_fn.invoke({}, entt::forward_as_meta(registry));
+            if (!result)
+            {
+                throw std::runtime_error(
+                    "Failed to invoke assure_storage for " + get_meta_type_name(meta_type));
+            }
+        }
+    }
+
 #if 0
     /*
         NOTE
@@ -49,8 +71,8 @@ namespace eeng::meta
             registry.destroy(temp_entity);
 
             // std::cout << "Ceeated storage for " << get_meta_type_name(meta_type) << std::endl;
+            }
         }
-    }
 #endif
     nlohmann::json serialize_any(const entt::meta_any& any)
     {
@@ -158,28 +180,30 @@ namespace eeng::meta
 
         return json;
     }
-#if 0
+
+
     nlohmann::json serialize_entity(
-        const Entity& entity,
+        const ecs::EntityRef& entity_ref,
         std::shared_ptr<entt::registry>& registry)
     {
-        std::cout << "Serializing entity "
-            << entity.to_integral() << std::endl;
+//        std::cout << "Serializing entity "
+//            << entity_ref.to_integral() << std::endl;
 
         nlohmann::json entity_json;
-        entity_json["entity"] = entity.to_integral();
+        // entity_json["entity"] = entity.to_integral();
+        entity_json["entity_guid"] = entity_ref.get_guid().raw();
 
         // For all component types
         for (auto&& [id, type] : registry->storage())
         {
-            if (!type.contains(entity)) continue;
+            if (!type.contains(entity_ref.get_entity())) continue;
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
                 auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
                 // auto type_name = get_meta_type_name(meta_type); // Display name or mangled name
 
-                entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity)));
+                entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity_ref.get_entity())));
             }
             else
             {
@@ -189,6 +213,7 @@ namespace eeng::meta
         return entity_json;
     }
 
+#if 0
 #if 0
     std::optional<ResourceHandle> deserialize_resource(const nlohmann::json& json, AssetDatabase& db, ResourceRegistry& registry) {
         auto type_name = json["type"].get<std::string>();
@@ -269,11 +294,11 @@ namespace eeng::meta
             }
             json.push_back(entity_json);
 #endif
-        }
+            }
 
         return json;
 #endif
-    }
+        }
 #endif
     void deserialize_any(
         const nlohmann::json& json,
@@ -440,27 +465,26 @@ namespace eeng::meta
                 throw std::runtime_error(std::string("Unable to cast ") + get_meta_type_name(any.type()));
         }
     }
-#if 0
-    // deserialize_component
 
-    Entity deserialize_entity(
+#if 1
+    // Note: Does not register the deserialized entity to any scene graph or chunk!
+    ecs::EntityRef deserialize_entity(
         const nlohmann::json& json,
-        Editor::Context& context
+        EngineContext& ctx
     )
     {
-        Entity entity_hint{ json["entity"].get<entt::entity>() };
-        auto entity = context.entity_remap.at(entity_hint);
+        // Fetch entity GUID and create EntityRef
+        assert(json.contains("entity_guid"));
+        auto guid = Guid { json["entity_guid"].get<Guid::underlying_type>() };
+        auto entity = ctx.entity_manager->create_empty_entity(ecs::Entity::EntityNull);
+        ecs::EntityRef entity_ref{ guid, entity };
 
-        // assert(json.contains("entity"));
-        // entt::entity entity_hint = json["entity"].get<entt::entity>();
-        // assert(!context.registry->valid(entity_hint));
+        // std::cout << "Deserializing entity " << entity.to_integral() << std::endl;
 
-        // auto entity = Entity{ context.registry->create(entity_hint) };
-        // assert(entity_hint == entity);
-
-        std::cout << "Deserializing entity " << entity.to_integral() << std::endl;
-
+        // Deserialize components and add to entity
         assert(json.contains("components"));
+        assert(json["components"].is_object());
+        
         for (const auto& component_json : json["components"].items())
         {
             auto key_str = component_json.key().c_str();
@@ -468,14 +492,14 @@ namespace eeng::meta
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
-                // Default-construct component
+                // Default-construct and deserialize component
                 entt::meta_any any = meta_type.construct();
-                // Deserialize
-                deserialize_any(component_json.value(), any, entity, context);
-                // Ensure storage and add component to entity
-                ensure_storage(*context.registry, id);
-                // assert(context.registry->storage(id));
-                context.registry->storage(id)->push(entity, any.data());
+                deserialize_any(component_json.value(), any, entity, ctx);
+                
+                // Add component to entity
+                auto& registry = ctx.entity_manager->registry();
+                ensure_storage(registry, id);
+                registry.storage(id)->push(entity, any.base().data());
             }
             else
             {
@@ -487,8 +511,10 @@ namespace eeng::meta
         // assert(context.register_entity_func);
         // context.register_entity_func(entity);
 
-        return entity;
+        return entity_ref;
     }
+#endif
+#if 0
 
     void deserialize_entities(
         const nlohmann::json& json,
@@ -562,8 +588,8 @@ namespace eeng::meta
                 i++;
                 assert(i < max_size * max_size && "Entity parent-child relationships corrupt");
             }
-        }
+    }
 #endif
     }
 #endif
-} // namespace eeng::meta
+    } // namespace eeng::meta

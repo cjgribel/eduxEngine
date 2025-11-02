@@ -71,7 +71,7 @@ public:
         }
     }
 
-    // Optional: blocking wait (main thread can call this if you run an event loop)
+    // Optional: blocking wait
     void wait_for_work()
     {
         std::unique_lock<std::mutex> lk(mtx_);

@@ -31,6 +31,14 @@ namespace eeng
             if (!entt::resolve<T>())
                 throw std::runtime_error("entt::resolve() failed for component type");
         }
+
+        template<typename T>
+        void assure_type_storage(entt::registry& registry)
+        {
+            (void)registry.storage<T>();
+
+            // if (!registry.storage<T>()) registry.storage<T>();
+        }
     }
 
     namespace
@@ -82,6 +90,7 @@ namespace eeng
             // Bind all AssetRef and EntityRef members
             // (Meta is needed, if we iterate all components per entity (e.g. Batch load))
             entt::meta_factory<T>()
+                .template func<&assure_type_storage<T>, entt::as_void_t>(literals::assure_component_storage_hs)
                 // .func<&resolve_component_meta<T>>(hashed_string("resolve_component"))
                 ;
 
@@ -113,7 +122,7 @@ namespace eeng
             assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
             *ptr = Guid{ j.get<uint64_t>() };
         }
-    } // namespace
+} // namespace
 #endif
 
     void register_component_meta_types(EngineContext& ctx)

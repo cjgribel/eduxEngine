@@ -146,7 +146,7 @@ void APIENTRY GLDebugMessageCallback(GLenum source,
         break;
     }
 
-    // ignore notification severity (you can add your own ignores)
+    // ignore notification severity
     // + Adds __debugbreak if _DEBUG is defined (automatic in visual studio)
     // note: __debugbreak is specific for MSVC, won't work with gcc/clang
     // -> in that case remove it and manually set breakpoints

@@ -53,7 +53,7 @@ namespace eeng
                     const auto count = data ? data->entries.size() : 0;
 
                     {
-                        std::unique_lock lk(scan_mutex_);                 // if you keep one
+                        std::unique_lock lk(scan_mutex_);                 // 
                         asset_index_->publish(std::move(data));           // atomic snapshot swap
                     }
 

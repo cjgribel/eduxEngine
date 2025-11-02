@@ -25,5 +25,7 @@ namespace eeng::literals
 
     constexpr entt::hashed_string validate_asset_hs = "validate_asset"_hs;
     constexpr entt::hashed_string validate_asset_recursive_hs = "validate_asset_recursive"_hs;
+
+    constexpr entt::hashed_string assure_component_storage_hs = "assure_component_storage"_hs;
 }
 #endif // MetaLiterals_h

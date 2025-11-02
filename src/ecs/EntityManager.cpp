@@ -59,6 +59,7 @@ namespace eeng
         return entity;
     }
 
+    // -> create_and_register_entity
     Entity EntityManager::create_entity(
         const std::string& chunk_tag,
         const std::string& name,

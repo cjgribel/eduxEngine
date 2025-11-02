@@ -86,14 +86,21 @@ namespace eeng::ecs
         entity_type id; ///< The internal integral representation of the entity.
     };
 
-    struct EntityRef
+    class EntityRef
     {
-        Guid guid;
-        ecs::Entity entity;
+        Guid guid {};
+        ecs::Entity entity {};
 
-        // TODO:
-        // bool resolved() const { return entity.valid(); }
-        // void clear_runtime() { entity = {}; }
+    public:
+        EntityRef(const Guid& guid, const ecs::Entity& entity);
+        EntityRef(const Guid& guid);
+
+        const Guid& get_guid() const;
+        const ecs::Entity& get_entity() const;
+
+        void set_entity(const ecs::Entity& entity);
+        bool has_entity() const;
+        void clear_entity();
     };
 } // namespace eeng::ecs
 
