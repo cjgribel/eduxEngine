@@ -46,10 +46,16 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/input)
 #
 # OpenGL
 #
-find_package(OpenGL REQUIRED)
-message(STATUS "Found OpenGL")
-message(STATUS "OpenGL include dir: ${OPENGL_INCLUDE_DIR}")
-message(STATUS "OpenGL libraries: ${OPENGL_LIBRARIES}")
+if(APPLE)
+    # On macOS, just use the framework directly
+    set(OPENGL_LIBRARIES "-framework OpenGL")
+    message(STATUS "Using OpenGL framework on macOS: ${OPENGL_LIBRARIES}")
+else()
+    find_package(OpenGL REQUIRED)
+    message(STATUS "Found OpenGL")
+    message(STATUS "OpenGL include dir: ${OPENGL_INCLUDE_DIR}")
+    message(STATUS "OpenGL libraries: ${OPENGL_LIBRARIES}")
+endif()
 
 #
 # Lua
@@ -253,13 +259,25 @@ set_target_properties(Module1 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Module1"
 )
 
+# GLEW headers and library
+# We need to prevent glew from using '-framework AGL', which was removed 
+# in macOS Tahoe. The current fix is to 1) explicitly include glew headers,
+# and 2) link to the glew library file directly, rather than the glew target.
+# Should work equally well on all platforms.
+# https://developer.apple.com/documentation/macos-release-notes/macos-26-release-notes
+target_include_directories(Module1 PRIVATE
+    ${glew_SOURCE_DIR}/include
+)
+
 target_link_libraries(Module1 PRIVATE 
     SDL2 
     assimp 
-    libglew_static 
+    # libglew_static 
+    $<TARGET_FILE:libglew_static> # link to library file directly to avoid AGL framework
     glm::glm 
     nlohmann_json::nlohmann_json
-    ${OPENGL_LIBRARIES})
+    ${OPENGL_LIBRARIES}
+    )
 if (TARGET ZLIB::ZLIB)
     target_link_libraries(Module1 PRIVATE ZLIB::ZLIB)
 endif()

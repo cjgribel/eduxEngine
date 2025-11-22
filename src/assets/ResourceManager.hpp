@@ -115,6 +115,8 @@ namespace eeng
         /// @brief Get a snapshot of asset index
         AssetIndexDataPtr get_index_data() const override;
 
+        std::vector<Guid> find_guids_by_name(std::string_view name) const override;
+
         std::string to_string() const override;
 
         // --- Non-inherited API -------------------------------------------------------
@@ -163,6 +165,7 @@ namespace eeng
             // EENG_LOG("[ResourceManager] Filing type: %s", typeid(T).name());
 
             // Add contained assets, note that t is const
+            // 'contained_assets' as such is QUESTIONABLE
             auto _meta = meta;
             visit_assets(t, [&](const auto& ref)
                 {

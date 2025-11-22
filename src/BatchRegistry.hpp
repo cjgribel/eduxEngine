@@ -51,23 +51,78 @@ namespace eeng {
 
     struct BatchInfo
     {
-        using State = enum { Idle, Queued, Loading, Bound, Unloading, Error };
+        enum class State { Unloaded, Queued, Loading, Loaded, Unloading, Error };
 
-        BatchId id{};
-        std::string name{};
-        // std::vector<Guid> closure;          // deduped closure of all asset GUIDs in the batch
-        std::vector<ecs::EntityRef> entities;    // entities associated with this batch
+        BatchId                     id{};
+        std::string                 name{};
+        std::filesystem::path       filename{};               // from index
+        std::vector<Guid>           asset_closure_hdr;    // what header says (or recomputed)
+        std::vector<ecs::EntityRef> live;                 // only while loaded
 
-        State state{ State::Idle };
-        // int last_error_count = 0;
-        TaskResult last_result{};
+        State       state{ State::Unloaded };
+        TaskResult  last_result{};
     };
+    // struct BatchInfo
+    // {
+    //     using State = enum { Idle, Queued, Loading, Bound, Unloading, Error };
+
+    //     BatchId id{};
+    //     std::string name{};
+    //     // std::vector<Guid> closure;          // deduped closure of all asset GUIDs in the batch
+    //     std::vector<ecs::EntityRef> entities;    // entities associated with this batch
+
+    //     State state{ State::Idle };
+    //     // int last_error_count = 0;
+    //     TaskResult last_result{};
+    // };
 
     class BatchRegistry : public IBatchRegistry
     {
     public:
         BatchRegistry() = default;
         ~BatchRegistry() = default;
+
+        void save_index(const std::filesystem::path& index_path);
+        void load_or_create_index(const std::filesystem::path& index_path);
+
+        Guid create_batch(
+            // const BatchId& id,
+            std::string name
+            // const std::filesystem::path& path
+        );
+
+        std::shared_future<TaskResult> queue_save_batch(const BatchId& id, EngineContext& ctx);
+
+        /**
+         * @brief Enqueue loading of all batches listed in the batch index.
+         *
+         * Schedules each batch load as an individual task via queue_load(), and waits
+         * for all loads to complete inside a worker thread (not the strand).
+         *
+         * @note The returned future becomes ready only when *all* batches have fully
+         *       completed their load sequence (asset load/bind + entity instantiation).
+         *
+         * @param ctx Engine context (resource manager, entity manager, thread pool).
+         * @return Shared future resolving to a TaskResult summarizing the overall load.
+         */
+        std::shared_future<TaskResult> queue_load_all_async(EngineContext& ctx);
+
+        /**
+         * @brief Enqueue saving of all currently loaded batches.
+         *
+         * Schedules a per-batch save operation (via queue_save_batch()), waits for each
+         * to finish inside a worker thread, and aggregates the results.
+         *
+         * @note Only batches in the Loaded state are saved; unloaded batches are skipped.
+         *
+         * @param ctx Engine context.
+         * @return Shared future resolving to a TaskResult summarizing the save results.
+         */
+        std::shared_future<TaskResult> queue_save_all_async(EngineContext& ctx);
+
+        // (private)
+        bool save_batch(const eeng::BatchId& id, EngineContext& ctx);
+        // void save_all_batches(EngineContext& ctx);
 
         // explicit BatchRegistry(eeng::EngineContext& ctx)
         //     : ctx_(ctx), strand_(eeng::SerialExecutor::make(ctx.thread_pool.get())) {
@@ -81,12 +136,12 @@ namespace eeng {
 
         // Called by tooling: set closure & entities (builder side)
         // void set_closure(const eeng::BatchId&, std::vector<eeng::Guid> closure);
-        void add_entity(const eeng::BatchId& id, const ecs::EntityRef& er);
+        // void add_entity(const eeng::BatchId& id, const ecs::EntityRef& er);
         // void set_entities(const eeng::BatchId&, std::vector<ecs::EntityRef> ents);
 
         // For UI
-        BatchInfo::State state(const eeng::BatchId&) const;
-        TaskResult last_result(const eeng::BatchId&) const;
+        // BatchInfo::State state(const eeng::BatchId&) const;
+        // TaskResult last_result(const eeng::BatchId&) const;
 
         // --- Orchestration (serialized via strand) ---
 #if 1
@@ -108,7 +163,7 @@ namespace eeng {
 #endif
 
         // Helpers (main-thread work)
-#if 1
+#if 0
         void spawn_entities_on_main(BatchInfo& B, EngineContext& ctx);   // Step 1 (create/populate)
 #endif
 #if 1
@@ -123,7 +178,8 @@ namespace eeng {
         SerialExecutor& strand(EngineContext& ctx);   // helper
 
         // registry storage
-        mutable std::mutex mtx_;
+        mutable std::mutex                           mtx_;
         std::unordered_map<eeng::BatchId, BatchInfo> batches_;
+        std::filesystem::path                        index_path_;
     };
 } // namespace eeng

@@ -1,0 +1,28 @@
+{
+  "batches": [
+    {
+      "asset_closure_hdr": [],
+      "filename": "ce35c859-3957-42d5.json",
+      "id": "ce35c859-3957-42d5",
+      "name": "Startup Batch 1"
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "8ee2b365-cb7d-0cc8.json",
+      "id": "8ee2b365-cb7d-0cc8",
+      "name": "Startup Batch 1"
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "2565bb36-94d4-07b1.json",
+      "id": "2565bb36-94d4-07b1",
+      "name": "Startup Batch 1"
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "2cf0a2df-4f43-ec85.json",
+      "id": "2cf0a2df-4f43-ec85",
+      "name": "Startup Batch 1"
+    }
+  ]
+}

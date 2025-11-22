@@ -56,7 +56,7 @@ namespace eeng
     };
 
     // Lease
-    using BatchId = Guid;             
+    using BatchId = Guid;
     //    inline BatchId AdHocBatch() { return {}; } // or Guid::null()
 
     class IResourceManager
@@ -80,6 +80,8 @@ namespace eeng
         virtual int  queued_tasks()   const noexcept = 0;
 
         virtual AssetIndexDataPtr get_index_data() const = 0;
+
+        virtual std::vector<Guid> find_guids_by_name(std::string_view name) const = 0;
 
         virtual std::string to_string() const = 0;
 

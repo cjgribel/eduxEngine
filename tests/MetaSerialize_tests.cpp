@@ -116,6 +116,7 @@ namespace
         int  queued_tasks()   const noexcept override { return 0; }
 
         AssetIndexDataPtr get_index_data() const override { return nullptr; }
+        std::vector<Guid> find_guids_by_name(std::string_view name) const override { return {}; }
         std::string to_string() const override { return std::string{}; }
     };
 

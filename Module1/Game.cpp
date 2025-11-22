@@ -12,7 +12,8 @@
 #include "AssimpImporter.hpp" // --> ENGINE API
 #include "MockImporter.hpp" // --> ENGINE API
 #include "ResourceTypes.hpp"
-#include "ResourceManager.hpp" // eeng::ResourceManager
+#include "ResourceManager.hpp" // Since we use the concrete type
+#include "BatchRegistry.hpp" // Since we use the concrete type
 #include <filesystem>
 // <-
 
@@ -34,32 +35,30 @@ namespace {
 namespace eeng::dev
 {
 
-    void schedule_startup_import_and_scan(const std::filesystem::path& asset_root,
+    void schedule_startup_import_and_scan(
+        const std::filesystem::path& asset_root,
+        const std::filesystem::path& batches_root,
         std::shared_ptr<eeng::EngineContext> ctx)
     {
         using ModelRef = eeng::AssetRef<eeng::mock::Model>;
 
         // 1) define task
-        auto startup_task = [asset_root, ctx]() {
+        auto startup_task = [asset_root, batches_root, ctx]() {
             // If logging must be on main, do it here:
             // ctx->main_thread_queue->push([ctx]() {
-                EENG_LOG(ctx.get(), "[startup] Begin startup import+scan task on main...");
-                // });
+            EENG_LOG(ctx.get(), "[startup] Begin startup import+scan task on main...");
+            // });
 
-            // 2) run orchestrator on worker pool
-            ctx->thread_pool->queue_task([asset_root, ctx]() {
+        // 2) run orchestrator on worker pool
+            ctx->thread_pool->queue_task([asset_root, batches_root, ctx]() {
                 try
                 {
                     constexpr int num_tasks = 10;
                     std::vector<std::future<ModelRef>> futures;
                     futures.reserve(num_tasks);
+                    EENG_LOG(ctx.get(), "[startup] Importing models on worker...");
 
-                    // worker-side log (safe?) – or push to main if needed
-                    // ctx->main_thread_queue->push([ctx]() {
-                        EENG_LOG(ctx.get(), "[startup] Importing models on worker...");
-                        // });
-
-                    // 2.1) launch import tasks
+                    // 2.1) Run import tasks
                     for (int i = 0; i < num_tasks; ++i)
                     {
                         futures.emplace_back(
@@ -70,34 +69,62 @@ namespace eeng::dev
                         );
                     }
 
-                    // 2.2) wait
+                    // Wait for import tasks to complete
                     std::vector<ModelRef> refs;
                     refs.reserve(num_tasks);
                     for (auto& f : futures) refs.push_back(f.get());
 
-                    // 3) run scan right here (still worker)
-                    // ctx->main_thread_queue->push([ctx]()
-                    //     {
-                            //EENG_LOG(ctx.get(), "[startup] Imports done: {} models. Scanning...", refs.size());
-
+                    // 3) Run scan (don't wait)
                     auto nbr_assets = refs.size();
-                    // ctx->main_thread_queue->push([ctx, nbr_assets]() {
-                        EENG_LOG(ctx.get(), "[startup] Imported %zu models. Scanning...", nbr_assets);
-                        // });
+                    EENG_LOG(ctx.get(), "[startup] Imported %zu models. Scanning...", nbr_assets);
+                    ctx->resource_manager->scan_assets_async(asset_root, *ctx);
 
-                    ctx->resource_manager->scan_assets_async(
-                        "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/",
-                        *ctx
-                    );
-                    // });
+                    // Create a few batches
+                    // Add a few entities to each batch
+                    // Let entities,
+                    //  - reference other entities (EntityRef)
+                    //  - reference assets (AssetRef<T>)
+                    //
+                    // Note: impport has finished at this point, but scanning may be ongoing
+                    // Defer loading to GUI command etc
+                    //
+                    // auto& br = ctx->batch_registry;
+                    auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
+                    // Save empty to reset index
+                    EENG_LOG(ctx.get(), "[startup] Creating batch index at: %s", batches_root.string().c_str());
+                    //br.save_index_to_json(batches_root / "index.json");
+                    br.load_or_create_index(batches_root / "index.json");
+                    //EENG_LOG(ctx.get(), "[startup] Loading batch index from: %s", (batches_root / "index.json").string().c_str());
+                    /* + DURING APP INIT */ //br.load_index_from_json(batches_root / "index.json");
+                    //
+                    auto batch_id1 = br.create_batch("Startup Batch 1"); assert(batch_id1.valid());
+                    // br.create_batch("startup_batch_2", "Startup Batch 2", batches_root / "startup_batch_2.json");
+                    //
+                    // LOADING BATCHES
+                    EENG_LOG(ctx.get(), "[startup] Loading batch 1...");
+                    br.queue_load(batch_id1, *ctx).get();
+                    EENG_LOG(ctx.get(), "[startup] Loading all batches...");
+                    br.queue_load_all_async(*ctx).get();
+                    // SAVING BATCHES
+                    EENG_LOG(ctx.get(), "[startup] Saving batch 1...");
+                    br.queue_save_batch(batch_id1, *ctx).get();
+                    EENG_LOG(ctx.get(), "[startup] Saving all batches...");
+                    br.queue_save_all_async(*ctx).get();
+                    // ADD ENTITIES TO BATCH
+                    // NOTE w.r.t. SCAN: We're adding entities to a loaded batch (as we must);
+                    //      if load_and_bind_async is called when an entity is added,
+                    //      then the assets must be available to RM (i.e. scan must have completed).
+                    //      Otherwise, load will fail for entities unknown assets.
+                    EENG_LOG(ctx.get(), "[startup] Saving batch index...");
+                    br.save_index(batches_root / "index.json");
                 }
                 catch (const std::exception& ex)
                 {
                     // push error log to main (safe)
                     // ctx->main_thread_queue->push([ctx, msg = std::string(ex.what())]()
                     //     {
-                            EENG_LOG(ctx.get(), "[startup] ERROR during import: %s", ex.what());
-                        // });
+                    EENG_LOG(ctx.get(), "[startup] ERROR during import: %s", ex.what());
+                    // });
                 }
                 });
             };
@@ -105,6 +132,17 @@ namespace eeng::dev
         // 3) schedule on main
         ctx->main_thread_queue->push(std::move(startup_task));
     }
+
+    // void schedule_startup_batch_setup()
+    // {
+
+
+    //     // TODO
+
+    //     auto task = [asset_root, ctx]() {
+    //         EENG_LOG(ctx.get(), "[startup] Begin startup import+scan task on main...");
+    //         };
+    // }
 
 } // namespace eeng::dev
 
@@ -171,6 +209,7 @@ bool Game::init()
         // - Use interface for parts of ResourceManager not part of IResourceManager (load etc)
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
         std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/";
+        std::filesystem::path batches_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/batches/";
         //std::filesystem::path asset_root = "C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/";
 
         // 1.   IMPORT resources concurrently
@@ -206,7 +245,7 @@ bool Game::init()
         //     resource_manager.scan_assets_async("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
         //     });
 // eeng::dev::import_then_scan_async(asset_root, ctx);
-        eeng::dev::schedule_startup_import_and_scan(asset_root, ctx);
+        eeng::dev::schedule_startup_import_and_scan(asset_root, batches_root, ctx);
         {
 #if 0
             EENG_LOG(ctx, "[Game::init()] Scanning assets...");

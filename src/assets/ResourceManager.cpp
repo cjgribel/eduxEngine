@@ -350,6 +350,21 @@ namespace eeng
         return asset_index_->get_index_data();
     }
 
+    std::vector<Guid> ResourceManager::find_guids_by_name(std::string_view name) const
+    {
+        std::vector<Guid> result;
+
+        auto index_data = asset_index_->get_index_data();
+        if (!index_data) return result;
+
+        for (const AssetEntry& entry : index_data->entries)
+        {
+            if (entry.meta.name == name) result.push_back(entry.meta.guid);
+        }
+
+        return result;
+    }
+
     std::string ResourceManager::to_string() const
     {
         return storage_->to_string();

@@ -1,0 +1,10 @@
+{
+    "Contained Assets": [
+        11130822683689403861,
+        106288702119063405
+    ],
+    "Guid": 11076639652553846337,
+    "Name": "MockModel2",
+    "Parent Guid": 0,
+    "Type Name": "eeng::mock::Model"
+}

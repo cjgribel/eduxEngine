@@ -13,6 +13,10 @@
 
 namespace eeng::meta
 {
+
+    /// @brief  Makes sure entt has storage for a given component via meta function.
+    /// @param registry 
+    /// @param component_id 
     void ensure_storage(entt::registry& registry, entt::id_type component_id)
     {
         if (!registry.storage(component_id))
@@ -71,8 +75,8 @@ namespace eeng::meta
             registry.destroy(temp_entity);
 
             // std::cout << "Ceeated storage for " << get_meta_type_name(meta_type) << std::endl;
-            }
         }
+    }
 #endif
     nlohmann::json serialize_any(const entt::meta_any& any)
     {
@@ -186,8 +190,8 @@ namespace eeng::meta
         const ecs::EntityRef& entity_ref,
         std::shared_ptr<entt::registry>& registry)
     {
-//        std::cout << "Serializing entity "
-//            << entity_ref.to_integral() << std::endl;
+        //        std::cout << "Serializing entity "
+        //            << entity_ref.to_integral() << std::endl;
 
         nlohmann::json entity_json;
         // entity_json["entity"] = entity.to_integral();
@@ -294,11 +298,11 @@ namespace eeng::meta
             }
             json.push_back(entity_json);
 #endif
-            }
+        }
 
         return json;
 #endif
-        }
+    }
 #endif
     void deserialize_any(
         const nlohmann::json& json,
@@ -466,8 +470,6 @@ namespace eeng::meta
         }
     }
 
-#if 1
-    // Note: Does not register the deserialized entity to any scene graph or chunk!
     ecs::EntityRef deserialize_entity(
         const nlohmann::json& json,
         EngineContext& ctx
@@ -475,7 +477,7 @@ namespace eeng::meta
     {
         // Fetch entity GUID and create EntityRef
         assert(json.contains("entity_guid"));
-        auto guid = Guid { json["entity_guid"].get<Guid::underlying_type>() };
+        auto guid = Guid{ json["entity_guid"].get<Guid::underlying_type>() };
         auto entity = ctx.entity_manager->create_empty_entity(ecs::Entity::EntityNull);
         ecs::EntityRef entity_ref{ guid, entity };
 
@@ -484,22 +486,22 @@ namespace eeng::meta
         // Deserialize components and add to entity
         assert(json.contains("components"));
         assert(json["components"].is_object());
-        
+
         for (const auto& component_json : json["components"].items())
         {
             auto key_str = component_json.key().c_str();
-            auto id = entt::hashed_string::value(key_str);
+            auto comp_id = entt::hashed_string::value(key_str);
 
-            if (entt::meta_type meta_type = entt::resolve(id); meta_type)
+            if (entt::meta_type meta_type = entt::resolve(comp_id); meta_type)
             {
                 // Default-construct and deserialize component
                 entt::meta_any any = meta_type.construct();
                 deserialize_any(component_json.value(), any, entity, ctx);
-                
+
                 // Add component to entity
                 auto& registry = ctx.entity_manager->registry();
-                ensure_storage(registry, id);
-                registry.storage(id)->push(entity, any.base().data());
+                ensure_storage(registry, comp_id);
+                registry.storage(comp_id)->push(entity, any.base().data());
             }
             else
             {
@@ -513,7 +515,54 @@ namespace eeng::meta
 
         return entity_ref;
     }
-#endif
+
+    EntitySpawnDesc create_entity_spawn_desc(const nlohmann::json& json)
+    {
+        EntitySpawnDesc out;
+        out.guid = Guid{ json["entity_guid"].get<Guid::underlying_type>() };
+
+        for (auto& [comp_name, comp_json] : json["components"].items())
+        {
+            ComponentSpawnDesc c;
+            c.type_id = entt::hashed_string::value(comp_name.c_str());
+            c.data = comp_json;
+            out.components.push_back(std::move(c));
+        }
+        return out;
+    }
+
+    ecs::EntityRef spawn_entity_from_desc(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx
+    )
+    {
+        auto& em = *ctx.entity_manager;
+        auto& reg = em.registry();
+
+        // Create + register
+        auto e = em.create_empty_entity(ecs::Entity::EntityNull);
+        // em.register_guid(desc.guid, e);
+
+        // Add components via meta pipeline
+        for (auto& cd : desc.components)
+        {
+            auto mt = entt::resolve(cd.type_id);
+            if (!mt) continue;
+
+            entt::meta_any any = mt.construct();
+            eeng::meta::deserialize_any(cd.data, any, e, ctx);
+
+            eeng::meta::ensure_storage(reg, cd.type_id);
+            reg.storage(cd.type_id)->push(e, any.base().data());
+        }
+
+        return ecs::EntityRef{ desc.guid, e };
+        // ecs::EntityRef er{ desc.guid, e };
+        // B.live.push_back(er);
+        // return er;
+    }
+
+
 #if 0
 
     void deserialize_entities(
@@ -588,8 +637,8 @@ namespace eeng::meta
                 i++;
                 assert(i < max_size * max_size && "Entity parent-child relationships corrupt");
             }
-    }
+        }
 #endif
     }
 #endif
-    } // namespace eeng::meta
+} // namespace eeng::meta

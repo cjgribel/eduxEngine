@@ -5,24 +5,29 @@
 #define MetaSerialize_hpp
 
 #include <entt/entt.hpp>
+
+// Note: We're including the full nlohmann header and not just 
+// <nlohmann/json_fwd.hpp>. The expected usage of this header is on engine cpp:s
+// where <nlohmann/json.hpp> is included anyway.
 #include <nlohmann/json.hpp>
 
 #include "ecs/Entity.hpp"
 #include "EngineContext.hpp"
 
-// Note: We're including the full nlohmann header and not just 
-// <nlohmann/json_fwd.hpp>. The expected usage of this header is on engine cpp:s
-// where <nlohmann/json.hpp> is included anyway.
-
 namespace eeng::meta
 {
-#if 0
-    /// @brief Makes sure entt has storage for a given component.
-    /// @param registry 
-    /// @param component_id 
-    /// If no storage exists, a component of the given type is added to a temporary entity.
-    void ensure_storage(entt::registry& registry, entt::id_type component_id);
-#endif
+    struct ComponentSpawnDesc
+    {
+        entt::id_type type_id;
+        nlohmann::json data;
+    };
+
+    struct EntitySpawnDesc
+    {
+        Guid guid;
+        std::vector<ComponentSpawnDesc> components;
+    };
+
     nlohmann::json serialize_any(
         const entt::meta_any& meta_any);
 
@@ -42,12 +47,27 @@ namespace eeng::meta
     void deserialize_any(
         const nlohmann::json& json,
         entt::meta_any& meta_any,
-        const ecs::Entity& entity,
-        EngineContext& context);
+        const ecs::Entity& entity, // SKIP THIS SOMEHOW?
+        EngineContext& context
+    );
 
+    /// One-shot deserialize-and-create entity from JSON
+    // Entity is not registered to scene graph or chunk
     ecs::EntityRef deserialize_entity(
         const nlohmann::json& json,
-        EngineContext& ctx);
+        EngineContext& ctx
+    );
+
+    // Can be called off main-thread
+    EntitySpawnDesc create_entity_spawn_desc(
+        const nlohmann::json& json
+    );
+
+    // Main-thread (touches entt::registry)
+    ecs::EntityRef spawn_entity_from_desc(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx
+    );
 
 #if 0
     void deserialize_entities(
