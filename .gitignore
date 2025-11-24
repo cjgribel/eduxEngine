@@ -4,7 +4,7 @@ doxygen/
 .DS_Store
 
 assets/
-# Ignore for now
+# Ignore project files for now
 Module1/project1
 # Whitelist
 !src/assets/
