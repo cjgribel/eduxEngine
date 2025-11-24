@@ -1,7 +1,6 @@
 #include "BatchRegistry.hpp"
 #include "MainThreadQueue.hpp"
 #include "ThreadPool.hpp"
-#include "MetaSerialize.hpp"
 #include <fstream>
 
 namespace eeng
@@ -224,6 +223,45 @@ namespace eeng
     }
 
     std::shared_future<TaskResult>
+        BatchRegistry::queue_unload_all_async(EngineContext& ctx)
+    {
+        // Snapshot ids of batches that are not Unloaded
+        std::vector<BatchId> ids;
+        {
+            std::lock_guard lk(mtx_);
+            for (auto& [id, b] : batches_)
+            {
+                if (b.state != BatchInfo::State::Unloaded)
+                    ids.push_back(id);
+            }
+        }
+
+        auto fut = ctx.thread_pool->queue_task(
+            [this, ids = std::move(ids), &ctx]() mutable -> TaskResult
+            {
+                TaskResult merged{};
+                merged.success = true;
+
+                std::vector<std::shared_future<TaskResult>> futs;
+                futs.reserve(ids.size());
+
+                for (const auto& id : ids)
+                    futs.emplace_back(queue_unload(id, ctx));
+
+                for (auto& f : futs)
+                {
+                    TaskResult r = f.get();
+                    merged.success &= r.success;
+                }
+
+                return merged;
+            });
+
+        return fut.share();
+    }
+
+
+    std::shared_future<TaskResult>
         BatchRegistry::queue_save_all_async(EngineContext& ctx)
     {
         // snapshot ids of Loaded batches
@@ -254,12 +292,167 @@ namespace eeng
     }
 
 
-#if 0
-    // -----------------------------------------------------------
-    // Add one entity to a loaded batch (thread safe)
-    // -----------------------------------------------------------
     std::shared_future<ecs::EntityRef>
-        BatchRegistry::queue_add_entity(const BatchId& id, EntitySpawnDesc desc, EngineContext& ctx)
+        BatchRegistry::queue_create_entity(
+            const BatchId& id,
+            const std::string& name,
+            EngineContext& ctx)
+    {
+        return strand(ctx).submit([this, id, name, &ctx]() -> ecs::EntityRef
+            {
+                BatchInfo* B = nullptr;
+                {
+                    std::lock_guard lk(mtx_);
+                    auto it = batches_.find(id);
+                    if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
+                        return ecs::EntityRef{ Guid::invalid() };      // require loaded batch
+                    B = &it->second;
+                }
+
+                // MT: create entity with a HeaderComponent and proper registration
+                ecs::EntityRef created = ctx.main_thread_queue->push_and_wait([&]() -> ecs::EntityRef
+                    {
+                        // Chunk tag = batch id string (or B->name, your call)
+                        std::string batch_tag = id.to_string();
+
+                        auto& em = ctx.entity_manager;
+                        auto [guid, entity] = em->create_entity(
+                            batch_tag,          // chunk_tag/batch_tag
+                            name,               // name
+                            ecs::Entity::EntityNull, // parent
+                            ecs::Entity::EntityNull  // hint
+                        );
+
+                        // Assume EntityManager can give you the GUID from HeaderComponent
+                        // Guid guid = em->guid_for_entity(entity); // or via header component
+                        return ecs::EntityRef{ guid, entity };
+                    });
+
+                // Register in batch live list
+                {
+                    std::lock_guard lk(mtx_);
+                    B->live.push_back(created);
+                }
+
+                // No components yet → no asset refs yet → no closure update now
+                return created;
+            });
+    }
+
+    std::shared_future<bool>
+        BatchRegistry::queue_destroy_entity(
+            const BatchId& id,
+            ecs::EntityRef entity_ref,
+            EngineContext& ctx)
+    {
+        return strand(ctx).submit([this, id, entity_ref, &ctx]() -> bool
+            {
+                BatchInfo* B = nullptr;
+                {
+                    std::lock_guard lk(mtx_);
+                    auto it = batches_.find(id);
+                    if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
+                        return false;
+                    B = &it->second;
+
+                    // Remove from live list
+                    auto& live = B->live;
+                    live.erase(std::remove_if(live.begin(), live.end(),
+                        [&](const ecs::EntityRef& er)
+                        {
+                            return er.get_guid() == entity_ref.get_guid();
+                        }),
+                        live.end());
+                }
+
+                // MT: queue destroy
+                ctx.main_thread_queue->push_and_wait([&]()
+                    {
+                        if (entity_ref.has_entity())
+                        {
+                            ctx.entity_manager->queue_entity_for_destruction(entity_ref.get_entity());
+                        }
+                    });
+
+                // NOTE: we do NOT shrink asset_closure_hdr here.
+                // Over-approx closure is fine; RM will ref-count correctly.
+                return true;
+            });
+    }
+
+    // TODO: Update closure
+    std::shared_future<bool>
+        BatchRegistry::queue_attach_entity(
+            const BatchId& id,
+            ecs::EntityRef entity_ref,
+            EngineContext& ctx)
+    {
+        return strand(ctx).submit([this, id, entity_ref, &ctx]() -> bool
+            {
+                BatchInfo* B = nullptr;
+                {
+                    std::lock_guard lk(mtx_);
+                    auto it = batches_.find(id);
+                    if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
+                        return false;
+                    B = &it->second;
+                }
+
+                // Add to live
+                {
+                    std::lock_guard lk(mtx_);
+                    B->live.push_back(entity_ref);
+                }
+
+                // Update asset closure from existing components
+                auto registry_sptr = ctx.entity_manager->registry_wptr().lock();
+                if (!registry_sptr || !entity_ref.has_entity())
+                    return true; // nothing more to do
+
+                // UPDATE CLOSURE
+                                // visit_asset_refs(entity_ref.get_entity(), *registry_sptr,
+                                //     [&](const Guid& guid)
+                                //     {
+                                //         std::lock_guard lk(mtx_);
+                                //         auto& closure = B->asset_closure_hdr;
+                                //         if (std::find(closure.begin(), closure.end(), guid) == closure.end())
+                                //             closure.push_back(guid);
+                                //     });
+
+                                // Optionally: load/bind new assets here via RM (later)
+                return true;
+            });
+    }
+
+    std::shared_future<bool>
+        BatchRegistry::queue_detach_entity(
+            const BatchId& id,
+            ecs::EntityRef entity_ref,
+            EngineContext& ctx)
+    {
+        return strand(ctx).submit([this, id, entity_ref]() -> bool
+            {
+                std::lock_guard lk(mtx_);
+                auto it = batches_.find(id);
+                if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
+                    return false;
+
+                auto& live = it->second.live;
+                auto old_size = live.size();
+                live.erase(std::remove_if(live.begin(), live.end(),
+                    [&](const ecs::EntityRef& er)
+                    {
+                        return er.get_guid() == entity_ref.get_guid();
+                    }),
+                    live.end());
+                return live.size() != old_size;
+            });
+    }
+
+
+    // TODO: Register entity + Update closure
+    std::shared_future<ecs::EntityRef>
+        BatchRegistry::queue_spawn_entity(const BatchId& id, meta::EntitySpawnDesc desc, EngineContext& ctx)
     {
         return strand(ctx).submit([this, id, desc = std::move(desc), &ctx]() mutable -> ecs::EntityRef
             {
@@ -267,7 +460,7 @@ namespace eeng
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
-                    if (it == batches_.end() || it->second.state != BatchInfo::State::Bound)
+                    if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
                         return ecs::EntityRef{}; // require loaded batch
                     B = &it->second;
                 }
@@ -275,23 +468,30 @@ namespace eeng
                 // Do entt work on main thread
                 ecs::EntityRef created = ctx.main_thread_queue->push_and_wait([&]() -> ecs::EntityRef
                     {
-                        return instantiate_one_on_main(desc, *B, ctx);
+                        // + REGISTER THIS ENTITY
+                        return spawn_entity_from_desc(desc, ctx);
                     });
 
+                {
+                    std::lock_guard lk(mtx_);
+                    B->live.push_back(created);
+                }
+
+                // Update closure + possibly call load_and_bind_async(...) here
+
                 // Update asset closure via your visitor
-                visit_asset_refs(created.get_entity(), ctx.entity_manager->registry(),
-                    [&](const Guid& guid)
-                    {
-                        std::lock_guard lk(mtx_);
-                        auto& closure = B->asset_closure_hdr;
-                        if (std::find(closure.begin(), closure.end(), guid) == closure.end())
-                            closure.push_back(guid);
-                    });
+                // visit_asset_refs(created.get_entity(), ctx.entity_manager->registry(),
+                //     [&](const Guid& guid)
+                //     {
+                //         std::lock_guard lk(mtx_);
+                //         auto& closure = B->asset_closure_hdr;
+                //         if (std::find(closure.begin(), closure.end(), guid) == closure.end())
+                //             closure.push_back(guid);
+                //     });
 
                 return created;
             });
-}
-#endif
+    }
 
     // BatchInfo& BatchRegistry::ensure(const BatchId& id, std::string name) {
     //     std::lock_guard lk(mtx_);
@@ -379,7 +579,7 @@ namespace eeng
 
     // -------- Orchestration (serialized) --------
 
-#if 1
+
     std::shared_future<TaskResult> BatchRegistry::queue_load(
         const BatchId& id,
         EngineContext& ctx)
@@ -404,64 +604,60 @@ namespace eeng
             return res;
             });
     }
-#endif
-#if 1
-    std::shared_future<TaskResult> BatchRegistry::queue_unload(
-        const BatchId& id,
-        EngineContext& ctx)
+
+    std::shared_future<TaskResult>
+        BatchRegistry::queue_unload(const BatchId& id, EngineContext& ctx)
     {
-        return strand(ctx).submit([this, id, &ctx]() -> TaskResult {
-            BatchInfo* B;
+        return strand(ctx).submit([this, id, &ctx]() -> TaskResult
             {
-                std::lock_guard lk(mtx_);
-                B = &batches_.at(id);
-            }
-            auto res = do_unload(*B, ctx);
-            {
-                std::lock_guard lk(mtx_);
-                B->last_result = res;
-                // B->last_error_count = int(std::count_if(B->last_result.results.begin(),
-                //     B->last_result.results.end(),
-                //     [](auto& r) { return !r.success; }));
-                B->state = (res.success ? BatchInfo::State::Unloaded : BatchInfo::State::Error);
-            }
-            return res;
+                BatchInfo* B = nullptr;
+                {
+                    std::lock_guard lk(mtx_);
+                    auto it = batches_.find(id);
+                    if (it == batches_.end())
+                    {
+                        TaskResult tr{};
+                        tr.success = false;
+                        return tr; // unknown batch
+                    }
+                    B = &it->second;
+
+                    if (B->state == BatchInfo::State::Unloaded)
+                    {
+                        TaskResult tr{};
+                        tr.success = true; // nothing to do
+                        return tr;
+                    }
+
+                    B->state = BatchInfo::State::Queued;
+                }
+
+                auto res = do_unload(*B, ctx);
+
+                {
+                    std::lock_guard lk(mtx_);
+                    B->last_result = res;
+                    B->state = (res.success ? BatchInfo::State::Unloaded
+                        : BatchInfo::State::Error);
+                }
+
+                return res;
             });
     }
 
-    // std::shared_future<TaskResult> BatchRegistry::queue_reload(const BatchId& id) {
-    //     return strand_.submit([this, id]() -> TaskResult {
-    //         BatchInfo* B;
-    //         {
-    //             std::lock_guard lk(mtx_);
-    //             B = &batches_.at(id);
-    //         }
-    //         // Simple “unload then load” in the strand (RM still does asset-level parallelism)
-    //         TaskResult merged; merged.type = TaskResult::TaskType::Reload;
-    //         {
-    //             auto r1 = do_unload(*B);
-    //             merged.results.insert(merged.results.end(), r1.results.begin(), r1.results.end());
-    //             merged.success &= r1.success;
-    //         }
-    //         {
-    //             auto r2 = do_load(*B);
-    //             merged.results.insert(merged.results.end(), r2.results.begin(), r2.results.end());
-    //             merged.success &= r2.success;
-    //         }
-    //         {
-    //             std::lock_guard lk(mtx_);
-    //             B->last_result = merged;
-    //             B->last_error_count = int(std::count_if(B->last_result.results.begin(),
-    //                                                     B->last_result.results.end(),
-    //                                                     [](auto& r){ return !r.success; }));
-    //             B->state = (merged.success ? BatchInfo::Bound : BatchInfo::Error);
-    //         }
-    //         return merged;
-    //     });
-    // }
-#endif
+    std::vector<const BatchInfo*> BatchRegistry::list() const
+    {
+        std::lock_guard lk(mtx_);
+        std::vector<const BatchInfo*> out;
+        out.reserve(batches_.size());
+        for (auto& [_, b] : batches_)
+        {
+            out.push_back(&b);
+        }
+        return out;
+    }
 
-// -------- Steps --------
+    // -------- Load / Unload implementations --------
 
 #if 1
     TaskResult BatchRegistry::do_load(BatchInfo& B, EngineContext& ctx)
@@ -526,6 +722,10 @@ namespace eeng
                 {
                     auto er = eeng::meta::spawn_entity_from_desc(desc, ctx);
                     B.live.push_back(er);
+
+                    // REGISTER ENTITY
+                    // CURRENTLY REQUIRES HeaderComponent
+                    // ctx.entity_manager->register_entity(er.get_entity());
                 }
             });
 
@@ -565,20 +765,33 @@ namespace eeng
     {
         B.state = BatchInfo::State::Unloading;
 
-        // 1) Main-thread: unhook components, despawn entities
-        despawn_entities_on_main(B, ctx);
-        //
-        // main.push_and_wait([&]{ unbind_and_despawn(B); });
-
-        // 2) Tell RM to unbind/unload assets (RM will only unload GUIDs no longer held)
         TaskResult res{};
-        // auto fut = ctx_.resource_manager->unbind_and_unload_async(
-        //     std::deque<Guid>(B.closure.begin(), B.closure.end()),
-        //     B.id, ctx_
-        // );
-        // TaskResult res = fut.get();
-        //
-        // auto res = rm.unbind_and_unload_async(deque<Guid>(B.closure.begin(), B.closure.end()), B.id, ctx).get();
+        res.success = true;
+
+        // 1) Main-thread: despawn / queue-destroy entities
+        ctx.main_thread_queue->push_and_wait([&]()
+            {
+                for (auto& er : B.live)
+                {
+                    if (er.has_entity())
+                    {
+                        ctx.entity_manager->queue_entity_for_destruction(er.get_entity());
+                        er.clear_entity();
+                    }
+                }
+            });
+
+        B.live.clear();
+
+        // 2) RM: unbind/unload assets for this batch (if any)
+        if (!B.asset_closure_hdr.empty())
+        {
+            res = ctx.resource_manager->unbind_and_unload_async(
+                std::deque<Guid>(B.asset_closure_hdr.begin(), B.asset_closure_hdr.end()),
+                B.id,
+                ctx
+            ).get();
+        }
 
         return res;
     }
@@ -591,7 +804,7 @@ namespace eeng
         {
             // thread_pool is owned by EngineContext; we just borrow it
             strand_.emplace(*ctx.thread_pool);
-    }
+        }
         return *strand_;
     }
 
@@ -622,7 +835,7 @@ namespace eeng
         // (Provide a barrier or future-returning push in your MainThreadQueue.)
     }
 #endif
-#if 1
+#if 0
     void BatchRegistry::despawn_entities_on_main(BatchInfo& B, EngineContext& ctx)
     {
         ctx.main_thread_queue->push_and_wait([&, id = B.id]()
@@ -638,4 +851,5 @@ namespace eeng
             });
     }
 #endif
+
 } // namespace eeng

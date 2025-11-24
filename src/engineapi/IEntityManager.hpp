@@ -24,7 +24,7 @@ namespace eeng
         virtual ecs::Entity create_empty_entity(
             const ecs::Entity& entity_hint) = 0;
 
-        virtual ecs::Entity create_entity(
+        virtual std::pair<Guid, ecs::Entity> create_entity(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent,
@@ -34,11 +34,11 @@ namespace eeng
             const ecs::Entity& entity) const = 0;
 
         virtual void reparent_entity(
-            const ecs::Entity& entity, 
+            const ecs::Entity& entity,
             const ecs::Entity& parent_entity) = 0;
 
         virtual void set_entity_header_parent(
-            const ecs::Entity& entity, 
+            const ecs::Entity& entity,
             const ecs::Entity& entity_parent) = 0;
 
         // entt::entity Scene::create_entity_hint(

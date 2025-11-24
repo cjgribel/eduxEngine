@@ -58,13 +58,13 @@ namespace
             return ecs::Entity{ e };
         }
 
-        ecs::Entity create_entity(
+        std::pair<Guid, ecs::Entity> create_entity(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent,
             const ecs::Entity& entity_hint) override
         {
-            return ecs::Entity{};
+            return {Guid::invalid(), ecs::Entity{}};
         }
 
         bool entity_parent_registered(

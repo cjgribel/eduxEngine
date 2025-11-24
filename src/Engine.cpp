@@ -117,6 +117,8 @@ namespace eeng
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowResourceBrowser, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowSceneGraph, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEntityInspector, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowBatchRegistry, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowTaskMonitor, true);
 
         EENG_LOG(ctx, "Engine initialized successfully.");
         return true;
@@ -150,7 +152,8 @@ namespace eeng
             // Scripts may queue entities for destruction
             // ??? if (play_state == GamePlayState::Play) update_scripts(*registry, deltaTime_s);
 
-            // ??? entity_manage->destroy_pending_entities();
+            // -> after MT
+            // ctx->entity_manager->destroy_pending_entities();
 
             // ??? scenegraph->traverse(registry);
 
@@ -159,13 +162,19 @@ namespace eeng
             // ??? Game thread tasks
 
             // ??? Physics step
+
+            // --- Command queue execution ---
+            // Can entities be destroyed here?
+            // ctx->command_queue->execute_all(*registry, deltaTime_s);
             
             // --- Game systems ---
             game->update(time_s, deltaTime_s);
             
-            // ??? Execute tasks enqueued by worker threads (entity/component updates)
+            // --- Main thread tasks ---
+            // entt::storage mutations etc
             ctx->main_thread_queue->execute_all();
-            //ctx.main_thread_queue.execute_all();
+            
+            ctx->entity_manager->destroy_pending_entities();
 
             // --- Event dispatch ---
             ctx->event_queue->dispatch_all_events();

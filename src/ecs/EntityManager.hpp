@@ -21,7 +21,7 @@ namespace eeng
         ecs::Entity create_empty_entity(
             const ecs::Entity& entity_hint) override;
 
-        ecs::Entity create_entity(
+        std::pair<Guid,ecs::Entity> create_entity(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent,
@@ -34,7 +34,7 @@ namespace eeng
             const ecs::Entity& entity, const ecs::Entity& parent_entity) override;
 
         void set_entity_header_parent(
-            const ecs::Entity& entity, 
+            const ecs::Entity& entity,
             const ecs::Entity& entity_parent) override;
 
         void queue_entity_for_destruction(

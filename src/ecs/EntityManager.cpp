@@ -60,7 +60,7 @@ namespace eeng
     }
 
     // -> create_and_register_entity
-    Entity EntityManager::create_entity(
+    std::pair<Guid, ecs::Entity> EntityManager::create_entity(
         const std::string& chunk_tag,
         const std::string& name,
         const Entity& entity_parent,
@@ -76,7 +76,7 @@ namespace eeng
         register_entity(entity);
 
         //std::cout << "Scene::create_entity " << entity.to_integral() << std::endl;
-        return entity;
+        return {guid, entity};
     }
 
     bool EntityManager::entity_parent_registered(const Entity& entity) const

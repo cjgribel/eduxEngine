@@ -94,6 +94,7 @@ namespace eeng::ecs
     public:
         EntityRef(const Guid& guid, const ecs::Entity& entity);
         EntityRef(const Guid& guid);
+        EntityRef();
 
         const Guid& get_guid() const;
         const ecs::Entity& get_entity() const;

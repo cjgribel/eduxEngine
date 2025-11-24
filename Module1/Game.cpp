@@ -14,6 +14,7 @@
 #include "ResourceTypes.hpp"
 #include "ResourceManager.hpp" // Since we use the concrete type
 #include "BatchRegistry.hpp" // Since we use the concrete type
+#include "MetaSerialize.hpp"
 #include <filesystem>
 // <-
 
@@ -92,29 +93,64 @@ namespace eeng::dev
                     auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
                     // Save empty to reset index
                     EENG_LOG(ctx.get(), "[startup] Creating batch index at: %s", batches_root.string().c_str());
-                    //br.save_index_to_json(batches_root / "index.json");
                     br.load_or_create_index(batches_root / "index.json");
-                    //EENG_LOG(ctx.get(), "[startup] Loading batch index from: %s", (batches_root / "index.json").string().c_str());
                     /* + DURING APP INIT */ //br.load_index_from_json(batches_root / "index.json");
                     //
                     auto batch_id1 = br.create_batch("Startup Batch 1"); assert(batch_id1.valid());
-                    // br.create_batch("startup_batch_2", "Startup Batch 2", batches_root / "startup_batch_2.json");
                     //
                     // LOADING BATCHES
+                    //
                     EENG_LOG(ctx.get(), "[startup] Loading batch 1...");
                     br.queue_load(batch_id1, *ctx).get();
                     EENG_LOG(ctx.get(), "[startup] Loading all batches...");
                     br.queue_load_all_async(*ctx).get();
+                    //
                     // SAVING BATCHES
+                    //
                     EENG_LOG(ctx.get(), "[startup] Saving batch 1...");
                     br.queue_save_batch(batch_id1, *ctx).get();
                     EENG_LOG(ctx.get(), "[startup] Saving all batches...");
                     br.queue_save_all_async(*ctx).get();
+                    //
                     // ADD ENTITIES TO BATCH
                     // NOTE w.r.t. SCAN: We're adding entities to a loaded batch (as we must);
                     //      if load_and_bind_async is called when an entity is added,
                     //      then the assets must be available to RM (i.e. scan must have completed).
                     //      Otherwise, load will fail for entities unknown assets.
+                    {
+                        // 1) Create new entity in batch (with HeaderComponent via EntityManager::create_entity)
+                        auto fut_entity = br.queue_create_entity(batch_id1, "StartupEntity_1", *ctx);
+                        ecs::EntityRef er = fut_entity.get();
+
+                        // 2) Add a placeholder component on main thread
+#if 0
+                        ctx->main_thread_queue->push_and_wait([&]()
+                            {
+                                auto registry_sptr = ctx->entity_manager->registry_wptr().lock();
+                                if (!registry_sptr || !er.has_entity())
+                                    return;
+
+                                auto& reg = *registry_sptr;
+
+                                // Example component type
+                                struct Position
+                                {
+                                    float x{}, y{}, z{};
+                                };
+
+                                reg.emplace<Position>(er.get_entity(), Position{ 0.0f, 0.0f, 0.0f });
+
+                                // If Position has AssetRef<T> inside,
+                                // you’d either:
+                                //  - call a BR helper to update closure, or
+                                //  - rely on a later “recompute closure” pass.
+                            });
+#endif
+                    }
+                    //
+                    EENG_LOG(ctx.get(), "[startup] Saving all batches...");
+                    br.queue_save_all_async(*ctx).get();
+                    //
                     EENG_LOG(ctx.get(), "[startup] Saving batch index...");
                     br.save_index(batches_root / "index.json");
                 }
@@ -187,7 +223,7 @@ bool Game::init()
         std::vector<eeng::ecs::Entity> entities;
         for (int i = 0; i < 5; ++i)
         {
-            auto entity = ctx->entity_manager->create_entity("", "Entity " + std::to_string(i), eeng::ecs::Entity::EntityNull, eeng::ecs::Entity{});
+            auto [guid, entity] = ctx->entity_manager->create_entity("", "Entity " + std::to_string(i), eeng::ecs::Entity::EntityNull, eeng::ecs::Entity{});
             // Add components. Leave GUIDs empty.
 
             EENG_LOG(ctx, "[Game::init()] Created entity: %i", entity.to_integral());
@@ -262,7 +298,7 @@ bool Game::init()
                 EENG_LOG(ctx, "[Game::init()] Waiting for asset scan to finish...");
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
-            }
+    }
 #endif
             // Get asset index snapshot and log it
             // auto asset_index = resource_manager.get_asset_entries_snapshot();
@@ -274,7 +310,7 @@ bool Game::init()
             //         entry.meta.type_name.c_str(),
             //         entry.relative_path.string().c_str());
             // }
-        }
+}
 #endif
 
 #if 0
@@ -940,7 +976,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-    }
+}
 #endif
 
     // Draw shape batches

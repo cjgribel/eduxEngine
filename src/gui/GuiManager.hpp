@@ -25,10 +25,12 @@ namespace eeng
         // GUI windows
         void draw_log(EngineContext& ctx) const;
         void draw_storage(EngineContext& ctx) const;
-        void draw_resource_browser(EngineContext& ctx) const;
 
+        void draw_resource_browser(EngineContext& ctx) const;
         void draw_content_tree(EngineContext& ctx) const;
 
+        void draw_batch_registry(EngineContext& ctx) const;
+        void draw_task_monitor(EngineContext& ctx) const;
         void draw_engine_info(EngineContext& ctx) const;
 
         std::unordered_map<GuiFlags, bool> flags;

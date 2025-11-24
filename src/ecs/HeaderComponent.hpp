@@ -13,7 +13,7 @@ namespace eeng::ecs
     struct HeaderComponent
     {
         std::string name;
-        std::string chunk_tag;
+        std::string chunk_tag; // PROBABLY SKIP
         Guid guid;
         Entity parent_entity;
 

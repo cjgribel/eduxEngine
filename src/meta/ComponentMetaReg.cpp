@@ -122,7 +122,7 @@ namespace eeng
             assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
             *ptr = Guid{ j.get<uint64_t>() };
         }
-} // namespace
+    } // namespace
 #endif
 
     void register_component_meta_types(EngineContext& ctx)
@@ -158,7 +158,15 @@ namespace eeng
                 assert(!context.dispatcher.expired());
                 context.dispatcher.lock()->dispatch(ChunkModifiedEvent{ entity, new_tag });
             };
+#endif
+        entt::meta_factory<eeng::ecs::HeaderComponent>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "HeaderComponent", "Metadata for HeaderComponent." })
 
+            .data<&eeng::ecs::HeaderComponent::name>("name"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Entity name." })
+            .traits(MetaFlags::none)
+            ;
+#if 0
         entt::meta<HeaderComponent>()
             .type("HeaderComponent"_hs).prop(display_name_hs, "Header")
 

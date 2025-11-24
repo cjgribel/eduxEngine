@@ -6,6 +6,7 @@
 //#include "ResourceManager.hpp"
 #include "engineapi/IResourceManager.hpp"
 #include "SerialExecutor.hpp"
+#include "MetaSerialize.hpp"
 #include "EngineContext.hpp"
 #include <unordered_map>
 #include <mutex>
@@ -13,6 +14,15 @@
 #include <string>
 
 #pragma once
+
+// Possible Comamnds
+//      CreateBatchCommand
+//      DeleteBatchCommand
+//      LoadBatchCommand
+//      UnloadBatchCommand
+//      SpawnEntityInBatchCommand (queue_spawn_entity)
+//      AttachEntityToBatchCommand
+//      DetachEntityFromBatchCommand
 
 /*
 UI ideas
@@ -91,6 +101,7 @@ namespace eeng {
             // const std::filesystem::path& path
         );
 
+
         std::shared_future<TaskResult> queue_save_batch(const BatchId& id, EngineContext& ctx);
 
         /**
@@ -107,6 +118,8 @@ namespace eeng {
          */
         std::shared_future<TaskResult> queue_load_all_async(EngineContext& ctx);
 
+        std::shared_future<TaskResult> queue_unload_all_async(EngineContext& ctx);
+
         /**
          * @brief Enqueue saving of all currently loaded batches.
          *
@@ -119,6 +132,22 @@ namespace eeng {
          * @return Shared future resolving to a TaskResult summarizing the save results.
          */
         std::shared_future<TaskResult> queue_save_all_async(EngineContext& ctx);
+
+        /// Create and spawn a new entity in the batch (thread safe).
+        std::shared_future<ecs::EntityRef> queue_create_entity(const BatchId& id, const std::string& name, EngineContext& ctx);
+
+        /// Destroy and remove an entity from the batch (thread safe).
+        std::shared_future<bool> queue_destroy_entity(const BatchId& id, ecs::EntityRef entity_ref, EngineContext& ctx);
+
+        /// Attach an entity to a batch (thread safe). Does NOT spawn the entity.
+        std::shared_future<bool> queue_attach_entity(const BatchId& id, ecs::EntityRef entity_ref, EngineContext& ctx);
+
+        /// Detach an entity from a batch (thread safe). Does NOT destroy the entity.
+        std::shared_future<bool> queue_detach_entity(const BatchId& id, ecs::EntityRef entity_ref, EngineContext& ctx);
+
+        /// Spawn entity from description and add to batch (thread safe).
+        std::shared_future<ecs::EntityRef> queue_spawn_entity(const BatchId& id, meta::EntitySpawnDesc desc, EngineContext& ctx);
+
 
         // (private)
         bool save_batch(const eeng::BatchId& id, EngineContext& ctx);
@@ -153,6 +182,8 @@ namespace eeng {
         // std::shared_future<TaskResult> queue_reload(const eeng::BatchId& id);
 #endif
 
+        std::vector<const BatchInfo*> list() const;
+
     private:
 #if 1
         // Steps (run by strand)
@@ -166,7 +197,7 @@ namespace eeng {
 #if 0
         void spawn_entities_on_main(BatchInfo& B, EngineContext& ctx);   // Step 1 (create/populate)
 #endif
-#if 1
+#if 0
         void despawn_entities_on_main(BatchInfo& B, EngineContext& ctx); // Step last (cleanup)
 #endif
 

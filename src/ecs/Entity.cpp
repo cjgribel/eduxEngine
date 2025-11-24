@@ -85,7 +85,11 @@ namespace eeng::ecs
     }
 
     EntityRef::EntityRef(const Guid& guid)
-        : guid(guid), entity() {
+        : guid(guid), entity(Entity::EntityNull) {
+    }
+
+    EntityRef::EntityRef()
+        : guid(Guid::invalid()), entity(Entity::EntityNull) {
     }
 
     const Guid& EntityRef::get_guid() const { return guid; }

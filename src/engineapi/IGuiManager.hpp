@@ -14,8 +14,10 @@ namespace eeng
         ShowLogWindow,
         ShowStorageWindow,
         ShowResourceBrowser,
+        ShowBatchRegistry,
         ShowSceneGraph,
-        ShowEntityInspector
+        ShowEntityInspector,
+        ShowTaskMonitor
         // ShowRenderStats,
         // ShowInputDebugger,
         // ...

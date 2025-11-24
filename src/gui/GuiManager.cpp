@@ -4,9 +4,11 @@
 #include "GuiManager.hpp"
 #include "LogManager.hpp"
 #include "ResourceManager.hpp"
+#include "BatchRegistry.hpp"
 #include "AssetTreeViews.hpp"
 #include "engineapi/SelectionManager.hpp"
-#include "ThreadPool.hpp" // remove
+#include "ThreadPool.hpp" // remove?
+#include "MainThreadQueue.hpp"
 #include "MetaInspect.hpp"
 
 #include "imgui.h"
@@ -85,6 +87,12 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowResourceBrowser))
             draw_resource_browser(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowBatchRegistry))
+            draw_batch_registry(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowTaskMonitor))
+            draw_task_monitor(ctx);
     }
 
     void GuiManager::draw_log(EngineContext& ctx) const
@@ -222,7 +230,7 @@ namespace eeng
     {
         auto& index = static_cast<ResourceManager&>(*ctx.resource_manager).asset_index();
         auto index_data = index.get_index_data();
-                if (!index_data) {
+        if (!index_data) {
             ImGui::Text("No asset index data available.");
             return;
         }
@@ -573,9 +581,9 @@ namespace eeng
                                 // Use resource_manager.get_asset_ref/try_get_asset_ref -->
                                 auto mesh = resource_manager.storage().get_ref(*h_opt);
                                 ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
-                    }
+                            }
                             //else ImGui::Text("Not a mock::Mesh");
-                }
+                        }
 #endif
                         // --- Line 5: Contained assets ---
                         tree.traverse_children(node_idx, [&](const Guid&, size_t child_idx, size_t)
@@ -584,8 +592,8 @@ namespace eeng
                             });
 
                         ImGui::TreePop();
-        }
-    };
+                    }
+                };
 
             for (size_t root_idx : tree.get_roots())
             {
@@ -593,7 +601,236 @@ namespace eeng
             }
 
             ImGui::EndTable();
-}
+        }
+    }
+
+    void GuiManager::draw_batch_registry(EngineContext& ctx) const
+    {
+        if (!ctx.batch_registry)
+            return;
+
+        auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
+
+        ImGui::Begin("Batch Registry");
+
+        // Snapshot of batches
+        const auto batches = br.list();
+        if (batches.empty())
+        {
+            ImGui::TextUnformatted("No batches found. Create some in startup or via tools.");
+            ImGui::End();
+            return;
+        }
+
+        // Selection state (local to this window)
+        static int selected_index = 0;
+        if (selected_index >= static_cast<int>(batches.size()))
+            selected_index = static_cast<int>(batches.size()) - 1;
+
+        // Layout: left = list, right = details
+        ImGui::Columns(2, nullptr, true);
+
+        // --- Left: batch list ---
+        ImGui::TextUnformatted("Batches");
+        ImGui::Separator();
+
+        for (int i = 0; i < static_cast<int>(batches.size()); ++i)
+        {
+            const BatchInfo* b = batches[i];
+
+            // Small label: "Name (state)"
+            const char* state_str = "";
+            switch (b->state)
+            {
+            case BatchInfo::State::Unloaded:   state_str = "Unloaded";   break;
+            case BatchInfo::State::Queued:     state_str = "Queued";     break;
+            case BatchInfo::State::Loading:    state_str = "Loading";    break;
+            case BatchInfo::State::Loaded:     state_str = "Loaded";     break;
+            case BatchInfo::State::Unloading:  state_str = "Unloading";  break;
+            case BatchInfo::State::Error:      state_str = "Error";      break;
+            }
+            ImVec4 state_color{};
+            switch (b->state)
+            {
+            case BatchInfo::State::Unloaded:   state_color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f); break; // gray
+            case BatchInfo::State::Queued:     state_color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); break; // yellow
+            case BatchInfo::State::Loading:    state_color = ImVec4(1.0f, 0.6f, 0.0f, 1.0f); break; // orange
+            case BatchInfo::State::Loaded:     state_color = ImVec4(0.2f, 0.9f, 0.2f, 1.0f); break; // green
+            case BatchInfo::State::Unloading:  state_color = ImVec4(0.8f, 0.5f, 0.2f, 1.0f); break;
+            case BatchInfo::State::Error:      state_color = ImVec4(1.0f, 0.2f, 0.2f, 1.0f); break; // red
+            }
+
+            std::string label = b->name.empty()
+                ? b->id.to_string()
+                : b->name + " (" + state_str + ")";
+            label += "##" + std::to_string(i); // ensure unique ID
+
+            ImGui::PushStyleColor(ImGuiCol_Text, state_color);
+            bool selected = ImGui::Selectable(label.c_str(), selected_index == i);
+            ImGui::PopStyleColor();
+            if (selected) selected_index = i;
+        }
+
+        ImGui::NextColumn();
+
+        // --- Right: details for selected batch ---
+        ImGui::TextUnformatted("Details");
+        ImGui::Separator();
+
+        if (selected_index >= 0 && selected_index < static_cast<int>(batches.size()))
+        {
+            const BatchInfo* b = batches[selected_index];
+
+            ImGui::Text("ID:   %s", b->id.to_string().c_str());
+            ImGui::Text("Name: %s", b->name.c_str());
+            ImGui::Text("File: %s", b->filename.string().c_str());
+
+            const char* state_str = "";
+            switch (b->state)
+            {
+            case BatchInfo::State::Unloaded:   state_str = "Unloaded";   break;
+            case BatchInfo::State::Queued:     state_str = "Queued";     break;
+            case BatchInfo::State::Loading:    state_str = "Loading";    break;
+            case BatchInfo::State::Loaded:     state_str = "Loaded";     break;
+            case BatchInfo::State::Unloading:  state_str = "Unloading";  break;
+            case BatchInfo::State::Error:      state_str = "Error";      break;
+            }
+
+            ImGui::Text("State: %s", state_str);
+            ImGui::Separator();
+
+            ImGui::Text("Asset closure size: %zu",
+                static_cast<size_t>(b->asset_closure_hdr.size()));
+            ImGui::Text("Live entities (loaded only): %zu",
+                static_cast<size_t>(b->live.size()));
+
+            ImGui::Separator();
+
+            // Actions
+            bool can_load = (b->state == BatchInfo::State::Unloaded ||
+                b->state == BatchInfo::State::Error);
+            bool can_unload = (b->state == BatchInfo::State::Loaded);
+            bool can_save = (b->state == BatchInfo::State::Loaded);
+
+            // -- Load selected batch --
+            if (can_load)
+            {
+                if (ImGui::Button("Load"))
+                {
+                    br.queue_load(b->id, ctx); // fire-and-forget; strand serializes it
+                }
+            }
+            else
+            {
+                ImGui::BeginDisabled();
+                ImGui::Button("Load");
+                ImGui::EndDisabled();
+            }
+
+            // -- Unload selected batch --
+            ImGui::SameLine();
+            if (can_unload)
+            {
+                if (ImGui::Button("Unload"))
+                {
+                    br.queue_unload(b->id, ctx);
+                }
+            }
+            else
+            {
+                ImGui::BeginDisabled();
+                ImGui::Button("Unload");
+                ImGui::EndDisabled();
+            }
+
+            // -- Save selected batch --
+            ImGui::SameLine();
+            if (can_save)
+            {
+                if (ImGui::Button("Save"))
+                {
+                    // Either call sync save, or your async wrapper if you add it:
+                    br.save_batch(b->id, ctx);
+                    // or br.queue_save_batch(b->id, ctx);
+                }
+            }
+            else
+            {
+                ImGui::BeginDisabled();
+                ImGui::Button("Save");
+                ImGui::EndDisabled();
+            }
+
+            ImGui::Separator();
+
+            // -- Load all batches --
+            if (ImGui::Button("Load All"))
+            {
+                // Using your async load-all helper:
+                br.queue_load_all_async(ctx);
+            }
+
+            // -- Unload all batches --
+            ImGui::SameLine();
+            if (ImGui::Button("Unload All"))
+            {
+                br.queue_unload_all_async(ctx);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Save All"))
+            {
+                br.queue_save_all_async(ctx);
+            }
+        }
+
+        ImGui::Columns(1);
+        ImGui::End();
+    }
+
+    void GuiManager::draw_task_monitor(EngineContext& ctx) const
+    {
+        ImGui::Begin("Task Monitor");
+
+        // Thread pool stats
+        if (ctx.thread_pool)
+        {
+            auto* pool = ctx.thread_pool.get();
+
+            ImGui::TextUnformatted("Thread Pool");
+            ImGui::Separator();
+
+            ImGui::BulletText("Threads:        %zu", pool->nbr_threads());
+            ImGui::BulletText("Working:        %zu", pool->nbr_working_threads());
+            ImGui::BulletText("Idle:           %zu", pool->nbr_idle_threads());
+            ImGui::BulletText("Queued tasks:   %zu", pool->task_queue_size());
+            ImGui::BulletText("Queue is empty: %s",
+                pool->is_task_queue_empty() ? "yes" : "no");
+        }
+        else
+        {
+            ImGui::TextUnformatted("No thread pool available.");
+        }
+
+        ImGui::Separator();
+
+        // Main thread queue stats
+        if (ctx.main_thread_queue)
+        {
+            auto* mtq = ctx.main_thread_queue.get();
+
+            ImGui::TextUnformatted("Main Thread Queue");
+            ImGui::Separator();
+
+            bool empty = mtq->empty();
+            ImGui::BulletText("Pending tasks: %s", empty ? "0 (empty)" : "> 0");
+        }
+        else
+        {
+            ImGui::TextUnformatted("No main-thread queue available.");
+        }
+
+        ImGui::End();
     }
 
     void GuiManager::draw_engine_info(EngineContext& ctx) const
@@ -708,7 +945,7 @@ namespace eeng
         inspector.entity_selection.remove_invalid([&](const Entity& entity)
             {
                 return !entity.is_null() && registry->valid(entity);
-    });
+            });
 
         if (Inspector::inspect_entity(inspector, *dispatcher)) {}
 #endif
