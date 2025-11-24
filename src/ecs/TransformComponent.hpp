@@ -31,7 +31,7 @@ namespace eeng::ecs
 
     std::string to_string(const TransformComponent& t);
 
-    template<typename Visitor> void visit_assets(TransformComponent& t, Visitor&& visitor) {}
+    template<typename Visitor> void visit_asset_refs(TransformComponent& t, Visitor&& visitor) {}
 
     template<typename Visitor> void visit_entities(TransformComponent& t, Visitor&& visitor) {}
 

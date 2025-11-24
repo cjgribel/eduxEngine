@@ -44,7 +44,7 @@ namespace eeng {
         template<typename T>
         void collect_guids(T& t, std::unordered_set<Guid>& out_guids)
         {
-            visit_assets(t, [&](const auto& asset_ref) {
+            visit_asset_refs(t, [&](const auto& asset_ref) {
                 out_guids.insert(asset_ref.guid);
                 });
         }

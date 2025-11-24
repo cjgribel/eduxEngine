@@ -27,7 +27,7 @@ namespace eeng::ecs
 
     std::string to_string(const HeaderComponent& t);
 
-    template<typename Visitor> void visit_assets(HeaderComponent& h, Visitor&& visitor) {}
+    template<typename Visitor> void visit_asset_refs(HeaderComponent& h, Visitor&& visitor) {}
 
     // -> EntityRef.hpp
     // template<typename T, typename Fn>

@@ -7,7 +7,7 @@
 #include "EngineContext.hpp"
 #include "Storage.hpp" // Can't pimpl-away since class is templated
 #include "AssetIndex.hpp"
-#include "ResourceTypes.hpp" // For AssetRef<T>, visit_assets
+#include "ResourceTypes.hpp" // For AssetRef<T>, visit_asset_refs
 #include "AssetMetaData.hpp"
 #include "AssetRef.hpp"
 #include "MetaLiterals.h" // load_asset_hs, unload_asset_hs
@@ -167,7 +167,7 @@ namespace eeng
             // Add contained assets, note that t is const
             // 'contained_assets' as such is QUESTIONABLE
             auto _meta = meta;
-            visit_assets(t, [&](const auto& ref)
+            visit_asset_refs(t, [&](const auto& ref)
                 {
                     //if (ref.valid())
                     _meta.contained_assets.push_back(ref.get_guid());
@@ -251,7 +251,7 @@ namespace eeng
 
             storage_->modify(ref.handle, [&](T& asset)
                 {
-                    visit_assets(asset, [&](auto& child_ref)
+                    visit_asset_refs(asset, [&](auto& child_ref)
                         {
                             // If already wired, skip (idempotent bind)
                             if (storage_->validate(child_ref.handle)) return;
@@ -342,7 +342,7 @@ namespace eeng
 
             storage_->modify(ref.handle, [&](T& asset)
                 {
-                    visit_assets(asset, [&](auto& child_ref)
+                    visit_asset_refs(asset, [&](auto& child_ref)
                         {
                             child_ref.handle = {};
                         });
@@ -407,7 +407,7 @@ namespace eeng
 
             storage_->modify(handle, [&](const T& asset)
                 {
-                    visit_assets(asset, [&](const auto& asset_ref)
+                    visit_asset_refs(asset, [&](const auto& asset_ref)
                         {
                             using SubT = typename std::decay_t<decltype(asset_ref.handle)>::value_type;
                             if (!validate_asset_recursive<SubT>(asset_ref.handle))

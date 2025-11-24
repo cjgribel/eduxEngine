@@ -12,7 +12,7 @@
 // #include "Guid.h"
 #include "LogGlobals.hpp"
 // #include "hash_combine.h"
-//#include "IResourceManager.hpp" // For AssetRef<>, visit_assets<>
+//#include "IResourceManager.hpp" // For AssetRef<>, visit_asset_refs<>
 
 // Placeholder resources
 namespace eeng
@@ -147,17 +147,17 @@ namespace eeng::mock
     {
         std::vector<float> vertices;
     };
-
-    template<typename Visitor> void visit_assets(Mesh&, Visitor&&) {}
-    /* try to remove */ template<typename Visitor> void visit_assets(const Mesh&, Visitor&&) {}
+    
+    template<typename Visitor> void visit_asset_refs(Mesh&, Visitor&&) {}
+    /* try to remove */ template<typename Visitor> void visit_asset_refs(const Mesh&, Visitor&&) {}
 
     struct Texture
     {
         std::string name;
     };
 
-    template<typename Visitor> void visit_assets(Texture&, Visitor&&) {}
-    /* try to remove */ template<typename Visitor> void visit_assets(const Texture&, Visitor&&) {}
+    template<typename Visitor> void visit_asset_refs(Texture&, Visitor&&) {}
+    /* try to remove */ template<typename Visitor> void visit_asset_refs(const Texture&, Visitor&&) {}
 
     struct Model
     {
@@ -165,10 +165,10 @@ namespace eeng::mock
         std::vector<AssetRef<Texture>> textures;
     };
 
-    // Found via ADL if visit_assets is called unqualified
-    // (e.g. visit_assets(model, visitor))
+    // Found via ADL if visit_asset_refs is called unqualified
+    // (e.g. visit_asset_refs(model, visitor))
     template<typename Visitor>
-    void visit_assets(Model& model, Visitor&& visitor)
+    void visit_asset_refs(Model& model, Visitor&& visitor)
     {
         for (auto& ref : model.meshes)
             visitor(ref);
@@ -177,9 +177,9 @@ namespace eeng::mock
             visitor(ref);
     }
 
-    // Used by ResourceManager::file
+    // Const version is used by ResourceManager::file - remove if possible
     template<typename Visitor>
-    void visit_assets(const Model& model, Visitor&& visitor)
+    void visit_asset_refs(const Model& model, Visitor&& visitor)
     {
         for (auto& ref : model.meshes)
             visitor(ref);
@@ -250,8 +250,8 @@ namespace eeng::mock
         }
     };
 
-    template<typename Visitor> void visit_assets(MockResource1&, Visitor&&) {}
-    /* try to remove */ template<typename Visitor> void visit_assets(const MockResource1&, Visitor&&) {}
+    template<typename Visitor> void visit_asset_refs(MockResource1&, Visitor&&) {}
+    /* try to remove */ template<typename Visitor> void visit_asset_refs(const MockResource1&, Visitor&&) {}
 
     struct MockResource2
     {
@@ -264,8 +264,8 @@ namespace eeng::mock
         }
     };
 
-    template<typename Visitor> void visit_assets(MockResource2&, Visitor&&) {}
-    /* try to remove */ template<typename Visitor> void visit_assets(const MockResource2&, Visitor&&) {}
+    template<typename Visitor> void visit_asset_refs(MockResource2&, Visitor&&) {}
+    /* try to remove */ template<typename Visitor> void visit_asset_refs(const MockResource2&, Visitor&&) {}
 
 } // namespace eeng
 
