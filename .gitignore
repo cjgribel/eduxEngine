@@ -5,7 +5,7 @@ doxygen/
 
 assets/
 # Ignore for now
-imported_assets/
+Module1/project1
 # Whitelist
 !src/assets/
 
