@@ -27,20 +27,18 @@ namespace eeng::ecs
 
     std::string to_string(const HeaderComponent& t);
 
-    template<typename Visitor> void visit_asset_refs(HeaderComponent& h, Visitor&& visitor) {}
+    template<typename Visitor>
+    void visit_asset_refs(HeaderComponent& h, Visitor&& visitor) {}
 
-    // -> EntityRef.hpp
-    // template<typename T, typename Fn>
-    // void visit_entities(T& object, Fn&& func);
-
-    template<typename Visitor> void visit_entities(HeaderComponent& h, Visitor&& visitor) {}
+    template<typename T, typename Visitor>
+    void visit_entity_refs(HeaderComponent&, Visitor&&) {}
 
 #if 0
     namespace {
         bool HeaderComponent_inspect(void* ptr, Editor::InspectorState& inspector)
         {
             return false;
-        }
+}
 }
 #endif
 

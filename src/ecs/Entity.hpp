@@ -6,6 +6,12 @@
 #include <cstdint>      // For uint32_t
 #include <functional>   // For std::hash
 
+namespace eeng
+{
+    template<typename T, typename Visitor>
+    void visit_entity_refs(T&, Visitor&&);
+}
+
 namespace eeng::ecs
 {
     /**
@@ -88,8 +94,8 @@ namespace eeng::ecs
 
     class EntityRef
     {
-        Guid guid {};
-        ecs::Entity entity {};
+        Guid guid{};
+        ecs::Entity entity{};
 
     public:
         EntityRef(const Guid& guid, const ecs::Entity& entity);

@@ -9,6 +9,8 @@
 #include "ecs/TransformComponent.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/CoreComponents.hpp"
+#include "ecs/MockComponents.hpp"
+
 #include "MetaLiterals.h"
 //#include "Storage.hpp"
 #include "MetaInfo.h"
@@ -128,6 +130,32 @@ namespace eeng
     void register_component_meta_types(EngineContext& ctx)
     {
         EENG_LOG_INFO(&ctx, "Registering component meta types...");
+
+        register_component<eeng::ecs::mock::MockPlayerComponent>();
+        entt::meta_factory<eeng::ecs::mock::MockPlayerComponent>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "MockPlayerComponent", "A mock player component for testing." })
+
+            .data<&eeng::ecs::mock::MockPlayerComponent::position>("position"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Player position." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::mock::MockPlayerComponent::health>("health"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "health", "Health", "Player health." })
+            .traits(MetaFlags::none)
+            ;
+
+        register_component<eeng::ecs::mock::MockCameraComponent>();
+        entt::meta_factory<eeng::ecs::mock::MockCameraComponent>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "MockCameraComponent", "A mock camera component for testing." })
+
+            .data<&eeng::ecs::mock::MockCameraComponent::position>("position"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Camera position." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::mock::MockCameraComponent::fov>("fov"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "fov", "Field of View", "Camera field of view." })
+            .traits(MetaFlags::none)
+            ;
 
         register_component<ecs::TransformComponent>();
 #if 0

@@ -23,21 +23,21 @@
 #include "Guid.h"
 #include "ecs/Entity.hpp"
 
-namespace eeng::mock
-{
-    struct MockComponent1
-    {
-        // GUID = 0 -> not set
-        // Handle = null -> not bound
-        ecs::EntityRef entity_ref;
-        AssetRef<Model> model_ref;
-    };
-    struct MockComponent2
-    {
-        AssetRef<Mesh> mesh_ref;
-        AssetRef<Texture> texture_ref;
-    };
-}
+// namespace eeng::mock
+// {
+//     struct MockComponent1
+//     {
+//         // GUID = 0 -> not set
+//         // Handle = null -> not bound
+//         ecs::EntityRef entity_ref;
+//         AssetRef<Model> model_ref;
+//     };
+//     struct MockComponent2
+//     {
+//         AssetRef<Mesh> mesh_ref;
+//         AssetRef<Texture> texture_ref;
+//     };
+// }
 
 #if 0
 // === CircleColliderGridComponent ============================================
