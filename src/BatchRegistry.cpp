@@ -89,8 +89,6 @@ namespace eeng
         return bi.id;
     }
 
-    // Later possibly: save batch via task queue
-#if 1
     std::shared_future<TaskResult>
         BatchRegistry::queue_save_batch(const BatchId& id, EngineContext& ctx)
     {
@@ -100,7 +98,6 @@ namespace eeng
             return tr;
             });
     }
-#endif
 
     bool BatchRegistry::save_batch(const eeng::BatchId& id, EngineContext& ctx)
     {
@@ -260,7 +257,6 @@ namespace eeng
         return fut.share();
     }
 
-
     std::shared_future<TaskResult>
         BatchRegistry::queue_save_all_async(EngineContext& ctx)
     {
@@ -290,7 +286,6 @@ namespace eeng
 
         return fut.share();
     }
-
 
     std::shared_future<ecs::EntityRef>
         BatchRegistry::queue_create_entity(
@@ -449,7 +444,6 @@ namespace eeng
             });
     }
 
-
     // TODO: Register entity + Update closure
     std::shared_future<ecs::EntityRef>
         BatchRegistry::queue_spawn_entity(const BatchId& id, meta::EntitySpawnDesc desc, EngineContext& ctx)
@@ -468,8 +462,11 @@ namespace eeng
                 // Do entt work on main thread
                 ecs::EntityRef created = ctx.main_thread_queue->push_and_wait([&]() -> ecs::EntityRef
                     {
-                        // + REGISTER THIS ENTITY
-                        return spawn_entity_from_desc(desc, ctx);
+                        // Spawn and register entity from desc
+                        // return spawn_entity_from_desc(desc, ctx);
+                        auto entity = spawn_entity_from_desc(desc, ctx);
+                        ctx.entity_manager->register_entity(entity.get_entity());
+                        return entity;
                     });
 
                 {
@@ -721,11 +718,8 @@ namespace eeng
                 for (const auto& desc : entity_descs)
                 {
                     auto er = eeng::meta::spawn_entity_from_desc(desc, ctx);
+                    ctx.entity_manager->register_entity(er.get_entity());
                     B.live.push_back(er);
-
-                    // REGISTER ENTITY
-                    // CURRENTLY REQUIRES HeaderComponent
-                    // ctx.entity_manager->register_entity(er.get_entity());
                 }
             });
 
