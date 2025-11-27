@@ -33,6 +33,8 @@ namespace eeng
         void draw_task_monitor(EngineContext& ctx) const;
         void draw_engine_info(EngineContext& ctx) const;
 
+        void draw_scene_graph(EngineContext& ctx) const;
+
         std::unordered_map<GuiFlags, bool> flags;
     };
 
