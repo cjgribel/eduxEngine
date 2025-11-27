@@ -103,8 +103,9 @@ namespace eeng::ecs
         EntityRef();
 
         const Guid& get_guid() const;
-        const ecs::Entity& get_entity() const;
+        void set_guid(const Guid& guid);
 
+        const ecs::Entity& get_entity() const;
         void set_entity(const ecs::Entity& entity);
         bool has_entity() const;
         void clear_entity();

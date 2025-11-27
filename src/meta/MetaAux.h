@@ -18,6 +18,7 @@
 namespace internal
 {
 
+    // Or maybe try_visit
     template<typename T, typename Callable>
     bool try_apply(entt::meta_any& value, Callable callable)
     {
@@ -214,7 +215,7 @@ inline std::string enum_value_name(const entt::meta_any& enum_any)
     entt::meta_type meta_type = enum_any.type();
     assert(meta_type.is_enum());
 
-    // Look for entry with current value
+    // Linear search for entry with current value
     auto any_conv = cast_to_underlying_type(meta_type, enum_any);
     auto enum_entries = gather_meta_enum_entries(enum_any);
     auto entry = std::find_if(enum_entries.begin(), enum_entries.end(), [&any_conv](auto& e)

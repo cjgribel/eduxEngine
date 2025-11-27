@@ -131,6 +131,21 @@ namespace eeng
     {
         EENG_LOG_INFO(&ctx, "Registering component meta types...");
 
+        // ---------------------------------------------------------------------
+        entt::meta_factory<eeng::ecs::EntityRef>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "EntityRef", "A reference to an entity." })
+
+            // GETTER / SETTER, OR EXPOSE GUID ???
+            .template data<&eeng::ecs::EntityRef::set_guid, &eeng::ecs::EntityRef::get_guid>("guid"_hs)
+            .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
+            .traits(MetaFlags::read_only)
+
+            //     .template data<&eeng::ecs::EntityRef::entity>("entity"_hs)
+            //     .template custom<DataMetaInfo>(DataMetaInfo{ "entity", "Entity", "The referenced entity." })
+            //     .traits(MetaFlags::read_only)   
+            ;
+        warm_start_meta_type<eeng::ecs::EntityRef>();
+        // ---------------------------------------------------------------------
         register_component<eeng::ecs::mock::MockPlayerComponent>();
         entt::meta_factory<eeng::ecs::mock::MockPlayerComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "MockPlayerComponent", "A mock player component for testing." })
@@ -142,8 +157,17 @@ namespace eeng
             .data<&eeng::ecs::mock::MockPlayerComponent::health>("health"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "health", "Health", "Player health." })
             .traits(MetaFlags::none)
+
+            // .data<&eeng::ecs::mock::MockPlayerComponent::camera_ref>("camera_ref"_hs)
+            // .custom<DataMetaInfo>(DataMetaInfo{ "camera_ref", "Camera Reference", "Reference to the player's camera entity." })
+            // .traits(MetaFlags::ReadOnly)
+
+            // .data<&eeng::ecs::mock::MockPlayerComponent::model_ref>("model_ref"_hs)
+            // .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model Reference", "Reference to the player's model asset." })
+            // .traits(MetaFlags::ReadOnly)
             ;
 
+        // ---------------------------------------------------------------------
         register_component<eeng::ecs::mock::MockCameraComponent>();
         entt::meta_factory<eeng::ecs::mock::MockCameraComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "MockCameraComponent", "A mock camera component for testing." })
@@ -157,6 +181,7 @@ namespace eeng
             .traits(MetaFlags::none)
             ;
 
+        // ---------------------------------------------------------------------
         register_component<ecs::TransformComponent>();
 #if 0
         entt::meta<ecs::Transform>()
@@ -172,6 +197,7 @@ namespace eeng
             ;
 #endif
 
+        // ---------------------------------------------------------------------
         register_component<ecs::HeaderComponent>();
 #if 0
         // chunk_tag callback

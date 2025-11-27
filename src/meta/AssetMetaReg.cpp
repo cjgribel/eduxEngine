@@ -151,7 +151,9 @@ namespace eeng {
 
             // AssetRef<T>
             entt::meta_factory<AssetRef<T>>{}
-            .template data<&AssetRef<T>::guid>("guid"_hs)
+            .template custom<TypeMetaInfo>(TypeMetaInfo{ "AssetRef", "An asset reference." })
+
+                .template data<&AssetRef<T>::guid>("guid"_hs)
                 .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
                 .traits(MetaFlags::read_only)
                 ;
@@ -183,6 +185,9 @@ namespace eeng {
 
         // === Guid ===
 
+        // ???
+        //      de/seralize: custom functions (no Handle needed)
+        //      inspect: 
         entt::meta_factory<Guid>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Guid", "A globally unique identifier." })
             .func<&serialize_Guid>(eeng::literals::serialize_hs)

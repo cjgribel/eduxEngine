@@ -36,6 +36,9 @@ namespace eeng
     - CommandQueue
     */
 
+    using GuidSelection = eeng::editor::SelectionManager<Guid>;
+    using EntitySelection = eeng::editor::SelectionManager<ecs::Entity>;
+
     struct SetVsyncEvent { bool enabled; };
     struct SetWireFrameRenderingEvent { bool enabled; };
     struct SetMinFrameTimeEvent { float dt; };
@@ -98,11 +101,9 @@ namespace eeng
         std::unique_ptr<ThreadPool>             thread_pool;
         std::unique_ptr<EventQueue>             event_queue;
         std::unique_ptr<editor::CommandQueue>   command_queue;
-        std::unique_ptr<editor::SelectionManager<Guid>>         asset_selection;
-        std::unique_ptr<editor::SelectionManager<ecs::Entity>>  entity_selection;
+        std::unique_ptr<GuidSelection>          asset_selection;
+        std::unique_ptr<EntitySelection>        entity_selection;
         std::unique_ptr<EngineConfig>           engine_config;
-
-        // std::shared_future<TaskResult> asset_async_future;
     };
 
     using EngineContextPtr = std::shared_ptr<EngineContext>;

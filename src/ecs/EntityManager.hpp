@@ -21,7 +21,7 @@ namespace eeng
         ecs::Entity create_empty_entity(
             const ecs::Entity& entity_hint) override;
 
-        std::pair<Guid,ecs::Entity> create_entity(
+        std::pair<Guid, ecs::Entity> create_entity(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent,
@@ -42,12 +42,15 @@ namespace eeng
 
         int destroy_pending_entities() override;
 
-        entt::registry& registry() noexcept override { return *registry_; }
-        const entt::registry& registry() const noexcept override { return *registry_; }
-        std::weak_ptr<entt::registry> registry_wptr() noexcept override { return registry_; }
+        entt::registry&                     registry() noexcept override { return *registry_; }
+        const entt::registry&               registry() const noexcept override { return *registry_; }
+        std::weak_ptr<entt::registry>       registry_wptr() noexcept override { return registry_; }
         std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
-        // Not part of public API
+        // Not part of public interface
+
+        ecs::SceneGraph&        scene_graph() { return *scene_graph_; }
+        const ecs::SceneGraph&  scene_graph() const { return *scene_graph_; }
 
         // destroy_pending_entities
 
@@ -55,15 +58,15 @@ namespace eeng
 
         void register_entity(const ecs::Entity& entity) override;
 
-        std::shared_ptr<entt::registry> registry_;
-        std::unordered_map<Guid, entt::entity> guid_to_entity_map_;
+        std::shared_ptr<entt::registry>         registry_;
+        std::unordered_map<Guid, entt::entity>  guid_to_entity_map_;
         // On create:
         // guid_to_entity_map[guid] = entity;
         // On destroy:
         // guid_to_entity_map.erase(guid);
 
-        std::unique_ptr<ecs::SceneGraph> scene_graph_;
-        std::deque<ecs::Entity> entities_pending_destruction_;
+        std::unique_ptr<ecs::SceneGraph>    scene_graph_;
+        std::deque<ecs::Entity>             entities_pending_destruction_;
     };
 
 
