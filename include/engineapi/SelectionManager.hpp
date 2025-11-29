@@ -95,7 +95,7 @@ namespace eeng::editor
         }
 
         template<class F>
-        bool remove_invalid(const F&& is_valid)
+        void remove_invalid(const F&& is_valid)
         {
             auto items_temp = items;
             items.clear();

@@ -8,6 +8,9 @@
 #include "ecs/EntityManager.hpp"
 
 #include "gui/SceneHierarchyWidget.hpp"
+#include "gui/SceneHierarchyToolbarWidget.hpp"
+#include "gui/EntityInspectorWidget.hpp"
+
 #include "AssetTreeViews.hpp"
 
 #include "engineapi/SelectionManager.hpp"
@@ -930,99 +933,93 @@ namespace eeng
 
     void GuiManager::draw_scene_graph(EngineContext& ctx) const
     {
-        if (!ctx.batch_registry)
-            return;
-
-        // auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
-
-        ImGui::Begin("Scene Graph");
-
-#if 0
-        bool has_selection = !inspector.entity_selection.empty();
-        bool has_multi_selection = inspector.entity_selection.size() > 1;
-
-        // New entity
-        if (ImGui::Button("New"))
+        // Validate selection
         {
-            Entity entity_parent;
-            if (has_selection) entity_parent = inspector.entity_selection.last();
-            CreateEntityEvent event{ .parent_entity = entity_parent };
-            dispatcher.enqueue_event(event);
+            auto registry_sptr = ctx.entity_manager->registry_wptr().lock();
+            if (!registry_sptr) return;
+            ctx.entity_selection->remove_invalid([&](const ecs::Entity& entity)
+                {
+                    return !entity.is_null() && registry_sptr->valid(entity);
+                });
         }
 
-        // Destroy selected entities
-        ImGui::SameLine();
-        if (!has_selection) inspector.begin_disabled();
-        if (ImGui::Button("Delete"))
-        {
-            DestroyEntitySelectionEvent event{ .entity_selection = inspector.entity_selection };
-            dispatcher.enqueue_event(event);
-            inspector.entity_selection.clear();
-        }
-        if (!has_selection) inspector.end_disabled();
+        ImGui::Begin("Scene Hierarchy");
 
-        // Copy selected entities
-        ImGui::SameLine();
-        if (!has_selection) inspector.begin_disabled();
-        if (ImGui::Button("Copy"))
+        // --- Scene tree toolbar -------------------------------------------
         {
-            // Scene::CopyEntityEvent event{ .entity = inspector.entity_selection.last() }; // last
-            CopyEntitySelectionEvent event{ inspector.entity_selection };
-            dispatcher.enqueue_event(event);
-        }
-        if (!has_selection) inspector.end_disabled();
-
-        // Reparent selected entities
-        ImGui::SameLine();
-        if (!has_multi_selection) inspector.begin_disabled();
-        if (ImGui::Button("Parent"))
-        {
-            SetParentEntitySelectionEvent event{ .entity_selection = inspector.entity_selection };
-            dispatcher.enqueue_event(event);
-        }
-        if (!has_multi_selection) inspector.end_disabled();
-
-        // Unparent selected entities (set them as roots)
-        ImGui::SameLine();
-        if (!has_selection) inspector.begin_disabled();
-        if (ImGui::Button("Unparent"))
-        {
-            UnparentEntitySelectionEvent event{ .entity_selection = inspector.entity_selection };
-            dispatcher.enqueue_event(event);
-        }
-        if (!has_selection) inspector.end_disabled();
-#endif
-
-        // Scene graph hierarchy
-        {
-            gui::SceneHierarchyWidget hierarchy{ ctx };
-            hierarchy.draw();
+            gui::SceneTreeToolbarWidget toolbar{ ctx };
+            toolbar.draw();
         }
 
-        // Entity inspector
+        ImGui::Separator();
+
+        // --- Scene graph hierarchy -------------------------------------------
+        {
+            static float hierarchy_height = 250.0f;
+
+            if (ImGui::BeginChild("SceneHierarchyRegion",
+                ImVec2(0.0f, hierarchy_height), // full width, fixed height
+                true,                           // border
+                ImGuiWindowFlags_HorizontalScrollbar))
+            {
+                gui::SceneHierarchyWidget hierarchy{ ctx };
+                hierarchy.draw();
+            }
+            ImGui::EndChild();
+        }
+
+        // --- List selected ---------------------------------------------------
+
+        ImGui::Separator();
+
+        auto& selection = *ctx.entity_selection;
+        if (selection.size() > 0)
+        {
+
+            ImGui::TextUnformatted("Selected entities (in order):");
+            // ImGui::SameLine();
+
+            std::string list;
+            list.reserve(selection.size() * 6); // tiny pre-reserve
+
+            bool first = true;
+            for (auto entity : selection.get_all())
+            {
+                if (!first)
+                    list += ", ";
+                first = false;
+
+                list += std::to_string(entity.to_integral());
+            }
+
+            // This will wrap nicely inside the window.
+            ImGui::TextWrapped("%s", list.c_str());
+        }
+
+        ImGui::Separator();
+
+        // --- Entity inspector ------------------------------------------------
+
         //static Editor::InspectorState inspector{};
-
         // if (Inspector::inspect_entity(inspector, *dispatcher)) {}
+
+        {
+            if (ImGui::BeginChild("InspectorRegion", ImVec2(0.0f, 0.0f), true))
+            {
+                // Entity inspector should draw *here* (no new window)
+                gui::EntityInspectorWidget inspector{ ctx };
+                inspector.draw();
+            }
+            ImGui::EndChild();
+        }
+
+        // --- Command Queue (NOT HERE) ----------------------------------------
 
         // Inspector::inspect_command_queue(inspector);
 
-#if 0
-        // Debug print selected
-        ImGui::Separator();
-        if (inspector.entity_selection.size())
-        {
-            ImGui::Text("Selected Entities (in order):");
-            std::stringstream ss;
-            for (auto entity : inspector.entity_selection.get_all())
-                //ss << std::to_string(entt::to_integral(entity)) << " ";
-                //ss << Editor::get_entity_name(registry, entity, entt::resolve<HeaderComponent>()) << " ";
-                ImGui::Text("Entity %u", entity.to_integral());
-            // ImGui::Text("%s", ss.str().c_str());
-    }
-#endif
-
+// End window
         ImGui::End();
-}
+    }
 
     void GuiManager::set_flag(GuiFlags flag, bool enabled)
     {

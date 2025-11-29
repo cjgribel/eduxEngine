@@ -36,10 +36,21 @@ namespace eeng::gui
 
         void draw()
         {
+            // Reset state
+            current_level = -1;
+            closed_index = -1;
+
             if (!scenegraph.size()) return;
 
             // Traverse and let *this act as the visitor functor
             scenegraph.get_tree().traverse_depthfirst(*this);
+
+            // Restore ImGui state
+            while (current_level >= 0)
+            {
+                ImGui::TreePop();
+                current_level--;
+            }
         }
 
         void operator()(const Entity& entity, size_t index, size_t level)
@@ -87,14 +98,6 @@ namespace eeng::gui
             else
             {
                 closed_index = level;
-            }
-        }
-
-        ~SceneHierarchyWidget()
-        {
-            while (current_level >= 0) {
-                ImGui::TreePop();
-                current_level--;
             }
         }
     };

@@ -220,6 +220,7 @@ bool Game::init()
         std::cout << "ECS API TESTS..." << std::endl;
 
         // 1. Create entities
+#if 0
         std::vector<eeng::ecs::Entity> entities;
         for (int i = 0; i < 5; ++i)
         {
@@ -229,6 +230,7 @@ bool Game::init()
             EENG_LOG(ctx, "[Game::init()] Created entity: %i", entity.to_integral());
             entities.push_back(entity);
         }
+#endif
 
         // 2. ...
 
@@ -298,7 +300,7 @@ bool Game::init()
                 EENG_LOG(ctx, "[Game::init()] Waiting for asset scan to finish...");
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
-    }
+            }
 #endif
             // Get asset index snapshot and log it
             // auto asset_index = resource_manager.get_asset_entries_snapshot();
@@ -310,7 +312,7 @@ bool Game::init()
             //         entry.meta.type_name.c_str(),
             //         entry.relative_path.string().c_str());
             // }
-}
+        }
 #endif
 
 #if 0
@@ -429,6 +431,7 @@ bool Game::init()
 
 
         // 7. Destroy entities
+#if 0
         for (const auto& entity : entities)
         {
             assert(ctx->entity_manager->entity_valid(entity));
@@ -436,6 +439,7 @@ bool Game::init()
         }
         auto nbr_destroyed = ctx->entity_manager->destroy_pending_entities();
         EENG_LOG(ctx, "[Game::init()] Destroyed %i entities", nbr_destroyed);
+#endif
 
         // 7. UNLOAD assets (concurrently)
         //      CAN BE MADE TS // storage->get_ref - NOT TS
@@ -456,11 +460,11 @@ bool Game::init()
             }
             // Wait for all loads to finish
             for (auto& future : load_futures) future.get();
-        }
+    }
 #endif
 
         // GUI: import. load, unload, unimport ...
-    }
+}
 
 #if 0
     // Thread pool test 1
