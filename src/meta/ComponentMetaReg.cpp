@@ -11,6 +11,9 @@
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
 
+#include "editor/EntityRefInspect.hpp"
+#include "editor/GuidInspect.hpp"
+
 #include "MetaLiterals.h"
 //#include "Storage.hpp"
 #include "MetaInfo.h"
@@ -107,10 +110,11 @@ namespace eeng
         }
     } // namespace
 
-#if 0
     namespace
     {
         // Guid to and from json
+        // MAYBE MOVE TO SEPARATE FILE UNDER EDITOR OR GUI (with nlohmann::json dependency)
+
         void serialize_Guid(nlohmann::json& j, const entt::meta_any& any)
         {
             auto ptr = any.try_cast<Guid>();
@@ -125,13 +129,24 @@ namespace eeng
             *ptr = Guid{ j.get<uint64_t>() };
         }
     } // namespace
-#endif
 
     void register_component_meta_types(EngineContext& ctx)
     {
         EENG_LOG_INFO(&ctx, "Registering component meta types...");
 
-        // ---------------------------------------------------------------------
+        // ---- Guid -----------------------------------------------------------
+        entt::meta_factory<Guid>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ "Guid", "A globally unique identifier." })
+
+            .func<&serialize_Guid>(eeng::literals::serialize_hs)
+            .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
+
+            .func<&eeng::editor::inspect_Guid>(eeng::literals::inspect_hs)
+            .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_Guid", "Inspect GUID" })
+            ;
+        warm_start_meta_type<Guid>();
+
+        // ---- EntityRef ------------------------------------------------------
         entt::meta_factory<eeng::ecs::EntityRef>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "EntityRef", "A reference to an entity." })
 
@@ -139,6 +154,11 @@ namespace eeng
             .template data<&eeng::ecs::EntityRef::set_guid, &eeng::ecs::EntityRef::get_guid>("guid"_hs)
             .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
             .traits(MetaFlags::read_only)
+
+            // Entity ???
+
+            .func<&eeng::editor::inspect_EntityRef>(eeng::literals::inspect_hs)
+            .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_EntityRef", "Inspect entity reference" })
 
             //     .template data<&eeng::ecs::EntityRef::entity>("entity"_hs)
             //     .template custom<DataMetaInfo>(DataMetaInfo{ "entity", "Entity", "The referenced entity." })
@@ -211,13 +231,24 @@ namespace eeng
                 // Dispatch immediately since entity may be in an invalid state
                 assert(!context.dispatcher.expired());
                 context.dispatcher.lock()->dispatch(ChunkModifiedEvent{ entity, new_tag });
-            };
+    };
 #endif
         entt::meta_factory<eeng::ecs::HeaderComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "HeaderComponent", "Metadata for HeaderComponent." })
 
+            // Name
             .data<&eeng::ecs::HeaderComponent::name>("name"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Entity name." })
+            .traits(MetaFlags::none)
+
+            // Guid
+            .data<&eeng::ecs::HeaderComponent::guid>("guid"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
+            .traits(MetaFlags::read_only)
+
+            // Parent Entity
+            .data<&eeng::ecs::HeaderComponent::parent_entity>("parent_entity"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "parent_entity", "Parent Entity", "The parent entity of this entity." })
             .traits(MetaFlags::none)
             ;
 #if 0
@@ -245,6 +276,6 @@ namespace eeng
                     //.func<&cloneDebugClass>(clone_hs)
                 ;
 #endif
-    }
+}
 
 } // namespace eeng

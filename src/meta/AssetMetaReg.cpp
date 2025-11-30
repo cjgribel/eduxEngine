@@ -161,39 +161,9 @@ namespace eeng {
         }
     } // namespace
 
-    namespace
-    {
-        // Guid to and from json
-        void serialize_Guid(nlohmann::json& j, const entt::meta_any& any)
-        {
-            auto ptr = any.try_cast<Guid>();
-            assert(ptr && "serialize_Guid: could not cast meta_any to Guid");
-            j = ptr->raw();
-        }
-
-        void deserialize_Guid(const nlohmann::json& j, entt::meta_any& any)
-        {
-            auto ptr = any.try_cast<Guid>();
-            assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
-            *ptr = Guid{ j.get<uint64_t>() };
-        }
-    } // namespace
-
     void register_asset_meta_types(EngineContext& ctx)
     {
         EENG_LOG_INFO(&ctx, "Registering resource meta types...");
-
-        // === Guid ===
-
-        // ???
-        //      de/seralize: custom functions (no Handle needed)
-        //      inspect: 
-        entt::meta_factory<Guid>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "Guid", "A globally unique identifier." })
-            .func<&serialize_Guid>(eeng::literals::serialize_hs)
-            .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
-            ;
-        warm_start_meta_type<Guid>();
 
         // === AssetMetaData ===
 

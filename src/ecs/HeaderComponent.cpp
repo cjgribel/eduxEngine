@@ -10,7 +10,7 @@ namespace eeng::ecs
         const std::string& name,
         const std::string& chunk_tag,
         const Guid& guid,
-        const Entity& parent_entity)
+        const EntityRef& parent_entity)
         : name(name)
         , chunk_tag(chunk_tag)
         , guid(guid)

@@ -76,10 +76,10 @@ namespace
             const ecs::Entity& entity, const ecs::Entity& parent_entity) override {
         }
 
-        void set_entity_header_parent(
-            const ecs::Entity& entity,
-            const ecs::Entity& entity_parent) override {
-        }
+        // void set_entity_parent(
+        //     const ecs::Entity& entity,
+        //     const ecs::Entity& entity_parent) override {
+        // }
 
         void queue_entity_for_destruction(
             const ecs::Entity& entity) override {
@@ -94,6 +94,8 @@ namespace
 
     private:
         void register_entity(const ecs::Entity& entity) override {}
+
+        void register_entities(const std::vector<ecs::Entity>& entities) override {};
 
         std::shared_ptr<entt::registry> registry_;
     };

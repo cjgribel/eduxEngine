@@ -377,6 +377,7 @@ namespace eeng::meta
                 {
                     // JSON key name is the display name if present, or the id type
                     std::string key_name = get_meta_data_nice_name(id, meta_data);
+                    assert(json.contains(key_name));
 
                     entt::meta_any field_any = meta_data.get(any);
                     deserialize_any(json[key_name], field_any, entity, context);

@@ -145,7 +145,8 @@ namespace eeng::meta {
 
                 auto copy_any = meta::clone_any(any, ctx.entity_selection->first());
                 //auto copy_any = any;
-                auto res_any = meta_func.invoke({}, copy_any.base().data(), entt::forward_as_meta(inspector));
+                // auto res_any = meta_func.invoke({}, copy_any.base().data(), entt::forward_as_meta(inspector));
+                auto res_any = meta_func.invoke({}, entt::forward_as_meta(copy_any), entt::forward_as_meta(inspector));
                 assert(res_any && "Failed to invoke inspect meta function");
 
                 // Issue command if a change is detected
@@ -212,7 +213,9 @@ namespace eeng::meta {
                         entt::meta_any data_any = meta_data.get(any); //.as_ref() will yield REF to a TEMP VALUE if entt::as_ref_t is not used
                         //std::cout << key_name << ": is_ref " << (any.policy() == entt::meta_any_policy::ref) << ", " << (data_any.policy() == entt::meta_any_policy::ref) << std::endl;
                         // Check & set readonly
-                        bool readonly = true; // get_meta_data_prop<bool, ReadonlyDefault>(meta_data, readonly_hs);
+                        //bool readonly = true; // get_meta_data_prop<bool, ReadonlyDefault>(meta_data, readonly_hs);
+                        const auto trait_flags = meta_data.traits<MetaFlags>();
+                        bool readonly = has_flag(trait_flags, MetaFlags::read_only);
                         if (readonly) inspector.begin_disabled();
 
                         // Inspect
@@ -458,4 +461,4 @@ namespace eeng::meta {
 }
 #endif
 
-} // namespace Editor
+    } // namespace Editor

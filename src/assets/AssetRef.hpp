@@ -9,8 +9,14 @@
 
 namespace eeng
 {
+    // Fallback for types without entity refs.
+    // Overload `visit_entity_refs(MyType&, Visitor&&)` in MyType's namespace,
+    // then call `visit_entity_refs(obj, visitor);` unqualified so ADL finds it.
     template<typename T, typename Visitor>
-    void visit_asset_refs(T&, Visitor&&);
+    void visit_asset_refs(T&, Visitor&&) 
+    {
+        // Default: no assets referenced
+    }
 }
 
 namespace eeng

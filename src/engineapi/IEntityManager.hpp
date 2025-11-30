@@ -17,9 +17,11 @@ namespace eeng
         virtual bool entity_valid(
             const ecs::Entity& entity) const = 0;
 
-        // When Entity was already created, e.g. during deserialization
+        // 
         virtual void register_entity(
             const ecs::Entity& entity) = 0;
+
+        virtual void register_entities(const std::vector<ecs::Entity>& entities) = 0;
 
         virtual ecs::Entity create_empty_entity(
             const ecs::Entity& entity_hint) = 0;
@@ -27,8 +29,8 @@ namespace eeng
         virtual std::pair<Guid, ecs::Entity> create_entity(
             const std::string& chunk_tag,
             const std::string& name,
-            const ecs::Entity& entity_parent,
-            const ecs::Entity& entity_hint) = 0;
+            const ecs::Entity& entity_parent    = ecs::Entity::EntityNull,
+            const ecs::Entity& entity_hint      = ecs::Entity::EntityNull) = 0;
 
         virtual bool entity_parent_registered(
             const ecs::Entity& entity) const = 0;
@@ -37,9 +39,9 @@ namespace eeng
             const ecs::Entity& entity,
             const ecs::Entity& parent_entity) = 0;
 
-        virtual void set_entity_header_parent(
-            const ecs::Entity& entity,
-            const ecs::Entity& entity_parent) = 0;
+        // virtual void set_entity_parent(
+        //     const ecs::Entity& entity,
+        //     const ecs::Entity& entity_parent) = 0;
 
         // entt::entity Scene::create_entity_hint(
         //     entt::entity hint_entity,

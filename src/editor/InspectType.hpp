@@ -15,7 +15,7 @@ namespace eeng::editor {
     template<class T>
     bool inspect_type(T& t, InspectorState& inspector)
     {
-        ImGui::Text("Widget not implemented");
+        ImGui::TextDisabled("No widget for type");
         return false;
     }
 

@@ -118,9 +118,19 @@ namespace eeng::dev
                     //      then the assets must be available to RM (i.e. scan must have completed).
                     //      Otherwise, load will fail for entities unknown assets.
                     {
-                        // 1) Create new entity in batch (with HeaderComponent via EntityManager::create_entity)
+                        // 1) Create new entity in batch (HeaderComponent added automatically)
                         auto fut_entity = br.queue_create_entity(batch_id1, "StartupEntity_1", *ctx);
                         ecs::EntityRef er = fut_entity.get();
+                        // 1b) Create a child entity and set parent
+                        // auto fut_entity_child = br.queue_create_entity(batch_id1, "StartupEntity_1_Child", *ctx);
+                        // ecs::EntityRef er_child = fut_entity_child.get();
+                        // ^ bound entity ref???
+                        // ctx->main_thread_queue->push_and_wait([&]() {
+                        //     ctx->entity_manager->reparent_entity(
+                        //         er_child.get_entity(),
+                        //         er.get_entity()
+                        //     );
+                        //     });
 
                         // 2) Add a placeholder component on main thread
 #if 0
@@ -460,11 +470,11 @@ bool Game::init()
             }
             // Wait for all loads to finish
             for (auto& future : load_futures) future.get();
-    }
+        }
 #endif
 
         // GUI: import. load, unload, unimport ...
-}
+    }
 
 #if 0
     // Thread pool test 1
@@ -980,7 +990,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-}
+    }
 #endif
 
     // Draw shape batches

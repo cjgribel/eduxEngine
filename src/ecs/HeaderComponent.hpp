@@ -15,14 +15,14 @@ namespace eeng::ecs
         std::string name;
         std::string chunk_tag; // PROBABLY SKIP
         Guid guid;
-        Entity parent_entity;
+        EntityRef parent_entity;
 
         HeaderComponent() = default;
         HeaderComponent(
             const std::string& name,
             const std::string& chunk_tag,
             const Guid& guid,
-            const Entity& entity_parent);
+            const EntityRef& entity_parent);
     };
 
     std::string to_string(const HeaderComponent& t);
@@ -30,8 +30,11 @@ namespace eeng::ecs
     template<typename Visitor>
     void visit_asset_refs(HeaderComponent& h, Visitor&& visitor) {}
 
-    template<typename T, typename Visitor>
-    void visit_entity_refs(HeaderComponent&, Visitor&&) {}
+    template<typename Visitor>
+    void visit_entity_refs(HeaderComponent& h, Visitor&& visitor) 
+    {
+        visitor(h.parent_entity);
+    }
 
 #if 0
     namespace {

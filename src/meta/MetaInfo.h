@@ -67,6 +67,12 @@ namespace eeng
     {
         return static_cast<std::uint16_t>(flags) != 0;
     }
+
+    constexpr bool has_flag(MetaFlags flags, MetaFlags flag)
+    {
+        return (flags & flag) != MetaFlags::none;
+    }
+
 } // namespace eeng
 
 #endif // MetaInfo_h

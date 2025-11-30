@@ -313,9 +313,9 @@ namespace eeng
                         auto& em = ctx.entity_manager;
                         auto [guid, entity] = em->create_entity(
                             batch_tag,          // chunk_tag/batch_tag
-                            name,               // name
-                            ecs::Entity::EntityNull, // parent
-                            ecs::Entity::EntityNull  // hint
+                            name               // name
+                            //ecs::EntityRef{}, // parent
+                            //ecs::Entity::EntityNull  // hint
                         );
 
                         // Assume EntityManager can give you the GUID from HeaderComponent
@@ -715,12 +715,17 @@ namespace eeng
         ctx.main_thread_queue->push_and_wait([&]()
             {
                 B.live.clear();
+                std::vector<ecs::Entity> new_entities;
+                new_entities.reserve(entity_descs.size());
+
                 for (const auto& desc : entity_descs)
                 {
                     auto er = eeng::meta::spawn_entity_from_desc(desc, ctx);
-                    ctx.entity_manager->register_entity(er.get_entity());
+                    // ctx.entity_manager->register_entity(er.get_entity());
                     B.live.push_back(er);
+                    new_entities.push_back(er.get_entity());
                 }
+                ctx.entity_manager->register_entities(new_entities);
             });
 
         // ABORT IF ASSET LOAD FAILED ???
@@ -841,7 +846,7 @@ namespace eeng
                         ctx.entity_manager->queue_entity_for_destruction(er.get_entity());
                         er.clear_entity();
                     }
-                }
+}
             });
     }
 #endif
