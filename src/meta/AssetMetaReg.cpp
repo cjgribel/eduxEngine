@@ -7,8 +7,9 @@
 #include <nlohmann/json.hpp>
 #include "config.h"
 #include "AssetMetaReg.hpp"
-#include "EngineContext.hpp"
 
+#include "EngineContext.hpp"
+#include "editor/AssetRefInspect.hpp"
 #include "ResourceTypes.hpp"
 #include "MetaLiterals.h"
 #include "Storage.hpp"
@@ -153,9 +154,17 @@ namespace eeng {
             entt::meta_factory<AssetRef<T>>{}
             .template custom<TypeMetaInfo>(TypeMetaInfo{ "AssetRef", "An asset reference." })
 
+                // (Serialization)
+                // Guid
                 .template data<&AssetRef<T>::guid>("guid"_hs)
                 .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
                 .traits(MetaFlags::read_only)
+
+                // Handle<T>
+
+                // (Inspection)
+                .template func<&eeng::editor::inspect_AssetRef<T>>(eeng::literals::inspect_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_AssetRef", "Inspect asset reference" })
                 ;
             warm_start_meta_type<AssetRef<T>>();
         }

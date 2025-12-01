@@ -226,7 +226,7 @@ namespace eeng::gui
                     {
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
-                        ImGui::TextUnformatted("Selected entity is null or invalid");
+                        ImGui::TextUnformatted("No valid selection");
                     }
 
                     ImGui::EndTable();

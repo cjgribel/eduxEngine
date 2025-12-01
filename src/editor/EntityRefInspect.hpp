@@ -7,8 +7,7 @@
 
 namespace eeng::editor
 {
-    // 
-
+    // + ctx
     bool inspect_EntityRef(entt::meta_any& any, InspectorState& inspector)
     {
         // Check const?
@@ -24,7 +23,7 @@ namespace eeng::editor
         //bool guid_modified = editor::inspect_type(guid, inspector);
         inspector.end_leaf();
 
-        inspector.begin_leaf("live entity");
+        inspector.begin_leaf("Live ID");
         auto entity = ptr->get_entity();
         ImGui::TextUnformatted(entity.is_null() ? "n/a" : std::to_string(entity.to_integral()).c_str());
         inspector.end_leaf();

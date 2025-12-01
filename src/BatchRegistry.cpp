@@ -291,9 +291,10 @@ namespace eeng
         BatchRegistry::queue_create_entity(
             const BatchId& id,
             const std::string& name,
+            const ecs::EntityRef& parent,
             EngineContext& ctx)
     {
-        return strand(ctx).submit([this, id, name, &ctx]() -> ecs::EntityRef
+        return strand(ctx).submit([this, id, name, parent, &ctx]() -> ecs::EntityRef
             {
                 BatchInfo* B = nullptr;
                 {
@@ -304,6 +305,8 @@ namespace eeng
                     B = &it->second;
                 }
 
+                // ecs::Entity parent_entity = parent.get_entity(); // may be null
+
                 // MT: create entity with a HeaderComponent and proper registration
                 ecs::EntityRef created = ctx.main_thread_queue->push_and_wait([&]() -> ecs::EntityRef
                     {
@@ -312,10 +315,10 @@ namespace eeng
 
                         auto& em = ctx.entity_manager;
                         auto [guid, entity] = em->create_entity(
-                            batch_tag,          // chunk_tag/batch_tag
-                            name               // name
-                            //ecs::EntityRef{}, // parent
-                            //ecs::Entity::EntityNull  // hint
+                            batch_tag,          // REMOVE ?
+                            name,
+                            parent.get_entity(), 
+                            ecs::Entity::EntityNull
                         );
 
                         // Assume EntityManager can give you the GUID from HeaderComponent

@@ -11,6 +11,7 @@
 #include "MainThreadQueue.hpp"
 #include "AssimpImporter.hpp" // --> ENGINE API
 #include "MockImporter.hpp" // --> ENGINE API
+#include "ecs/MockComponents.hpp"
 #include "ResourceTypes.hpp"
 #include "ResourceManager.hpp" // Since we use the concrete type
 #include "BatchRegistry.hpp" // Since we use the concrete type
@@ -47,7 +48,7 @@ namespace eeng::dev
         auto startup_task = [asset_root, batches_root, ctx]() {
             // If logging must be on main, do it here:
             // ctx->main_thread_queue->push([ctx]() {
-            EENG_LOG(ctx.get(), "[startup] Begin startup import+scan task on main...");
+            EENG_LOG(ctx.get(), "[startup] Begin startup worker on main...");
             // });
 
         // 2) run orchestrator on worker pool
@@ -78,7 +79,7 @@ namespace eeng::dev
                     // 3) Run scan (don't wait)
                     auto nbr_assets = refs.size();
                     EENG_LOG(ctx.get(), "[startup] Imported %zu models. Scanning...", nbr_assets);
-                    ctx->resource_manager->scan_assets_async(asset_root, *ctx);
+                    auto scan_fut = ctx->resource_manager->scan_assets_async(asset_root, *ctx);
 
                     // Create a few batches
                     // Add a few entities to each batch
@@ -117,43 +118,47 @@ namespace eeng::dev
                     //      if load_and_bind_async is called when an entity is added,
                     //      then the assets must be available to RM (i.e. scan must have completed).
                     //      Otherwise, load will fail for entities unknown assets.
+                    EENG_LOG(ctx.get(), "[startup] Creating entities...");
                     {
-                        // 1) Create new entity in batch (HeaderComponent added automatically)
-                        auto fut_entity = br.queue_create_entity(batch_id1, "StartupEntity_1", *ctx);
-                        ecs::EntityRef er = fut_entity.get();
-                        // 1b) Create a child entity and set parent
-                        // auto fut_entity_child = br.queue_create_entity(batch_id1, "StartupEntity_1_Child", *ctx);
-                        // ecs::EntityRef er_child = fut_entity_child.get();
-                        // ^ bound entity ref???
-                        // ctx->main_thread_queue->push_and_wait([&]() {
-                        //     ctx->entity_manager->reparent_entity(
-                        //         er_child.get_entity(),
-                        //         er.get_entity()
-                        //     );
-                        //     });
+                        // 1) Create entities new entity in batch (HeaderComponent added automatically)
+                        auto root_fut = br.queue_create_entity(batch_id1, "Root", eeng::ecs::EntityRef{}, *ctx);
+                        ecs::EntityRef er_root = root_fut.get();
+                        auto player_fut = br.queue_create_entity(batch_id1, "Player", er_root, *ctx);
+                        auto camera_fut = br.queue_create_entity(batch_id1, "Camera", er_root, *ctx);
+                        ecs::EntityRef er_player = player_fut.get();
+                        ecs::EntityRef er_camera = camera_fut.get();
 
-                        // 2) Add a placeholder component on main thread
-#if 0
+                        // Wait for scan to finish before assigning assets
+                        EENG_LOG(ctx.get(), "[startup] Waiting for scan to complete before adding components...");
+                        scan_fut.get();
+                        EENG_LOG(ctx.get(), "[startup] Scan done.");
+
+                        // 2) Add mock components on main thread
+#if 1
                         ctx->main_thread_queue->push_and_wait([&]()
                             {
+                                EENG_LOG(ctx.get(), "[startup] Adding components to entities on main...");
+
                                 auto registry_sptr = ctx->entity_manager->registry_wptr().lock();
-                                if (!registry_sptr || !er.has_entity())
+                                if (!registry_sptr || !er_player.has_entity() || !er_camera.has_entity())
                                     return;
 
                                 auto& reg = *registry_sptr;
 
-                                // Example component type
-                                struct Position
-                                {
-                                    float x{}, y{}, z{};
-                                };
+                                auto player_model_ref = refs[0]; // 
+                                auto camera_model_ref = refs[1];
+                                ecs::mock::MockPlayerComponent player_comp{ 1.0f, 2.0f, er_camera, player_model_ref };
+                                ecs::mock::MockCameraComponent camera_comp{ 3.0f, 4.0f, er_player, camera_model_ref };
 
-                                reg.emplace<Position>(er.get_entity(), Position{ 0.0f, 0.0f, 0.0f });
+                                reg.emplace<ecs::mock::MockPlayerComponent>(er_player.get_entity(), player_comp);
+                                reg.emplace<ecs::mock::MockCameraComponent>(er_camera.get_entity(), camera_comp);
+
 
                                 // If Position has AssetRef<T> inside,
                                 // you’d either:
                                 //  - call a BR helper to update closure, or
                                 //  - rely on a later “recompute closure” pass.
+                                EENG_LOG(ctx.get(), "[startup] Done adding components...");
                             });
 #endif
                     }

@@ -150,13 +150,15 @@ namespace eeng
         entt::meta_factory<eeng::ecs::EntityRef>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "EntityRef", "A reference to an entity." })
 
-            // GETTER / SETTER, OR EXPOSE GUID ???
+            // (Serialization, Cloning)
+            // Guid
             .template data<&eeng::ecs::EntityRef::set_guid, &eeng::ecs::EntityRef::get_guid>("guid"_hs)
             .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
             .traits(MetaFlags::read_only)
+            
+            // Entity
 
-            // Entity ???
-
+            // (Inspection)
             .func<&eeng::editor::inspect_EntityRef>(eeng::literals::inspect_hs)
             .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_EntityRef", "Inspect entity reference" })
 
@@ -178,13 +180,13 @@ namespace eeng
             .custom<DataMetaInfo>(DataMetaInfo{ "health", "Health", "Player health." })
             .traits(MetaFlags::none)
 
-            // .data<&eeng::ecs::mock::MockPlayerComponent::camera_ref>("camera_ref"_hs)
-            // .custom<DataMetaInfo>(DataMetaInfo{ "camera_ref", "Camera Reference", "Reference to the player's camera entity." })
-            // .traits(MetaFlags::ReadOnly)
+            .data<&eeng::ecs::mock::MockPlayerComponent::camera_ref>("camera_ref"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "camera_ref", "Camera Reference", "Reference to the player's camera entity." })
+            .traits(MetaFlags::none)
 
-            // .data<&eeng::ecs::mock::MockPlayerComponent::model_ref>("model_ref"_hs)
-            // .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model Reference", "Reference to the player's model asset." })
-            // .traits(MetaFlags::ReadOnly)
+            .data<&eeng::ecs::mock::MockPlayerComponent::model_ref>("model_ref"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model Reference", "Reference to the player's model asset." })
+            .traits(MetaFlags::none)
             ;
 
         // ---------------------------------------------------------------------
@@ -198,6 +200,14 @@ namespace eeng
 
             .data<&eeng::ecs::mock::MockCameraComponent::fov>("fov"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "fov", "Field of View", "Camera field of view." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::mock::MockCameraComponent::target_ref>("target_ref"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "target_ref", "Target Reference", "Reference to the camera target entity." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::mock::MockCameraComponent::model_ref>("model_ref"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model Reference", "Reference to the camera's model asset." })
             .traits(MetaFlags::none)
             ;
 
@@ -231,7 +241,7 @@ namespace eeng
                 // Dispatch immediately since entity may be in an invalid state
                 assert(!context.dispatcher.expired());
                 context.dispatcher.lock()->dispatch(ChunkModifiedEvent{ entity, new_tag });
-    };
+            };
 #endif
         entt::meta_factory<eeng::ecs::HeaderComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "HeaderComponent", "Metadata for HeaderComponent." })
@@ -276,6 +286,6 @@ namespace eeng
                     //.func<&cloneDebugClass>(clone_hs)
                 ;
 #endif
-}
+    }
 
 } // namespace eeng

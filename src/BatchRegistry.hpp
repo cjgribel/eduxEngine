@@ -134,7 +134,7 @@ namespace eeng {
         std::shared_future<TaskResult> queue_save_all_async(EngineContext& ctx);
 
         /// Create and spawn a new entity in the batch (thread safe).
-        std::shared_future<ecs::EntityRef> queue_create_entity(const BatchId& id, const std::string& name, EngineContext& ctx);
+        std::shared_future<ecs::EntityRef> queue_create_entity(const BatchId& id, const std::string& name, const ecs::EntityRef& parent, EngineContext& ctx);
 
         /// Destroy and remove an entity from the batch (thread safe).
         std::shared_future<bool> queue_destroy_entity(const BatchId& id, ecs::EntityRef entity_ref, EngineContext& ctx);
