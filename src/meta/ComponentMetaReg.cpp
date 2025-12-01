@@ -24,7 +24,7 @@
 // #include <iostream>
 #include <entt/entt.hpp>
 // #include <entt/meta/pointer.hpp>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json.hpp> // -> TYPE HELPER
 
 namespace eeng
 {
@@ -152,7 +152,8 @@ namespace eeng
 
             // (Serialize) (Clone)
             // Guid
-            .template data<&eeng::ecs::EntityRef::set_guid, &eeng::ecs::EntityRef::get_guid>("guid"_hs)
+            .template data<&eeng::ecs::EntityRef::guid>("guid"_hs)
+            // .template data<&eeng::ecs::EntityRef::set_guid, &eeng::ecs::EntityRef::get_guid>("guid"_hs)
             .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
             .traits(MetaFlags::read_only)
             // Entity
@@ -241,7 +242,7 @@ namespace eeng
                 // Dispatch immediately since entity may be in an invalid state
                 assert(!context.dispatcher.expired());
                 context.dispatcher.lock()->dispatch(ChunkModifiedEvent{ entity, new_tag });
-            };
+    };
 #endif
         entt::meta_factory<eeng::ecs::HeaderComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "HeaderComponent", "Metadata for HeaderComponent." })
@@ -286,6 +287,6 @@ namespace eeng
                     //.func<&cloneDebugClass>(clone_hs)
                 ;
 #endif
-    }
+}
 
 } // namespace eeng

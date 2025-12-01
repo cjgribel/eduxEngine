@@ -135,7 +135,7 @@ namespace eeng
 
             for (const auto& er : snapshot.live)
             {
-                if (!er.has_entity()) continue;
+                if (!er.is_bound()) continue;
 
                 // existing meta serializer:
                 //   nlohmann::json ejson = eeng::meta::serialize_entity(er, ctx.entity_manager->registry_ptr());
@@ -317,7 +317,7 @@ namespace eeng
                         auto [guid, entity] = em->create_entity(
                             batch_tag,          // REMOVE ?
                             name,
-                            parent.get_entity(), 
+                            parent.entity, 
                             ecs::Entity::EntityNull
                         );
 
@@ -358,7 +358,7 @@ namespace eeng
                     live.erase(std::remove_if(live.begin(), live.end(),
                         [&](const ecs::EntityRef& er)
                         {
-                            return er.get_guid() == entity_ref.get_guid();
+                            return er.guid == entity_ref.guid;
                         }),
                         live.end());
                 }
@@ -366,9 +366,9 @@ namespace eeng
                 // MT: queue destroy
                 ctx.main_thread_queue->push_and_wait([&]()
                     {
-                        if (entity_ref.has_entity())
+                        if (entity_ref.is_bound())
                         {
-                            ctx.entity_manager->queue_entity_for_destruction(entity_ref.get_entity());
+                            ctx.entity_manager->queue_entity_for_destruction(entity_ref.entity);
                         }
                     });
 
@@ -404,7 +404,7 @@ namespace eeng
 
                 // Update asset closure from existing components
                 auto registry_sptr = ctx.entity_manager->registry_wptr().lock();
-                if (!registry_sptr || !entity_ref.has_entity())
+                if (!registry_sptr || !entity_ref.is_bound())
                     return true; // nothing more to do
 
                 // UPDATE CLOSURE
@@ -440,7 +440,7 @@ namespace eeng
                 live.erase(std::remove_if(live.begin(), live.end(),
                     [&](const ecs::EntityRef& er)
                     {
-                        return er.get_guid() == entity_ref.get_guid();
+                        return er.guid == entity_ref.guid;
                     }),
                     live.end());
                 return live.size() != old_size;
@@ -468,7 +468,7 @@ namespace eeng
                         // Spawn and register entity from desc
                         // return spawn_entity_from_desc(desc, ctx);
                         auto entity = spawn_entity_from_desc(desc, ctx);
-                        ctx.entity_manager->register_entity(entity.get_entity());
+                        ctx.entity_manager->register_entity(entity.entity);
                         return entity;
                     });
 
@@ -726,7 +726,7 @@ namespace eeng
                     auto er = eeng::meta::spawn_entity_from_desc(desc, ctx);
                     // ctx.entity_manager->register_entity(er.get_entity());
                     B.live.push_back(er);
-                    new_entities.push_back(er.get_entity());
+                    new_entities.push_back(er.entity);
                 }
                 ctx.entity_manager->register_entities(new_entities);
             });
@@ -775,10 +775,10 @@ namespace eeng
             {
                 for (auto& er : B.live)
                 {
-                    if (er.has_entity())
+                    if (er.is_bound())
                     {
-                        ctx.entity_manager->queue_entity_for_destruction(er.get_entity());
-                        er.clear_entity();
+                        ctx.entity_manager->queue_entity_for_destruction(er.entity);
+                        er.unbind();
                     }
                 }
             });

@@ -170,7 +170,7 @@ namespace eeng
             visit_asset_refs(t, [&](const auto& ref)
                 {
                     //if (ref.valid())
-                    _meta.contained_assets.push_back(ref.get_guid());
+                    _meta.contained_assets.push_back(ref.guid);
                 });
 
             asset_index_->serialize_to_file<T>(t, _meta, file_path, meta_file_path);
@@ -257,7 +257,7 @@ namespace eeng
                             if (storage_->validate(child_ref.handle)) return;
 
                             using CT = typename std::decay_t<decltype(child_ref.handle)>::value_type;
-                            const Guid child = child_ref.get_guid();
+                            const Guid child = child_ref.guid;
 
                             auto h = storage_->handle_for_guid<CT>(child);
                             if (!h)

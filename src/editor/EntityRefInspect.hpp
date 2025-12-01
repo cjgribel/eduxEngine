@@ -18,14 +18,14 @@ namespace eeng::editor
 
         inspector.begin_leaf("GUID");
         
-        auto& guid = ptr->get_guid();
+        auto& guid = ptr->guid;
         ImGui::TextUnformatted(guid.valid() ? guid.to_string().c_str() : "n/a");
         
         //bool guid_modified = editor::inspect_type(guid, inspector);
         inspector.end_leaf();
 
         inspector.begin_leaf("Live ID");
-        auto entity = ptr->get_entity();
+        auto entity = ptr->entity;
         ImGui::TextUnformatted(entity.is_null() ? "n/a" : std::to_string(entity.to_integral()).c_str());
         inspector.end_leaf();
 

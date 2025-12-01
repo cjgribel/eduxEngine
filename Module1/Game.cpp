@@ -140,7 +140,7 @@ namespace eeng::dev
                                 EENG_LOG(ctx.get(), "[startup] Adding components to entities on main...");
 
                                 auto registry_sptr = ctx->entity_manager->registry_wptr().lock();
-                                if (!registry_sptr || !er_player.has_entity() || !er_camera.has_entity())
+                                if (!registry_sptr || !er_player.is_bound() || !er_camera.is_bound())
                                     return;
 
                                 auto& reg = *registry_sptr;
@@ -150,8 +150,8 @@ namespace eeng::dev
                                 ecs::mock::MockPlayerComponent player_comp{ 1.0f, 2.0f, er_camera, player_model_ref };
                                 ecs::mock::MockCameraComponent camera_comp{ 3.0f, 4.0f, er_player, camera_model_ref };
 
-                                reg.emplace<ecs::mock::MockPlayerComponent>(er_player.get_entity(), player_comp);
-                                reg.emplace<ecs::mock::MockCameraComponent>(er_camera.get_entity(), camera_comp);
+                                reg.emplace<ecs::mock::MockPlayerComponent>(er_player.entity, player_comp);
+                                reg.emplace<ecs::mock::MockCameraComponent>(er_camera.entity, camera_comp);
 
 
                                 // If Position has AssetRef<T> inside,

@@ -195,19 +195,19 @@ namespace eeng::meta
 
         nlohmann::json entity_json;
         // entity_json["entity"] = entity.to_integral();
-        entity_json["entity_guid"] = entity_ref.get_guid().raw();
+        entity_json["entity_guid"] = entity_ref.guid.raw();
 
         // For all component types
         for (auto&& [id, type] : registry->storage())
         {
-            if (!type.contains(entity_ref.get_entity())) continue;
+            if (!type.contains(entity_ref.entity)) continue;
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
                 auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
                 // auto type_name = get_meta_type_name(meta_type); // Display name or mangled name
 
-                entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity_ref.get_entity())));
+                entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity_ref.entity)));
             }
             else
             {

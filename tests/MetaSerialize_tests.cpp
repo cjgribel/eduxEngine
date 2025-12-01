@@ -679,9 +679,9 @@ TEST_F(MetaSerializationTest, SerializeDeserialize_EntityRoundTrip)
     ecs::EntityRef dst_entity_ref = eeng::meta::deserialize_entity(json_entity, dst_ctx);
 
     // basic GUID check
-    EXPECT_EQ(dst_entity_ref.get_guid().raw(), src_guid.raw());
+    EXPECT_EQ(dst_entity_ref.guid.raw(), src_guid.raw());
 
-    entt::entity dst_entt_entity = static_cast<entt::entity>(dst_entity_ref.get_entity());
+    entt::entity dst_entt_entity = static_cast<entt::entity>(dst_entity_ref.entity);
     ASSERT_TRUE(dst_reg.valid(dst_entt_entity));
 
     //

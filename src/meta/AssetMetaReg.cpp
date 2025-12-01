@@ -1,20 +1,24 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-// #include <iostream>
-#include <entt/entt.hpp>
-// #include <entt/meta/pointer.hpp>
-#include <nlohmann/json.hpp>
+
 #include "config.h"
 #include "AssetMetaReg.hpp"
 
 #include "EngineContext.hpp"
+#include "MetaInfo.h"
+#include "MetaLiterals.h"
+#include "MetaHelpers.hpp"
+
 #include "editor/AssetRefInspect.hpp"
 #include "ResourceTypes.hpp"
-#include "MetaLiterals.h"
 #include "Storage.hpp"
-#include "MetaInfo.h"
 #include "ResourceManager.hpp"
+
+// #include <iostream>
+#include <entt/entt.hpp>
+// #include <entt/meta/pointer.hpp>
+#include <nlohmann/json.hpp> // -> TYPE HELPER
 
 namespace eeng {
 

@@ -92,11 +92,13 @@ namespace eeng::ecs
         : guid(Guid::invalid()), entity(Entity::EntityNull) {
     }
 
-    const Guid& EntityRef::get_guid() const { return guid; }
-    void EntityRef::set_guid(const Guid& guid) { this->guid = guid; }
+    // const Guid& EntityRef::get_guid() const { return guid; }
+    // void EntityRef::set_guid(const Guid& guid) { this->guid = guid; }
 
-    const ecs::Entity& EntityRef::get_entity() const { return entity; }
-    void EntityRef::set_entity(const ecs::Entity& entity) { this->entity = entity; }
-    bool EntityRef::has_entity() const { return !entity.is_null(); }
-    void EntityRef::clear_entity() { entity = {}; }
+    // const ecs::Entity& EntityRef::get_entity() const { return entity; }
+    // void EntityRef::set_entity(const ecs::Entity& entity) { this->entity = entity; }
+
+    void EntityRef::bind(const ecs::Entity& entity) { this->entity = entity; }
+    bool EntityRef::is_bound() const { return !entity.is_null(); }
+    void EntityRef::unbind() { entity = {}; }
 } 

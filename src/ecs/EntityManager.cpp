@@ -30,7 +30,7 @@ namespace eeng
     {
         assert(registry_->all_of<HeaderComponent>(entity));
         auto& header_comp = registry_->get<HeaderComponent>(entity);
-        auto& parent_entity = header_comp.parent_entity.get_entity();
+        auto& parent_entity = header_comp.parent_entity.entity;
         auto& guid = header_comp.guid;
 
         // Add entity to scene graph
@@ -81,10 +81,10 @@ namespace eeng
             //auto& header = registry_->get<HeaderComponent>(entity);
             auto& parent_ref = header.parent_entity;
 
-            const Guid& parent_guid = parent_ref.get_guid();  // or parent_ref.get_guid()
+            const Guid& parent_guid = parent_ref.guid;  // or parent_ref.get_guid()
             if (!parent_guid.valid())
             {
-                parent_ref.set_entity(Entity::EntityNull);
+                parent_ref.unbind();
                 continue; // stays root
             }
 
@@ -99,7 +99,7 @@ namespace eeng
             // }
 
             // Bind runtime handle into EntityRef
-            parent_ref.set_entity(parent_entity);
+            parent_ref.bind(parent_entity);
 
             // Now that both nodes exist in the graph, safe to reparent
             scene_graph_->reparent(entity, parent_entity);
@@ -157,7 +157,7 @@ namespace eeng
 
     bool EntityManager::entity_parent_registered(const Entity& entity) const
     {
-        auto entity_parent = get_entity_parent(entity).get_entity();
+        auto entity_parent = get_entity_parent(entity).entity;
         // assert(registry_->all_of<HeaderComponent>(entity));
         // auto& header = registry_->get<HeaderComponent>(entity);
         // auto entity_parent = header.parent_entity.get_entity();

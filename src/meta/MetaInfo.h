@@ -5,6 +5,7 @@
 #define MetaInfo_h
 
 #include <iostream>
+#include <entt/entt.hpp>
 
 namespace eeng
 {
