@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "EngineContext.hpp"
 #include "InspectorState.hpp"
 // #include "ecs/Entity.hpp"
 #include "AssetRef.hpp"
@@ -12,7 +13,7 @@ namespace eeng::editor
     // 
 
     template <class T>
-    bool inspect_AssetRef(entt::meta_any& any, InspectorState& inspector)
+    bool inspect_AssetRef(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
         // Check const?
 

@@ -146,7 +146,12 @@ namespace eeng::meta {
                 auto copy_any = meta::clone_any(any, ctx.entity_selection->first());
                 //auto copy_any = any;
                 // auto res_any = meta_func.invoke({}, copy_any.base().data(), entt::forward_as_meta(inspector));
-                auto res_any = meta_func.invoke({}, entt::forward_as_meta(copy_any), entt::forward_as_meta(inspector));
+                auto res_any = meta_func.invoke(
+                    {},
+                    entt::forward_as_meta(copy_any),
+                    entt::forward_as_meta(inspector),
+                    entt::forward_as_meta(ctx)
+                );
                 assert(res_any && "Failed to invoke inspect meta function");
 
                 // Issue command if a change is detected
@@ -461,4 +466,4 @@ namespace eeng::meta {
 }
 #endif
 
-    } // namespace Editor
+} // namespace Editor

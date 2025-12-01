@@ -154,15 +154,15 @@ namespace eeng {
             entt::meta_factory<AssetRef<T>>{}
             .template custom<TypeMetaInfo>(TypeMetaInfo{ "AssetRef", "An asset reference." })
 
-                // (Serialization)
+                // (Serialize) (Clone)
                 // Guid
                 .template data<&AssetRef<T>::guid>("guid"_hs)
                 .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
                 .traits(MetaFlags::read_only)
-
                 // Handle<T>
+                // (Not serialized) (Not cloned)
 
-                // (Inspection)
+                // (Inspect)
                 .template func<&eeng::editor::inspect_AssetRef<T>>(eeng::literals::inspect_hs)
                 .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_AssetRef", "Inspect asset reference" })
                 ;

@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "EngineContext.hpp"
 #include "InspectorState.hpp"
 #include "ecs/Entity.hpp"
 #include "entt/entt.hpp"
@@ -8,7 +9,7 @@
 namespace eeng::editor
 {
     // + ctx
-    bool inspect_EntityRef(entt::meta_any& any, InspectorState& inspector)
+    bool inspect_EntityRef(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
         // Check const?
 

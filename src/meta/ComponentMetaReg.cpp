@@ -150,15 +150,15 @@ namespace eeng
         entt::meta_factory<eeng::ecs::EntityRef>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "EntityRef", "A reference to an entity." })
 
-            // (Serialization, Cloning)
+            // (Serialize) (Clone)
             // Guid
             .template data<&eeng::ecs::EntityRef::set_guid, &eeng::ecs::EntityRef::get_guid>("guid"_hs)
             .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
             .traits(MetaFlags::read_only)
-            
             // Entity
+            // (Not serialized) (Not cloned)
 
-            // (Inspection)
+            // (Inspect)
             .func<&eeng::editor::inspect_EntityRef>(eeng::literals::inspect_hs)
             .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_EntityRef", "Inspect entity reference" })
 
