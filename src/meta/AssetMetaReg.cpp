@@ -8,7 +8,7 @@
 #include "EngineContext.hpp"
 #include "MetaInfo.h"
 #include "MetaLiterals.h"
-#include "MetaHelpers.hpp"
+// #include "MetaHelpers.hpp"
 
 #include "editor/AssetRefInspect.hpp"
 #include "ResourceTypes.hpp"
@@ -43,17 +43,6 @@ namespace eeng {
         {
             storage.assure_storage<T>();
         }
-
-#if 0
-        // Collect referenced GUIDs for Assets or Components
-        template<typename T>
-        void collect_guids(T& t, std::unordered_set<Guid>& out_guids)
-        {
-            visit_asset_refs(t, [&](const auto& asset_ref) {
-                out_guids.insert(asset_ref.guid);
-                });
-        }
-#endif
 
         template<class T>
         void load_asset(const Guid& guid, EngineContext& ctx)

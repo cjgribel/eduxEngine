@@ -2,8 +2,10 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "config.h"
-#include "ComponentMetaReg.hpp"
 #include "EngineContext.hpp"
+
+#include "ComponentMetaReg.hpp"
+#include "EntityMetaHelpers.hpp"
 
 //#include "ResourceTypes.hpp"
 #include "ecs/TransformComponent.hpp"
@@ -97,6 +99,10 @@ namespace eeng
             entt::meta_factory<T>()
                 .template func<&assure_type_storage<T>, entt::as_void_t>(literals::assure_component_storage_hs)
                 // .func<&resolve_component_meta<T>>(hashed_string("resolve_component"))
+
+                .template func<&meta::collect_asset_guids<T>, entt::as_void_t>(literals::collect_asset_guids_hs)
+                .template func<&meta::bind_asset_refs<T>, entt::as_void_t>(literals::bind_asset_refs_hs)
+
                 ;
 
             // AssetRef<T>
@@ -242,7 +248,7 @@ namespace eeng
                 // Dispatch immediately since entity may be in an invalid state
                 assert(!context.dispatcher.expired());
                 context.dispatcher.lock()->dispatch(ChunkModifiedEvent{ entity, new_tag });
-    };
+            };
 #endif
         entt::meta_factory<eeng::ecs::HeaderComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "HeaderComponent", "Metadata for HeaderComponent." })
@@ -287,6 +293,6 @@ namespace eeng
                     //.func<&cloneDebugClass>(clone_hs)
                 ;
 #endif
-}
+    }
 
 } // namespace eeng

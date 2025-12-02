@@ -2,11 +2,12 @@
 
 // ECSMetaHelpers
 
+#include "MetaAux.h"
 #include "Guid.h"
 #include "EngineContext.hpp"
+#include "ResourceManager.hpp"
 #include <vector>
 
-#if 0
 
 // REGISTER
 // TODO: REGISTER to Asset & Comp types
@@ -18,36 +19,48 @@ namespace eeng::meta
     {
         visit_asset_refs(self, [&](auto& ref)
             {
-                // ref is AssetRef<SomeType>& (typed)
-                out.push_back(ref.get_guid());
+                // ref is AssetRef<SomeAssetType>&
+                out.push_back(ref.guid);
             });
     }
 
+    // 'bind_component_asset_refs'
+    // Or, integrate with RM and use it for both Asset & Comp types
     template<typename T>
-    void resolve_asset_refs(T& self, IResourceManager& rm, EngineContext& ctx)
+    void bind_asset_refs(T& self, /*, IResourceManager& rm*/ EngineContext& ctx)
     {
+        auto& rm_ = static_cast<eeng::ResourceManager&>(*ctx.resource_manager);
+
         visit_asset_refs(self, [&](auto& ref)
             {
                 using Ref = std::decay_t<decltype(ref)>;
                 using HandleT = std::decay_t<decltype(ref.handle)>;
                 using AssetT = typename HandleT::value_type;  // matches your existing pattern
 
-                const Guid g = ref.get_guid();
+                const Guid g = ref.guid;
                 if (!g.valid())
                     return;
 
-                auto h = rm.handle_for_guid<AssetT>(g);
-                if (!h)
+                auto handle_opt = rm_.handle_for_guid<AssetT>(g);
+                if (!handle_opt)
                 {
+                    // ref                          // The ref we are trying to bind
+                    get_meta_type_name<T>();        // Component/refereer type
+                    get_meta_type_name<AssetT>();   // Asset type
+
                     // Policy choice: leave handle empty, or log, or throw.
                     // For now: just leave it empty.
                     return;
                 }
 
-                ref.handle = *h;
+                ref.bind(*handle_opt);
+                // ref.handle = *h;
             });
     }
+#if 0
 
+    // 'bind_component_entity_refs'
+    // Mot relevant for Asset types (assets not reference entities)
     template<typename T>
     void resolve_entity_refs(T& self, EntityManager& em)
     {
@@ -187,7 +200,6 @@ if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
                     );
                 }
             });
-    }
 }
-
 #endif
+}

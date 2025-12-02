@@ -35,13 +35,11 @@ namespace eeng
             Handle<T> handle = Handle<T>())
             : guid(guid)
             , handle(handle)
-        {
-        }
+        { }
 
-        // Optional helpers
-        bool is_bound() const { return bool(handle); }         // -> is_referant
-        void bind(Handle<T> handle) { this->handle = handle; }  // -> set_reference
-        void unbind() { handle.reset(); }                       // -> unreference
+        bool is_bound() const { return bool(handle); }
+        void bind(Handle<T> handle) { this->handle = handle; }
+        void unbind() { handle.reset(); }
         
         //Guid get_guid() const { return guid; }
         // Handle<T> get_handle() const { return handle; }

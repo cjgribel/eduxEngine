@@ -112,6 +112,12 @@ namespace eeng
         void wait_until_idle() override;
         int  queued_tasks() const noexcept override;
 
+        template<class T>
+        std::optional<Handle<T>> handle_for_guid(const Guid& guid) const
+        {
+            return storage_->handle_for_guid<T>(guid);
+        }
+
         /// @brief Get a snapshot of asset index
         AssetIndexDataPtr get_index_data() const override;
 
