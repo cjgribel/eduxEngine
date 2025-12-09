@@ -58,18 +58,19 @@ namespace eeng {
             rm.unload_asset<T>(guid, ctx);
         }
 
+        // -> META HELPER, or MERGE WITH GENERAL BIND CODE
         template<class T>
-        void bind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
+        BindResult bind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
         {
             auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
-            rm.bind_asset<T>(guid, batch_id, ctx);
+            return rm.bind_asset<T>(guid, batch_id, ctx);
         }
 
         template<class T>
-        void unbind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
+        BindResult unbind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
         {
             auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
-            rm.unbind_asset<T>(guid, batch_id, ctx);
+            return rm.unbind_asset<T>(guid, batch_id, ctx);
         }
 
         // template<class T>
@@ -116,8 +117,8 @@ namespace eeng {
                 // Type-safe binding
                 // .template func<&bind_asset<T>, entt::as_void_t>(eeng::literals::bind_asset_hs)
                 // .template func<&unbind_asset<T>, entt::as_void_t>(eeng::literals::unbind_asset_hs)
-                .template func<&bind_asset<T>, entt::as_void_t>(eeng::literals::bind_asset_hs)
-                .template func<&unbind_asset<T>, entt::as_void_t>(eeng::literals::unbind_asset_hs)
+                .template func<&bind_asset<T>/*, entt::as_void_t*/>(eeng::literals::bind_asset_hs)
+                .template func<&unbind_asset<T>/*, entt::as_void_t*/>(eeng::literals::unbind_asset_hs)
 
                 // Asset validation
                 .template func<&validate_asset<T>>(eeng::literals::validate_asset_hs)

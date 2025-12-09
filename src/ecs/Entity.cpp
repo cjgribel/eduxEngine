@@ -44,11 +44,13 @@ namespace eeng::ecs
         return id;
     }
 
+    bool Entity::valid() const { return id != static_cast<entity_type>(entt::null); }
+
     // Check if the entity is null
-    bool Entity::is_null() const
-    {
-        return id == static_cast<entity_type>(entt::null);
-    }
+    // bool Entity::is_null() const
+    // {
+    //     return id == static_cast<entity_type>(entt::null);
+    // }
 
     // Set the entity to null
     void Entity::set_null()
@@ -99,6 +101,6 @@ namespace eeng::ecs
     // void EntityRef::set_entity(const ecs::Entity& entity) { this->entity = entity; }
 
     void EntityRef::bind(const ecs::Entity& entity) { this->entity = entity; }
-    bool EntityRef::is_bound() const { return !entity.is_null(); }
+    bool EntityRef::is_bound() const { return entity.valid(); }
     void EntityRef::unbind() { entity = {}; }
 } 

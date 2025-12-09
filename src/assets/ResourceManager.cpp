@@ -155,14 +155,14 @@ namespace eeng
         const BatchId& batch,
         EngineContext& ctx)
     {
-        using Op = TaskResult::OperationResult;
+        using Op = OperationResult;
         TaskResult res; res.type = TaskResult::TaskType::Load;
 
         // Not needed, mostly for predictability
         std::sort(guids.begin(), guids.end());
         guids.erase(std::unique(guids.begin(), guids.end()), guids.end());
 
-        // [We don't do overlapping loads/unloads anymore] Acquire parent leases up-front so overlapping unloads can't drop them
+        // Acquire parent leases up-front so overlapping unloads can't drop them
         for (const Guid& g : guids) batch_acquire(batch, g);
 
         // Parallel loads (status-gated)
@@ -208,32 +208,74 @@ namespace eeng
         }
 
         // Bind phase (meta bind that takes batch)
+#if 1
+        for (const Guid& g : guids)
+        {
+            // Skip bind if asset failed to load
+            if (failed.count(g)) continue;
+
+            try
+            {
+                BindResult br{};
+                {
+                    auto br_any = invoke_meta_function(g, batch, ctx, literals::bind_asset_hs, "bind_asset");
+                    br = br_any.cast<BindResult>();
+                }
+
+                {
+                    std::lock_guard lk(status_mutex_);
+                    auto& st = statuses_[g];
+
+                    if (br.all_refs_bound)
+                    {
+                        st.bind_state = BindState::Bound;
+                    }
+                    else
+                    {
+                        st.bind_state = BindState::PartiallyBound;
+                        // TODO st.error_message ...
+                    }
+                }
+            }
+            catch (const std::exception& ex)
+            {
+                // Catastrophic error, but: do *not* drop the lease
+                {
+                    std::lock_guard lk(status_mutex_);
+                    auto& st = statuses_[g];
+                    st.bind_state = BindState::Unbound;
+                    //st.error_message = ex.what();
+                }
+                res.add_result(g, false, ex.what());
+            }
+        }
+#else
         for (const Guid& g : guids) {
             //if (failed.count(g)) { (void)batch_release(batch, g); continue; }
             if (failed.count(g)) continue;
 
             try {
                 // invoke_meta_function(g, batch, ctx, bind_asset_hs, "bind_asset_with_batch");
-                // (Use your overload that takes batch_id)
                 (void)invoke_meta_function(g, batch, ctx, literals::bind_asset_hs, "bind_asset");
 
                 res.add_result(g, true, "Bind Ok");
-            }
+                }
             catch (const std::exception& ex) {
                 (void)batch_release(batch, g); // roll back parent lease if bind fails
                 res.add_result(g, false, ex.what());
             }
-        }
+            }
+#endif
 
         return res;
-    }
+        }
 
     TaskResult ResourceManager::unbind_and_unload_impl(
         std::deque<Guid> guids,
         const BatchId& batch,
         EngineContext& ctx)
     {
-        using Op = TaskResult::OperationResult;
+        using Op = OperationResult;
         TaskResult res; res.type = TaskResult::TaskType::Unload;
 
         // Optional determinism:
@@ -279,13 +321,16 @@ namespace eeng
                 st.error_message.clear();
             }
 
-            try {
+            try 
+            {
                 this->unload_asset(g, ctx);
+
                 std::lock_guard lk(status_mutex_);
                 statuses_.erase(g);
                 res.add_result(g, true, "Unbind+Unload Ok");
             }
-            catch (const std::exception& ex) {
+            catch (const std::exception& ex) 
+            {
                 std::lock_guard lk(status_mutex_);
                 auto& st = statuses_[g];
                 st.state = LoadState::Failed;
@@ -521,4 +566,4 @@ namespace eeng
 
         return result;
     }
-}
+    }

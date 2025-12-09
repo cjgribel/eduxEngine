@@ -26,7 +26,7 @@ namespace eeng::editor
 
         inspector.begin_leaf("Live ID");
         auto entity = ptr->entity;
-        ImGui::TextUnformatted(entity.is_null() ? "n/a" : std::to_string(entity.to_integral()).c_str());
+        ImGui::TextUnformatted(entity.valid() ? std::to_string(entity.to_integral()).c_str() : "n/a");
         inspector.end_leaf();
 
         // auto ptr = any.try_cast<Guid>();

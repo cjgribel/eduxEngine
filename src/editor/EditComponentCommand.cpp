@@ -295,7 +295,7 @@ namespace eeng::editor {
         // Valdiate before returning command instance 
 
         assert(!command.registry.expired() && "registry pointer expired");
-        assert(!command.entity.is_null() && "entity invalid");
+        assert(command.entity.valid() && "entity invalid");
         assert(command.component_id != 0 && "component id invalid");
 
         assert(command.prev_value);

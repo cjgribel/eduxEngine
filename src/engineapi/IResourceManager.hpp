@@ -14,35 +14,30 @@ namespace eeng
 {
     struct EngineContext;
 
-    enum class LoadState {
-        Loading,
-        Loaded,
-        Unloading,
-        Unloaded,
-        Failed
+    enum class LoadState { Loading, Loaded, Unloading, Unloaded, Failed };
+    enum class BindState { Unbound, PartiallyBound, Bound };
+
+    struct OperationResult
+    {
+        Guid guid{}; // Asset GUID
+        bool success{ true };
+        std::string message{};
     };
 
     // Load status and reference counting for an asset
     struct AssetStatus
     {
         LoadState state = LoadState::Unloaded;
-        // int ref_count = 0;
-        // bool resolved = false;
-        // std::optional<entt::meta_type> type;
+        BindState bind_state = BindState::Unbound;
         std::string error_message;
+        // std::vector<OperationResult> logs;
     };
 
     // Result of a task (load/unload/reload)
     struct TaskResult
     {
-        struct OperationResult
-        {
-            Guid guid{}; // Asset GUID
-            bool success{ true };
-            std::string message{};
-        };
-
         enum class TaskType { None, Load, Unload, Reload, Scan };
+        // enum class TaskType  { None, ResourceLoad, ResourceUnload, ResourceReload, ResourceScan, BatchLoad, BatchUnload, BatchSave, BatchRebindClosure };
 
         TaskType type{ TaskType::None };
         bool success{ true };
@@ -53,6 +48,30 @@ namespace eeng
             success &= ok;
             results.push_back(OperationResult{ guid, ok, std::string(err) });
         }
+    };
+
+    // class BindRefResult
+    // {
+    //     Guid guid{};
+    //     bool success{ true };
+    //     std::string msg;   // empty on success
+    // public:
+    //     BindRefResult(const Guid& guid, bool success, const std::string& msg)
+    //         : guid(guid), success(success), msg(msg) {
+    //     }
+    // };
+
+    // struct LoadResult
+    // {
+    //     // maybe other stuff
+    //     std::vector<OperationResult> ref_results;
+    // };
+
+    struct BindResult
+    {
+        Guid guid{};                    // referrer
+        bool all_refs_bound{ false };
+        std::vector<OperationResult> ref_results;
     };
 
     // Lease

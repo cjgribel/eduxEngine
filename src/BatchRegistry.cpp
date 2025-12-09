@@ -1,4 +1,8 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
 #include "BatchRegistry.hpp"
+#include "EntityMetaHelpers.hpp"
 #include "MainThreadQueue.hpp"
 #include "ThreadPool.hpp"
 #include <fstream>
@@ -99,6 +103,7 @@ namespace eeng
             });
     }
 
+    // TODO -> update index file as well?
     bool BatchRegistry::save_batch(const eeng::BatchId& id, EngineContext& ctx)
     {
         // 1) Snapshot BatchInfo (and enforce "Loaded" state)
@@ -317,7 +322,7 @@ namespace eeng
                         auto [guid, entity] = em->create_entity(
                             batch_tag,          // REMOVE ?
                             name,
-                            parent.entity, 
+                            parent.entity,
                             ecs::Entity::EntityNull
                         );
 
@@ -333,6 +338,7 @@ namespace eeng
                 }
 
                 // No components yet → no asset refs yet → no closure update now
+
                 return created;
             });
     }
@@ -657,6 +663,119 @@ namespace eeng
         return out;
     }
 
+    std::shared_future<TaskResult>
+        BatchRegistry::queue_rebuild_closure(const BatchId& id, EngineContext& ctx)
+    {
+        return strand(ctx).submit([this, id, &ctx]() -> TaskResult
+            {
+                TaskResult result{};
+                result.success = true;
+
+                // 1) Snapshot BatchInfo pointer, ensure Loaded
+                BatchInfo* B = nullptr;
+                {
+                    std::lock_guard lk(mtx_);
+                    auto it = batches_.find(id);
+                    if (it == batches_.end())
+                    {
+                        // unknown batch
+                        result.success = false;
+                        return result;
+                    }
+                    if (it->second.state != BatchInfo::State::Loaded)
+                    {
+                        // only rebind closure for loaded batches
+                        result.success = false;
+                        return result;
+                    }
+                    B = &it->second;
+                }
+
+                // 2) Grab registry (shared_ptr) once
+                auto registry_sp = ctx.entity_manager->registry_wptr().lock();
+                if (!registry_sp)
+                {
+                    result.success = false;
+                    return result;
+                }
+                auto& reg = *registry_sp;
+
+                // 3) Main-thread: recompute closure from live entities
+                std::vector<Guid> new_closure = ctx.main_thread_queue->push_and_wait([&]() {
+                    std::vector<Guid> guids;
+
+                    for (auto& er : B->live)
+                    {
+                        if (!er.is_bound()) continue;
+                        auto per_entity = eeng::meta::collect_asset_guids_for_entity(
+                            er.entity, reg);
+                        guids.insert(guids.end(), per_entity.begin(), per_entity.end());
+                    }
+
+                    // dedup
+                    std::sort(guids.begin(), guids.end());
+                    guids.erase(std::unique(guids.begin(), guids.end()), guids.end());
+
+                    return guids;
+                    });
+                // for (auto& g : new_closure) { EENG_LOG(&ctx, "[queue_rebuild_closure] col. closure %s", g.to_string().c_str()); }
+
+                // 4) Compute diff vs old header closure
+                std::vector<Guid> old_closure;
+                {
+                    std::lock_guard lk(mtx_);
+                    old_closure = B->asset_closure_hdr;
+                }
+
+                auto sorted_old = old_closure;
+                std::sort(sorted_old.begin(), sorted_old.end());
+                auto sorted_new = new_closure; // already sorted above, but cheap to be sure
+                std::sort(sorted_new.begin(), sorted_new.end());
+
+                std::vector<Guid> to_add;
+                std::vector<Guid> to_remove;
+
+                std::set_difference(
+                    sorted_new.begin(), sorted_new.end(),
+                    sorted_old.begin(), sorted_old.end(),
+                    std::back_inserter(to_add));
+
+                std::set_difference(
+                    sorted_old.begin(), sorted_old.end(),
+                    sorted_new.begin(), sorted_new.end(),
+                    std::back_inserter(to_remove));
+
+                for (auto& g : B->asset_closure_hdr) { EENG_LOG(&ctx, "[queue_rebuild_closure] closure %s", g.to_string().c_str()); }
+                for (auto& g : to_add) { EENG_LOG(&ctx, "[queue_rebuild_closure] + %s", g.to_string().c_str()); }
+                for (auto& g : to_remove) { EENG_LOG(&ctx, "[queue_rebuild_closure] - %s", g.to_string().c_str()); }
+
+                // 5) Adjust RM leases (idempotent at RM level)
+                auto& rm = *ctx.resource_manager;
+
+                if (!to_add.empty())
+                {
+                    std::deque<Guid> dq(to_add.begin(), to_add.end());
+                    auto r = rm.load_and_bind_async(dq, B->id, ctx).get();
+                    result.success = result.success && r.success;
+                }
+
+                if (!to_remove.empty())
+                {
+                    std::deque<Guid> dq(to_remove.begin(), to_remove.end());
+                    auto r = rm.unbind_and_unload_async(dq, B->id, ctx).get();
+                    result.success = result.success && r.success;
+                }
+
+                // 6) Commit new closure to BatchInfo
+                {
+                    std::lock_guard lk(mtx_);
+                    B->asset_closure_hdr = std::move(new_closure);
+                }
+
+                return result;
+            });
+    }
+
     // -------- Load / Unload implementations --------
 
 #if 1
@@ -702,7 +821,7 @@ namespace eeng
                 entity_descs.push_back(eeng::meta::create_entity_spawn_desc(ent_json));
         }
 
-        // 1) load assets (if any)
+        // 1) Load assets
         if (!B.asset_closure_hdr.empty())
         {
             res = ctx.resource_manager->load_and_bind_async(
@@ -711,7 +830,7 @@ namespace eeng
                 ctx
             ).get();
             if (!res.success)
-                return res;
+                return res; // TODO -> assets failed -> go on and spawn entities anyway?
         }
 
         // 2) spawn entities on main (if any)
@@ -733,29 +852,27 @@ namespace eeng
 
         // ABORT IF ASSET LOAD FAILED ???
 
-        // --- Main thread: Resolve AssetRef fields by looking up handles from RM
-        //
-        // Resolve AssetRef<T> fields
-        // visit_entity_refs(plan, [&](const Guid& guid, ecs::EntityRef& er) {
-            //     // lookup entity in global guid→entity map
-            //     auto it = global_guid_entity_map.find(guid);
-            //     if (it != global_guid_entity_map.end()) {
-                //         er.set_entity(it->second);
-                //     }
-                // });
+        // 3) Bind AssetRef<> + EntityRef<> inside components
+        if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
+        {
+            auto& reg = *reg_sp;
 
-        // --- Main thread: Resolve EntityRef fields (soft) using guid→entity map in EntityManager
-        //
-        // 6. MT phase 3: resolve EntityRef fields (soft)
-        //    - for each EntityRef (guid, entt::entity):
-        //        if guid is in the global guid→entity map → set .entity
-        //        else leave .entity invalid
-        // 7. MT?: run any "finalize" / "on_loaded" step for components that need GPU/init
-        // 8. mark batch as Bound / Loaded and store TaskResult
+            ctx.main_thread_queue->push_and_wait([&]()
+                {
+                    for (auto& er : B.live)
+                    {
+                        if (!er.is_bound()) continue;
+                        auto e = er.entity;
 
-        // ....
+                        // Bind asset refs in this entity's components
+                        eeng::meta::bind_asset_refs_for_entity(e, ctx);
+                        // Bind entity refs (uses EM via ctx)
+                        eeng::meta::bind_entity_refs_for_entity(e, ctx);
+                    }
+                });
+        }
 
-        // -- Main thread: Initialize GPU resources
+        // 4) Main thread: Initialize GPU resources
         // finalize_gpu(B);
 
         return res;
@@ -849,7 +966,7 @@ namespace eeng
                         ctx.entity_manager->queue_entity_for_destruction(er.get_entity());
                         er.clear_entity();
                     }
-}
+                }
             });
     }
 #endif

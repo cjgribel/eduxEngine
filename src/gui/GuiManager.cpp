@@ -18,6 +18,10 @@
 #include "MainThreadQueue.hpp"
 // #include "MetaInspect.hpp"
 
+// Inspection TODO -> using a Comp command - need an Asset command?
+#include "meta/MetaInspect.hpp"
+#include "editor/EditComponentCommand.hpp"
+
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
@@ -110,8 +114,7 @@ namespace eeng
         static_cast<LogManager&>(*ctx.log_manager).draw_gui_widget("Log");
     }
 
-    // TODO
-    // Content
+    // TODO -> WIDGET not a window
     void DrawOccupancyBar(size_t used, size_t capacity)
     {
         if (capacity == 0) return;
@@ -234,7 +237,7 @@ namespace eeng
 
     }
 
-    // TODO
+    // TODO -> WIDGET not a window
     // Window content
     void draw_asset_flat_list(EngineContext& ctx)
     {
@@ -413,6 +416,7 @@ namespace eeng
 
         if (ImGui::Button("Load (Batch 1)"))
         {
+            EENG_LOG(&ctx, "GUI load batch (1) %s", batch_id1.to_string().c_str());
             // auto batch_id = Guid::generate();
             auto to_reload = compute_selected_bottomup_closure(ctx);
             /*ctx.asset_async_future =*/ resource_manager.load_and_bind_async(to_reload, batch_id1, ctx);
@@ -456,23 +460,139 @@ namespace eeng
         // <-
 
         //ImGui::Text("Tasks in flight: %d", resource_manager.tasks_in_flight());
-        ImGui::Text("%s", resource_manager.is_busy() ? "(busy)" : "(idle)");
-        ImGui::SameLine();
-        ImGui::Text("Tasks in flight: %d", resource_manager.queued_tasks());
+        // ImGui::Text("%s", resource_manager.is_busy() ? "(busy)" : "(idle)");
+        // ImGui::SameLine();
+        // ImGui::Text("Tasks in flight: %d", resource_manager.queued_tasks());
 
-        ImGui::Text("Thread utilization %zu/%zu, queued %zu",
-            ctx.thread_pool->nbr_working_threads(),
-            ctx.thread_pool->nbr_threads(),
-            ctx.thread_pool->task_queue_size());
+        // ImGui::Text("Thread utilization %zu/%zu, queued %zu",
+        //     ctx.thread_pool->nbr_working_threads(),
+        //     ctx.thread_pool->nbr_threads(),
+        //     ctx.thread_pool->task_queue_size());
 
         ImGui::Separator();
-        ImGui::TextUnformatted("Inspection:");
-        ImGui::TextWrapped("Select an asset above to see details here...");
+
+        // TODO -> Widget
+        // --- Asset inspector -------------------------------------------------
+
+        // auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+        auto index_data = resource_manager.asset_index().get_index_data();
+        if (index_data)
+        {
+
+            // auto& storage = resource_manager.storage();
+            // const auto& tree = index_data->trees->content_tree;
+            auto& selection = *ctx.asset_selection;
+
+            ImGui::TextDisabled("%s", "Asset inspector");
+            if (selection.size())
+            {
+                // ImGui::TextWrapped("Select an asset above to see details here...");
+                auto guid = selection.first();
+                auto guid_status = ctx.resource_manager->get_status(guid);
+
+                auto it = index_data->by_guid.find(guid);
+                if (it != index_data->by_guid.end())
+                {
+                    const AssetEntry& entry = *it->second;
+
+                    bool valid = resource_manager.validate_asset(entry.meta.guid, ctx);
+                    bool valid_rec = resource_manager.validate_asset_recursive(entry.meta.guid, ctx);
+                    // --- Line 1: Status indicators ---
+                    {
+                        ImGui::TextColored(valid ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "%s", valid ? "Valid" : "Invalid");
+                        ImGui::SameLine();
+                        ImGui::TextColored(valid_rec ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.5f, 0.2f, 1.0f), "%s", valid_rec ? "Recursive" : "Recursive");
+                        ImGui::SameLine();
+                        ImVec4 state_color;
+                        const char* state_str = nullptr;
+                        switch (guid_status.state) {
+                        case LoadState::Unloaded:  state_str = "Unloaded";  state_color = ImVec4(0.6f, 0.6f, 0.6f, 1.0f); break;
+                        case LoadState::Unloading: state_str = "Unloading"; state_color = ImVec4(1.0f, 0.7f, 0.2f, 1.0f); break;
+                        case LoadState::Loading:   state_str = "Loading";   state_color = ImVec4(0.6f, 0.8f, 1.0f, 1.0f); break;
+                        case LoadState::Loaded:    state_str = "Loaded";    state_color = ImVec4(0.4f, 1.0f, 0.4f, 1.0f); break;
+                        case LoadState::Failed:    state_str = "Failed";    state_color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); break;
+                        }
+                        ImGui::TextColored(state_color, "%s", state_str);
+                        if (!guid_status.error_message.empty())
+                        {
+                            ImGui::SameLine();
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[%s]", guid_status.error_message.c_str());
+                        }
+                    }
+                    // --- Line 2: Type + Ref count ---
+                    {
+                        ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                        ImGui::SameLine();
+                        // ImGui::Text("Ref Count: %d", guid_status.ref_count);
+                        ImGui::Text("Nbr Leases: %d", resource_manager.total_leases(entry.meta.guid));
+                    }
+                    // --- Line 3: GUID ---
+                    ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
+                    // --- Line 4: Path ---
+                    ImGui::Text("Path: %s", entry.relative_path.string().c_str());
+                    // -- Line 5: Debug print content of certain types (if loaded) --
+#if 1
+                    if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value())
+                    {
+                        // Explicit type check + cast
+                        if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
+                        {
+                            // Use resource_manager.get_asset_ref/try_get_asset_ref -->
+                            auto mesh = resource_manager.storage().get_ref(*h_opt);
+                            ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
+                        }
+                        //else ImGui::Text("Not a mock::Mesh");
+
+                        // Generic access (any)
+                        editor::InspectorState insp;
+                        editor::ComponentCommandBuilder cmd_builder;
+
+                        auto any = resource_manager.storage().get(*metah_opt);
+                        auto type_name = get_meta_type_name(any.type());
+                        // meta::inspect_any(any, insp, cmd, ctx);
+                        const ImGuiTableFlags flags =
+                            ImGuiTableFlags_BordersV |
+                            ImGuiTableFlags_BordersOuterH |
+                            ImGuiTableFlags_Resizable |
+                            ImGuiTableFlags_RowBg |
+                            ImGuiTableFlags_NoBordersInBody;
+                        if (ImGui::BeginTable("InspectorTable", 2, flags)) // TODO -> part of insepctor?
+                        {
+                            if (insp.begin_node(type_name.c_str()))
+                            {
+                                // #ifdef USE_COMMANDS
+                                                            // Reset meta command for component type
+                                cmd_builder.reset().
+                                    registry(ctx.entity_manager->registry_wptr())
+                                    //.entity(ecs::Entity::EntityNull) // no entity for assets
+                                    //.component(any.type().id()) // asset type - no comp type id!
+                                    ;
+                                // #endif
+                                bool res = meta::inspect_any(any, insp, cmd_builder, ctx);
+                                // ^ NOTE: Any edits are recorded -> cmd will be built -> Error, since no entity + comp!
+                                //         KEEP EVERYTHING READ-ONLY until we have eg IEditCommandBuilder + AssetEditCommand!
+                                
+
+                                insp.end_node();
+                            }
+                            ImGui::EndTable();
+                        }
+                    }
+                    // resource_manager.storage().get(entry.meta.guid);
+#endif
+                }
+            }
+            else
+            {
+
+            }
+        }
         ImGui::EndChild();
 
         ImGui::End();
     }
 
+    // TODO -> WIDGET not a window
     void GuiManager::draw_content_tree(EngineContext& ctx) const
     {
         auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
@@ -565,7 +685,11 @@ namespace eeng
                             case LoadState::Loaded:    state_str = "Loaded";    state_color = ImVec4(0.4f, 1.0f, 0.4f, 1.0f); break;
                             case LoadState::Failed:    state_str = "Failed";    state_color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); break;
                             }
+                            ImGui::SameLine();
                             ImGui::TextColored(state_color, "%s", state_str);
+                            ImGui::SameLine();
+                            ImGui::Text("Leases %u", resource_manager.total_leases(entry.meta.guid));
+                            //
                             if (!guid_status.error_message.empty())
                             {
                                 ImGui::SameLine();
@@ -792,6 +916,15 @@ namespace eeng
             {
                 br.queue_save_all_async(ctx);
             }
+
+            ImGui::Separator();
+
+            // -- Rebuild --
+            if (ImGui::Button("Rebuild"))
+            {
+                // Fire and forget, since we're on the main thread
+                auto res = br.queue_rebuild_closure(b->id, ctx);
+            }
         }
 
         ImGui::Columns(1);
@@ -939,7 +1072,7 @@ namespace eeng
             if (!registry_sptr) return;
             ctx.entity_selection->remove_invalid([&](const ecs::Entity& entity)
                 {
-                    return !entity.is_null() && registry_sptr->valid(entity);
+                    return entity.valid() && registry_sptr->valid(entity);
                 });
         }
 

@@ -38,7 +38,7 @@ namespace eeng
         SerialExecutor& strand(EngineContext& ctx);   // helper
 
         // Asset lease tracking
-        struct AssetLease 
+        struct AssetLease
         {
             std::unordered_set<BatchId> holders; // batches that currently hold this asset
         };
@@ -230,76 +230,56 @@ namespace eeng
         void bind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx);
         void unbind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx);
 
-        // template<class T>
-        // void bind_asset(AssetRef<T> ref, EngineContext& ctx)
-        // {
-        //     storage_->modify(ref.handle, [&](T& asset)
-        //         {
-        //             visit_assets(asset, [&](auto& ref)
-        //                 {
-        //                     if (storage_->validate(ref.handle)) return;
-
-        //                     using CT = decltype(ref.handle)::value_type;
-        //                     auto handle = storage_->handle_for_guid<CT>(ref.guid);
-        //                     if (!handle)
-        //                         throw std::runtime_error("Bind failed: referenced asset GUID not loaded " + ref.guid.to_string());
-
-        //                     ref.handle = handle.value();
-        //                     retain_guid(ref.guid);
-        //                 });
-        //         });
-        // }
-
+        // TODO -> combine with bind_asset(guid)
+        // TODO -> this is virtual AssetRef; all we really need is the handle
         template<class T>
-        void bind_asset(AssetRef<T> ref, /*not used*/ const BatchId& batch, EngineContext& ctx)
+        BindResult bind_asset(AssetRef<T> ref_, /*not used*/ const BatchId& batch, EngineContext& ctx)
         {
-            if (!storage_->validate(ref.handle)) return;
+            BindResult br{ .guid = ref_.guid };
 
-            storage_->modify(ref.handle, [&](T& asset)
+            if (!storage_->validate(ref_.handle)) return br;
+
+            br.all_refs_bound = true;
+            storage_->modify(ref_.handle, [&](T& asset)
                 {
-                    visit_asset_refs(asset, [&](auto& child_ref)
+                    visit_asset_refs(asset, [&](auto& ref)
                         {
-                            // If already wired, skip (idempotent bind)
-                            if (storage_->validate(child_ref.handle)) return;
+                            using CT = typename std::decay_t<decltype(ref.handle)>::value_type;
+                            const Guid ref_guid = ref.guid;
 
-                            using CT = typename std::decay_t<decltype(child_ref.handle)>::value_type;
-                            const Guid child = child_ref.guid;
+                            // Already bound: skip (idempotent bind)
+                            if (storage_->validate(ref.handle))
+                            {
+                                br.ref_results.push_back(OperationResult{ ref_guid, true, "Already bound" });
+                                return;
+                            }
 
-                            auto h = storage_->handle_for_guid<CT>(child);
-                            if (!h)
-                                throw std::runtime_error("Bind failed: referenced asset not loaded " + child.to_string());
+                            auto handle_opt = storage_->handle_for_guid<CT>(ref_guid);
 
-                            child_ref.handle = *h;
+                            // Referenced handle invalid
+                            if (!handle_opt)
+                            {
+                                br.all_refs_bound = false;
+                                br.ref_results.push_back(OperationResult{ ref_guid, false, "Referenced asset not loaded: " + ref_guid.to_string() });
+                                return;
+                            }
+                            // if (!handle_opt) 
+                            // {
+                            //     throw std::runtime_error("Bind failed: referenced asset not loaded " + ref_guid.to_string());
+                            // }
+
+                            // Bind
+                            ref.bind(*handle_opt);
+                            br.ref_results.push_back(OperationResult{ ref_guid, true, "" });
                         });
                 });
-            // std::vector<Guid> newly_acquired;
-            // newly_acquired.reserve(8);
 
-            // try {
-            //     storage_->modify(ref.handle, [&](T& asset)
-            //         {
-            //             visit_assets(asset, [&](auto& child_ref)
-            //                 {
-            //                     const Guid child = child_ref.get_guid();
-
-            //                     // Lease child to this batch before wiring the handle
-            //                     // batch_acquire(batch, child);
-            //                     // newly_acquired.push_back(child);
-            //                     if (batch_acquire(batch, child)) newly_acquired.push_back(child); // for rollback
-
-            //                     using CT = decltype(child_ref.handle)::value_type;
-            //                     auto h = storage_->handle_for_guid<CT>(child);
-            //                     if (!h)
-            //                         throw std::runtime_error("Bind failed: referenced asset not loaded " + child.to_string());
-            //                     child_ref.handle = *h;
-            //                 });
-            //         });
-            // }
-            // catch (...) {
-            //     // Rollback child leases we added in this call
-            //     for (const Guid& c : newly_acquired)
-            //         (void)batch_release(batch, c);
-            //     throw;
+            return br;
+            // return BindResult
+            // {
+            //     .result = BindResult::BindResultType::Success,
+            //     .has_references = false,
+            //     .error_message = "";
             // }
         }
 
@@ -315,13 +295,14 @@ namespace eeng
         //     bind_asset<T>(maybe_ref.value(), ctx);
         // }
 
+        // -> META HELPER
         template<class T>
-        void bind_asset(const Guid& guid, const BatchId& batch, EngineContext& ctx)
+        BindResult bind_asset(const Guid& guid, const BatchId& batch, EngineContext& ctx)
         {
             auto ref = ref_for_guid<T>(guid);
             if (!ref)
                 throw std::runtime_error("Bind failed: asset GUID not loaded " + guid.to_string());
-            bind_asset<T>(*ref, batch, ctx);
+            return bind_asset<T>(*ref, batch, ctx);
         }
 
     private:
@@ -340,19 +321,33 @@ namespace eeng
         //         });
         // }
 
-        // Unbind: release child leases and clear handles (idempotent per call)
+        // TODO -> combine with unbind_asset(guid)
+        // Unbind: clear handles (idempotent per call)
         template<class T>
-        void unbind_asset(AssetRef<T> ref, const BatchId& batch, EngineContext& ctx)
+        BindResult unbind_asset(AssetRef<T> ref_, const BatchId& batch, EngineContext& ctx)
         {
-            if (!storage_->validate(ref.handle)) return;
+            BindResult br;
 
-            storage_->modify(ref.handle, [&](T& asset)
+            if (!storage_->validate(ref_.handle)) return br;
+
+            storage_->modify(ref_.handle, [&](T& asset)
                 {
-                    visit_asset_refs(asset, [&](auto& child_ref)
+                    visit_asset_refs(asset, [&](auto& ref)
                         {
-                            child_ref.handle = {};
+                            const Guid ref_guid = ref.guid;
+
+                            // Already unbound: skip (idempotent bind)
+                            if (!storage_->validate(ref.handle))
+                            {
+                                br.ref_results.push_back(OperationResult{ ref_guid, true, "Already unbound" });
+                                return;
+                            }
+
+                            ref.unbind();
+                            br.ref_results.push_back(OperationResult{ ref_guid, true, "" });
                         });
                 });
+            return br;
             // if (!storage_->validate(ref.handle)) return;
             // storage_->modify(ref.handle, [&](T& asset)
             //     {
@@ -378,11 +373,17 @@ namespace eeng
         //     unbind_asset<T>(ref_opt.value(), ctx);
         // }
 
+        // -> META HELPER
         template<class T>
-        void unbind_asset(const Guid& guid, const BatchId& batch, EngineContext& ctx)
+        BindResult unbind_asset(const Guid& guid, const BatchId& batch, EngineContext& ctx)
         {
-            if (auto ref = ref_for_guid<T>(guid))
-                unbind_asset<T>(*ref, batch, ctx);
+            // if (auto ref = ref_for_guid<T>(guid))
+            //     return unbind_asset<T>(*ref, batch, ctx);
+
+            auto ref = ref_for_guid<T>(guid);
+            if (!ref)
+                throw std::runtime_error("Unbind failed: asset GUID not loaded " + guid.to_string());
+            return unbind_asset<T>(*ref, batch, ctx);
         }
 
         // ---

@@ -55,7 +55,23 @@ namespace eeng::dev
             ctx->thread_pool->queue_task([asset_root, batches_root, ctx]() {
                 try
                 {
-                    constexpr int num_tasks = 10;
+#if 1
+                    // Just scan & load batche index
+
+                    // Scan assets
+                    EENG_LOG(ctx.get(), "[startup] Waiting for scan to complete before adding components...");
+                    auto scan_fut = ctx->resource_manager->scan_assets_async(asset_root, *ctx);
+
+                    // Create/load batch index
+                    EENG_LOG(ctx.get(), "[startup] Loading/Creating batch index at: %s", batches_root.string().c_str());
+                    auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
+                    br.load_or_create_index(batches_root / "index.json");
+
+                    // Wait for scan to finish
+                    scan_fut.get();
+                    EENG_LOG(ctx.get(), "[startup] Scan done.");
+#else
+                    constexpr int num_tasks = 3;
                     std::vector<std::future<ModelRef>> futures;
                     futures.reserve(num_tasks);
                     EENG_LOG(ctx.get(), "[startup] Importing models on worker...");
@@ -155,7 +171,7 @@ namespace eeng::dev
 
 
                                 // If Position has AssetRef<T> inside,
-                                // you’d either:
+                                // either:
                                 //  - call a BR helper to update closure, or
                                 //  - rely on a later “recompute closure” pass.
                                 EENG_LOG(ctx.get(), "[startup] Done adding components...");
@@ -168,6 +184,7 @@ namespace eeng::dev
                     //
                     EENG_LOG(ctx.get(), "[startup] Saving batch index...");
                     br.save_index(batches_root / "index.json");
+#endif
                 }
                 catch (const std::exception& ex)
                 {
@@ -244,7 +261,7 @@ bool Game::init()
 
             EENG_LOG(ctx, "[Game::init()] Created entity: %i", entity.to_integral());
             entities.push_back(entity);
-        }
+    }
 #endif
 
         // 2. ...
@@ -315,7 +332,7 @@ bool Game::init()
                 EENG_LOG(ctx, "[Game::init()] Waiting for asset scan to finish...");
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
-            }
+        }
 #endif
             // Get asset index snapshot and log it
             // auto asset_index = resource_manager.get_asset_entries_snapshot();
@@ -429,7 +446,7 @@ bool Game::init()
                     assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
-                }
+}
             }
 #endif
         }
@@ -1001,7 +1018,7 @@ void Game::render(
     // Draw shape batches
     shapeRenderer->render(matrices.P * matrices.V);
     shapeRenderer->post_render();
-}
+    }
 
 void Game::renderUI()
 {

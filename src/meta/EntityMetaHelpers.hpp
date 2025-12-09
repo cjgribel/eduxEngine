@@ -3,53 +3,75 @@
 // ECSMetaHelpers
 
 #include "MetaAux.h"
+#include "MetaLiterals.h"
 #include "Guid.h"
 #include "EngineContext.hpp"
 #include "ResourceManager.hpp"
+#include "ecs/EntityManager.hpp"
 #include <vector>
 
+#include "LogGlobals.hpp" // DEBUG
 
 // REGISTER
-// TODO: REGISTER to Asset & Comp types
+// REGISTERED to Comp types (later maybe also Asset types, if wired through the same system)
 namespace eeng::meta
 {
 
+    // any is a component type (later: or possibly an asset type)
     template<typename T>
-    void collect_asset_guids(T& self, std::vector<Guid>& out)
+    // void collect_asset_guids(T& self, std::vector<Guid>& out)
+    void collect_asset_guids(entt::meta_any& any, std::vector<Guid>& out)
     {
-        visit_asset_refs(self, [&](auto& ref)
+        LogGlobals::log("[collect_asset_guids]");
+
+        auto self_ptr = any.try_cast<T>();
+        assert(self_ptr && "[collect_asset_guids]: Could not cast meta_any to Guid");
+
+        visit_asset_refs(*self_ptr, [&](auto& ref)
             {
                 // ref is AssetRef<SomeAssetType>&
                 out.push_back(ref.guid);
+
+                // LogGlobals::log("[collect_asset_guids] %s", ref.guid.to_string().c_str());
             });
     }
 
     // 'bind_component_asset_refs'
     // Or, integrate with RM and use it for both Asset & Comp types
     template<typename T>
-    void bind_asset_refs(T& self, /*, IResourceManager& rm*/ EngineContext& ctx)
+    // void bind_asset_refs(T& self, /*, IResourceManager& rm*/ EngineContext& ctx)
+    void bind_asset_refs(entt::meta_any& any, EngineContext& ctx)
     {
-        auto& rm_ = static_cast<eeng::ResourceManager&>(*ctx.resource_manager);
+        auto& rm = static_cast<eeng::ResourceManager&>(*ctx.resource_manager);
 
-        visit_asset_refs(self, [&](auto& ref)
+        auto self_ptr = any.try_cast<T>();
+        assert(self_ptr && "[bind_asset_refs]: Could not cast meta_any to Guid");
+
+        visit_asset_refs(*self_ptr, [&](auto& ref)
             {
-                using Ref = std::decay_t<decltype(ref)>;
-                using HandleT = std::decay_t<decltype(ref.handle)>;
-                using AssetT = typename HandleT::value_type;  // matches your existing pattern
+                using Ref = std::decay_t<decltype(ref)>;            // Ref = AssetRef<AssetT>
+                using HandleT = std::decay_t<decltype(ref.handle)>; // HandleT = Handle<AssetT>
+                using AssetT = typename HandleT::value_type;        // AssetT = Asset type
 
-                const Guid g = ref.guid;
-                if (!g.valid())
+                const Guid guid = ref.guid;
+                if (!guid.valid())
+                {
+                    // Reference Guid invalid - ok, leave unassigned
                     return;
+                }
 
-                auto handle_opt = rm_.handle_for_guid<AssetT>(g);
+                auto handle_opt = rm.handle_for_guid<AssetT>(guid);
                 if (!handle_opt)
                 {
-                    // ref                          // The ref we are trying to bind
-                    get_meta_type_name<T>();        // Component/refereer type
-                    get_meta_type_name<AssetT>();   // Asset type
+                    // Asset handle not found for guid
+                    // Ok (soft reference policy) - leave reference unbound
 
-                    // Policy choice: leave handle empty, or log, or throw.
-                    // For now: just leave it empty.
+                    // Log
+                    auto guid_str = guid.to_string();
+                    auto comp_tstr = get_meta_type_name<T>();
+                    auto asset_tstr = get_meta_type_name<AssetT>();
+                    EENG_LOG(&ctx, "[bind_asset_refs] Could not bind asset %s (%s) to %s...", asset_tstr.c_str(), guid_str.c_str(), comp_tstr.c_str());
+
                     return;
                 }
 
@@ -57,34 +79,55 @@ namespace eeng::meta
                 // ref.handle = *h;
             });
     }
-#if 0
 
     // 'bind_component_entity_refs'
-    // Mot relevant for Asset types (assets not reference entities)
+    // Not relevant for Asset types (assets not reference entities)
     template<typename T>
-    void resolve_entity_refs(T& self, EntityManager& em)
+    // void bind_entity_refs(T& self, /*EntityManager& em,*/ EngineContext& ctx)
+    void bind_entity_refs(entt::meta_any& any, EngineContext& ctx)
     {
-        visit_entity_refs(self, [&](ecs::EntityRef& ref)
-            {
-                const Guid g = ref.get_guid();
-                if (!g) // or your own validity check
-                    return;
+        auto& em = static_cast<eeng::EntityManager&>(*ctx.entity_manager);
 
-                auto ent = em.find_entity_by_guid(g);
-                ref.set_entity(ent); // your EntityRef can decide what "invalid" means
+        auto self_ptr = any.try_cast<T>();
+        assert(self_ptr && "[bind_entity_refs]: Could not cast meta_any to Guid");
+
+        visit_entity_refs(*self_ptr, [&](ecs::EntityRef& ref)
+            {
+                const Guid guid = ref.guid;
+                if (!guid.valid())
+                {
+                    // Reference Guid invalid - ok, leave unassigned
+                    return;
+                }
+
+                auto ent_opt = em.get_entity_from_guid(guid);
+                if (!ent_opt)
+                {
+                    // Entity not found for guid
+                    // Ok (soft reference policy) - leave reference unbound
+
+                    auto guid_str = guid.to_string();
+                    auto comp_tstr = get_meta_type_name<T>();
+                    EENG_LOG(&ctx, "[bind_entity_refs] Could not bind entity %s to component %s...", guid_str.c_str(), comp_tstr.c_str());
+
+                    return;
+                }
+                ref.bind(*ent_opt);
             });
     }
 }
 
 namespace eeng::meta
 {
-
-    // ENTITY HELPER
+    // ENTITY HELPER: 
     template<typename Visitor>
-    void for_each_component(entt::entity e,
+    void for_each_component(
+        entt::entity e,
         entt::registry& reg,
         Visitor&& visitor)
     {
+        // LogGlobals::log("[for_each_component]");
+
         for (auto&& [type_id, storage] : reg.storage())
         {
             if (!storage.contains(e))
@@ -93,13 +136,20 @@ namespace eeng::meta
             if (auto mt = entt::resolve(type_id); mt)
             {
                 void* comp_ptr = storage.value(e);
-                entt::meta_any any = mt.from_void(comp_ptr);
+                entt::meta_any any = mt.from_void(comp_ptr); // ref
+
+                // if (any.base().policy() == entt::any_policy::ref)
+                //     LogGlobals::log("[for_each_component] is_ref");
+
                 visitor(mt, any);
             }
         }
     }
 
     /*
+    1) WHEN AN ENTITY WITH COMPS IS ATTACHED
+    2) WHEN A COMP IS ATTACHED TO AN ENTITY ALREADY IN A BATCH
+
     Usage in BatchRegistry when an entity is attached/created:
 
     if (auto reg_sp = ctx.entity_manager->registry_wptr().lock();
@@ -117,22 +167,30 @@ namespace eeng::meta
     */
 
     inline std::vector<Guid>
-        collect_asset_guids_for_entity(entt::entity e, entt::registry& reg)
+        collect_asset_guids_for_entity(
+            entt::entity e,
+            entt::registry& reg)
     {
+        LogGlobals::log("[collect_asset_guids_for_entity]");
         std::vector<Guid> result;
 
         for_each_component(e, reg, [&](entt::meta_type mt, entt::meta_any& any)
             {
+                LogGlobals::log("[collect_asset_guids_for_entity] comp type %s", mt.info().name());
                 using namespace entt::literals;
 
-                if (auto mf = mt.func("collect_asset_guids"_hs); mf)
+                if (auto mf = mt.func(literals::collect_asset_guids_hs); mf)
                 {
-                    mf.invoke({}, any, entt::forward_as_meta(result));
+                    mf.invoke(
+                        {},
+                        entt::forward_as_meta(any),
+                        entt::forward_as_meta(result));
                 }
             });
 
         return result;
     }
+
 
     /*
 Usage after a batch has loaded and all entities are spawned + registered:
@@ -150,17 +208,22 @@ if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
 }
     */
     inline void
-        resolve_entity_refs_for_entity(entt::entity e,
-            entt::registry& reg,
-            EntityManager& em)
+        bind_entity_refs_for_entity(
+            entt::entity e,
+            EngineContext& ctx)
     {
         using namespace entt::literals;
 
-        for_each_component(e, reg, [&](entt::meta_type mt, entt::meta_any& any)
+        auto& em = static_cast<eeng::EntityManager&>(*ctx.entity_manager);
+
+        for_each_component(e, em.registry(), [&](entt::meta_type mt, entt::meta_any& any)
             {
-                if (auto mf = mt.func("resolve_entity_refs"_hs); mf)
+                if (auto mf = mt.func(literals::bind_entity_refs_hs); mf)
                 {
-                    mf.invoke({}, any, entt::forward_as_meta(em));
+                    mf.invoke(
+                        {}, 
+                        entt::forward_as_meta(any),
+                        entt::forward_as_meta(ctx));
                 }
             });
     }
@@ -181,25 +244,26 @@ if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
 }
     */
     inline void
-        resolve_asset_refs_for_entity(entt::entity e,
-            entt::registry& reg,
-            IResourceManager& rm,
+        bind_asset_refs_for_entity(
+            entt::entity e,
+            // entt::registry& reg,
+            // IResourceManager& rm,
             EngineContext& ctx)
     {
         using namespace entt::literals;
 
-        for_each_component(e, reg, [&](entt::meta_type mt, entt::meta_any& any)
+        auto& em = static_cast<eeng::EntityManager&>(*ctx.entity_manager);
+
+        for_each_component(e, em.registry(), [&](entt::meta_type mt, entt::meta_any& any)
             {
-                if (auto mf = mt.func("resolve_asset_refs"_hs); mf)
+                if (auto mf = mt.func(literals::bind_asset_refs_hs); mf)
                 {
                     mf.invoke(
                         {},
-                        any,
-                        entt::forward_as_meta(rm),
-                        entt::forward_as_meta(ctx)
-                    );
+                        entt::forward_as_meta(any),
+                        // entt::forward_as_meta(rm),
+                        entt::forward_as_meta(ctx));
                 }
             });
-}
-#endif
+    }
 }

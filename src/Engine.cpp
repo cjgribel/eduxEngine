@@ -8,6 +8,8 @@
 
 #include "MainThreadQueue.hpp"
 #include "InputManager.hpp"
+#include "editor/CommandQueue.hpp"
+
 #include "LogMacros.h"
 #include "LogGlobals.hpp"
 #include "AssetMetaReg.hpp"
@@ -166,18 +168,50 @@ namespace eeng
             // --- Command queue execution ---
             // Can entities be destroyed here?
             // ctx->command_queue->execute_all(*registry, deltaTime_s);
-            
+
             // --- Game systems ---
             game->update(time_s, deltaTime_s);
-            
+
             // --- Main thread tasks ---
             // entt::storage mutations etc
             ctx->main_thread_queue->execute_all();
-            
+
             ctx->entity_manager->destroy_pending_entities();
 
             // --- Event dispatch ---
             ctx->event_queue->dispatch_all_events();
+
+            // --- Event dispatch / Command execution / Entity destruction ---
+#if 1
+            if (ctx->command_queue->has_new_commands_pending())
+                ctx->command_queue->execute_pending();
+#else
+            //void Scene::event_loop()
+            {
+                int cycles = 0;
+                const int max_cycles = 5;
+
+                while ((dispatcher->has_pending_events() ||
+                    cmd_queue->has_new_commands_pending() ||
+                    dispatcher->has_pending_events())
+                    && cycles++ <= max_cycles)
+                {
+                    // Dispatch events. May lead to commands being issued.
+                    dispatcher->dispatch_all_events();
+
+                    // Execute commands. May lead to entities being queued for destruction
+                    // and new events being issued.
+                    if (cmd_queue->has_new_commands_pending())
+                        cmd_queue->execute_pending();
+
+                    // Destroy entities flagged for destruction.
+                    // May lead to additional entities being flagged for destruction.
+                    destroy_pending_entities();
+                }
+                if (cycles > 1) std::cout << "Event loop cycles " << cycles << std::endl;
+                assert(cycles <= max_cycles);
+            }
+#endif
 
             // --- Render ---
             game->render(time_s, window_width, window_height);

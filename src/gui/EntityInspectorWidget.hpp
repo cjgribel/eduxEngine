@@ -49,7 +49,7 @@ namespace eeng::gui
             }
 
             const bool selected_entity_valid =
-                !selected_entity.is_null() &&
+                selected_entity.valid()&
                 registry_sp->valid(selected_entity);
 
             // --- Add / Remove Component ------------------------------------
@@ -106,6 +106,7 @@ namespace eeng::gui
 
             // Add Component button
             ImGui::SameLine();
+            ImGui::BeginDisabled(); // disable for now
             if (ImGui::Button("Add##addcomponent") &&
                 selected_comp_id &&
                 !entity_selection.empty())
@@ -118,9 +119,11 @@ namespace eeng::gui
                 event_queue.enqueue_event(event);
 #endif
             }
+            ImGui::EndDisabled();
 
             // Remove Component button
             ImGui::SameLine();
+            ImGui::BeginDisabled(); // disable for now
             if (ImGui::Button("Remove##removecomponent") &&
                 selected_comp_id &&
                 !entity_selection.empty())
@@ -133,6 +136,7 @@ namespace eeng::gui
                 event_queue.enqueue_event(event);
 #endif
             }
+            ImGui::EndDisabled();
 
             // --- Add / Remove Behavior ------------------------------------
             ImGui::TextUnformatted("Add/Remove Behavior");

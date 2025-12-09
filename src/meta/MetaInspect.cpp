@@ -384,7 +384,7 @@ namespace eeng::meta {
         // TODO: Take ctx directly as an argument
         // auto context_sp = inspector.ctx.lock();
         auto& registry = ctx.entity_manager->registry();
-        assert(!entity.is_null());
+        assert(entity.valid());
         assert(registry.valid(entity));
 
         for (auto&& [id, type] : registry.storage())

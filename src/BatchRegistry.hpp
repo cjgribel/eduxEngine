@@ -173,25 +173,26 @@ namespace eeng {
         // TaskResult last_result(const eeng::BatchId&) const;
 
         // --- Orchestration (serialized via strand) ---
-#if 1
+
 // Returns a future that completes when the full sequence is done.
-        std::shared_future<TaskResult> queue_load(const eeng::BatchId& id, EngineContext& ctx);
-#endif
-#if 1
-        std::shared_future<TaskResult> queue_unload(const eeng::BatchId& id, EngineContext& ctx);
-        // std::shared_future<TaskResult> queue_reload(const eeng::BatchId& id);
-#endif
+        std::shared_future<TaskResult>
+            queue_load(const eeng::BatchId& id, EngineContext& ctx);
+        std::shared_future<TaskResult>
+            queue_unload(const eeng::BatchId& id, EngineContext& ctx);
+
+        /// Recompute the asset closure for a loaded batch from its live entities,
+        /// and adjust RM leases accordingly (load/bind new GUIDs, unbind/unload
+        /// GUIDs that are no longer referenced). Runs on the BatchRegistry strand.
+        std::shared_future<TaskResult>
+            queue_rebuild_closure(const BatchId& id, EngineContext& ctx);
 
         std::vector<const BatchInfo*> list() const;
 
     private:
-#if 1
+
         // Steps (run by strand)
         TaskResult do_load(BatchInfo& B, EngineContext& ctx);
-#endif
-#if 1
         TaskResult do_unload(BatchInfo& B, EngineContext& ctx);
-#endif
 
         // Helpers (main-thread work)
 #if 0

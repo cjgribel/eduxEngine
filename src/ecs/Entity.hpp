@@ -1,3 +1,7 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
+#pragma once
 #ifndef ENTITY_HPP
 #define ENTITY_HPP
 
@@ -72,16 +76,20 @@ namespace eeng::ecs
          */
         entity_type to_integral() const;
 
+        bool valid() const;
+
         /**
          * @brief Checks if the entity is null.
          * @return True if the entity is null, false otherwise.
          */
-        bool is_null() const;
+        // bool is_null() const;
 
         /**
          * @brief Sets the entity to null.
          */
         void set_null();
+
+        operator bool () const { return valid(); }
 
         // Comparison operators
         bool operator==(const Entity& other) const;

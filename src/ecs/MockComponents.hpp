@@ -2,8 +2,10 @@
 #define MockComponents_hpp
 
 #include "ResourceTypes.hpp"
-
 #include "Guid.h"
+#include "LogGlobals.hpp" // DEBUG
+
+
 #include "ecs/Entity.hpp"
 
 namespace eeng::ecs::mock
@@ -16,14 +18,15 @@ namespace eeng::ecs::mock
         AssetRef<eeng::mock::Model> model_ref;
     };
 
-    template<typename Visitor> 
-    void visit_asset_refs(MockPlayerComponent& t, Visitor&& visitor) 
+    template<typename Visitor>
+    void visit_asset_refs(MockPlayerComponent& t, Visitor&& visitor)
     {
+        LogGlobals::log("[visit_asset_refs<MockPlayerComponent>]");
         visitor(t.model_ref);
     }
 
-    template<typename Visitor> 
-    void visit_entity_refs(MockPlayerComponent& t, Visitor&& visitor) 
+    template<typename Visitor>
+    void visit_entity_refs(MockPlayerComponent& t, Visitor&& visitor)
     {
         visitor(t.camera_ref);
     }
@@ -35,14 +38,15 @@ namespace eeng::ecs::mock
         AssetRef<eeng::mock::Model> model_ref;
     };
 
-    template<typename Visitor> 
-    void visit_asset_refs(MockCameraComponent& t, Visitor&& visitor) 
+    template<typename Visitor>
+    void visit_asset_refs(MockCameraComponent& t, Visitor&& visitor)
     {
+        LogGlobals::log("[visit_asset_refs<MockCameraComponent>]");
         visitor(t.model_ref);
     }
 
-    template<typename Visitor> 
-    void visit_entity_refs(MockCameraComponent& t, Visitor&& visitor) 
+    template<typename Visitor>
+    void visit_entity_refs(MockCameraComponent& t, Visitor&& visitor)
     {
         visitor(t.target_ref);
     }

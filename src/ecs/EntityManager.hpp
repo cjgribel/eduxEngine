@@ -69,10 +69,10 @@ namespace eeng
 
         ecs::EntityRef get_entity_parent(const ecs::Entity& entity) const;
 
-        Guid& get_entity_guid(const ecs::Entity& entity);
-        const Guid& get_entity_guid(const ecs::Entity& entity) const;
+        // Guid& get_entity_guid(const ecs::Entity& entity);
+        const Guid get_entity_guid(const ecs::Entity& entity) const;
 
-        ecs::Entity get_entity_from_guid(const Guid& guid) const;
+        std::optional<ecs::Entity> get_entity_from_guid(const Guid& guid) const;
 
         // destroy_pending_entities
 
