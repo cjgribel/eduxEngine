@@ -7,6 +7,52 @@
 #include "ThreadPool.hpp"
 #include <fstream>
 
+namespace eeng::detail
+{
+    template<typename T>
+    void append_new_elements(
+        std::vector<T>& closure,
+        const std::vector<T>& candidates,
+        std::vector<T>& out_added)
+    {
+        for (const auto& g : candidates)
+        {
+            if (std::find(closure.begin(), closure.end(), g) == closure.end())
+            {
+                closure.push_back(g);
+                out_added.push_back(g);
+            }
+        }
+    }
+
+    template<typename T>
+    void diff_sets(
+        const std::vector<T>& old_closure,
+        const std::vector<T>& new_closure,
+        std::vector<T>& out_to_add,
+        std::vector<T>& out_to_remove)
+    {
+        auto sorted_old = old_closure;
+        auto sorted_new = new_closure;
+
+        std::sort(sorted_old.begin(), sorted_old.end());
+        sorted_old.erase(std::unique(sorted_old.begin(), sorted_old.end()), sorted_old.end());
+
+        std::sort(sorted_new.begin(), sorted_new.end());
+        sorted_new.erase(std::unique(sorted_new.begin(), sorted_new.end()), sorted_new.end());
+
+        std::set_difference(
+            sorted_new.begin(), sorted_new.end(),
+            sorted_old.begin(), sorted_old.end(),
+            std::back_inserter(out_to_add));
+
+        std::set_difference(
+            sorted_old.begin(), sorted_old.end(),
+            sorted_new.begin(), sorted_new.end(),
+            std::back_inserter(out_to_remove));
+    }
+}
+
 namespace eeng
 {
     void BatchRegistry::save_index(const std::filesystem::path& index_path)
@@ -296,7 +342,7 @@ namespace eeng
         BatchRegistry::queue_create_entity(
             const BatchId& id,
             const std::string& name,
-            const ecs::EntityRef& parent,
+            const ecs::EntityRef& parent, // <- TODO just Entity?
             EngineContext& ctx)
     {
         return strand(ctx).submit([this, id, name, parent, &ctx]() -> ecs::EntityRef
@@ -384,7 +430,6 @@ namespace eeng
             });
     }
 
-    // TODO: Update closure
     std::shared_future<bool>
         BatchRegistry::queue_attach_entity(
             const BatchId& id,
@@ -399,31 +444,57 @@ namespace eeng
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
                         return false;
-                    B = &it->second;
-                }
 
-                // Add to live
-                {
-                    std::lock_guard lk(mtx_);
+                    B = &it->second;
                     B->live.push_back(entity_ref);
                 }
 
-                // Update asset closure from existing components
-                auto registry_sptr = ctx.entity_manager->registry_wptr().lock();
-                if (!registry_sptr || !entity_ref.is_bound())
-                    return true; // nothing more to do
+                // If entity isn't live or registry is gone, nothing more to do.
+                auto registry_sp = ctx.entity_manager->registry_wptr().lock();
+                if (!registry_sp || !entity_ref.is_bound())
+                    return true;
 
-                // UPDATE CLOSURE
-                                // visit_asset_refs(entity_ref.get_entity(), *registry_sptr,
-                                //     [&](const Guid& guid)
-                                //     {
-                                //         std::lock_guard lk(mtx_);
-                                //         auto& closure = B->asset_closure_hdr;
-                                //         if (std::find(closure.begin(), closure.end(), guid) == closure.end())
-                                //             closure.push_back(guid);
-                                //     });
+                auto& reg = *registry_sp;
 
-                                // Optionally: load/bind new assets here via RM (later)
+                // 1) MT: collect asset GUIDs from this entity's components
+                std::vector<Guid> guids = ctx.main_thread_queue->push_and_wait([&]()
+                    {
+                        return eeng::meta::collect_asset_guids_for_entity(
+                            entity_ref.entity,
+                            reg
+                        );
+                    });
+
+                if (!guids.empty())
+                {
+                    // 2) Compute which GUIDs are new to this batch’s closure
+                    std::vector<Guid> to_add;
+                    {
+                        std::lock_guard lk(mtx_);
+                        auto& closure = B->asset_closure_hdr;
+                        eeng::detail::append_new_elements(closure, guids, to_add);
+                    }
+
+                    // 3) Ask RM to load/bind newly added assets (idempotent at RM level)
+                    if (!to_add.empty())
+                    {
+                        std::deque<Guid> dq(to_add.begin(), to_add.end());
+                        auto tr = ctx.resource_manager->load_and_bind_async(
+                            std::move(dq),
+                            B->id,
+                            ctx
+                        ).get();
+                        (void)tr; // TODO -> fold into TaskResult
+                    }
+                }
+
+                // 4) MT: bind AssetRef<> and EntityRef<> inside this entity’s components
+                ctx.main_thread_queue->push_and_wait([&]()
+                    {
+                        eeng::meta::bind_asset_refs_for_entity(entity_ref.entity, ctx);
+                        eeng::meta::bind_entity_refs_for_entity(entity_ref.entity, ctx);
+                    });
+
                 return true;
             });
     }
@@ -453,13 +524,15 @@ namespace eeng
             });
     }
 
-    // TODO: Register entity + Update closure
     std::shared_future<ecs::EntityRef>
-        BatchRegistry::queue_spawn_entity(const BatchId& id, meta::EntitySpawnDesc desc, EngineContext& ctx)
+        BatchRegistry::queue_spawn_entity(
+            const BatchId& id,
+            meta::EntitySpawnDesc desc,
+            EngineContext& ctx)
     {
         return strand(ctx).submit([this, id, desc = std::move(desc), &ctx]() mutable -> ecs::EntityRef
             {
-                BatchInfo* B;
+                BatchInfo* B = nullptr;
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
@@ -468,36 +541,69 @@ namespace eeng
                     B = &it->second;
                 }
 
-                // Do entt work on main thread
+                // 1) MT: spawn + register entity from desc
                 ecs::EntityRef created = ctx.main_thread_queue->push_and_wait([&]() -> ecs::EntityRef
                     {
-                        // Spawn and register entity from desc
-                        // return spawn_entity_from_desc(desc, ctx);
-                        auto entity = spawn_entity_from_desc(desc, ctx);
-                        ctx.entity_manager->register_entity(entity.entity);
-                        return entity;
+                        auto er = eeng::meta::spawn_entity_from_desc(desc, ctx);
+                        ctx.entity_manager->register_entity(er.entity);
+                        return er;
                     });
+
+                if (!created.is_bound())
+                    return created;
 
                 {
                     std::lock_guard lk(mtx_);
                     B->live.push_back(created);
                 }
 
-                // Update closure + possibly call load_and_bind_async(...) here
+                auto registry_sp = ctx.entity_manager->registry_wptr().lock();
+                if (!registry_sp)
+                    return created;
 
-                // Update asset closure via your visitor
-                // visit_asset_refs(created.get_entity(), ctx.entity_manager->registry(),
-                //     [&](const Guid& guid)
-                //     {
-                //         std::lock_guard lk(mtx_);
-                //         auto& closure = B->asset_closure_hdr;
-                //         if (std::find(closure.begin(), closure.end(), guid) == closure.end())
-                //             closure.push_back(guid);
-                //     });
+                auto& reg = *registry_sp;
+
+                // 2) MT: collect asset GUIDs from the spawned entity
+                std::vector<Guid> guids = ctx.main_thread_queue->push_and_wait([&]()
+                    {
+                        return eeng::meta::collect_asset_guids_for_entity(
+                            created.entity,
+                            reg
+                        );
+                    });
+
+                if (!guids.empty())
+                {
+                    std::vector<Guid> to_add;
+                    {
+                        std::lock_guard lk(mtx_);
+                        auto& closure = B->asset_closure_hdr;
+                        eeng::detail::append_new_elements(closure, guids, to_add);
+                    }
+
+                    if (!to_add.empty())
+                    {
+                        std::deque<Guid> dq(to_add.begin(), to_add.end());
+                        auto tr = ctx.resource_manager->load_and_bind_async(
+                            std::move(dq),
+                            B->id,
+                            ctx
+                        ).get();
+                        (void)tr;
+                    }
+                }
+
+                // 3) MT: bind refs in the spawned entity’s components
+                ctx.main_thread_queue->push_and_wait([&]()
+                    {
+                        eeng::meta::bind_asset_refs_for_entity(created.entity, ctx);
+                        eeng::meta::bind_entity_refs_for_entity(created.entity, ctx);
+                    });
 
                 return created;
             });
     }
+
 
     // BatchInfo& BatchRegistry::ensure(const BatchId& id, std::string name) {
     //     std::lock_guard lk(mtx_);
@@ -727,23 +833,9 @@ namespace eeng
                     old_closure = B->asset_closure_hdr;
                 }
 
-                auto sorted_old = old_closure;
-                std::sort(sorted_old.begin(), sorted_old.end());
-                auto sorted_new = new_closure; // already sorted above, but cheap to be sure
-                std::sort(sorted_new.begin(), sorted_new.end());
-
                 std::vector<Guid> to_add;
                 std::vector<Guid> to_remove;
-
-                std::set_difference(
-                    sorted_new.begin(), sorted_new.end(),
-                    sorted_old.begin(), sorted_old.end(),
-                    std::back_inserter(to_add));
-
-                std::set_difference(
-                    sorted_old.begin(), sorted_old.end(),
-                    sorted_new.begin(), sorted_new.end(),
-                    std::back_inserter(to_remove));
+                eeng::detail::diff_sets(old_closure, new_closure, to_add, to_remove);
 
                 for (auto& g : B->asset_closure_hdr) { EENG_LOG(&ctx, "[queue_rebuild_closure] closure %s", g.to_string().c_str()); }
                 for (auto& g : to_add) { EENG_LOG(&ctx, "[queue_rebuild_closure] + %s", g.to_string().c_str()); }
@@ -855,7 +947,7 @@ namespace eeng
         // 3) Bind AssetRef<> + EntityRef<> inside components
         if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
         {
-            auto& reg = *reg_sp;
+            auto& reg = *reg_sp; // TODO -> us is instead of direct ref's in helpers?
 
             ctx.main_thread_queue->push_and_wait([&]()
                 {
@@ -966,8 +1058,8 @@ namespace eeng
                         ctx.entity_manager->queue_entity_for_destruction(er.get_entity());
                         er.clear_entity();
                     }
-                }
-            });
+                    }
+                });
     }
 #endif
 

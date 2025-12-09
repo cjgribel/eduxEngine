@@ -21,7 +21,7 @@ namespace eeng::ecs::mock
     template<typename Visitor>
     void visit_asset_refs(MockPlayerComponent& t, Visitor&& visitor)
     {
-        LogGlobals::log("[visit_asset_refs<MockPlayerComponent>]");
+        // LogGlobals::log("[visit_asset_refs<MockPlayerComponent>]");
         visitor(t.model_ref);
     }
 
@@ -41,7 +41,7 @@ namespace eeng::ecs::mock
     template<typename Visitor>
     void visit_asset_refs(MockCameraComponent& t, Visitor&& visitor)
     {
-        LogGlobals::log("[visit_asset_refs<MockCameraComponent>]");
+        // LogGlobals::log("[visit_asset_refs<MockCameraComponent>]");
         visitor(t.model_ref);
     }
 
