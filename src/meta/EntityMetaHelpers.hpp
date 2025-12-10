@@ -49,9 +49,7 @@ namespace eeng::meta
 
         visit_asset_refs(*self_ptr, [&](auto& ref)
             {
-                using Ref = std::decay_t<decltype(ref)>;            // Ref = AssetRef<AssetT>
-                using HandleT = std::decay_t<decltype(ref.handle)>; // HandleT = Handle<AssetT>
-                using AssetT = typename HandleT::value_type;        // AssetT = Asset type
+                using AssetType = typename std::remove_reference_t<decltype(ref)>::asset_type;
 
                 const Guid guid = ref.guid;
                 if (!guid.valid())
@@ -60,23 +58,24 @@ namespace eeng::meta
                     return;
                 }
 
-                auto handle_opt = rm.handle_for_guid<AssetT>(guid);
+                auto handle_opt = rm.handle_for_guid<AssetType>(guid);
                 if (!handle_opt)
                 {
                     // Asset handle not found for guid
-                    // Ok (soft reference policy) - leave reference unbound
+                    // Ok (soft reference policy) -> leave reference unbound
 
                     // Log
-                    auto guid_str = guid.to_string();
-                    auto comp_tstr = get_meta_type_name<T>();
-                    auto asset_tstr = get_meta_type_name<AssetT>();
-                    EENG_LOG(&ctx, "[bind_asset_refs] Could not bind asset %s (%s) to %s...", asset_tstr.c_str(), guid_str.c_str(), comp_tstr.c_str());
+                    {
+                        auto guid_str = guid.to_string();
+                        auto comp_tstr = get_meta_type_name<T>();
+                        auto asset_tstr = get_meta_type_name<AssetType>();
+                        EENG_LOG(&ctx, "[bind_asset_refs] Could not bind asset %s (%s) to %s...", asset_tstr.c_str(), guid_str.c_str(), comp_tstr.c_str());
+                    }
 
                     return;
                 }
 
                 ref.bind(*handle_opt);
-                // ref.handle = *h;
             });
     }
 
@@ -221,7 +220,7 @@ if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
                 if (auto mf = mt.func(literals::bind_entity_refs_hs); mf)
                 {
                     mf.invoke(
-                        {}, 
+                        {},
                         entt::forward_as_meta(any),
                         entt::forward_as_meta(ctx));
                 }

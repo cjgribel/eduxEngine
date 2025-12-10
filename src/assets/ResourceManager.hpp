@@ -244,7 +244,7 @@ namespace eeng
                 {
                     visit_asset_refs(asset, [&](auto& ref)
                         {
-                            using CT = typename std::decay_t<decltype(ref.handle)>::value_type;
+                            using AssetType = typename std::remove_reference_t<decltype(ref)>::asset_type;
                             const Guid ref_guid = ref.guid;
 
                             // Already bound: skip (idempotent bind)
@@ -254,7 +254,7 @@ namespace eeng
                                 return;
                             }
 
-                            auto handle_opt = storage_->handle_for_guid<CT>(ref_guid);
+                            auto handle_opt = storage_->handle_for_guid<AssetType>(ref_guid);
 
                             // Referenced handle invalid
                             if (!handle_opt)
@@ -416,8 +416,8 @@ namespace eeng
                 {
                     visit_asset_refs(asset, [&](const auto& asset_ref)
                         {
-                            using SubT = typename std::decay_t<decltype(asset_ref.handle)>::value_type;
-                            if (!validate_asset_recursive<SubT>(asset_ref.handle))
+                            using AssetType = typename std::remove_reference_t<decltype(asset_ref)>::asset_type;
+                            if (!validate_asset_recursive<AssetType>(asset_ref.handle))
                                 valid = false;
 
                         });

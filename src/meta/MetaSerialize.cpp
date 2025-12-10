@@ -459,7 +459,7 @@ namespace eeng::meta
             // Try casting the meta_any to a primitive type.
             bool res = try_apply(any, [&json, &any](auto& value)
                 {
-                    // Stript away any constness
+                    // Strip away any constness
                     using Type = std::decay_t<decltype(value)>;
 
                     // Assign a new value to the stored object

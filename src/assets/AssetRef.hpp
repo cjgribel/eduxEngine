@@ -13,7 +13,7 @@ namespace eeng
     // Overload `visit_entity_refs(MyType&, Visitor&&)` in MyType's namespace,
     // then call `visit_entity_refs(obj, visitor);` unqualified so ADL finds it.
     template<typename T, typename Visitor>
-    void visit_asset_refs(T&, Visitor&&) 
+    void visit_asset_refs(T&, Visitor&&)
     {
         // Default: no assets referenced
     }
@@ -26,6 +26,9 @@ namespace eeng
     {
         static_assert(!std::is_reference_v<T>, "AssetRef<T> cannot use reference types");
 
+        using asset_type = T;
+        using handle_type = Handle<T>;
+
         Guid guid;
         Handle<T> handle;
 
@@ -35,12 +38,13 @@ namespace eeng
             Handle<T> handle = Handle<T>())
             : guid(guid)
             , handle(handle)
-        { }
+        {
+        }
 
         bool is_bound() const { return bool(handle); }
         void bind(Handle<T> handle) { this->handle = handle; }
         void unbind() { handle.reset(); }
-        
+
         //Guid get_guid() const { return guid; }
         // Handle<T> get_handle() const { return handle; }
     };
