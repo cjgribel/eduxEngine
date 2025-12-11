@@ -1088,7 +1088,7 @@ namespace eeng
 
         // --- Scene graph hierarchy -------------------------------------------
         {
-            static float hierarchy_height = 250.0f;
+            static float hierarchy_height = 150.0f;
 
             if (ImGui::BeginChild("SceneHierarchyRegion",
                 ImVec2(0.0f, hierarchy_height), // full width, fixed height
