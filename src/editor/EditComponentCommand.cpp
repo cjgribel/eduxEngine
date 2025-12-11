@@ -13,6 +13,116 @@
 #include "MetaSerialize.hpp"
 #include "EditComponentCommand.hpp"
 
+// TODO -> IEditComponentCommand ???
+namespace
+{
+    bool apply_path_and_set(entt::meta_any& root,
+        const eeng::editor::MetaPath& path,
+        const entt::meta_any& value)
+    {
+        using namespace eeng::editor;
+        using Entry = MetaPath::Entry;
+
+        // Start from a reference view of the root component
+        entt::meta_any current = root.as_ref();
+
+#ifdef COMMAND_DEBUG_PRINTS
+        std::cout << "apply_path_and_set: root.policy = "
+            << policy_to_string(root.base().policy()) << std::endl;
+        std::cout << "apply_path_and_set: current.policy = "
+            << policy_to_string(current.base().policy()) << std::endl;
+#endif
+
+        if (path.entries.empty())
+            return false;
+
+        // Traverse all but last
+        for (size_t i = 0; i + 1 < path.entries.size(); ++i)
+        {
+            const auto& entry = path.entries[i];
+
+            switch (entry.type)
+            {
+            case Entry::Type::Data:
+            {
+                auto field = current.type().data(entry.data_id);
+                if (!field) return false;
+
+                entt::meta_any next = field.get(current);
+                if (!next) return false;
+
+                // Keep aliasing as we descend
+                current = next.as_ref();
+                break;
+            }
+
+            case Entry::Type::Index:
+            {
+                auto seq = current.as_sequence_container();
+                if (!seq || entry.index < 0 || entry.index >= seq.size()) return false;
+
+                entt::meta_any next = seq[entry.index];
+                if (!next) return false;
+
+                current = next.as_ref();
+                break;
+            }
+
+            case Entry::Type::Key:
+            {
+                auto assoc = current.as_associative_container();
+                if (!assoc) return false;
+
+                auto it = assoc.find(entry.key_any);
+                if (it == assoc.end()) return false;
+
+                entt::meta_any next = it->second;
+                if (!next) return false;
+
+                current = next.as_ref();
+                break;
+            }
+
+            default:
+                return false;
+            }
+        }
+
+        const auto& leaf = path.entries.back();
+
+        switch (leaf.type)
+        {
+        case Entry::Type::Data:
+        {
+            auto field = current.type().data(leaf.data_id);
+            if (!field) return false;
+            return field.set(current, value);
+        }
+
+        case Entry::Type::Index:
+        {
+            auto seq = current.as_sequence_container();
+            if (!seq || leaf.index < 0 || leaf.index >= seq.size()) return false;
+            seq[leaf.index].assign(value);
+            return true;
+        }
+
+        case Entry::Type::Key:
+        {
+            auto assoc = current.as_associative_container();
+            if (!assoc) return false;
+            auto it = assoc.find(leaf.key_any);
+            if (it == assoc.end()) return false;
+            it->second.assign(value);
+            return true;
+        }
+
+        default:
+            return false;
+        }
+    }
+}
+
 namespace
 {
     // bool is_ref(const entt::meta_any& any)
@@ -30,8 +140,46 @@ namespace
     }
 }
 
-namespace eeng::editor {
+namespace eeng::editor
+{
 
+#if 0
+    void ComponentCommand::traverse_and_set_meta_type(entt::meta_any& value_any)
+    {
+        //         auto registry_sp = registry.lock();
+        //         assert(registry_sp && "Registry expired");
+
+        //         // Get a handle to the entity
+        //         entt::handle handle{ *registry_sp, entity };
+        //         // Get the component as a meta_any (this should be by-ref)
+        //         entt::meta_any root = handle.get(component_id);
+        //         assert(root && "Failed to get component as meta_any");
+
+        // #ifdef COMMAND_DEBUG_PRINTS
+        //         std::cout << "root.policy = "
+        //             << policy_to_string(root.base().policy()) << std::endl;
+        // #endif
+
+        //         const bool ok = apply_path_and_set(root, meta_path, value_any);
+        //         assert(ok && "Failed to set field");
+
+        auto registry_sp = registry.lock();
+        assert(registry_sp && "Registry expired");
+
+        auto* storage = registry_sp->storage(component_id);
+        assert(storage && storage->contains(entity));
+
+        entt::meta_type meta_type = entt::resolve(component_id);
+        entt::meta_any root = meta_type.from_void(storage->value(entity));
+        assert(root && "Failed to get component as meta_any");
+
+        const bool ok = apply_path_and_set(root, meta_path, value_any);
+        assert(ok && "Failed to set field");
+
+        // After this, the component in the registry is actually modified.
+        // Now we can run per-field callbacks or emit events.
+    }
+#else
     void ComponentCommand::traverse_and_set_meta_type(entt::meta_any& value_any)
     {
         using EntryType = MetaPath::Entry::Type;
@@ -227,6 +375,7 @@ namespace eeng::editor {
         }
 #endif
     }
+#endif
 
     void ComponentCommand::execute()
     {

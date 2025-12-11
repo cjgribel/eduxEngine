@@ -56,7 +56,7 @@ namespace eeng::dev
                 try
                 {
 #if 1
-                    // Just scan & load batche index
+                    // Just scan & load existing batch index
 
                     // Scan assets
                     EENG_LOG(ctx.get(), "[startup] Waiting for scan to complete before adding components...");
@@ -165,10 +165,11 @@ namespace eeng::dev
                                 auto camera_model_ref = refs[1];
                                 ecs::mock::MockPlayerComponent player_comp{ 1.0f, 2.0f, er_camera, player_model_ref };
                                 ecs::mock::MockCameraComponent camera_comp{ 3.0f, 4.0f, er_player, camera_model_ref };
-
                                 reg.emplace<ecs::mock::MockPlayerComponent>(er_player.entity, player_comp);
                                 reg.emplace<ecs::mock::MockCameraComponent>(er_camera.entity, camera_comp);
 
+                                reg.emplace<ecs::mock::MockMixComponent>(er_player.entity);
+                                reg.emplace<ecs::mock::MockMixComponent>(er_camera.entity);
 
                                 // If Position has AssetRef<T> inside,
                                 // either:
@@ -332,7 +333,7 @@ bool Game::init()
                 EENG_LOG(ctx, "[Game::init()] Waiting for asset scan to finish...");
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
-        }
+}
 #endif
             // Get asset index snapshot and log it
             // auto asset_index = resource_manager.get_asset_entries_snapshot();
@@ -446,7 +447,7 @@ bool Game::init()
                     assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
-}
+                }
             }
 #endif
         }
@@ -1012,7 +1013,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-    }
+}
 #endif
 
     // Draw shape batches

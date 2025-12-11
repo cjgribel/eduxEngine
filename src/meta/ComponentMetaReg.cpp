@@ -30,6 +30,8 @@
 
 namespace eeng
 {
+    using namespace eeng::ecs::mock;
+
     namespace
     {
         template<class T>
@@ -93,25 +95,16 @@ namespace eeng
         template<typename T>
         void register_component()
         {
-            // Bind / Resolve
-            // Bind all AssetRef and EntityRef members
-            // (Meta is needed, if we iterate all components per entity (e.g. Batch load))
             entt::meta_factory<T>()
                 .template func<&assure_type_storage<T>, entt::as_void_t>(literals::assure_component_storage_hs)
-                // .func<&resolve_component_meta<T>>(hashed_string("resolve_component"))
 
                 .template func<&meta::collect_asset_guids<T>, entt::as_void_t>(literals::collect_asset_guids_hs)
+
                 .template func<&meta::bind_asset_refs<T>, entt::as_void_t>(literals::bind_asset_refs_hs)
                 .template func<&meta::bind_entity_refs<T>, entt::as_void_t>(literals::bind_entity_refs_hs)
+                // + unbind?
 
                 ;
-
-            // AssetRef<T>
-            // entt::meta_factory<AssetRef<T>>{}
-            // .template data<&AssetRef<T>::guid>("guid"_hs)
-            //     .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
-            //     .traits(MetaFlags::read_only)
-            //     ;
 
             warm_start_meta_type<T>();
         }
@@ -119,8 +112,8 @@ namespace eeng
 
     namespace
     {
+        // TODO -> editor/GuidSerialize.hpp (takes nlohmann::json dependency with it)
         // Guid to and from json
-        // MAYBE MOVE TO SEPARATE FILE UNDER EDITOR OR GUI (with nlohmann::json dependency)
 
         void serialize_Guid(nlohmann::json& j, const entt::meta_any& any)
         {
@@ -141,7 +134,7 @@ namespace eeng
     {
         EENG_LOG_INFO(&ctx, "Registering component meta types...");
 
-        // ---- Guid -----------------------------------------------------------
+        // --- Guid ------------------------------------------------------------
         entt::meta_factory<Guid>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "Guid", "A globally unique identifier." })
 
@@ -153,7 +146,7 @@ namespace eeng
             ;
         warm_start_meta_type<Guid>();
 
-        // ---- EntityRef ------------------------------------------------------
+        // --- EntityRef -------------------------------------------------------
         entt::meta_factory<eeng::ecs::EntityRef>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "EntityRef", "A reference to an entity." })
 
@@ -175,7 +168,8 @@ namespace eeng
             //     .traits(MetaFlags::read_only)   
             ;
         warm_start_meta_type<eeng::ecs::EntityRef>();
-        // ---------------------------------------------------------------------
+
+        // --- MockPlayerComponent ---------------------------------------------
         register_component<eeng::ecs::mock::MockPlayerComponent>();
         entt::meta_factory<eeng::ecs::mock::MockPlayerComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "MockPlayerComponent", "A mock player component for testing." })
@@ -197,7 +191,7 @@ namespace eeng
             .traits(MetaFlags::none)
             ;
 
-        // ---------------------------------------------------------------------
+        // --- MockCameraComponent ---------------------------------------------
         register_component<eeng::ecs::mock::MockCameraComponent>();
         entt::meta_factory<eeng::ecs::mock::MockCameraComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ "MockCameraComponent", "A mock camera component for testing." })
@@ -219,7 +213,7 @@ namespace eeng
             .traits(MetaFlags::none)
             ;
 
-        // ---------------------------------------------------------------------
+        // --- TransformComponent ----------------------------------------------
         register_component<ecs::TransformComponent>();
 #if 0
         entt::meta<ecs::Transform>()
@@ -235,7 +229,7 @@ namespace eeng
             ;
 #endif
 
-        // ---------------------------------------------------------------------
+        // --- HeaderComponent -------------------------------------------------
         register_component<ecs::HeaderComponent>();
 #if 0
         // chunk_tag callback
@@ -294,6 +288,131 @@ namespace eeng
                     //.func<&cloneDebugClass>(clone_hs)
                 ;
 #endif
+
+            // --- MockMixComponent + nested types -----------------------------
+
+            entt::meta_factory<ecs::mock::MockUVcoords>()
+                .custom<TypeMetaInfo>(TypeMetaInfo{ "MockUVcoords", "Metadata for MockUVcoords." })
+                // .type("UVcoords"_hs).prop(display_name_hs, "UVcoords")
+
+                .data<&ecs::mock::MockUVcoords::u>("u"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "u", "U", "" }).traits(MetaFlags::none)
+
+                .data<&ecs::mock::MockUVcoords::v>("v"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "v", "V", "" }).traits(MetaFlags::none)
+
+                .func<&ecs::mock::MockUVcoords::to_string>(literals::to_string_hs)
+                ;
+
+            entt::meta_factory<ecs::mock::MockVec3>()
+                .custom<TypeMetaInfo>(TypeMetaInfo{ "MockVec3", "Metadata for MockVec3." })
+                // .type("MockVec3"_hs).prop(display_name_hs, "MockVec3")
+
+                .data<&ecs::mock::MockVec3::x>("x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "" }).traits(MetaFlags::none)
+
+                .data<&ecs::mock::MockVec3::y>("y"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "" }).traits(MetaFlags::none)
+
+                .data<&ecs::mock::MockVec3::z>("z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "z", "Z", "" }).traits(MetaFlags::none)
+
+                .data<&ecs::mock::MockVec3::uv_coords>("uv_coords"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "uv_coords", "UV Coords", "" }).traits(MetaFlags::none)
+
+#ifdef JSON
+                //.func<&MockVec3_to_json>(to_json_hs)
+                .func < [](nlohmann::json& j, const void* ptr) { to_json(j, *static_cast<const MockVec3*>(ptr)); }, entt::as_void_t > (to_json_hs)
+                .func < [](const nlohmann::json&& ? j, void* ptr) { from_json(j, *static_cast<MockVec3*>(ptr)); }, entt::as_void_t > (from_json_hs)
+#endif
+                //        .func<&MockVec3::to_string>(to_string_hs)
+                .func<&ecs::mock::MockVec3_to_string>(literals::to_string_hs)
+                ;
+
+            entt::meta_factory<ElementType>()
+                .custom<TypeMetaInfo>(TypeMetaInfo{ "ElementType", "Metadata for ElementType." })
+                // .type("ElementType"_hs).prop(display_name_hs, "ElementType")
+
+                .data<&ElementType::m>("m"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "m", "M", "" }).traits(MetaFlags::none)
+
+                //        .func<&debugvec3::to_string>(to_string_hs)
+                ;
+
+            auto enum_info = EnumTypeMetaInfo
+            {
+                .name = "AnEnum",
+                .tooltip = "AnEnum is a test enum with three values.",
+                .underlying_type = entt::resolve<std::underlying_type_t<AnEnum>>()
+            };
+            entt::meta_factory<AnEnum>()
+                // .type("AnEnum"_hs)
+                .custom<EnumTypeMetaInfo>(enum_info)
+
+                .data<AnEnum::Hello>("Hello"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hello", "Greeting in English." })
+                .traits(MetaFlags::none)
+
+                .data<AnEnum::Bye>("Bye"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Bye", "Farewell in English." })
+                .traits(MetaFlags::none)
+
+                .data<AnEnum::Hola>("Hola"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hola", "Greeting in Spanish." })
+                .traits(MetaFlags::none)
+                ;
+
+            register_component<MockMixComponent>();
+            entt::meta_factory<MockMixComponent>()
+                .custom<TypeMetaInfo>(TypeMetaInfo{ "MockMixComponent", "A mock component with mixed data types for testing." })
+                // .type("DebugClass"_hs).prop(display_name_hs, "DebugClass")
+
+                .data<&MockMixComponent::flag/*, entt::as_ref_t*/>("flag"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "flag", "Flag", "A boolean flag." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::a>("a"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "a", "A", "A float value." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::b/*, entt::as_ref_t*/>("b"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "b", "B", "An integer value." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::c>("c"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "c", "C", "An integer value." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::position>("position"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "A 3D position vector." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::somestring>("somestring"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "somestring", "Some String", "A sample string." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::vector1>("vector1"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "vector1", "Vector1", "An array of integers." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::vector2>("vector2"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "vector2", "Vector2", "An array of integers." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::map1>("map1"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "map1", "Map1", "A map of strings to integers." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::map2>("map2"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "map2", "Map2", "A map of strings to floats." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::map3>("map3"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "map3", "Map3", "A map of strings to strings." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::set1>("set1"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "set1", "Set1", "A set of strings." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::anEnum>("anEnum"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "anEnum", "An Enum", "An example enum value." }).traits(MetaFlags::none)
+
+                // to_string, member version
+                    //.func<&DebugClass::to_string>(to_string_hs)
+                // to_string, free function version
+                    //.func<&to_string_DebugClass>(to_string_hs)
+                // clone
+                    //.func<&cloneDebugClass>(clone_hs)
+                ;
     }
 
 } // namespace eeng
