@@ -16,71 +16,49 @@
 // TODO -> IEditComponentCommand ???
 namespace
 {
-    bool apply_path_and_set(entt::meta_any& root,
+    using Entry = eeng::editor::MetaPath::Entry;
+
+    static bool set_recursive(entt::meta_any& obj,
         const eeng::editor::MetaPath& path,
-        const entt::meta_any& value)
+        std::size_t idx,
+        const entt::meta_any& leaf_value)
     {
-        using namespace eeng::editor;
-        using Entry = MetaPath::Entry;
+        const auto& entry = path.entries[idx];
+        const bool is_leaf = (idx + 1 == path.entries.size());
 
-        // Start from a reference view of the root component
-        entt::meta_any current = root.as_ref();
-
-#ifdef COMMAND_DEBUG_PRINTS
-        std::cout << "apply_path_and_set: root.policy = "
-            << policy_to_string(root.base().policy()) << std::endl;
-        std::cout << "apply_path_and_set: current.policy = "
-            << policy_to_string(current.base().policy()) << std::endl;
-#endif
-
-        if (path.entries.empty())
-            return false;
-
-        // Traverse all but last
-        for (size_t i = 0; i + 1 < path.entries.size(); ++i)
+        // ---- LEAF CASE ----
+        if (is_leaf)
         {
-            const auto& entry = path.entries[i];
-
             switch (entry.type)
             {
             case Entry::Type::Data:
             {
-                auto field = current.type().data(entry.data_id);
-                if (!field) return false;
-
-                entt::meta_any next = field.get(current);
-                if (!next) return false;
-
-                // Keep aliasing as we descend
-                current = next.as_ref();
-                break;
+                entt::meta_type type = obj.type();
+                entt::meta_data field = type.data(entry.data_id);
+                if (!field)
+                    return false;
+                return field.set(obj, leaf_value);
             }
 
             case Entry::Type::Index:
             {
-                auto seq = current.as_sequence_container();
-                if (!seq || entry.index < 0 || entry.index >= seq.size()) return false;
-
-                entt::meta_any next = seq[entry.index];
-                if (!next) return false;
-
-                current = next.as_ref();
-                break;
+                auto seq = obj.as_sequence_container();
+                if (!seq || entry.index < 0 || entry.index >= seq.size())
+                    return false;
+                seq[entry.index].assign(leaf_value);
+                return true;
             }
 
             case Entry::Type::Key:
             {
-                auto assoc = current.as_associative_container();
-                if (!assoc) return false;
-
+                auto assoc = obj.as_associative_container();
+                if (!assoc)
+                    return false;
                 auto it = assoc.find(entry.key_any);
-                if (it == assoc.end()) return false;
-
-                entt::meta_any next = it->second;
-                if (!next) return false;
-
-                current = next.as_ref();
-                break;
+                if (it == assoc.end())
+                    return false;
+                it->second.assign(leaf_value);
+                return true;
             }
 
             default:
@@ -88,32 +66,68 @@ namespace
             }
         }
 
-        const auto& leaf = path.entries.back();
-
-        switch (leaf.type)
+        // ---- NON-LEAF CASE ----
+        switch (entry.type)
         {
         case Entry::Type::Data:
         {
-            auto field = current.type().data(leaf.data_id);
-            if (!field) return false;
-            return field.set(current, value);
+            entt::meta_type type = obj.type();
+            entt::meta_data field = type.data(entry.data_id);
+            if (!field)
+                return false;
+
+            // Get a VALUE copy of the subobject
+            entt::meta_any sub = field.get(obj);
+            if (!sub)
+                return false;
+
+            // Recurse into subobject
+            if (!set_recursive(sub, path, idx + 1, leaf_value))
+                return false;
+
+            // Write updated subobject back into obj
+            return field.set(obj, sub);
         }
 
         case Entry::Type::Index:
         {
-            auto seq = current.as_sequence_container();
-            if (!seq || leaf.index < 0 || leaf.index >= seq.size()) return false;
-            seq[leaf.index].assign(value);
+            auto seq = obj.as_sequence_container();
+            if (!seq || entry.index < 0 || entry.index >= seq.size())
+                return false;
+
+            // VALUE copy of element
+            entt::meta_any element = seq[entry.index];
+            if (!element)
+                return false;
+
+            if (!set_recursive(element, path, idx + 1, leaf_value))
+                return false;
+
+            // Write updated element back into container
+            seq[entry.index].assign(element);
             return true;
         }
 
         case Entry::Type::Key:
         {
-            auto assoc = current.as_associative_container();
-            if (!assoc) return false;
-            auto it = assoc.find(leaf.key_any);
-            if (it == assoc.end()) return false;
-            it->second.assign(value);
+            auto assoc = obj.as_associative_container();
+            if (!assoc)
+                return false;
+
+            auto it = assoc.find(entry.key_any);
+            if (it == assoc.end())
+                return false;
+
+            // VALUE copy of element
+            entt::meta_any element = it->second;
+            if (!element)
+                return false;
+
+            if (!set_recursive(element, path, idx + 1, leaf_value))
+                return false;
+
+            // Write updated element back into container
+            it->second.assign(element);
             return true;
         }
 
@@ -121,7 +135,19 @@ namespace
             return false;
         }
     }
-}
+
+    bool apply_path_and_set(entt::meta_any& root,
+        const eeng::editor::MetaPath& path,
+        const entt::meta_any& value)
+    {
+        if (path.entries.empty())
+            return false;
+
+        // 'root' here is the alias from from_void(...) – we pass it by reference.
+        // set_recursive will propagate changes correctly all the way down and back up.
+        return set_recursive(root, path, 0, value);
+    }
+} // 
 
 namespace
 {
@@ -143,7 +169,7 @@ namespace
 namespace eeng::editor
 {
 
-#if 0
+#if 1
     void ComponentCommand::traverse_and_set_meta_type(entt::meta_any& value_any)
     {
         //         auto registry_sp = registry.lock();
@@ -374,7 +400,7 @@ namespace eeng::editor
             }
         }
 #endif
-    }
+}
 #endif
 
     void ComponentCommand::execute()
