@@ -5,412 +5,67 @@
 //  Copyright © 2024 Carl Johan Gribel. All rights reserved.
 //
 
+#include "MetaLiterals.h"
+#include "MetaSerialize.hpp"
+#include "editor/AssignMetaField.hpp"
+#include "EditComponentCommand.hpp"
 #include <iostream>
 #include <cassert>
 #include <stack>
-//#include <nlohmann/json.hpp>
-#include "MetaLiterals.h"
-#include "MetaSerialize.hpp"
-#include "EditComponentCommand.hpp"
 
-// TODO -> IEditComponentCommand ???
-namespace
-{
-    using Entry = eeng::editor::MetaPath::Entry;
-
-    static bool set_recursive(entt::meta_any& obj,
-        const eeng::editor::MetaPath& path,
-        std::size_t idx,
-        const entt::meta_any& leaf_value)
-    {
-        const auto& entry = path.entries[idx];
-        const bool is_leaf = (idx + 1 == path.entries.size());
-
-        // ---- LEAF CASE ----
-        if (is_leaf)
-        {
-            switch (entry.type)
-            {
-            case Entry::Type::Data:
-            {
-                entt::meta_type type = obj.type();
-                entt::meta_data field = type.data(entry.data_id);
-                if (!field)
-                    return false;
-                return field.set(obj, leaf_value);
-            }
-
-            case Entry::Type::Index:
-            {
-                auto seq = obj.as_sequence_container();
-                if (!seq || entry.index < 0 || entry.index >= seq.size())
-                    return false;
-                seq[entry.index].assign(leaf_value);
-                return true;
-            }
-
-            case Entry::Type::Key:
-            {
-                auto assoc = obj.as_associative_container();
-                if (!assoc)
-                    return false;
-                auto it = assoc.find(entry.key_any);
-                if (it == assoc.end())
-                    return false;
-                it->second.assign(leaf_value);
-                return true;
-            }
-
-            default:
-                return false;
-            }
-        }
-
-        // ---- NON-LEAF CASE ----
-        switch (entry.type)
-        {
-        case Entry::Type::Data:
-        {
-            entt::meta_type type = obj.type();
-            entt::meta_data field = type.data(entry.data_id);
-            if (!field)
-                return false;
-
-            // Get a VALUE copy of the subobject
-            entt::meta_any sub = field.get(obj);
-            if (!sub)
-                return false;
-
-            // Recurse into subobject
-            if (!set_recursive(sub, path, idx + 1, leaf_value))
-                return false;
-
-            // Write updated subobject back into obj
-            return field.set(obj, sub);
-        }
-
-        case Entry::Type::Index:
-        {
-            auto seq = obj.as_sequence_container();
-            if (!seq || entry.index < 0 || entry.index >= seq.size())
-                return false;
-
-            // VALUE copy of element
-            entt::meta_any element = seq[entry.index];
-            if (!element)
-                return false;
-
-            if (!set_recursive(element, path, idx + 1, leaf_value))
-                return false;
-
-            // Write updated element back into container
-            seq[entry.index].assign(element);
-            return true;
-        }
-
-        case Entry::Type::Key:
-        {
-            auto assoc = obj.as_associative_container();
-            if (!assoc)
-                return false;
-
-            auto it = assoc.find(entry.key_any);
-            if (it == assoc.end())
-                return false;
-
-            // VALUE copy of element
-            entt::meta_any element = it->second;
-            if (!element)
-                return false;
-
-            if (!set_recursive(element, path, idx + 1, leaf_value))
-                return false;
-
-            // Write updated element back into container
-            it->second.assign(element);
-            return true;
-        }
-
-        default:
-            return false;
-        }
-    }
-
-    bool apply_path_and_set(entt::meta_any& root,
-        const eeng::editor::MetaPath& path,
-        const entt::meta_any& value)
-    {
-        if (path.entries.empty())
-            return false;
-
-        // 'root' here is the alias from from_void(...) – we pass it by reference.
-        // set_recursive will propagate changes correctly all the way down and back up.
-        return set_recursive(root, path, 0, value);
-    }
-} // 
+// Pick one
+//#define ASSIGN_META_FIELD_USE_STACKBASED
+#define ASSIGN_META_FIELD_USE_RECURSIVE
 
 namespace
 {
-    // bool is_ref(const entt::meta_any& any)
-
     bool is_ref(const entt::meta_any& any)
     {
-        return any.base().policy() == entt::any_policy::ref; // as_ref_t::value(); // entt::meta_any::policy::reference;
-
-        // // DOOES NOT WORK
-        // // Create a reference-based meta_any from the original
-        // auto ref_any = any.as_ref();
-        // // Compare addresses: if the original `any` was already a reference, 
-        // // `ref_any` should match it in content (same underlying object)
-        // return ref_any == any;
+        return any.base().policy() == entt::any_policy::ref;
     }
 }
 
 namespace eeng::editor
 {
-
-#if 1
-    void ComponentCommand::traverse_and_set_meta_type(entt::meta_any& value_any)
+    void ComponentCommand::assign_meta_field(entt::meta_any& value_any)
     {
-        //         auto registry_sp = registry.lock();
-        //         assert(registry_sp && "Registry expired");
-
-        //         // Get a handle to the entity
-        //         entt::handle handle{ *registry_sp, entity };
-        //         // Get the component as a meta_any (this should be by-ref)
-        //         entt::meta_any root = handle.get(component_id);
-        //         assert(root && "Failed to get component as meta_any");
-
-        // #ifdef COMMAND_DEBUG_PRINTS
-        //         std::cout << "root.policy = "
-        //             << policy_to_string(root.base().policy()) << std::endl;
-        // #endif
-
-        //         const bool ok = apply_path_and_set(root, meta_path, value_any);
-        //         assert(ok && "Failed to set field");
-
+        // Get registry
         auto registry_sp = registry.lock();
         assert(registry_sp && "Registry expired");
 
+        // Get storage for component type
         auto* storage = registry_sp->storage(component_id);
         assert(storage && storage->contains(entity));
 
+        // Get ref meta_any to component
         entt::meta_type meta_type = entt::resolve(component_id);
         entt::meta_any root = meta_type.from_void(storage->value(entity));
         assert(root && "Failed to get component as meta_any");
+        assert(is_ref(root) && "Component meta_any is not a reference");
 
-        const bool ok = apply_path_and_set(root, meta_path, value_any);
+        // Apply path and set new value
+        assert(!meta_path.entries.empty() && "MetaPath is empty");
+#ifdef ASSIGN_META_FIELD_USE_RECURSIVE
+        const bool ok = assign_meta_field_recursive(root, meta_path, 0, value_any);
+#endif
+#ifdef ASSIGN_META_FIELD_USE_STACKBASED
+        const bool ok = assign_meta_field_stackbased(root, meta_path, value_any);
+#endif
         assert(ok && "Failed to set field");
 
-        // After this, the component in the registry is actually modified.
-        // Now we can run per-field callbacks or emit events.
+        // TODO ->
+        // Component is now modified - run per-field callbacks or emit events.
     }
-#else
-    void ComponentCommand::traverse_and_set_meta_type(entt::meta_any& value_any)
-    {
-        using EntryType = MetaPath::Entry::Type;
-        assert(!registry.expired());
-        auto registry_sp = registry.lock();
 
-#ifdef COMMAND_DEBUG_PRINTS
-        auto any_to_string = [](const entt::meta_any any) -> std::string {
-            if (auto j = Meta::serialize_any(any); !j.is_null())
-                return j.dump();
-            return "n/a";
-            };
-
-        std::cout << "Executing command" << std::endl;
-        std::cout << "\t" << get_name() << std::endl;
-        std::cout << "\tentity " << entt::to_integral(entity);
-        std::cout << ", component type " << component_id << std::endl;
-        std::cout << "\tprev value: " << any_to_string(prev_value) << std::endl;
-        std::cout << "\tnew value: " << any_to_string(new_value) << std::endl;
-#endif   
-
-        // Component
-        auto type = registry_sp->storage(component_id);
-        assert(type->contains(entity));
-        entt::meta_type meta_type = entt::resolve(component_id);
-        // from_void returns "a wrapper that references the given instance"
-        entt::meta_any meta_any = meta_type.from_void(type->value(entity));
-
-        // 1.   Use meta path to build a stack with values copied from the specific component
-        // 2.   Iterate stack and assign values, from the edited data field up to the component itself 
-        struct Property {
-            entt::meta_any meta_any; entt::meta_data meta_data; MetaPath::Entry entry;
-
-            // explicit Property(entt::meta_any& meta_any, const entt::meta_data& meta_data, const MetaPath::Entry& entry)
-            //     : meta_any{ is_ref(meta_any) ? meta_any : meta_any.as_ref() },
-            //     meta_data(meta_data),
-            //     entry(entry) { }
-        };
-        std::stack<Property> prop_stack;
-
-        // Push first data path entry manually (meta_any is the component itself)
-        auto& entry0 = meta_path.entries[0];
-        const entt::meta_data meta_data0 = meta_type.data(entry0.data_id);
-        Property last_prop{ meta_any, meta_data0, entry0 };
-        prop_stack.push(last_prop);
-        prop_stack.top().meta_any = meta_any.as_ref(); // TODO
-        assert(is_ref(prop_stack.top().meta_any)); // TODO
-
-        //entt::as_ref_t
-        //meta_any.policy
-        // entt::meta_any any = meta_any;
-        // //assert(any == any.as_ref());
-        // entt::meta_any cpy2 = meta_any.as_ref();
-        // std::cout << "is_ref meta_any " << is_ref(meta_any) << std::endl;
-        // std::cout << "is_ref meta_any.as_ref() " << is_ref(meta_any.as_ref()) << std::endl;
-        // std::cout << "is_ref cpy1 " << is_ref(any) << std::endl;
-        // std::cout << "is_ref cpy2 " << is_ref(cpy2) << std::endl;
-
-#ifdef COMMAND_DEBUG_PRINTS
-        std::cout << "building property stack..." << std::endl;
-        std::cout << "entry 0: " << last_prop.meta_any.type().info().name() << std::endl;
-#endif
-
-        // Push the remaining path entries
-        int i = 1;
-        for (;i < meta_path.entries.size(); i++)
-        {
-            auto& e = meta_path.entries[i];
-            if (e.type == EntryType::Data)
-            {
-                entt::meta_any meta_any;
-                if (last_prop.entry.type == EntryType::Index)
-                {
-                    meta_any = last_prop.meta_any.as_sequence_container()[last_prop.entry.index];
-                }
-                else if (last_prop.entry.type == EntryType::Key)
-                {
-                    meta_any = last_prop.meta_any.as_associative_container().find(last_prop.entry.key_any)->second;
-                }
-                else if (last_prop.entry.type == EntryType::Data)
-                {
-                    meta_any = last_prop.meta_data.get(last_prop.meta_any);
-                }
-                else { assert(0); }
-                assert(meta_any);
-                // auto meta_any = last_prop.meta_data.get(last_prop.meta_any); assert(meta_any);
-                auto meta_type = entt::resolve(meta_any.type().id());  assert(meta_type);
-                auto meta_data = meta_type.data(e.data_id); assert(meta_data);
-
-                last_prop = Property{ meta_any, meta_data, e };
-                prop_stack.push(last_prop);
-            }
-            else if (e.type == EntryType::Index)
-            {
-                assert(last_prop.entry.type == EntryType::Data);
-                auto meta_any = last_prop.meta_data.get(last_prop.meta_any); assert(meta_any); // = container
-
-                // Validate index
-                assert(meta_any.type().is_sequence_container());
-                assert(e.index < meta_any.as_sequence_container().size());
-
-                last_prop = Property{ meta_any, entt::meta_data{}, e };
-                prop_stack.push(last_prop);
-            }
-            else if (e.type == EntryType::Key)
-            {
-                assert(last_prop.entry.type == EntryType::Data);
-                auto meta_any = last_prop.meta_data.get(last_prop.meta_any); assert(meta_any); // = container
-
-                // Validate key
-                assert(meta_any.type().is_associative_container());
-                assert(meta_any.as_associative_container().find(e.key_any));
-
-                last_prop = Property{ meta_any, entt::meta_data{}, e };
-                prop_stack.push(last_prop);
-            }
-            else { assert(0); }
-#ifdef COMMAND_DEBUG_PRINTS
-            std::cout << "entry " << i << ": " << last_prop.meta_any.type().info().name() << std::endl;
-#endif
-        }
-
-#ifdef COMMAND_DEBUG_PRINTS
-        std::cout << "assigning new values..." << std::endl;
-#endif
-        entt::meta_any any_new = value_any;
-
-        // Iterate stack and assign new values
-        while (!prop_stack.empty())
-        {
-            auto& prop = prop_stack.top();
-#ifdef COMMAND_DEBUG_PRINTS
-            std::cout << "Property " << prop_stack.size() << std::endl;
-            std::cout << "object:" << std::endl;
-            std::cout << prop.meta_any.type().info().name() << " ";     // object type
-            std::cout << any_to_string(prop.meta_any) << std::endl;     // object value
-            std::cout << prop.entry.name << " =>" << std::endl;         // property name/index
-            std::cout << any_new.type().info().name() << " ";           // new property type
-            std::cout << any_to_string(any_new) << std::endl;           // new property value
-#endif
-            if (prop.entry.type == EntryType::Data)
-            {
-                bool res = prop.meta_data.set(prop.meta_any, any_new); assert(res); //break;
-            }
-            else if (prop.entry.type == EntryType::Index)
-            {
-                auto view = prop.meta_any.as_sequence_container();
-                // Index already validated
-                view[prop.entry.index].assign(any_new);
-            }
-            else if (prop.entry.type == EntryType::Key)
-            {
-                auto view = prop.meta_any.as_associative_container();
-                // Key already validated
-                auto pair = view.find(prop.entry.key_any);
-                pair->second.assign(any_new);
-            }
-            else { assert(0); }
-
-            any_new = prop.meta_any;
-            prop_stack.pop();
-        }
-
-#ifdef COMMAND_DEBUG_PRINTS
-        std::cout << "Object before:" << std::endl;
-        std::cout << any_to_string(meta_any) << std::endl;
-#endif
-
-        // At this point, any_new is an updated COPY of the component:
-        // assign it to the in-memory component
-        // This works since
-        //      * meta_type.from_void(type.value(entity)) is a REFERENCE
-        //      * We do this above: prop_stack.top().meta_any = meta_any.as_ref();
-        // meta_any.assign(any_new);
-
-#ifdef COMMAND_DEBUG_PRINTS
-        std::cout << "Object after:" << std::endl;
-        std::cout << any_to_string(meta_any) << std::endl;
-        std::cout << "Done executing command" << std::endl;
-#endif
-
-#if 0
-        // Call data field callback if present
-        {
-            // meta_data is the actual data field that was edited
-            using TypeModifiedCallbackType = std::function<void(entt::meta_any, const ecs::Entity&)>;
-            if (auto prop = meta_data0.prop("callback"_hs); prop)
-            {
-                if (auto ptr = prop.value().try_cast<TypeModifiedCallbackType>(); ptr)
-                    ptr->operator()(value_any, entity);
-                else { assert(0); }
-            }
-        }
-#endif
-}
-#endif
 
     void ComponentCommand::execute()
     {
-        traverse_and_set_meta_type(new_value);
+        assign_meta_field(new_value);
     }
 
     void ComponentCommand::undo()
     {
-        traverse_and_set_meta_type(prev_value);
+        assign_meta_field(prev_value);
     }
 
     std::string ComponentCommand::get_name() const
@@ -431,7 +86,7 @@ namespace eeng::editor
     ComponentCommandBuilder& ComponentCommandBuilder::push_path_data(entt::id_type id, const std::string& name)
     {
         command.meta_path.entries.push_back(
-            MetaPath::Entry{ .type = MetaPath::Entry::Type::Data, .data_id = id, .name = name }
+            MetaFieldPath::Entry{ .type = MetaFieldPath::Entry::Type::Data, .data_id = id, .name = name }
         );
         return *this;
     }
@@ -439,7 +94,7 @@ namespace eeng::editor
     ComponentCommandBuilder& ComponentCommandBuilder::push_path_index(int index, const std::string& name)
     {
         command.meta_path.entries.push_back(
-            MetaPath::Entry{ .type = MetaPath::Entry::Type::Index, .index = index, .name = name }
+            MetaFieldPath::Entry{ .type = MetaFieldPath::Entry::Type::Index, .index = index, .name = name }
         );
         return *this;
     }
@@ -447,7 +102,7 @@ namespace eeng::editor
     ComponentCommandBuilder& ComponentCommandBuilder::push_path_key(const entt::meta_any& key_any, const std::string& name)
     {
         command.meta_path.entries.push_back(
-            MetaPath::Entry{ .type = MetaPath::Entry::Type::Key, .key_any = key_any/*.as_ref()*/, .name = name }
+            MetaFieldPath::Entry{ .type = MetaFieldPath::Entry::Type::Key, .key_any = key_any/*.as_ref()*/, .name = name }
         );
         return *this;
     }
@@ -484,17 +139,17 @@ namespace eeng::editor
                 auto& entry = command.meta_path.entries[i];
 
                 // First entry must be Data (enter data member of a component)
-                assert(i > 0 || entry.type == MetaPath::Entry::Type::Data);
+                assert(i > 0 || entry.type == MetaFieldPath::Entry::Type::Data);
 
                 // Check so relevant values are set for each entry type
-                assert(entry.type != MetaPath::Entry::Type::None);
-                assert(entry.type != MetaPath::Entry::Type::Data || entry.data_id);
-                assert(entry.type != MetaPath::Entry::Type::Index || entry.index > -1);
-                assert(entry.type != MetaPath::Entry::Type::Key || entry.key_any);
+                assert(entry.type != MetaFieldPath::Entry::Type::None);
+                assert(entry.type != MetaFieldPath::Entry::Type::Data || entry.data_id);
+                assert(entry.type != MetaFieldPath::Entry::Type::Index || entry.index > -1);
+                assert(entry.type != MetaFieldPath::Entry::Type::Key || entry.key_any);
 
                 last_was_index_or_key =
-                    entry.type == MetaPath::Entry::Type::Index ||
-                    entry.type == MetaPath::Entry::Type::Key;
+                    entry.type == MetaFieldPath::Entry::Type::Index ||
+                    entry.type == MetaFieldPath::Entry::Type::Key;
             }
         }
 
@@ -504,20 +159,20 @@ namespace eeng::editor
             command.display_name = entt::resolve(command.component_id).info().name();
             for (auto& entry : command.meta_path.entries)
             {
-                if (entry.type == MetaPath::Entry::Type::Data) {
+                if (entry.type == MetaFieldPath::Entry::Type::Data) {
                     command.display_name += "::" + entry.name;
                 }
-                else if (entry.type == MetaPath::Entry::Type::Index) {
+                else if (entry.type == MetaFieldPath::Entry::Type::Index) {
                     command.display_name += "[" + std::to_string(entry.index) + "]";
                 }
-                else if (entry.type == MetaPath::Entry::Type::Key) {
+                else if (entry.type == MetaFieldPath::Entry::Type::Key) {
                     if (auto j_new = meta::serialize_any(entry.key_any); !j_new.is_null())
                         command.display_name += "[" + j_new.dump() + "]";
                     else
                         command.display_name += "[]";
                 }
             }
-            // Serialize new value
+            // Serialize new value for display
             if (auto j_new = meta::serialize_any(command.new_value); !j_new.is_null())
                 command.display_name += " = " + j_new.dump();
         }

@@ -243,6 +243,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/CoreComponents.cpp
     #${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/EditComponentCommand.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/AssignMetaField.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/Profiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/ThreadPool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/AssetMetaReg.cpp

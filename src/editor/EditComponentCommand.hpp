@@ -8,39 +8,25 @@
 #ifndef EditComponentCommand_hpp
 #define EditComponentCommand_hpp
 
-#include <entt/entt.hpp>
 #include "Command.hpp"
+#include "editor/MetaFieldPath.hpp"
 #include "ecs/Entity.hpp"
+#include <entt/entt.hpp>
 
-namespace eeng::editor {
-
-    struct MetaPath
-    {
-        struct Entry
-        {
-            enum class Type : int { None, Data, Index, Key } type = Type::None;
-
-            entt::id_type data_id {0};  // data field by type id
-            int index {-1};             // sequential container by index
-            entt::meta_any key_any {};  // associative container by key
-
-            std::string name;           // 
-        };
-        std::vector<Entry> entries;
-    };
-
+namespace eeng::editor
+{
     class ComponentCommand : public Command
     {
         std::weak_ptr<entt::registry>   registry;
-        eeng::ecs::Entity                     entity;
+        eeng::ecs::Entity               entity;
         entt::id_type                   component_id = 0;
-        MetaPath                        meta_path{};
+        MetaFieldPath                   meta_path{};
         entt::meta_any                  prev_value{}, new_value{};
 
         std::string display_name;
         friend class ComponentCommandBuilder;
 
-        void traverse_and_set_meta_type(entt::meta_any& value_any);
+        void assign_meta_field(entt::meta_any& value_any);
 
     public:
         void execute() override;
