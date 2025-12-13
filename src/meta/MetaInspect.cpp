@@ -4,7 +4,7 @@
 #include "meta/MetaInspect.hpp"
 #include "MetaClone.hpp"
 #include "editor/InspectorState.hpp"
-#include "editor/InspectType.hpp"
+#include "editor/TypeInspect.hpp"
 #include "editor/CommandQueue.hpp"
 #include "editor/EditComponentCommand.hpp"
 #include "MetaLiterals.h"
