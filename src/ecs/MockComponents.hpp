@@ -1,3 +1,6 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
 #ifndef MockComponents_hpp
 #define MockComponents_hpp
 
@@ -5,8 +8,13 @@
 #include "Guid.h"
 #include "LogGlobals.hpp" // DEBUG
 
-
 #include "ecs/Entity.hpp"
+#include <string>
+#include <vector>
+#include <array>
+#include <map>
+#include <set>
+#include <sstream>
 
 // --- MockPlayerComponent -----------------------------------------------------
 // --- MockCameraComponent -----------------------------------------------------
