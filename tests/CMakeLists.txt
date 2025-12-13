@@ -30,6 +30,7 @@ add_executable(tests
     MetaSerialize_tests.cpp ../src/ecs/Entity.cpp ../src/meta/MetaSerialize.cpp ../src/engineapi/EngineContext.cpp ../src/util/ThreadPool.cpp
     Storage_tests.cpp ../src/assets/Storage.cpp
     EventQueue_tests.cpp
+    MetaFieldAssign_tests.cpp ../src/editor/MetaFieldAssign.cpp
     )
 
 target_link_libraries(tests PRIVATE gtest_main nlohmann_json::nlohmann_json)
