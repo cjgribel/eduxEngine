@@ -1,5 +1,5 @@
 //
-//  EditComponentCommand.hpp
+//  GuiCommands.hpp
 //
 //  Created by Carl Johan Gribel on 2024-12-01.
 //  Copyright © 2024 Carl Johan Gribel. All rights reserved.
@@ -13,7 +13,7 @@
 // #include <entt/entt.hpp>
 // #include "Scene.hpp"
 #include "Command.hpp"
-#include "EditComponentCommand.hpp"
+#include "AssignComponentFieldCommand.hpp"
 #include "MetaSerialize.hpp"
 #include <deque>
 

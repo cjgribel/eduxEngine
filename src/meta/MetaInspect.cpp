@@ -6,7 +6,7 @@
 #include "editor/InspectorState.hpp"
 #include "editor/TypeInspect.hpp"
 #include "editor/CommandQueue.hpp"
-#include "editor/EditComponentCommand.hpp"
+#include "editor/AssignComponentFieldCommand.hpp"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
 #include "engineapi/SelectionManager.hpp"
@@ -28,7 +28,7 @@ namespace eeng::meta {
             // auto cmd_queue_sptr = cmd_queue_wptr.lock();
             // cmd_queue_sptr->add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
 
-            cmd_queue.add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
+            cmd_queue.add(editor::CommandFactory::Create<editor::AssignComponentFieldCommand>(cmd_builder.build()));
         }
     }
 
@@ -123,7 +123,7 @@ namespace eeng::meta {
     bool inspect_any(
         entt::meta_any& any,
         editor::InspectorState& inspector,
-        editor::ComponentCommandBuilder& cmd_builder,
+        editor::AssignComponentFieldCommandBuilder& cmd_builder,
         EngineContext& ctx)
     {
         assert(any);
@@ -379,7 +379,7 @@ namespace eeng::meta {
         EngineContext& ctx)
     {
         bool mod = false;
-        editor::ComponentCommandBuilder cmd_builder;
+        editor::AssignComponentFieldCommandBuilder cmd_builder;
 
         // TODO: Take ctx directly as an argument
         // auto context_sp = inspector.ctx.lock();

@@ -7,8 +7,8 @@
 
 #include "MetaLiterals.h"
 #include "MetaSerialize.hpp"
-#include "editor/AssignMetaField.hpp"
-#include "EditComponentCommand.hpp"
+#include "editor/MetaFieldAssign.hpp"
+#include "editor/AssignComponentFieldCommand.hpp"
 #include <iostream>
 #include <cassert>
 #include <stack>
@@ -27,7 +27,7 @@ namespace
 
 namespace eeng::editor
 {
-    void ComponentCommand::assign_meta_field(entt::meta_any& value_any)
+    void AssignComponentFieldCommand::assign_meta_field(entt::meta_any& value_any)
     {
         // Get registry
         auto registry_sp = registry.lock();
@@ -58,32 +58,32 @@ namespace eeng::editor
     }
 
 
-    void ComponentCommand::execute()
+    void AssignComponentFieldCommand::execute()
     {
         assign_meta_field(new_value);
     }
 
-    void ComponentCommand::undo()
+    void AssignComponentFieldCommand::undo()
     {
         assign_meta_field(prev_value);
     }
 
-    std::string ComponentCommand::get_name() const
+    std::string AssignComponentFieldCommand::get_name() const
     {
         return display_name;
     }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::registry(std::weak_ptr<entt::registry> registry) { command.registry = registry; return *this; }
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::registry(std::weak_ptr<entt::registry> registry) { command.registry = registry; return *this; }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::entity(const ecs::Entity& entity) { command.entity = entity; return *this; }
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::entity(const ecs::Entity& entity) { command.entity = entity; return *this; }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::component(entt::id_type id) { command.component_id = id; return *this; }
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::component(entt::id_type id) { command.component_id = id; return *this; }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::prev_value(const entt::meta_any& value) { command.prev_value = value; return *this; }
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::prev_value(const entt::meta_any& value) { command.prev_value = value; return *this; }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::new_value(const entt::meta_any& value) { command.new_value = value; return *this; }
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::new_value(const entt::meta_any& value) { command.new_value = value; return *this; }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::push_path_data(entt::id_type id, const std::string& name)
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::push_path_data(entt::id_type id, const std::string& name)
     {
         command.meta_path.entries.push_back(
             MetaFieldPath::Entry{ .type = MetaFieldPath::Entry::Type::Data, .data_id = id, .name = name }
@@ -91,7 +91,7 @@ namespace eeng::editor
         return *this;
     }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::push_path_index(int index, const std::string& name)
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::push_path_index(int index, const std::string& name)
     {
         command.meta_path.entries.push_back(
             MetaFieldPath::Entry{ .type = MetaFieldPath::Entry::Type::Index, .index = index, .name = name }
@@ -99,7 +99,7 @@ namespace eeng::editor
         return *this;
     }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::push_path_key(const entt::meta_any& key_any, const std::string& name)
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::push_path_key(const entt::meta_any& key_any, const std::string& name)
     {
         command.meta_path.entries.push_back(
             MetaFieldPath::Entry{ .type = MetaFieldPath::Entry::Type::Key, .key_any = key_any/*.as_ref()*/, .name = name }
@@ -107,20 +107,20 @@ namespace eeng::editor
         return *this;
     }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::pop_path()
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::pop_path()
     {
         command.meta_path.entries.pop_back();
         return *this;
     }
 
-    ComponentCommandBuilder& ComponentCommandBuilder::reset()
+    AssignComponentFieldCommandBuilder& AssignComponentFieldCommandBuilder::reset()
     {
         assert(!command.meta_path.entries.size() && "Meta path not empty when clearing");
-        command = ComponentCommand{};
+        command = AssignComponentFieldCommand{};
         return *this;
     }
 
-    ComponentCommand ComponentCommandBuilder::build()
+    AssignComponentFieldCommand AssignComponentFieldCommandBuilder::build()
     {
         // Valdiate before returning command instance 
 

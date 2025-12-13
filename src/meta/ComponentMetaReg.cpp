@@ -12,6 +12,7 @@
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
+#include "mock/MockTypes.hpp"
 
 #include "editor/EntityRefInspect.hpp"
 #include "editor/GuidInspect.hpp"

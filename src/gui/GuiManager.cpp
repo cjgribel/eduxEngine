@@ -20,7 +20,7 @@
 
 // Inspection TODO -> using a Comp command - need an Asset command?
 #include "meta/MetaInspect.hpp"
-#include "editor/EditComponentCommand.hpp"
+#include "editor/AssignComponentFieldCommand.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -545,7 +545,7 @@ namespace eeng
 
                         // Generic access (any)
                         editor::InspectorState insp;
-                        editor::ComponentCommandBuilder cmd_builder;
+                        editor::AssignComponentFieldCommandBuilder cmd_builder;
 
                         auto any = resource_manager.storage().get(*metah_opt);
                         auto type_name = get_meta_type_name(any.type());

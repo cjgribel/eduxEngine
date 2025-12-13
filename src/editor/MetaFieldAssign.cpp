@@ -1,7 +1,7 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-#include "editor/MetaFieldPath.hpp"
+#include "editor/MetaFieldAssign.hpp"
 #include <entt/entt.hpp>
 
 namespace
