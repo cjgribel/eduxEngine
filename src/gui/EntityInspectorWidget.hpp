@@ -53,6 +53,9 @@ namespace eeng::gui
                 registry_sp->valid(selected_entity);
 
             // --- Add / Remove Component ------------------------------------
+            
+            ImGui::BeginDisabled(); // <- entire Add/Remove Component & Behavior section done
+
             ImGui::TextUnformatted("Add/Remove Component");
 
             // Same static as before, now local to this function
@@ -201,6 +204,8 @@ namespace eeng::gui
 #endif
             }
             ImGui::EndDisabled();
+
+            ImGui::EndDisabled(); // <- entire Add/Remove Component & Behavior section done
 
             // --- Component inspector --------------------------------------
             // ImGui::SetNextItemOpen(true);
