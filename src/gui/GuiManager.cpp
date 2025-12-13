@@ -1109,7 +1109,7 @@ namespace eeng
         if (selection.size() > 0)
         {
 
-            ImGui::TextUnformatted("Selected entities (in order):");
+            ImGui::TextUnformatted("Selected entities:");
             // ImGui::SameLine();
 
             std::string list;
@@ -1126,6 +1126,7 @@ namespace eeng
             }
 
             // This will wrap nicely inside the window.
+            ImGui::SameLine();
             ImGui::TextWrapped("%s", list.c_str());
         }
 
@@ -1163,27 +1164,6 @@ namespace eeng
     {
         auto it = flags.find(flag);
         return it != flags.end() ? it->second : false;
-    }
-
-    // TODO
-    void entity_inspector()
-    {
-        // Scene graph + entity inspector
-
-        // renderUI()
-#if 0
-        static Editor::InspectorState inspector{};
-        inspector.context = create_context();
-        inspector.cmd_queue = cmd_queue;
-        inspector.entity_selection.remove_invalid([&](const Entity& entity)
-            {
-                return !entity.is_null() && registry->valid(entity);
-            });
-
-        if (Inspector::inspect_entity(inspector, *dispatcher)) {}
-#endif
-
-
     }
 
 } // namespace eeng
