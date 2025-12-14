@@ -195,7 +195,7 @@ namespace eeng::meta {
                 // inspect() not available: traverse data members
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
-                    std::string key_name = get_meta_data_nice_name(id, meta_data);
+                    std::string key_name = get_meta_data_display_name(id, meta_data);
 #ifdef INSPECTION_DEBUG_PRINT
                     std::cout << "inspecting data field: " << key_name << std::endl;
 #endif

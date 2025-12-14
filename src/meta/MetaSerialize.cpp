@@ -122,7 +122,7 @@ namespace eeng::meta
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
                     // JSON key name is the display name if present, or the id type
-                    std::string key_name = get_meta_data_nice_name(id, meta_data);
+                    std::string key_name = get_meta_data_display_name(id, meta_data);
 
                     auto field_any = meta_data.get(any);
                     json[key_name] = serialize_any(field_any);
@@ -376,7 +376,7 @@ namespace eeng::meta
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
                     // JSON key name is the display name if present, or the id type
-                    std::string key_name = get_meta_data_nice_name(id, meta_data);
+                    std::string key_name = get_meta_data_display_name(id, meta_data);
                     assert(json.contains(key_name));
 
                     entt::meta_any field_any = meta_data.get(any);

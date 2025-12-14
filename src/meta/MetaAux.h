@@ -136,7 +136,7 @@ inline auto get_meta_data_name(
 /// @param id Data field id, used as fallback
 /// @param data Meta data field
 /// @return Name provided as a nice name property, or string generated from id
-inline auto get_meta_data_nice_name(
+inline auto get_meta_data_display_name(
     const entt::id_type& id,
     const entt::meta_data& meta_data)
 {
@@ -148,38 +148,6 @@ inline auto get_meta_data_nice_name(
         return data_info->nice_name;
     return std::to_string(id);
 }
-
-#if 0
-/// @brief Get the value of a meta_type property
-/// @tparam Type Non-class property type
-/// @tparam Default Value to be used if property does ot exist or cast to Type fails
-/// @param data 
-/// @param id 
-/// @return The property value if it exists, or the default value
-template<class Type, Type Default>
-inline Type get_meta_type_prop(const entt::meta_type& type, const entt::id_type& id)
-{
-    if (auto prop = type.prop(id); prop)
-        if (auto ptr = prop.value().try_cast<Type>(); ptr)
-            return *ptr;
-    return Default;
-}
-
-/// @brief Get the value of a meta_data property
-/// @tparam Type Non-class property type
-/// @tparam Default Value to be used if property does ot exist or cast to Type fails
-/// @param data 
-/// @param id 
-/// @return The property value if it exists, or the default value
-template<class Type, Type Default>
-inline Type get_meta_data_prop(const entt::meta_data& data, const entt::id_type& id)
-{
-    if (auto prop = data.prop(id); prop)
-        if (auto ptr = prop.value().try_cast<Type>(); ptr)
-            return *ptr;
-    return Default;
-}
-#endif
 
 inline auto cast_to_underlying_type(const entt::meta_type& meta_type, const entt::meta_any& enum_any)
 {
