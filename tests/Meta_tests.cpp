@@ -117,11 +117,13 @@ TEST(MetaBasicTests, VerifyResolution)
     std::cout << mt.info().name() << " resolved successfully." << std::endl;
 }
 
+// Test for serialization roundtrip with default type id
+// Note: This test assumes that entt's type_hash and type_name are stable across runs, which is not guaranteed for all compilers/settings.
 TEST(MetaBasicTests, VerifySerializationRoundtrip)
 {
     // Setup and registration
     struct RegType { int x; float y; };
-    entt::meta_factory<RegType>{};
+    entt::meta_factory<RegType>{}; // No explicit type id or name set
 
     // "Serialize"
     auto mt_ser = entt::resolve<RegType>();
@@ -138,6 +140,68 @@ TEST(MetaBasicTests, VerifySerializationRoundtrip)
     EXPECT_EQ(mt_deser, mt_ser) << "Meta types do not match after serialization/deserialization";
     EXPECT_EQ(mt_ser.info().name(), mt_deser.info().name()) << "Type names do not match after serialization/deserialization";
 }
+
+// Test for serialization roundtrip with explicit stable type id
+TEST(MetaBasicTests, VerifySerializationRoundtrip_ExplicitTypeId)
+{
+    using namespace entt::literals;
+
+    // --- Local test type -----------------------------------------------------
+    struct RegType { int x; float y; };
+
+    // This is the metadata pattern we discussed:
+    // - id  : stable technical/serialization id
+    // - name: display name (editor)
+    struct TypeMetaInfo
+    {
+        std::string id;
+        std::string name;
+        std::string tooltip;
+    };
+
+    // --- Registration --------------------------------------------------------
+    //
+    //  - .type("...")       = stable serialization id (hashed)
+    //  - .custom<TypeMetaInfo> = carries the same id as string, plus display name
+    //
+    entt::meta_factory<RegType>()
+        .type("eeng.RegType"_hs) // stable id for roundtrips
+        .custom<TypeMetaInfo>(TypeMetaInfo{
+            .id = "eeng.RegType",   // <- string to serialize, must match .type(...).
+            .name = "RegType",        // <- display name
+            .tooltip = "Test type for meta serialization roundtrip."
+            });
+
+    // --- "Serialize" ---------------------------------------------------------
+    auto mt_ser = entt::resolve<RegType>();
+    ASSERT_TRUE(mt_ser) << "Failed to resolve RegType";
+
+    TypeMetaInfo* info = mt_ser.custom();
+    ASSERT_NE(info, nullptr) << "TypeMetaInfo not attached to RegType";
+
+    // This is the string we write to JSON (instead of info().name()).
+    std::string type_id_str = info->id;          // "eeng.RegType"
+
+    // And this is the numeric id EnTT uses internally (matches .type(...)).
+    auto id_ser = mt_ser.id();
+    EXPECT_EQ(id_ser, entt::hashed_string{ "eeng.RegType" }.value());
+
+    // --- "Deserialize" -------------------------------------------------------
+    //
+    // Simulate reading "eeng.RegType" from JSON:
+    auto id_deser = entt::hashed_string{ type_id_str.c_str() }.value();
+    EXPECT_EQ(id_deser, id_ser) << "Type id mismatch after serialization/deserialization";
+
+    auto mt_deser = entt::resolve(id_deser);
+    ASSERT_TRUE(mt_deser) << "Failed to resolve type from deserialized id";
+
+    // Same meta type instance
+    EXPECT_EQ(mt_deser, mt_ser);
+
+    // Optional: for debug, not as part of the protocol
+    EXPECT_EQ(mt_ser.info().name(), mt_deser.info().name());
+}
+
 
 TEST(MetaAnyPolicyTest, VerifyMetaAnyBasePolicies)
 {
