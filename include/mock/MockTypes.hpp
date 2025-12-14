@@ -110,6 +110,13 @@ namespace eeng::ecs::mock
         //    enum class AnEnum: int { A = 1, B = 2 } anEnum;
         AnEnum anEnum = AnEnum::Hello;
 
+        // Nested containers
+        std::vector<std::vector<int>> nested_int_vectors{ {1, 2, 3}, {4, 5, 6} };
+
+        // Enum in containers
+        std::vector<AnEnum> enum_vector{ AnEnum::Hello, AnEnum::Bye, AnEnum::Hola };
+        std::map<AnEnum, int> enum_map{ { AnEnum::Hello, 10 }, { AnEnum::Bye,   20 } };
+
         std::string to_string() const {
             std::ostringstream oss;
             oss << "MockMixComponent {\n"

@@ -76,21 +76,30 @@ protected:
         using namespace entt::literals;
         using namespace eeng::ecs::mock;
 
+
         entt::meta_factory<ElementType>()
             .type("ElementType"_hs)
-            .data<&ElementType::m>("m"_hs);
+            .data<&ElementType::m>("m"_hs)
+            ;
 
         entt::meta_factory<MockUVcoords>()
             .type("MockUVcoords"_hs)
             .data<&MockUVcoords::u>("u"_hs)
-            .data<&MockUVcoords::v>("v"_hs);
+            .data<&MockUVcoords::v>("v"_hs)
+            ;
 
         entt::meta_factory<MockVec3>()
             .type("MockVec3"_hs)
             .data<&MockVec3::x>("x"_hs)
             .data<&MockVec3::y>("y"_hs)
             .data<&MockVec3::z>("z"_hs)
-            .data<&MockVec3::uv_coords>("uv_coords"_hs);
+            .data<&MockVec3::uv_coords>("uv_coords"_hs)
+            ;
+
+        entt::meta_factory<AnEnum>()
+            //.type("AnEnum"_hs)
+            // Fields not needed - only used as key 
+            ;
 
         entt::meta_factory<MockMixComponent>()
             .type("MockMixComponent"_hs)
@@ -106,7 +115,11 @@ protected:
             .data<&MockMixComponent::map2>("map2"_hs)
             .data<&MockMixComponent::map3>("map3"_hs)
             .data<&MockMixComponent::set1>("set1"_hs)
-            .data<&MockMixComponent::anEnum>("anEnum"_hs);
+            .data<&MockMixComponent::anEnum>("anEnum"_hs)
+            .data<&MockMixComponent::nested_int_vectors>("nested_int_vectors"_hs)
+            .data<&MockMixComponent::enum_vector>("enum_vector"_hs)
+            .data<&MockMixComponent::enum_map>("enum_map"_hs)
+            ;
     }
 };
 
@@ -271,5 +284,89 @@ TEST_F(MetaFieldAssignTest, Assign_Map2_ElementField_M)
     EXPECT_FLOAT_EQ(it9->second.m, 777.0f);
     EXPECT_FLOAT_EQ(it10->second.m, 10.5f);
 }
-#if 0
-#endif
+
+TEST_F(MetaFieldAssignTest, Assign_NestedVector_Element)
+{
+    using eeng::editor::MetaFieldPathBuilder;
+
+    MockMixComponent obj{};
+    // nested_int_vectors = { {1,2,3}, {4,5,6} };
+
+    entt::meta_any root = entt::forward_as_meta(obj);
+
+    auto path =
+        MetaFieldPathBuilder{}
+        .data("nested_int_vectors")
+        .index(1)   // second vector {4,5,6}
+        .index(2)   // third element in that vector (value 6)
+        .build();
+
+    entt::meta_any new_val = 999;
+
+    bool ok = assign_field(root, path, new_val);
+    ASSERT_TRUE(ok);
+
+    ASSERT_EQ(obj.nested_int_vectors.size(), 2u);
+    ASSERT_EQ(obj.nested_int_vectors[1].size(), 3u);
+    EXPECT_EQ(obj.nested_int_vectors[0][0], 1);
+    EXPECT_EQ(obj.nested_int_vectors[0][1], 2);
+    EXPECT_EQ(obj.nested_int_vectors[0][2], 3);
+    EXPECT_EQ(obj.nested_int_vectors[1][0], 4);
+    EXPECT_EQ(obj.nested_int_vectors[1][1], 5);
+    EXPECT_EQ(obj.nested_int_vectors[1][2], 999);
+}
+
+TEST_F(MetaFieldAssignTest, Assign_EnumVector_Element)
+{
+    using eeng::editor::MetaFieldPathBuilder;
+
+    MockMixComponent obj{};
+    // enum_vector = { Hello, Bye, Hola };
+
+    entt::meta_any root = entt::forward_as_meta(obj);
+
+    auto path =
+        MetaFieldPathBuilder{}
+        .data("enum_vector")
+        .index(1)   // second element
+        .build();   // leaf is the enum value itself
+
+    entt::meta_any new_val = AnEnum::Hola;
+
+    bool ok = assign_field(root, path, new_val);
+    ASSERT_TRUE(ok);
+
+    ASSERT_EQ(obj.enum_vector.size(), 3u);
+    EXPECT_EQ(obj.enum_vector[0], AnEnum::Hello);
+    EXPECT_EQ(obj.enum_vector[1], AnEnum::Hola);   // changed
+    EXPECT_EQ(obj.enum_vector[2], AnEnum::Hola);
+}
+
+TEST_F(MetaFieldAssignTest, Assign_EnumKeyedMap_Value)
+{
+    using eeng::editor::MetaFieldPathBuilder;
+
+    MockMixComponent obj{};
+    // enum_map = { {Hello,10}, {Bye,20} };
+
+    entt::meta_any root = entt::forward_as_meta(obj);
+
+    auto path =
+        MetaFieldPathBuilder{}
+        .data("enum_map")
+        .key(AnEnum::Bye, "Bye")
+        .build();  // leaf is the mapped int
+
+    entt::meta_any new_val = 123;
+
+    bool ok = assign_field(root, path, new_val);
+    ASSERT_TRUE(ok);
+
+    auto it_hello = obj.enum_map.find(AnEnum::Hello);
+    auto it_bye = obj.enum_map.find(AnEnum::Bye);
+    ASSERT_NE(it_hello, obj.enum_map.end());
+    ASSERT_NE(it_bye, obj.enum_map.end());
+
+    EXPECT_EQ(it_hello->second, 10);
+    EXPECT_EQ(it_bye->second, 123);
+}

@@ -407,6 +407,15 @@ namespace eeng
                 .data<&MockMixComponent::anEnum>("anEnum"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "anEnum", "An Enum", "An example enum value." }).traits(MetaFlags::none)
 
+                .data<&MockMixComponent::nested_int_vectors>("nested_int_vectors"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "nested_int_vectors", "Nested Int Vectors", "A vector of vectors of integers." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::enum_vector>("enum_vector"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "enum_vector", "Enum Vector", "A vector of enum values." }).traits(MetaFlags::none)
+
+                .data<&MockMixComponent::enum_map>("enum_map"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "enum_map", "Enum Map", "A map of enum values to integers." }).traits(MetaFlags::none)
+
                 // to_string, member version
                     //.func<&DebugClass::to_string>(to_string_hs)
                 // to_string, free function version
