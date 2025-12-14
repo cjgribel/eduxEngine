@@ -12,6 +12,7 @@
 #include "AssimpImporter.hpp" // --> ENGINE API
 #include "MockImporter.hpp" // --> ENGINE API
 #include "ecs/MockComponents.hpp"
+#include "mock/MockTypes.hpp"
 #include "ResourceTypes.hpp"
 #include "ResourceManager.hpp" // Since we use the concrete type
 #include "BatchRegistry.hpp" // Since we use the concrete type
