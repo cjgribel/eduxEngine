@@ -497,6 +497,7 @@ namespace eeng
 
                     bool valid = resource_manager.validate_asset(entry.meta.guid, ctx);
                     bool valid_rec = resource_manager.validate_asset_recursive(entry.meta.guid, ctx);
+
                     // --- Line 1: Status indicators ---
                     {
                         ImGui::TextColored(valid ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "%s", valid ? "Valid" : "Invalid");
@@ -519,6 +520,7 @@ namespace eeng
                             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[%s]", guid_status.error_message.c_str());
                         }
                     }
+
                     // --- Line 2: Type + Ref count ---
                     {
                         ImGui::Text("Type: %s", entry.meta.type_name.c_str());
@@ -530,34 +532,53 @@ namespace eeng
                     ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
                     // --- Line 4: Path ---
                     ImGui::Text("Path: %s", entry.relative_path.string().c_str());
+
                     // -- Line 5: Debug print content of certain types (if loaded) --
 #if 1
-                    if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value())
+                    editor::InspectorState insp;
+                    const ImGuiTableFlags flags =
+                        ImGuiTableFlags_BordersV |
+                        ImGuiTableFlags_BordersOuterH |
+                        ImGuiTableFlags_Resizable |
+                        ImGuiTableFlags_RowBg |
+                        ImGuiTableFlags_NoBordersInBody;
+                    if (ImGui::BeginTable("InspectorTable", 2, flags)) // TODO -> part of insepctor?
                     {
-                        // Explicit type check + cast
-                        if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
+                        if (insp.begin_node("Metadata"))
                         {
-                            // Use resource_manager.get_asset_ref/try_get_asset_ref -->
-                            auto mesh = resource_manager.storage().get_ref(*h_opt);
-                            ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
+                            // Inspect asset meta data
+                            editor::AssignComponentFieldCommandBuilder cmd_builder;
+                            cmd_builder.reset().
+                                registry(ctx.entity_manager->registry_wptr())
+                                //.entity(ecs::Entity::EntityNull) // no entity for assets
+                                //.component(any.type().id()) // asset type - no comp type id!
+                                ;
+                            auto any = entt::forward_as_meta(entry.meta); // Technically editable, but we won't edit it here
+                            bool res = meta::inspect_any(any, insp, cmd_builder, ctx);
+                            // ^ NOTE: Any edits are recorded -> cmd will be built -> Error, since no entity + comp!
+                            //         KEEP EVERYTHING READ-ONLY until we have eg IEditCommandBuilder + AssetEditCommand!
+
+                            insp.end_node();
                         }
-                        //else ImGui::Text("Not a mock::Mesh");
-
-                        // Generic access (any)
-                        editor::InspectorState insp;
-                        editor::AssignComponentFieldCommandBuilder cmd_builder;
-
-                        auto any = resource_manager.storage().get(*metah_opt);
-                        auto type_name = get_meta_type_name(any.type());
-                        // meta::inspect_any(any, insp, cmd, ctx);
-                        const ImGuiTableFlags flags =
-                            ImGuiTableFlags_BordersV |
-                            ImGuiTableFlags_BordersOuterH |
-                            ImGuiTableFlags_Resizable |
-                            ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_NoBordersInBody;
-                        if (ImGui::BeginTable("InspectorTable", 2, flags)) // TODO -> part of insepctor?
+                        // Inspect asset type data
+                        if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value())
                         {
+                            // Explicit type check + cast
+                            if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
+                            {
+                                // Use resource_manager.get_asset_ref/try_get_asset_ref -->
+                                auto mesh = resource_manager.storage().get_ref(*h_opt);
+                                ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
+                            }
+                            //else ImGui::Text("Not a mock::Mesh");
+
+                            // Generic access (any)
+                            editor::AssignComponentFieldCommandBuilder cmd_builder;
+
+                            auto any = resource_manager.storage().get(*metah_opt);
+                            auto type_name = get_meta_type_name(any.type());
+                            // meta::inspect_any(any, insp, cmd, ctx);
+
                             if (insp.begin_node(type_name.c_str()))
                             {
                                 // #ifdef USE_COMMANDS
@@ -571,12 +592,12 @@ namespace eeng
                                 bool res = meta::inspect_any(any, insp, cmd_builder, ctx);
                                 // ^ NOTE: Any edits are recorded -> cmd will be built -> Error, since no entity + comp!
                                 //         KEEP EVERYTHING READ-ONLY until we have eg IEditCommandBuilder + AssetEditCommand!
-                                
+
 
                                 insp.end_node();
                             }
-                            ImGui::EndTable();
                         }
+                        ImGui::EndTable();
                     }
                     // resource_manager.storage().get(entry.meta.guid);
 #endif
