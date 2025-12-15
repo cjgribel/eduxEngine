@@ -93,6 +93,69 @@ bool try_apply(const entt::meta_any& value, Callable callable)
     return internal::any_apply_impl(value, callable, internal::TryCastTypes{});
 }
 
+namespace eeng::meta
+{
+    inline std::string get_meta_type_display_name(entt::meta_type mt)
+    {
+        assert(mt);
+        if (eeng::TypeMetaInfo* info = mt.custom(); info && !info->name.empty())
+            return info->name;
+
+        // Fallback: raw type name from entt
+        return std::string{ mt.info().name() };
+    }
+
+    template<typename T>
+    inline std::string get_meta_type_display_name()
+    {
+        entt::meta_type mt = entt::resolve<T>();
+        assert(mt);
+        return get_meta_type_display_name(mt);
+    }
+
+    inline std::string get_meta_type_id_string(entt::meta_type mt)
+    {
+        assert(mt);
+        if (eeng::TypeMetaInfo* info = mt.custom(); info && !info->id.empty())
+            return info->id;                         // "eeng.RegType"
+
+        // Fallback: something deterministic but less robust.
+        // *can* use info().name() here as a temporary fallback,
+        // but ideally all serialized types get an explicit id.
+        return std::string{ mt.info().name() };
+    }
+
+    template<typename T>
+    inline std::string get_meta_type_id_string()
+    {
+        entt::meta_type mt = entt::resolve<T>();
+        assert(mt);
+        return get_meta_type_id_string(mt);
+    }
+
+    // (deserialize)
+    inline entt::meta_type resolve_by_type_id_string(std::string_view id)
+    {
+        auto hash = entt::hashed_string{ id.data(), id.size() }.value();
+        return entt::resolve(hash);
+    }
+
+    inline entt::id_type get_meta_type_id(entt::meta_type mt)
+    {
+        assert(mt);
+        return mt.id();   // result of .type("...") or type_hash<T>::value()
+    }
+
+    template<typename T>
+    inline entt::id_type get_meta_type_id()
+    {
+        entt::meta_type mt = entt::resolve<T>();
+        assert(mt);
+        return mt.id();
+    }
+}
+
+#if 0
 /// @brief Get inspector-friendly name of a meta_type
 /// @param meta_type 
 /// @return Name provided as a display name property, or default name
@@ -114,6 +177,7 @@ inline auto get_meta_type_name()
     assert(meta_type);
     return get_meta_type_name(meta_type);
 }
+#endif
 
 /// @brief Get name of a meta data field
 /// @param id Data field id, used as fallback

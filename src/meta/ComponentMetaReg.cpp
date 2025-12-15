@@ -137,7 +137,7 @@ namespace eeng
 
         // --- Guid ------------------------------------------------------------
         entt::meta_factory<Guid>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "Guid", "A globally unique identifier." })
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.Guid", .name = "Guid", .tooltip = "A globally unique identifier." })
 
             .func<&serialize_Guid>(eeng::literals::serialize_hs)
             .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
@@ -149,7 +149,7 @@ namespace eeng
 
         // --- EntityRef -------------------------------------------------------
         entt::meta_factory<eeng::ecs::EntityRef>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "EntityRef", "A reference to an entity." })
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.EntityRef", .name = "EntityRef", .tooltip = "A reference to an entity." })
 
             // (Serialize) (Clone)
             // Guid
@@ -173,7 +173,7 @@ namespace eeng
         // --- MockPlayerComponent ---------------------------------------------
         register_component<eeng::ecs::mock::MockPlayerComponent>();
         entt::meta_factory<eeng::ecs::mock::MockPlayerComponent>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "MockPlayerComponent", "A mock player component for testing." })
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockPlayerComponent", .name = "MockPlayerComponent", .tooltip = "A mock player component for testing." })
 
             .data<&eeng::ecs::mock::MockPlayerComponent::position>("position"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Player position." })
@@ -195,7 +195,7 @@ namespace eeng
         // --- MockCameraComponent ---------------------------------------------
         register_component<eeng::ecs::mock::MockCameraComponent>();
         entt::meta_factory<eeng::ecs::mock::MockCameraComponent>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "MockCameraComponent", "A mock camera component for testing." })
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockCameraComponent", .name = "MockCameraComponent", .tooltip = "A mock camera component for testing." })
 
             .data<&eeng::ecs::mock::MockCameraComponent::position>("position"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Camera position." })
@@ -247,7 +247,7 @@ namespace eeng
             };
 #endif
         entt::meta_factory<eeng::ecs::HeaderComponent>{}
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "HeaderComponent", "Metadata for HeaderComponent." })
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.HeaderComponent", .name = "HeaderComponent", .tooltip = "Metadata for HeaderComponent." })
 
             // Name
             .data<&eeng::ecs::HeaderComponent::name>("name"_hs)
@@ -293,7 +293,7 @@ namespace eeng
             // --- MockMixComponent + nested types -----------------------------
 
             entt::meta_factory<ecs::mock::MockUVcoords>()
-                .custom<TypeMetaInfo>(TypeMetaInfo{ "MockUVcoords", "Metadata for MockUVcoords." })
+                .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockUVcoords", .name = "MockUVcoords", .tooltip = "Metadata for MockUVcoords." })
                 // .type("UVcoords"_hs).prop(display_name_hs, "UVcoords")
 
                 .data<&ecs::mock::MockUVcoords::u>("u"_hs)
@@ -331,7 +331,7 @@ namespace eeng
                 ;
 
             entt::meta_factory<ElementType>()
-                .custom<TypeMetaInfo>(TypeMetaInfo{ "ElementType", "Metadata for ElementType." })
+                .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ElementType", .name = "ElementType", .tooltip = "Metadata for ElementType." })
                 // .type("ElementType"_hs).prop(display_name_hs, "ElementType")
 
                 .data<&ElementType::m>("m"_hs)
@@ -365,7 +365,7 @@ namespace eeng
 
             register_component<MockMixComponent>();
             entt::meta_factory<MockMixComponent>()
-                .custom<TypeMetaInfo>(TypeMetaInfo{ "MockMixComponent", "A mock component with mixed data types for testing." })
+                .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockMixComponent", .name = "MockMixComponent", .tooltip = "A mock component with mixed data types for testing." })
                 // .type("DebugClass"_hs).prop(display_name_hs, "DebugClass")
 
                 .data<&MockMixComponent::flag/*, entt::as_ref_t*/>("flag"_hs)

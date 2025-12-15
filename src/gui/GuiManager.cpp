@@ -576,7 +576,7 @@ namespace eeng
                             editor::AssignComponentFieldCommandBuilder cmd_builder;
 
                             auto any = resource_manager.storage().get(*metah_opt);
-                            auto type_name = get_meta_type_name(any.type());
+                            auto type_name = meta::get_meta_type_display_name(any.type());
                             // meta::inspect_any(any, insp, cmd, ctx);
 
                             if (insp.begin_node(type_name.c_str()))

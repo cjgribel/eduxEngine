@@ -83,7 +83,7 @@ protected:
         // Register MockType
         entt::meta_factory<MockType>{}
         .type("MockType"_hs)
-            .custom<TypeMetaInfo>(TypeMetaInfo{ "MockType", "A mock resource type." })
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "MockType", .name = "MockType", .tooltip = "A mock resource type." })
             .traits(MetaFlags::none)
 
             .data<&MockType::x>("x"_hs)
@@ -149,15 +149,14 @@ TEST(MetaBasicTests, VerifySerializationRoundtrip_ExplicitTypeId)
     // --- Local test type -----------------------------------------------------
     struct RegType { int x; float y; };
 
-    // This is the metadata pattern we discussed:
     // - id  : stable technical/serialization id
     // - name: display name (editor)
-    struct TypeMetaInfo
-    {
-        std::string id;
-        std::string name;
-        std::string tooltip;
-    };
+    // struct TypeMetaInfo
+    // {
+    //     std::string id;
+    //     std::string name;
+    //     std::string tooltip;
+    // };
 
     // --- Registration --------------------------------------------------------
     //
@@ -166,7 +165,7 @@ TEST(MetaBasicTests, VerifySerializationRoundtrip_ExplicitTypeId)
     //
     entt::meta_factory<RegType>()
         .type("eeng.RegType"_hs) // stable id for roundtrips
-        .custom<TypeMetaInfo>(TypeMetaInfo{
+        .custom<eeng::TypeMetaInfo>(eeng::TypeMetaInfo{
             .id = "eeng.RegType",   // <- string to serialize, must match .type(...).
             .name = "RegType",        // <- display name
             .tooltip = "Test type for meta serialization roundtrip."

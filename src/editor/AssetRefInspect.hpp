@@ -38,7 +38,7 @@ namespace eeng::editor
 
         // --- Handle row ------------------------------------------------------
         inspector.begin_leaf("Live handle");
-        const auto type_name = get_meta_type_name<T>();
+        const auto type_name = meta::get_meta_type_display_name<T>();
         ImGui::TextDisabled("%s", type_name.c_str());
 
         auto handle = ptr->handle;

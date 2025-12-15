@@ -34,7 +34,7 @@ namespace eeng::meta
             if (!result)
             {
                 throw std::runtime_error(
-                    "Failed to invoke assure_storage for " + get_meta_type_name(meta_type));
+                    "Failed to invoke assure_storage for " + get_meta_type_display_name(meta_type));
             }
         }
     }
@@ -179,7 +179,7 @@ namespace eeng::meta
                     json = value;
                 });
             if (!res)
-                throw std::runtime_error(std::string("Unable to cast ") + get_meta_type_name(any.type()));
+                throw std::runtime_error(std::string("Unable to cast ") + get_meta_type_display_name(any.type()));
         }
 
         return json;
@@ -467,7 +467,7 @@ namespace eeng::meta
                     any.assign(json.get<Type>());
                 });
             if (!res)
-                throw std::runtime_error(std::string("Unable to cast ") + get_meta_type_name(any.type()));
+                throw std::runtime_error(std::string("Unable to cast ") + get_meta_type_display_name(any.type()));
         }
     }
 

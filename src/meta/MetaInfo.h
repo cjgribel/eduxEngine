@@ -11,6 +11,7 @@ namespace eeng
 {
     struct TypeMetaInfo
     {
+        std::string id;
         std::string name;
         std::string tooltip;
     };

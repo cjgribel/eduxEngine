@@ -9,9 +9,6 @@
 
 namespace eeng::editor::detail
 {
-    // TODO -> aux get_meta_type_name -> get_custom_meta_type_name
-    // TODO -> put the aux helpers inside meta namespace
-
     template<class T>
     std::string get_meta_type_name()
     {
@@ -26,7 +23,7 @@ namespace eeng::editor::detail
     {
         assert(index);
 
-        const std::string type_name = detail::get_meta_type_name<T>();
+        const std::string type_name = get_meta_type_name<T>(); // meta::get_meta_type_id_string<T>();
         auto it = index->by_type.find(type_name);
         if (it == index->by_type.end())
         {
@@ -78,8 +75,8 @@ namespace eeng::editor
 
         {
             // Debug asset type info
-            const std::string type_name = get_meta_type_name<T>();
-            const std::string full_type_name = detail::get_meta_type_name<T>(); // std::string(entt::resolve<T>().info().name());
+            const std::string type_name = meta::get_meta_type_display_name<T>();
+            const std::string full_type_name = meta::get_meta_type_id_string<T>(); // std::string(entt::resolve<T>().info().name());
             ImGui::TextDisabled("Type: %s (%s)", type_name.c_str(), full_type_name.c_str());
             ImGui::TextDisabled("by_type size: %zu", index->by_type.size());
             ImGui::TextDisabled("assets for this type: %zu", assets.size());

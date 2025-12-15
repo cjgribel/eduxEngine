@@ -67,8 +67,8 @@ namespace eeng::meta
                     // Log
                     {
                         auto guid_str = guid.to_string();
-                        auto comp_tstr = get_meta_type_name<T>();
-                        auto asset_tstr = get_meta_type_name<AssetType>();
+                        auto comp_tstr = meta::get_meta_type_display_name<T>();
+                        auto asset_tstr = meta::get_meta_type_display_name<AssetType>();
                         EENG_LOG(&ctx, "[bind_asset_refs] Could not bind asset %s (%s) to %s...", asset_tstr.c_str(), guid_str.c_str(), comp_tstr.c_str());
                     }
 
@@ -106,7 +106,7 @@ namespace eeng::meta
                     // Ok (soft reference policy) - leave reference unbound
 
                     auto guid_str = guid.to_string();
-                    auto comp_tstr = get_meta_type_name<T>();
+                    auto comp_tstr = meta::get_meta_type_display_name<T>();
                     EENG_LOG(&ctx, "[bind_entity_refs] Could not bind entity %s to component %s...", guid_str.c_str(), comp_tstr.c_str());
 
                     return;

@@ -310,6 +310,7 @@ protected:
         // Register vec2
         entt::meta_factory<vec2>()
             // .type("vec2"_hs)
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "vec2", .name = "vec2", .tooltip = "A 2D vector type." })
 
             .data<&vec2::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "n/a" })
@@ -327,6 +328,7 @@ protected:
         // Register vec3
         entt::meta_factory<vec3>()
             // .type("vec3"_hs)
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "vec3", .name = "vec3", .tooltip = "A 3D vector type." })
 
             .data<&vec3::xy>("xy"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "xy", "XY", "n/a" })
@@ -367,7 +369,7 @@ protected:
         // Register MockType2
         entt::meta_factory<MockType2>{}
         // .type("MockType2"_hs)
-        .custom<TypeMetaInfo>(TypeMetaInfo{ "MockType2", "A mock resource type." })
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "MockType2", .name = "MockType2", .tooltip = "A mock resource type." })
             .traits(MetaFlags::none)
 
             .data<&MockType2::x>("x"_hs)

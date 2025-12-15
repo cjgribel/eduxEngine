@@ -363,7 +363,7 @@ namespace eeng::meta {
 #endif
                 });
             if (!res)
-                throw std::runtime_error(std::string("Unable to cast type ") + get_meta_type_name(any.type()));
+                throw std::runtime_error(std::string("Unable to cast type ") + get_meta_type_display_name(any.type()));
         }
         // else { /* cref */ }
 
@@ -393,7 +393,7 @@ namespace eeng::meta {
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
-                auto type_name = get_meta_type_name(meta_type);
+                auto type_name = get_meta_type_display_name(meta_type);
 
                 if (inspector.begin_node(type_name.c_str()))
                 {
