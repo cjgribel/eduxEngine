@@ -5,6 +5,7 @@
 #include "AssetIndex.hpp"
 #include "ThreadPool.hpp"
 #include "EventQueue.h"
+#include "meta/MetaAux.h"
 
 namespace eeng
 {
@@ -259,16 +260,16 @@ namespace eeng
                 (void)invoke_meta_function(g, batch, ctx, literals::bind_asset_hs, "bind_asset");
 
                 res.add_result(g, true, "Bind Ok");
-                }
+            }
             catch (const std::exception& ex) {
                 (void)batch_release(batch, g); // roll back parent lease if bind fails
                 res.add_result(g, false, ex.what());
             }
-            }
+        }
 #endif
 
         return res;
-        }
+    }
 
     TaskResult ResourceManager::unbind_and_unload_impl(
         std::deque<Guid> guids,
@@ -321,7 +322,7 @@ namespace eeng
                 st.error_message.clear();
             }
 
-            try 
+            try
             {
                 this->unload_asset(g, ctx);
 
@@ -329,7 +330,7 @@ namespace eeng
                 statuses_.erase(g);
                 res.add_result(g, true, "Unbind+Unload Ok");
             }
-            catch (const std::exception& ex) 
+            catch (const std::exception& ex)
             {
                 std::lock_guard lk(status_mutex_);
                 auto& st = statuses_[g];
@@ -520,7 +521,8 @@ namespace eeng
 
         const auto& type_name = it->second->meta.type_name;
 
-        entt::meta_type type = entt::resolve(entt::hashed_string{ type_name.c_str() });
+        // entt::meta_type type = entt::resolve(entt::hashed_string{ type_name.c_str() });
+        entt::meta_type type = meta::resolve_by_type_id_string(type_name);
         if (!type)
             throw std::runtime_error("Type not registered: " + std::string(type_name));
 
@@ -552,7 +554,8 @@ namespace eeng
 
         const auto& type_name = it->second->meta.type_name;
 
-        entt::meta_type type = entt::resolve(entt::hashed_string{ type_name.c_str() });
+        // entt::meta_type type = entt::resolve(entt::hashed_string{ type_name.c_str() });
+        entt::meta_type type = meta::resolve_by_type_id_string(type_name);
         if (!type)
             throw std::runtime_error("Type not registered: " + std::string(type_name));
 
@@ -566,4 +569,4 @@ namespace eeng
 
         return result;
     }
-    }
+}

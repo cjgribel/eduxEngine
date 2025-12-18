@@ -1,4 +1,5 @@
-// eeng/editor/EntityInspectorWidget.hpp (for example)
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
 #pragma once
 
@@ -10,7 +11,7 @@
 #include "MetaLiterals.h"
 #include "MetaAux.h"
 //#include "FileManager.hpp"
-#include "ecs/HeaderComponent.hpp" // if you still need it
+// #include "ecs/HeaderComponent.hpp"
 
 #include "imgui.h"
 #include <string>
@@ -188,7 +189,7 @@ namespace eeng::gui
 #endif
             }
 
-            // Remove script (still always disabled until you add logic)
+            // Remove script (disabled)
             ImGui::SameLine();
             ImGui::BeginDisabled();
             if (ImGui::Button("Remove##removescript") &&

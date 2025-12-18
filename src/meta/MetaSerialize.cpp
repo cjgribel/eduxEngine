@@ -30,7 +30,11 @@ namespace eeng::meta
             // call: assure_component_storage<T>(registry)
             //assure_fn.invoke({}, entt::forward_as_meta(registry));
 
-            auto result = assure_fn.invoke({}, entt::forward_as_meta(registry));
+            auto result = assure_fn.invoke(
+                {},
+                entt::forward_as_meta(registry)
+                // component_id
+            );
             if (!result)
             {
                 throw std::runtime_error(
@@ -75,8 +79,8 @@ namespace eeng::meta
             registry.destroy(temp_entity);
 
             // std::cout << "Ceeated storage for " << get_meta_type_name(meta_type) << std::endl;
-        }
     }
+}
 #endif
     nlohmann::json serialize_any(const entt::meta_any& any)
     {
@@ -115,7 +119,7 @@ namespace eeng::meta
                 json = entry->first;
 #endif
                 json = enum_value_name(any);
-            }
+        }
             else
             {
                 // to_json() not available: traverse data members
@@ -130,7 +134,7 @@ namespace eeng::meta
             }
 
             return json;
-        }
+    }
 
         // any is not a meta type
 
@@ -204,7 +208,8 @@ namespace eeng::meta
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
-                auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
+                auto key_name = meta::get_meta_type_id_string(meta_type); // Better for serialization?
+                // auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
                 // auto type_name = get_meta_type_name(meta_type); // Display name or mangled name
 
                 entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity_ref.entity)));
@@ -286,7 +291,7 @@ namespace eeng::meta
 
                 if (entt::meta_type meta_type = entt::resolve(id); meta_type)
                 {
-                    auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
+                    auto key_name = meta::get_meta_type_id_string(meta_type); // Better for serialization?
                     // auto type_name = get_meta_type_name(meta_type); // Inspector-friendly version
 
                     entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity)));
@@ -418,8 +423,8 @@ namespace eeng::meta
                 entt::meta_any elem_any = view[i]; // view[i].as_ref() works too
                 deserialize_any(json[i], elem_any, entity, context); // TODO: view[i] here if &&
 #endif
-            }
         }
+    }
 
         else if (any.type().is_associative_container())
         {
@@ -490,10 +495,11 @@ namespace eeng::meta
 
         for (const auto& component_json : json["components"].items())
         {
-            auto key_str = component_json.key().c_str();
-            auto comp_id = entt::hashed_string::value(key_str);
+            std::string key_str = component_json.key();
+            // auto comp_id = entt::hashed_string::value(key_str);
 
-            if (entt::meta_type meta_type = entt::resolve(comp_id); meta_type)
+            if (auto meta_type = meta::resolve_by_type_id_string(key_str); meta_type)
+                // if (entt::meta_type meta_type = entt::resolve(comp_id); meta_type)
             {
                 // Default-construct and deserialize component
                 entt::meta_any any = meta_type.construct();
@@ -501,6 +507,8 @@ namespace eeng::meta
 
                 // Add component to entity
                 auto& registry = ctx.entity_manager->registry();
+                // Ensure_storage
+                auto comp_id = meta_type.id();
                 ensure_storage(registry, comp_id);
                 registry.storage(comp_id)->push(entity, any.base().data());
             }
@@ -517,6 +525,9 @@ namespace eeng::meta
         return entity_ref;
     }
 
+    /// @brief  Creates an EntitySpawnDesc from JSON data. 
+    /// @param json 
+    /// @return 
     EntitySpawnDesc create_entity_spawn_desc(const nlohmann::json& json)
     {
         EntitySpawnDesc out;
@@ -525,7 +536,9 @@ namespace eeng::meta
         for (auto& [comp_name, comp_json] : json["components"].items())
         {
             ComponentSpawnDesc c;
-            c.type_id = entt::hashed_string::value(comp_name.c_str());
+            c.type_id_str = comp_name;
+            // c.type_id = entt::hashed_string::value(comp_name.c_str());
+            //c.type_id = meta::resolve_by_type_id_string(comp_name).id(); // touches entt meta
             c.data = comp_json;
             out.components.push_back(std::move(c));
         }
@@ -547,14 +560,16 @@ namespace eeng::meta
         // Add components via meta pipeline
         for (auto& cd : desc.components)
         {
-            auto mt = entt::resolve(cd.type_id);
+            // auto mt = entt::resolve(cd.type_id);
+            auto mt = meta::resolve_by_type_id_string(cd.type_id_str);
             if (!mt) continue;
 
             entt::meta_any any = mt.construct();
             eeng::meta::deserialize_any(cd.data, any, e, ctx);
 
-            eeng::meta::ensure_storage(reg, cd.type_id);
-            reg.storage(cd.type_id)->push(e, any.base().data());
+            auto comp_id = mt.id();
+            eeng::meta::ensure_storage(reg, comp_id);
+            reg.storage(comp_id)->push(e, any.base().data());
         }
 
         return ecs::EntityRef{ desc.guid, e };
@@ -640,6 +655,6 @@ namespace eeng::meta
             }
         }
 #endif
-    }
+}
 #endif
 } // namespace eeng::meta

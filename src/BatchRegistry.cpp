@@ -179,8 +179,6 @@ namespace eeng
         entities_json = ctx.main_thread_queue->push_and_wait([&]() {
             nlohmann::json arr = nlohmann::json::array();
 
-            //auto& reg = ctx.entity_manager->registry();
-            // If you have a shared_ptr<entt::registry>, adapt this call accordingly
             auto registry_sptr = ctx.entity_manager->registry_wptr().lock();
             if (!registry_sptr) return nlohmann::json::array();
 
@@ -372,8 +370,6 @@ namespace eeng
                             ecs::Entity::EntityNull
                         );
 
-                        // Assume EntityManager can give you the GUID from HeaderComponent
-                        // Guid guid = em->guid_for_entity(entity); // or via header component
                         return ecs::EntityRef{ guid, entity };
                     });
 

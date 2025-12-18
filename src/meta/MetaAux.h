@@ -14,6 +14,7 @@
 #include <cassert>
 #include "MetaLiterals.h"
 #include "MetaInfo.h"
+#include "meta/TypeIdRegistry.hpp"
 
 namespace internal
 {
@@ -95,6 +96,17 @@ bool try_apply(const entt::meta_any& value, Callable callable)
 
 namespace eeng::meta
 {
+    inline bool type_is_registered(entt::meta_type mt)
+    {
+        return static_cast<bool>(mt);
+    }
+
+    template<typename T>
+    inline bool type_is_registered()
+    {
+        return type_is_registered(entt::resolve<T>());
+    }
+
     inline std::string get_meta_type_display_name(entt::meta_type mt)
     {
         assert(mt);
@@ -116,13 +128,17 @@ namespace eeng::meta
     inline std::string get_meta_type_id_string(entt::meta_type mt)
     {
         assert(mt);
-        if (eeng::TypeMetaInfo* info = mt.custom(); info && !info->id.empty())
-            return info->id;                         // "eeng.RegType"
 
-        // Fallback: something deterministic but less robust.
-        // *can* use info().name() here as a temporary fallback,
-        // but ideally all serialized types get an explicit id.
-        return std::string{ mt.info().name() };
+        eeng::TypeMetaInfo* info = mt.custom();
+        assert(info && !info->id.empty());  // Ensure non-empty registered id string
+
+        return info->id;
+
+        // if (eeng::TypeMetaInfo* info = mt.custom(); info && !info->id.empty())
+        //     return info->id;                         // "eeng.RegType"
+
+        // // Fallback: raw type name from entt
+        // return std::string{ mt.info().name() };
     }
 
     template<typename T>
@@ -133,11 +149,29 @@ namespace eeng::meta
         return get_meta_type_id_string(mt);
     }
 
+    // Global map of registered type id strings to entt type ids
+    // inline std::unordered_map<std::string, entt::id_type>& type_id_map()
+    // {
+    //     static std::unordered_map<std::string, entt::id_type> map;
+    //     return map;
+    // }
+
+    template<class T>
+    entt::id_type register_type()
+    {
+        return TypeIdRegistry::register_type_from_meta<T>();
+    }
+
     // (deserialize)
     inline entt::meta_type resolve_by_type_id_string(std::string_view id)
     {
-        auto hash = entt::hashed_string{ id.data(), id.size() }.value();
-        return entt::resolve(hash);
+        return TypeIdRegistry::resolve(id);
+
+        // auto& map = type_id_map();
+        // auto it = map.find(std::string{ id });
+        // if (it == map.end())
+        //     return {};
+        // return entt::resolve(it->second);
     }
 
     inline entt::id_type get_meta_type_id(entt::meta_type mt)
@@ -216,7 +250,7 @@ inline auto get_meta_data_display_name(
 inline auto cast_to_underlying_type(const entt::meta_type& meta_type, const entt::meta_any& enum_any)
 {
     assert(meta_type.is_enum());
-    eeng::EnumTypeMetaInfo* enum_info = meta_type.custom();
+    eeng::TypeMetaInfo* enum_info = meta_type.custom();
     assert(enum_info);
     assert(enum_info->underlying_type);
     return enum_any.allow_cast(enum_info->underlying_type);

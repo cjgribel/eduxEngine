@@ -201,7 +201,7 @@ namespace eeng::editor
 
 #ifdef COMMAND_DEBUG_PRINTS
         std::cout << "building property stack..." << std::endl;
-        std::cout << "entry 0: " << last_prop.meta_any.type().info().name() << std::endl;
+        std::cout << "entry 0: " << meta::get_meta_type_display_name(last_prop.meta_any.type()) << std::endl;
 #endif
 
         // Push the remaining path entries
@@ -259,7 +259,7 @@ namespace eeng::editor
             }
             else { assert(0); }
 #ifdef COMMAND_DEBUG_PRINTS
-            std::cout << "entry " << i << ": " << last_prop.meta_any.type().info().name() << std::endl;
+            std::cout << "entry " << i << ": " << meta::get_meta_type_display_name(last_prop.meta_any.type())  << std::endl;
 #endif
         }
 
@@ -275,10 +275,10 @@ namespace eeng::editor
 #ifdef COMMAND_DEBUG_PRINTS
             std::cout << "Property " << prop_stack.size() << std::endl;
             std::cout << "object:" << std::endl;
-            std::cout << prop.meta_any.type().info().name() << " ";     // object type
+            std::cout << meta::get_meta_type_display_name(prop.meta_any.type()) << " ";     // object type
             std::cout << any_to_string(prop.meta_any) << std::endl;     // object value
             std::cout << prop.entry.name << " =>" << std::endl;         // property name/index
-            std::cout << any_new.type().info().name() << " ";           // new property type
+            std::cout << meta::get_meta_type_display_name(any_new.type()) << " ";           // new property type
             std::cout << any_to_string(any_new) << std::endl;           // new property value
 #endif
             if (prop.entry.type == EntryType::Data)

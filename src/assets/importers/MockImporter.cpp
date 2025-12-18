@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "MockImporter.hpp"
+#include "meta/MetaAux.h"
 #include "ResourceManager.hpp" // Treats IResourceManager as this type
 #include "Storage.hpp"
 #include "ThreadPool.hpp"
@@ -22,6 +23,10 @@ namespace eeng::mock {
         const std::filesystem::path& assets_root,
         EngineContextPtr ctx)
     {
+        assert(meta::type_is_registered<Model>());
+        assert(meta::type_is_registered<Mesh>());
+        assert(meta::type_is_registered<Texture>());
+
         std::cout << "MockImporter::import" << std::endl;
         auto& resource_manager = static_cast<ResourceManager&>(*ctx->resource_manager);
 
@@ -65,7 +70,7 @@ namespace eeng::mock {
             mesh_guid,
             model_guid, // Parent GUID
             std::string("MockMesh") + std::to_string(value), // name
-            std::string(entt::resolve<Mesh>().info().name()) // type name, alt. entt::type_name<T>
+            meta::get_meta_type_id_string<Mesh>()
         };
         resource_manager.import(
             mesh,
@@ -84,7 +89,7 @@ namespace eeng::mock {
             texture_guid,
             model_guid, // Parent GUID
             std::string("MockTexture") + std::to_string(value), // name
-            std::string(entt::resolve<Texture>().info().name()) // type name
+            meta::get_meta_type_id_string<Texture>(),
         };
         resource_manager.import(
             texture,
@@ -100,7 +105,7 @@ namespace eeng::mock {
             model_guid,
             Guid::invalid(), // Parent GUID
             std::string("MockModel") + std::to_string(value), // name
-            std::string(entt::resolve<Model>().info().name()) // type name
+            meta::get_meta_type_id_string<Model>(),
             // model_file_path // desired filepath
         };
         resource_manager.import(

@@ -29,7 +29,7 @@ namespace eeng::meta
         {
             if (entt::meta_func meta_func = meta_type.func(literals::clone_hs); meta_func)
             {
-                // std::cout << "clone_any: invoking clone() for " << any.type().info().name() << std::endl;
+                // std::cout << "clone_any: invoking clone() for " << meta::get_meta_type_display_name(any.type()) << std::endl;
 
                 auto copy_any = meta_func.invoke({}, any.base().data() /*src_ptr*/, dst_entity);
                 assert(copy_any && "Failed to invoke clone() for type ");
@@ -40,7 +40,7 @@ namespace eeng::meta
             }
         }
 
-        // std::cout << "clone_any: copying by value: " << any.type().info().name() << std::endl;
+        // std::cout << "clone_any: copying by value: " << meta::get_meta_type_display_name(any.type()) << std::endl;
         return any;
     }
 

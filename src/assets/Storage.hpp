@@ -1088,8 +1088,8 @@ namespace eeng
             oss << "Storage summary:\n";
             for (auto const& [type_id, pool_ptr] : pools)
             {
-                auto name = entt::resolve(type_id).info().name();
-                oss << "- Type " << name << " (id = " << type_id << ")\n";
+                auto type_name = entt::resolve(type_id).info().name();
+                oss << "- Type " << type_name << " (id = " << type_id << ")\n";
                 oss << pool_ptr->to_string() << "\n";
             }
             return oss.str();

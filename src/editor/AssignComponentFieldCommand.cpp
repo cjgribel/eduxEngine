@@ -6,6 +6,7 @@
 //
 
 #include "MetaLiterals.h"
+#include "meta/MetaAux.h"
 #include "MetaSerialize.hpp"
 #include "editor/MetaFieldAssign.hpp"
 #include "editor/AssignComponentFieldCommand.hpp"
@@ -156,7 +157,7 @@ namespace eeng::editor
         // Build a display name for the command
         {
             // Gather meta path
-            command.display_name = entt::resolve(command.component_id).info().name();
+            command.display_name = meta::get_meta_type_display_name(entt::resolve(command.component_id));
             for (auto& entry : command.meta_path.entries)
             {
                 if (entry.type == MetaFieldPath::Entry::Type::Data) {

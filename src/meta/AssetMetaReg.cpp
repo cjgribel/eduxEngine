@@ -100,12 +100,30 @@ namespace eeng {
             auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
             return rm.validate_asset_recursive<T>(guid);
         }
+    }
+
+    namespace
+    {
+        // template<class T>
+        // void register_type_info(
+        //     const std::string& type_id,
+        //     const std::string& type_name,
+        //     const std::string& tooltip,
+        //     const entt::meta_type& underlying_type = entt::meta_type{})
+        // {
+        //     entt::meta_factory<T>{}
+        //     .template custom<TypeMetaInfo>(TypeMetaInfo{ .id = type_id, .name = type_name, .tooltip = tooltip, .underlying_type = underlying_type })
+        //         ;
+        // }
 
         template<typename T>
         void register_asset()
         {
             // constexpr auto alias = entt::type_name<T>::value();  // e.g. "ResourceTest"
             // constexpr auto id    = entt::type_hash<T>::value();
+
+            meta::register_type<T>();
+            warm_start_meta_type<T>();
 
             entt::meta_factory<T>()
                 // Assuring type storage
@@ -126,10 +144,6 @@ namespace eeng {
                 //
                 //.func<&collect_guids<MeshRendererComponent>>("collect_asset_guids"_hs)
                 ;
-            warm_start_meta_type<T>();
-
-            // Caution: this name will include namespaces
-            // auto name = std::string{ entt::resolve<T>().info().name() };
 
             // Handle<T>
             // NOTE: Is not exposed via AssetRef<T>
@@ -144,7 +158,7 @@ namespace eeng {
                 ;
 #endif
 
-            // AssetRef<T>
+            // AssetRef<T> helper
             entt::meta_factory<AssetRef<T>>{}
             .template custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.AssetRef", .name = "AssetRef", .tooltip = "An asset reference." })
 
@@ -160,6 +174,14 @@ namespace eeng {
                 .template func<&eeng::editor::inspect_AssetRef<T>>(eeng::literals::inspect_hs)
                 .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_AssetRef", "Inspect asset reference" })
                 ;
+            warm_start_meta_type<AssetRef<T>>();
+            // NOTE: Generic name for all AssetRef<T> types.
+            // meta::type_id_map()["eeng.AssetRef"] = entt::resolve<AssetRef<T>>().id();
+        }
+
+        template<typename T>
+        void register_helper_type()
+        {
             warm_start_meta_type<AssetRef<T>>();
         }
     } // namespace
@@ -197,30 +219,38 @@ namespace eeng {
             // .custom<DataMetaInfo>(DataMetaInfo{ "file_path", "File Path", "The file path of the asset." })
             // .traits(MetaFlags::read_only)
             ;
-        warm_start_meta_type<AssetMetaData>();
+        register_helper_type<AssetMetaData>();
+        // warm_start_meta_type<AssetMetaData>();
+        // meta::type_id_map()["eeng.AssetMetaData"] = entt::resolve<AssetMetaData>().id();
+        /* -> */ //meta::TypeIdRegistry::register_type_from_meta<AssetMetaData>();
 
         // === RESOURCES ===
 
         // mock::Mesh
-        register_asset<mock::Mesh>();
+        // register_asset<mock::Mesh>();
         entt::meta_factory<mock::Mesh>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.Mesh", .name = "Mesh", .tooltip = "This is a mock mesh type." })
             .data<&mock::Mesh::vertices>("vertices"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "vertices", "Vertices", "A vector of vertex positions." })
             .traits(MetaFlags::read_only)
             ;
+        // warm_start_meta_type<mock::Mesh>();
+        // meta::type_id_map()["eeng.mock.Mesh"] = entt::resolve<mock::Mesh>().id();
+        register_asset<mock::Mesh>();
 
         // mock::Texture
-        register_asset<mock::Texture>();
+        // register_asset<mock::Texture>();
         entt::meta_factory<mock::Texture>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.Texture", .name = "Texture", .tooltip = "This is a mock Texture type." })
             .data<&mock::Texture::name>("name"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the texture." })
             .traits(MetaFlags::read_only)
             ;
+        // warm_start_meta_type<mock::Texture>();
+        // meta::type_id_map()["eeng.mock.Texture"] = entt::resolve<mock::Texture>().id();
+        register_asset<mock::Texture>();
 
         // mock::Model
-        register_asset<mock::Model>();
         entt::meta_factory<mock::Model>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.Model", .name = "Model", .tooltip = "This is a mock model type." })
 
@@ -232,6 +262,9 @@ namespace eeng {
             .custom<DataMetaInfo>(DataMetaInfo{ "textures", "Textures", "A vector of texture references." })
             .traits(MetaFlags::read_only)
             ;
+        register_asset<mock::Model>();
+        // warm_start_meta_type<mock::Model>();
+        // meta::type_id_map()["eeng.mock.Model"] = entt::resolve<mock::Model>().id();
 
         // entt::meta<Texture>()
         //     .type("Texture"_hs)
@@ -242,7 +275,6 @@ namespace eeng {
         // assure_fn.invoke({}, registry);
 
         // mock::MockResource1
-        register_asset<mock::MockResource1>();
         entt::meta_factory<mock::MockResource1>{}
         // .type("MockResource1"_hs)
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.MockResource1", .name = "MockResource1", .tooltip = "This is a mock resource type." })
@@ -273,8 +305,11 @@ namespace eeng {
         //.data<&BehaviorScript::on_collision/*, entt::as_ref_t*/>("on_collision"_hs).prop(display_name_hs, "on_collision")
 
             ;
+        // warm_start_meta_type<mock::MockResource1>();
+        // meta::type_id_map()["eeng.mock.MockResource1"] = entt::resolve<mock::MockResource1>().id();
+        register_asset<mock::MockResource1>();
 
-        register_asset<mock::MockResource2>();
+        // register_asset<mock::MockResource2>();
     }
 
 } // namespace eeng

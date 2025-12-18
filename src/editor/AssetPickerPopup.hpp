@@ -10,21 +10,13 @@
 namespace eeng::editor::detail
 {
     template<class T>
-    std::string get_meta_type_name()
-    {
-        auto meta_type = entt::resolve<T>();
-        assert(meta_type && "get_meta_type_name: type not registered in entt meta system");
-        return std::string(meta_type.info().name());
-    }
-
-    template<class T>
     std::span<const AssetEntry* const>
         get_assets_of_type(AssetIndexDataPtr index)
     {
         assert(index);
 
-        const std::string type_name = get_meta_type_name<T>(); // meta::get_meta_type_id_string<T>();
-        auto it = index->by_type.find(type_name);
+        const std::string type_id_str = meta::get_meta_type_id_string<T>();
+        auto it = index->by_type.find(type_id_str);
         if (it == index->by_type.end())
         {
             return {};
@@ -76,7 +68,7 @@ namespace eeng::editor
         {
             // Debug asset type info
             const std::string type_name = meta::get_meta_type_display_name<T>();
-            const std::string full_type_name = meta::get_meta_type_id_string<T>(); // std::string(entt::resolve<T>().info().name());
+            const std::string full_type_name = meta::get_meta_type_id_string<T>();
             ImGui::TextDisabled("Type: %s (%s)", type_name.c_str(), full_type_name.c_str());
             ImGui::TextDisabled("by_type size: %zu", index->by_type.size());
             ImGui::TextDisabled("assets for this type: %zu", assets.size());

@@ -1,3 +1,4 @@
+// Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
 #pragma once
@@ -14,6 +15,9 @@ namespace eeng
         std::string id;
         std::string name;
         std::string tooltip;
+
+        // For enum types
+        entt::meta_type underlying_type;
     };
 
     struct DataMetaInfo
@@ -23,12 +27,12 @@ namespace eeng
         std::string tooltip;
     };
 
-    struct EnumTypeMetaInfo
-    {
-        std::string name;
-        std::string tooltip;
-        entt::meta_type underlying_type;
-    };
+    // struct EnumTypeMetaInfo
+    // {
+    //     std::string name;
+    //     std::string tooltip;
+    //     entt::meta_type underlying_type;
+    // };
 
     struct EnumDataMetaInfo
     {

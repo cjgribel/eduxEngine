@@ -18,7 +18,8 @@ namespace eeng::meta
 {
     struct ComponentSpawnDesc
     {
-        entt::id_type type_id;
+        // entt::id_type type_id;
+        std::string type_id_str;
         nlohmann::json data;
     };
 
@@ -58,12 +59,12 @@ namespace eeng::meta
         EngineContext& ctx
     );
 
-    // Can be called off main-thread
+    // Can be called off main-thread (does not touch entt::meta or entt::registry)
     EntitySpawnDesc create_entity_spawn_desc(
         const nlohmann::json& json
     );
 
-    // Main-thread (touches entt::registry)
+    // Main-thread (touches entt::meta and entt::registry)
     ecs::EntityRef spawn_entity_from_desc(
         const EntitySpawnDesc& desc,
         EngineContext& ctx

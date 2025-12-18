@@ -175,7 +175,7 @@ namespace eeng::meta
 
         for_each_component(e, reg, [&](entt::meta_type mt, entt::meta_any& any)
             {
-                LogGlobals::log("[collect_asset_guids_for_entity] comp type %s", mt.info().name());
+                LogGlobals::log("[collect_asset_guids_for_entity] comp type %s", meta::get_meta_type_display_name(mt).c_str());
                 using namespace entt::literals;
 
                 if (auto mf = mt.func(literals::collect_asset_guids_hs); mf)

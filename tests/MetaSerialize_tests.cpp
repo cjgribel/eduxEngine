@@ -64,7 +64,7 @@ namespace
             const ecs::Entity& entity_parent,
             const ecs::Entity& entity_hint) override
         {
-            return {Guid::invalid(), ecs::Entity{}};
+            return { Guid::invalid(), ecs::Entity{} };
         }
 
         bool entity_parent_registered(
@@ -310,7 +310,7 @@ protected:
         // Register vec2
         entt::meta_factory<vec2>()
             // .type("vec2"_hs)
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "vec2", .name = "vec2", .tooltip = "A 2D vector type." })
+            .custom<eeng::TypeMetaInfo>(eeng::TypeMetaInfo{ .id = "vec2", .name = "vec2", .tooltip = "A 2D vector type." })
 
             .data<&vec2::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "n/a" })
@@ -324,6 +324,8 @@ protected:
 
             .template func<&assure_type_storage<vec2>, entt::as_void_t>(literals::assure_component_storage_hs)
             ;
+        meta::register_type<vec2>(); // -> Can be used as a component directly
+        // meta::type_id_map()["vec2"] = entt::resolve<vec2>().id();
 
         // Register vec3
         entt::meta_factory<vec3>()
@@ -340,16 +342,19 @@ protected:
 
             .template func<&assure_type_storage<vec3>, entt::as_void_t>(literals::assure_component_storage_hs)
             ;
+        meta::register_type<vec3>(); // -> Can be used as a component directly
+        // meta::type_id_map()["vec3"] = entt::resolve<vec3>().id();
 
         // Register MockType2::AnEnum
-        auto enum_info = EnumTypeMetaInfo{
+        auto enum_info = TypeMetaInfo{
+            .id = "MockType2.AnEnum",
             .name = "AnEnum",
             .tooltip = "AnEnum is a test enum with three values.",
             .underlying_type = entt::resolve<std::underlying_type_t<MockType2::AnEnum>>()
         };
         entt::meta_factory<MockType2::AnEnum>()
             // .type("MockType2::AnEnum"_hs)
-            .custom<EnumTypeMetaInfo>(enum_info)
+            .custom<TypeMetaInfo>(enum_info)
 
             .data<MockType2::AnEnum::Hello>("Hello"_hs)
             .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hello", "Greeting in English." })
@@ -386,6 +391,8 @@ protected:
 
             .template func<&assure_type_storage<MockType2>, entt::as_void_t>(literals::assure_component_storage_hs)
             ;
+        meta::register_type<MockType2>(); // -> Can be used as a component directly
+        // meta::type_id_map()["MockType2"] = entt::resolve<MockType2>().id();
     }
 };
 
@@ -630,6 +637,10 @@ TEST_F(MetaSerializationTest, SerializeDeserialize_EntityRoundTrip)
     auto  src_reg_sp = src_em->registry_wptr().lock();
     ASSERT_TRUE(src_reg_sp);
     auto& src_reg = *src_reg_sp;
+
+    // src_reg = entt::registry(); //.clear();
+    // src_reg.storage<vec2>(entt::hashed_string::value("vec2"));
+    // src_reg.storage<MockType2>(entt::hashed_string::value("MockType2"));
 
     // create an entity in the source registry
     Guid src_guid{ 0x12345678ULL };

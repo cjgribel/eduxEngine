@@ -149,7 +149,7 @@ namespace eeng
         for (const auto& [type_id, pool_ptr] : storage)
         {
             const auto meta_type = entt::resolve(type_id);
-            const auto type_name = std::string(meta_type.info().name());
+            const auto type_name = meta::get_meta_type_id_string(meta_type);
 
             if (ImGui::TreeNode(type_name.c_str()))
             {
@@ -215,9 +215,8 @@ namespace eeng
                 // Column 1: Type name
                 ImGui::TableSetColumnIndex(0);
                 auto meta_type = entt::resolve(id_type);
-                const auto type_name = std::string(meta_type.info().name());
+                const auto type_name = meta::get_meta_type_id_string(meta_type);
                 ImGui::Text("%s", type_name.c_str());
-                // ImGui::TextUnformatted(meta_type.info().name().data()); // has garbage at end
 
                 // Column 2: Usage summary
                 ImGui::TableSetColumnIndex(1);
@@ -904,7 +903,6 @@ namespace eeng
             {
                 if (ImGui::Button("Save"))
                 {
-                    // Either call sync save, or your async wrapper if you add it:
                     br.save_batch(b->id, ctx);
                     // or br.queue_save_batch(b->id, ctx);
                 }

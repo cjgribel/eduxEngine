@@ -59,14 +59,15 @@ protected:
     static void SetUpTestSuite()
     {
         // Register MockType::AnEnum
-        auto enum_info = EnumTypeMetaInfo{
+        auto enum_info = TypeMetaInfo{
+            .id = "MockType.AnEnum",
             .name = "AnEnum",
             .tooltip = "AnEnum is a test enum with three values.",
             .underlying_type = entt::resolve<std::underlying_type_t<MockType::AnEnum>>()
         };
         entt::meta_factory<MockType::AnEnum>()
             .type("AnEnum"_hs)
-            .custom<EnumTypeMetaInfo>(enum_info)
+            .custom<TypeMetaInfo>(enum_info)
 
             .data<MockType::AnEnum::Hello>("Hello"_hs)
             .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hello", "Greeting in English." })
