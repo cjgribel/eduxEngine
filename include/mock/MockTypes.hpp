@@ -86,7 +86,7 @@ namespace std {
     template <>
     struct hash<eeng::ecs::mock::ElementType> {
         std::size_t operator()(const eeng::ecs::mock::ElementType& e) const {
-            // Hash the float 'm' member. You can combine this with more fields if needed.
+            // Hash the float 'm' member. Combine with more fields if needed.
             return std::hash<float>()(e.m);
         }
     };
