@@ -274,7 +274,7 @@ namespace eeng
             // Parent Entity
             .data<&eeng::ecs::HeaderComponent::parent_entity>("parent_entity"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "parent_entity", "Parent Entity", "The parent entity of this entity." })
-            .traits(MetaFlags::none)
+            .traits(MetaFlags::read_only)
             ;
         register_component<ecs::HeaderComponent>();
         // warm_start_meta_type<eeng::ecs::HeaderComponent>();
