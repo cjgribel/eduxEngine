@@ -57,7 +57,7 @@ namespace eeng
         std::weak_ptr<entt::registry>       registry_wptr() noexcept override { return registry_; }
         std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
-        // Not part of interface
+        // (public, not part of interface)
 
         ecs::SceneGraph& scene_graph();
         const ecs::SceneGraph& scene_graph() const;
@@ -75,6 +75,20 @@ namespace eeng
         std::optional<ecs::Entity> get_entity_from_guid(const Guid& guid) const;
 
         // destroy_pending_entities
+
+        template<class Fn>
+        void for_each_registered_entity(Fn&& fn) const
+        {
+            for (const auto& [entity, guid] : entity_to_guid_map_)
+            {
+                fn(entity, guid);
+            }
+        }
+
+        std::size_t registered_entity_count() const
+        {
+            return entity_to_guid_map_.size();
+        }
 
     private:
 

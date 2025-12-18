@@ -11,7 +11,6 @@
 
 namespace eeng::editor
 {
-#if 1
     template <class T>
     bool inspect_AssetRef(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
@@ -80,61 +79,4 @@ namespace eeng::editor
 
         return modified;
     }
-
-#else
-    template <class T>
-    bool inspect_AssetRef(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
-    {
-        auto index = ctx.resource_manager->get_index_data();
-
-        // Check const?
-
-        auto ptr = any.try_cast<eeng::AssetRef<T>>();
-        assert(ptr && "inspect_EntityRef: could not cast meta_any to AssetRef");
-
-        // COLORED TEXT TEST
-        ImVec4 state_color{};
-        state_color = ImVec4(0.2f, 0.9f, 0.2f, 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_Text, state_color);
-        ImGui::TextUnformatted("Bound");
-        ImGui::PopStyleColor();
-        //
-        state_color = ImVec4(1.0f, 0.2f, 0.2f, 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_Text, state_color);
-        ImGui::SameLine();
-        ImGui::TextUnformatted("Unbound");
-        ImGui::PopStyleColor();
-
-
-        inspector.begin_leaf("GUID");
-
-        auto& guid = ptr->guid;
-        ImGui::TextUnformatted(guid.valid() ? guid.to_string().c_str() : "n/a");
-
-        //bool guid_modified = editor::inspect_type(guid, inspector);
-        inspector.end_leaf();
-
-        inspector.begin_leaf("Live handle");
-        const auto type_name = get_meta_type_name<T>();
-        ImGui::TextDisabled("%s", type_name.c_str());
-
-        auto handle = ptr->handle;
-        if (handle)
-        {
-            ImGui::Text("idx %zu", handle.idx);
-            ImGui::Text("ver %u", handle.ver);
-        }
-        else
-        {
-            ImGui::TextUnformatted("n/a");
-        }
-        inspector.end_leaf();
-
-        // auto ptr = any.try_cast<Guid>();
-        // assert(ptr && "serialize_Guid: could not cast meta_any to Guid");
-        // j = ptr->raw();
-
-        return false;
-    }
-#endif
 } // namespace
