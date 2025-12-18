@@ -58,7 +58,6 @@ namespace eeng::editor
         // Component is now modified - run per-field callbacks or emit events.
     }
 
-
     void AssignComponentFieldCommand::execute()
     {
         assign_meta_field(new_value);
