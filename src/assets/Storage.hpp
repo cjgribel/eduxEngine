@@ -587,6 +587,7 @@ namespace eeng
 
             /// @brief Visit all objects of this static type in the pool.
             /// @param visitor A function that takes a const reference to T
+            /// @note Risk for deadlock if visitor re-enters storage
             template<class F>
             void visit(F&& visitor) const noexcept
             {
@@ -596,6 +597,7 @@ namespace eeng
 
             /// @brief Visit all objects of this static type in the pool.
             /// @param visitor A function that takes a reference to T
+            /// @note Risk for deadlock if visitor re-enters storage
             template<class F>
             void visit(F&& visitor) noexcept
             {
@@ -603,8 +605,9 @@ namespace eeng
                 m_pool.used_visitor(std::forward<F>(visitor));
             }
 
-            /// @brief Visit all objects of this runtime type in the pool (const).
+            /// @brief Visit all objects of this meta type in the pool (const).
             /// @param visitor A function that takes an entt::meta_any with a const reference to T
+            /// @note Risk for deadlock if visitor re-enters storage
             void visit_any(const std::function<void(entt::meta_any)>& visitor) const noexcept override
             {
                 std::lock_guard lock{ m_mutex };
@@ -613,8 +616,9 @@ namespace eeng
                     });
             }
 
-            /// @brief Visit all objects of this runtime type in the pool.
+            /// @brief Visit all objects of this meta type in the pool.
             /// @param visitor A function that takes an entt::meta_any with a reference to T
+            /// @note Risk for deadlock if visitor re-enters storage
             void visit_any(const std::function<void(entt::meta_any)>& visitor) noexcept override
             {
                 std::lock_guard lock{ m_mutex };
@@ -838,7 +842,7 @@ namespace eeng
         // --- Meta typed modify -----------------------------------------------
 
         template<class Fn>
-        requires std::invocable<Fn, entt::meta_any&>
+            requires std::invocable<Fn, entt::meta_any&>
         auto modify(const MetaHandle& mh, Fn&& f)
             -> std::invoke_result_t<Fn, entt::meta_any&>
         {
@@ -857,7 +861,7 @@ namespace eeng
         // --- Statically typed modify -----------------------------------------
 
         template<typename T, typename Fn>
-        requires std::invocable<Fn, T&>
+            requires std::invocable<Fn, T&>
         auto modify(const Handle<T>& h, Fn&& f)
             -> std::invoke_result_t<Fn, T&>
         {
@@ -1195,19 +1199,29 @@ namespace eeng
         using iterator = decltype(pools)::iterator;
         using const_iterator = decltype(pools)::const_iterator;
 
+        /// @brief Get iterator to beginning of pools map.
+        /// @note Not thread-safe.
         iterator begin() {
             std::lock_guard lock{ storage_mutex };
             return pools.begin();
         }
+
+        /// @brief Get iterator to end of pools map.
+        /// @note Not thread-safe.
         iterator end() {
             std::lock_guard lock{ storage_mutex };
             return pools.end();
         }
 
+        /// @brief Get const iterator to beginning of pools map.
+        /// @note Not thread-safe.
         const_iterator begin() const {
             std::lock_guard lock{ storage_mutex };
             return pools.begin();
         }
+
+        /// @brief Get const iterator to end of pools map.
+        /// @note Not thread-safe.
         const_iterator end() const {
             std::lock_guard lock{ storage_mutex };
             return pools.end();
