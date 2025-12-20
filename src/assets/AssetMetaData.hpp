@@ -14,7 +14,7 @@ namespace eeng
         Guid guid_parent;   // remove ?
 
         std::string name;
-        std::string type_name;
+        std::string type_id;
 
         std::vector<Guid> contained_assets; // ???
 
@@ -24,12 +24,12 @@ namespace eeng
             Guid guid,
             Guid guid_parent,
             std::string name,
-            std::string type_name
+            std::string type_id
         )
             : guid(guid)
             , guid_parent(guid_parent)
             , name(std::move(name))
-            , type_name(std::move(type_name))
+            , type_id(std::move(type_id))
         {
         }
     };

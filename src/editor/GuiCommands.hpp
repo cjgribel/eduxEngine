@@ -13,7 +13,7 @@
 // #include <entt/entt.hpp>
 // #include "Scene.hpp"
 #include "Command.hpp"
-#include "AssignComponentFieldCommand.hpp"
+#include "AssignFieldCommand.hpp"
 #include "MetaSerialize.hpp"
 #include <deque>
 

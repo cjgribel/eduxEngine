@@ -6,7 +6,7 @@
 #include "editor/InspectorState.hpp"
 #include "editor/TypeInspect.hpp"
 #include "editor/CommandQueue.hpp"
-#include "editor/AssignComponentFieldCommand.hpp"
+#include "editor/AssignFieldCommand.hpp"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
 #include "engineapi/SelectionManager.hpp"
@@ -28,7 +28,7 @@ namespace eeng::meta {
             // auto cmd_queue_sptr = cmd_queue_wptr.lock();
             // cmd_queue_sptr->add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
 
-            cmd_queue.add(editor::CommandFactory::Create<editor::AssignComponentFieldCommand>(cmd_builder.build()));
+            cmd_queue.add(editor::CommandFactory::Create<editor::AssignFieldCommand>(cmd_builder.build()));
         }
     }
 
@@ -123,7 +123,7 @@ namespace eeng::meta {
     bool inspect_any(
         entt::meta_any& any,
         editor::InspectorState& inspector,
-        editor::AssignComponentFieldCommandBuilder& cmd_builder,
+        editor::AssignFieldCommandBuilder& cmd_builder,
         EngineContext& ctx)
     {
         assert(any);
@@ -379,7 +379,7 @@ namespace eeng::meta {
         EngineContext& ctx)
     {
         bool mod = false;
-        editor::AssignComponentFieldCommandBuilder cmd_builder;
+        editor::AssignFieldCommandBuilder cmd_builder;
 
         // TODO: Take ctx directly as an argument
         // auto context_sp = inspector.ctx.lock();
@@ -399,10 +399,15 @@ namespace eeng::meta {
                 {
 #ifdef USE_COMMANDS
                     // Reset meta command for component type
-                    cmd_builder.reset().
-                        registry(ctx.entity_manager->registry_wptr())
-                        .entity(entity)
-                        .component(id);
+                    cmd_builder.target_component(
+                        ctx.entity_manager->registry_wptr(),
+                        entity,
+                        id
+                    );
+                    // cmd_builder.reset().
+                    //     registry(ctx.entity_manager->registry_wptr())
+                    //     .entity(entity)
+                    //     .component(id);
 #endif
                     auto comp_any = meta_type.from_void(type.value(entity)); // ref
                     mod |= inspect_any(comp_any, inspector, cmd_builder, ctx);

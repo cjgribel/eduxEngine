@@ -298,7 +298,7 @@ class MetaSerializationTest : public ::testing::Test
 protected:
     eeng::EngineContext ctx{
         std::make_unique<MockEntityManager>(),
-        std::make_unique<MockResourceManager>(),
+        std::make_shared<MockResourceManager>(),
         std::make_unique<MockBatchRegistry>(),
         std::make_unique<MockGuiManager>(),
         std::make_unique<MockInputManager>(),

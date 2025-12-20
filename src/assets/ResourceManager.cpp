@@ -519,7 +519,7 @@ namespace eeng
         if (it == index_data->by_guid.end() || !it->second)
             throw std::runtime_error("Asset not found for GUID: " + guid.to_string());
 
-        const auto& type_name = it->second->meta.type_name;
+        const auto& type_name = it->second->meta.type_id;
 
         // entt::meta_type type = entt::resolve(entt::hashed_string{ type_name.c_str() });
         entt::meta_type type = meta::resolve_by_type_id_string(type_name);
@@ -552,7 +552,7 @@ namespace eeng
         if (it == index_data->by_guid.end() || !it->second)
             throw std::runtime_error("Asset not found for GUID: " + asset_guid.to_string());
 
-        const auto& type_name = it->second->meta.type_name;
+        const auto& type_name = it->second->meta.type_id;
 
         // entt::meta_type type = entt::resolve(entt::hashed_string{ type_name.c_str() });
         entt::meta_type type = meta::resolve_by_type_id_string(type_name);

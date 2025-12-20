@@ -372,7 +372,7 @@ namespace eeng
             {
                 if (auto opt = self.validate_handle_no_lock(meta_handle); !opt)
                 {
-                    throw ValidationError{ "Invalid or not‐ready MetaHandle" };
+                    throw ValidationError{ "Invalid or not-ready MetaHandle" };
                 }
                 else
                 {
@@ -780,7 +780,7 @@ namespace eeng
         }
 
         /// @brief Runtime-typed get (not thread-safe)
-        /// @return An entt::metaany with a reference to the requested object
+        /// @return An entt::meta_any with a reference to the requested object
         entt::meta_any get(const MetaHandle& meta_handle)
         {
             std::lock_guard lock{ storage_mutex };

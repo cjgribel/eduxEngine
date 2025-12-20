@@ -25,7 +25,7 @@ namespace eeng
         // 2) Build aux maps
         for (const auto& entry : data->entries) {
             data->by_guid[entry.meta.guid] = &entry;
-            data->by_type[entry.meta.type_name].push_back(&entry);
+            data->by_type[entry.meta.type_id].push_back(&entry);
             data->by_parent[entry.meta.guid_parent].push_back(&entry);
         }
 

@@ -6,12 +6,12 @@
 
 #include "config.h"
 #include "EngineContext.hpp"
-// #include "editor/AssignComponentFieldCommand.hpp"
+// #include "editor/AssignFieldCommand.hpp"
 #include <entt/entt.hpp>
 
 namespace eeng::editor {
     struct InspectorState;
-    class AssignComponentFieldCommandBuilder;
+    class AssignFieldCommandBuilder;
 }
 
 namespace eeng::meta {
@@ -34,7 +34,7 @@ namespace eeng::meta {
     bool inspect_any(
         entt::meta_any& any,
         eeng::editor::InspectorState& inspector,
-        editor::AssignComponentFieldCommandBuilder& cmd_builder,
+        editor::AssignFieldCommandBuilder& cmd_builder,
         EngineContext& ctx);
 
     bool inspect_entity(

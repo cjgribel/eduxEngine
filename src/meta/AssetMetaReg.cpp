@@ -207,8 +207,8 @@ namespace eeng {
             .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the asset." })
             .traits(MetaFlags::read_only)
 
-            .data<&AssetMetaData::type_name>("type_name"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "type_name", "Type Name", "The type name of the asset." })
+            .data<&AssetMetaData::type_id>("type_id"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "type_id", "Type ID", "The type ID of the asset." })
             .traits(MetaFlags::read_only)
 
             .data<&AssetMetaData::contained_assets>("contained_assets"_hs)
@@ -232,7 +232,7 @@ namespace eeng {
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.Mesh", .name = "Mesh", .tooltip = "This is a mock mesh type." })
             .data<&mock::Mesh::vertices>("vertices"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "vertices", "Vertices", "A vector of vertex positions." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::none)
             ;
         // warm_start_meta_type<mock::Mesh>();
         // meta::type_id_map()["eeng.mock.Mesh"] = entt::resolve<mock::Mesh>().id();
@@ -256,11 +256,11 @@ namespace eeng {
 
             .data<&mock::Model::meshes>("meshes"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "meshes", "Meshes", "A vector of mesh references." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::none)
 
             .data<&mock::Model::textures>("textures"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "textures", "Textures", "A vector of texture references." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::none)
             ;
         register_asset<mock::Model>();
         // warm_start_meta_type<mock::Model>();

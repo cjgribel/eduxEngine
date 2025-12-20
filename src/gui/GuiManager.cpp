@@ -20,7 +20,7 @@
 
 // Inspection TODO -> using a Comp command - need an Asset command?
 #include "meta/MetaInspect.hpp"
-#include "editor/AssignComponentFieldCommand.hpp"
+#include "editor/AssignFieldCommand.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -259,7 +259,7 @@ namespace eeng
 
             if (ImGui::TreeNode(entry.meta.name.c_str()))
             {
-                ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                ImGui::Text("Type: %s", entry.meta.type_id.c_str());
                 ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
                 ImGui::Text("File: %s", entry.relative_path.string().c_str());
 
@@ -277,7 +277,7 @@ namespace eeng
                                 const AssetEntry* child = it->second;
                                 ImGui::BulletText("%s [%s]",
                                     child->meta.name.c_str(),
-                                    child->meta.type_name.c_str());
+                                    child->meta.type_id.c_str());
                             }
                             else
                             {
@@ -522,7 +522,7 @@ namespace eeng
 
                     // --- Line 2: Type + Ref count ---
                     {
-                        ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                        ImGui::Text("Type: %s", entry.meta.type_id.c_str());
                         ImGui::SameLine();
                         // ImGui::Text("Ref Count: %d", guid_status.ref_count);
                         ImGui::Text("Nbr Leases: %d", resource_manager.total_leases(entry.meta.guid));
@@ -533,6 +533,17 @@ namespace eeng
                     ImGui::Text("Path: %s", entry.relative_path.string().c_str());
 
                     // -- Line 5: Debug print content of certain types (if loaded) --
+
+                    // Explicit type check + cast
+                    if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value())
+                    {
+                        if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
+                        {
+                            // Use resource_manager.get_asset_ref/try_get_asset_ref -->
+                            auto mesh = resource_manager.storage().get_ref(*h_opt);
+                            ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
+                        }
+                    }
 #if 1
                     editor::InspectorState insp;
                     const ImGuiTableFlags flags =
@@ -546,12 +557,12 @@ namespace eeng
                         if (insp.begin_node("Metadata"))
                         {
                             // Inspect asset meta data
-                            editor::AssignComponentFieldCommandBuilder cmd_builder;
-                            cmd_builder.reset().
-                                registry(ctx.entity_manager->registry_wptr())
+                            editor::AssignFieldCommandBuilder cmd_builder;
+                            // cmd_builder
+                                //.registry(ctx.entity_manager->registry_wptr())
                                 //.entity(ecs::Entity::EntityNull) // no entity for assets
                                 //.component(any.type().id()) // asset type - no comp type id!
-                                ;
+                                // ;
                             auto any = entt::forward_as_meta(entry.meta); // Technically editable, but we won't edit it here
                             bool res = meta::inspect_any(any, insp, cmd_builder, ctx);
                             // ^ NOTE: Any edits are recorded -> cmd will be built -> Error, since no entity + comp!
@@ -563,16 +574,16 @@ namespace eeng
                         if (auto metah_opt = resource_manager.storage().handle_for_guid(entry.meta.guid); metah_opt.has_value())
                         {
                             // Explicit type check + cast
-                            if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
-                            {
-                                // Use resource_manager.get_asset_ref/try_get_asset_ref -->
-                                auto mesh = resource_manager.storage().get_ref(*h_opt);
-                                ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
-                            }
+                            // if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
+                            // {
+                            //     // Use resource_manager.get_asset_ref/try_get_asset_ref -->
+                            //     auto mesh = resource_manager.storage().get_ref(*h_opt);
+                            //     ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
+                            // }
                             //else ImGui::Text("Not a mock::Mesh");
 
                             // Generic access (any)
-                            editor::AssignComponentFieldCommandBuilder cmd_builder;
+                            editor::AssignFieldCommandBuilder cmd_builder;
 
                             auto any = resource_manager.storage().get(*metah_opt);
                             auto type_name = meta::get_meta_type_display_name(any.type());
@@ -582,12 +593,12 @@ namespace eeng
                             {
                                 // #ifdef USE_COMMANDS
                                                             // Reset meta command for component type
-                                cmd_builder.reset().
-                                    registry(ctx.entity_manager->registry_wptr())
-                                    //.entity(ecs::Entity::EntityNull) // no entity for assets
-                                    //.component(any.type().id()) // asset type - no comp type id!
-                                    ;
-                                // #endif
+                                cmd_builder.target_asset(ctx.resource_manager, entry.meta.guid, entry.meta.type_id);
+                                //.registry(ctx.entity_manager->registry_wptr())
+                                //.entity(ecs::Entity::EntityNull) // no entity for assets
+                                //.component(any.type().id()) // asset type - no comp type id!
+                              //  ;
+                            // #endif
                                 bool res = meta::inspect_any(any, insp, cmd_builder, ctx);
                                 // ^ NOTE: Any edits are recorded -> cmd will be built -> Error, since no entity + comp!
                                 //         KEEP EVERYTHING READ-ONLY until we have eg IEditCommandBuilder + AssetEditCommand!
@@ -718,7 +729,7 @@ namespace eeng
                         }
                         // --- Line 2: Type + Ref count ---
                         {
-                            ImGui::Text("Type: %s", entry.meta.type_name.c_str());
+                            ImGui::Text("Type: %s", entry.meta.type_id.c_str());
                             ImGui::SameLine();
                             // ImGui::Text("Ref Count: %d", guid_status.ref_count);
                             ImGui::Text("Nbr Leases: %d", resource_manager.total_leases(entry.meta.guid));

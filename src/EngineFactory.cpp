@@ -13,7 +13,7 @@ namespace eeng
     {
         std::shared_ptr<EngineContext> ctx = std::make_shared<EngineContext>(
             std::make_unique<EntityManager>(),
-            std::make_unique<ResourceManager>(),
+            std::make_shared<ResourceManager>(),
             std::make_unique<BatchRegistry>(),
             std::make_unique<GuiManager>(),
             std::make_unique<InputManager>(),
