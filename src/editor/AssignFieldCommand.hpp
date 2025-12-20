@@ -5,6 +5,7 @@
 #define EditComponentCommand_hpp
 
 #include "Command.hpp"
+#include "engineapi/IResourceManager.hpp"
 #include "editor/MetaFieldPath.hpp"
 #include "ecs/Entity.hpp"
 #include <entt/entt.hpp>

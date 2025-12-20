@@ -211,11 +211,11 @@ namespace eeng
             virtual MetaHandle add(const Guid& guid, const entt::meta_any& data) = 0;
             virtual MetaHandle add(const Guid& guid, entt::meta_any&& data) = 0;
 
-            virtual entt::meta_any get(const MetaHandle& meta_handle) = 0;
-            virtual entt::meta_any get(const MetaHandle& meta_handle) const = 0;
+            virtual entt::meta_any get_meta_ref(const MetaHandle& meta_handle) = 0;
+            virtual entt::meta_any get_meta_ref(const MetaHandle& meta_handle) const = 0;
 
-            virtual std::optional<entt::meta_any> try_get(const MetaHandle& mh) noexcept = 0;
-            virtual std::optional<entt::meta_any> try_get(const MetaHandle& mh) const noexcept = 0;
+            virtual std::optional<entt::meta_any> try_get_meta_ref(const MetaHandle& mh) noexcept = 0;
+            virtual std::optional<entt::meta_any> try_get_meta_ref(const MetaHandle& mh) const noexcept = 0;
 
             virtual void remove_now(const MetaHandle& handle) = 0;
             virtual size_t retain(const MetaHandle& mh) = 0;
@@ -341,26 +341,26 @@ namespace eeng
 
             // --- Meta typed get & try_get ------------------------------------
 
-            entt::meta_any get(const MetaHandle& meta_handle) override
+            entt::meta_any get_meta_ref(const MetaHandle& meta_handle) override
             {
                 std::lock_guard lock{ m_mutex };
                 return get_impl(*this, meta_handle);
             }
 
-            entt::meta_any get(const MetaHandle& meta_handle) const override
+            entt::meta_any get_meta_ref(const MetaHandle& meta_handle) const override
             {
                 std::lock_guard lock{ m_mutex };
                 return get_impl(*this, meta_handle);
             }
 
-            std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) noexcept override
+            std::optional<entt::meta_any> try_get_meta_ref(const MetaHandle& meta_handle) noexcept override
             {
-                return try_get_impl(*this, meta_handle);
+                return try_get_meta_ref_impl(*this, meta_handle);
             }
 
-            std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) const noexcept override
+            std::optional<entt::meta_any> try_get_meta_ref(const MetaHandle& meta_handle) const noexcept override
             {
-                return try_get_impl(*this, meta_handle);
+                return try_get_meta_ref_impl(*this, meta_handle);
             }
 
         private:
@@ -382,7 +382,7 @@ namespace eeng
             }
 
             template<typename PoolType>
-            static std::optional<entt::meta_any> try_get_impl(
+            static std::optional<entt::meta_any> try_get_meta_ref_impl(
                 PoolType& self,
                 const MetaHandle& meta_handle) noexcept
             {
@@ -772,19 +772,19 @@ namespace eeng
         // --- Meta typed get --------------------------------------------------
 
         /// @brief Runtime-typed get (not thread-safe)
-        /// @return An entt::metaany with a const reference to the requested object
-        entt::meta_any get(const MetaHandle& meta_handle) const
+        /// @return An entt::meta_any with a const reference to the requested object
+        entt::meta_any get_meta_ref(const MetaHandle& meta_handle) const
         {
             std::lock_guard lock{ storage_mutex };
-            return get_pool(meta_handle.type.id()).get(meta_handle);
+            return get_pool(meta_handle.type.id()).get_meta_ref(meta_handle);
         }
 
         /// @brief Runtime-typed get (not thread-safe)
         /// @return An entt::meta_any with a reference to the requested object
-        entt::meta_any get(const MetaHandle& meta_handle)
+        entt::meta_any get_meta_ref(const MetaHandle& meta_handle)
         {
             std::lock_guard lock{ storage_mutex };
-            return get_pool(meta_handle.type.id()).get(meta_handle);
+            return get_pool(meta_handle.type.id()).get_meta_ref(meta_handle);
         }
 
         // --- Statically typed get --------------------------------------------
@@ -813,31 +813,51 @@ namespace eeng
             return get_pool<T>().get_ref_nolock(h);
         }
 
-        // --- try_get ---------------------------------------------------------
+        // --- Meta typed try_get ---------------------------------------------------------
 
-        std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) const noexcept
+        std::optional<entt::meta_any> try_get_meta_ref(const MetaHandle& meta_handle) const noexcept
         {
             std::lock_guard lock{ storage_mutex };
             auto it = pools.find(meta_handle.type.id());
             if (it == pools.end()) return std::nullopt;
 
             const IPool& pool = *it->second;
-            return pool.try_get(meta_handle);
+            return pool.try_get_meta_ref(meta_handle);
         }
 
-        std::optional<entt::meta_any> try_get(const MetaHandle& meta_handle) noexcept
+        std::optional<entt::meta_any> try_get_meta_ref(const MetaHandle& meta_handle) noexcept
         {
             std::lock_guard lock{ storage_mutex };
             auto it = pools.find(meta_handle.type.id());
             if (it == pools.end()) return std::nullopt;
 
             auto& pool = get_pool(meta_handle.type.id());
-            return pool.try_get(meta_handle);
+            return pool.try_get_meta_ref(meta_handle);
         }
 
-        // --- modify ----------------------------------------------------------
+        // --- Meta typed modify -----------------------------------------------
+
+        template<class Fn>
+        requires std::invocable<Fn, entt::meta_any&>
+        auto modify(const MetaHandle& mh, Fn&& f)
+            -> std::invoke_result_t<Fn, entt::meta_any&>
+        {
+            std::lock_guard lock{ storage_mutex };
+            auto& pool = get_pool(mh.type.id());
+            entt::meta_any obj = pool.get_meta_ref(mh);
+
+            if constexpr (std::is_void_v<std::invoke_result_t<Fn, entt::meta_any&>>) {
+                std::forward<Fn>(f)(obj);
+            }
+            else {
+                return std::forward<Fn>(f)(obj);
+            }
+        }
+
+        // --- Statically typed modify -----------------------------------------
 
         template<typename T, typename Fn>
+        requires std::invocable<Fn, T&>
         auto modify(const Handle<T>& h, Fn&& f)
             -> std::invoke_result_t<Fn, T&>
         {

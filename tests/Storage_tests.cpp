@@ -117,14 +117,14 @@ TEST_F(StorageTest, GetAndMutateNonConst) {
     auto guid = eeng::Guid::generate();
     auto handle = storage.add(any, guid);
 
-    auto meta = storage.get(handle);
+    auto meta = storage.get_meta_ref(handle);
     EXPECT_EQ(meta.base().policy(), entt::any_policy::ref);
     auto& val = meta.cast<MockResource1&>();
     val.x = 5;
     val.data.push_back(40);
 
     // Confirm internal state updated via try_get
-    auto opt = storage.try_get(handle);
+    auto opt = storage.try_get_meta_ref(handle);
     ASSERT_TRUE(opt.has_value());
     auto& val2 = opt->cast<MockResource1&>();
     EXPECT_EQ(val2.x, 5);
@@ -139,11 +139,11 @@ TEST_F(StorageTest, GetConstPolicyAndValue) {
     auto handle = storage.add(any, guid);
 
     // Mutate via non-const get
-    storage.get(handle).cast<MockResource1&>().x = 9;
+    storage.get_meta_ref(handle).cast<MockResource1&>().x = 9;
 
     // Now fetch as const storage
     const auto& cstorage = storage;
-    auto meta = cstorage.get(handle);
+    auto meta = cstorage.get_meta_ref(handle);
     EXPECT_EQ(meta.base().policy(), entt::any_policy::cref);
     const auto& cval = meta.cast<const MockResource1&>();
     EXPECT_EQ(cval.x, 9);
@@ -152,7 +152,7 @@ TEST_F(StorageTest, GetConstPolicyAndValue) {
 TEST_F(StorageTest, TryGetInvalid) {
     // try_get on invalid handle returns nullopt
     eeng::MetaHandle bad;
-    EXPECT_FALSE(storage.try_get(bad).has_value());
+    EXPECT_FALSE(storage.try_get_meta_ref(bad).has_value());
 }
 
 TEST_F(StorageTest, RetainAndReleaseReferenceCount) {
@@ -171,7 +171,7 @@ TEST_F(StorageTest, RetainAndReleaseReferenceCount) {
 
     // Now handle should be invalid
     EXPECT_FALSE(storage.validate(handle));
-    EXPECT_FALSE(storage.try_get(handle).has_value());
+    EXPECT_FALSE(storage.try_get_meta_ref(handle).has_value());
 }
 
 TEST_F(StorageTest, TypeMismatchThrows) {
@@ -186,7 +186,7 @@ TEST_F(StorageTest, TypeMismatchThrows) {
     wrong.type = entt::resolve<int>();
 
     // Expect std::runtime_error("Pool not found") when type mismatches
-    EXPECT_THROW(storage.get(wrong), std::runtime_error);
+    EXPECT_THROW(storage.get_meta_ref(wrong), std::runtime_error);
 }
 
 TEST_F(StorageTest, VersionInvalidAfterRemoval)
@@ -218,8 +218,8 @@ TEST_F(StorageTest, MultiTypeStorage) {
     EXPECT_TRUE(storage.validate(h1));
     EXPECT_TRUE(storage.validate(h2));
 
-    auto& val1 = storage.get(h1).cast<MockResource1&>();
-    auto& val2 = storage.get(h2).cast<MockResource2&>();
+    auto& val1 = storage.get_meta_ref(h1).cast<MockResource1&>();
+    auto& val2 = storage.get_meta_ref(h2).cast<MockResource2&>();
     EXPECT_EQ(val1.x, 100u);
     EXPECT_EQ(val2.y, 200u);
 }
@@ -371,7 +371,7 @@ TEST_F(StorageTest, ConcurrencySafety) {
             // std::cout << j << ", " << storage.get(h).cast<MockResource1&>().x << std::endl;
 
             auto& h = handles[j];
-            EXPECT_EQ(j, storage.get(h).cast<MockResource1&>().x);
+            EXPECT_EQ(j, storage.get_meta_ref(h).cast<MockResource1&>().x);
             storage.release(h);
             EXPECT_FALSE(storage.validate(h));
         }

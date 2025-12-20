@@ -5,11 +5,12 @@
 //  Copyright © 2024 Carl Johan Gribel. All rights reserved.
 //
 
+#include "editor/AssignFieldCommand.hpp"
+#include "editor/MetaFieldAssign.hpp"
+#include "ResourceManager.hpp"
 #include "MetaLiterals.h"
 #include "meta/MetaAux.h"
 #include "MetaSerialize.hpp"
-#include "editor/MetaFieldAssign.hpp"
-#include "editor/AssignFieldCommand.hpp"
 #include "LogGlobals.hpp"
 #include <iostream>
 #include <cassert>
@@ -31,7 +32,8 @@ namespace
         const eeng::editor::MetaFieldPath& meta_path,
         entt::meta_any& value_any)
     {
-        entt::meta_any root;
+        // entt::meta_any root;
+        assert(!meta_path.entries.empty() && "MetaPath is empty");
 
         if (target.kind == eeng::editor::FieldTarget::Kind::Component)
         {
@@ -45,24 +47,48 @@ namespace
 
             // Get ref meta_any to component
             entt::meta_type meta_type = entt::resolve(target.component_id);
-            root = meta_type.from_void(storage->value(target.entity));
+            entt::meta_any root = meta_type.from_void(storage->value(target.entity));
             assert(root && "Failed to get component as meta_any");
             assert(is_ref(root) && "Component meta_any is not a reference");
+
+#ifdef ASSIGN_META_FIELD_USE_RECURSIVE
+            const bool ok = eeng::editor::assign_meta_field_recursive(root, meta_path, 0, value_any);
+#endif
+#ifdef ASSIGN_META_FIELD_USE_STACKBASED
+            const bool ok = eeng::editor::assign_meta_field_stackbased(root, meta_path, value_any);
+#endif
+            assert(ok && "Failed to set field in component");
         }
         else if (target.kind == eeng::editor::FieldTarget::Kind::Asset)
         {
-            // TODO
-#if 0
-            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
-            if (auto metah_opt = resource_manager.storage().handle_for_guid(edit.target.asset_guid); metah_opt.has_value())
+            // Get registry
+            auto rm_sp = target.resource_manager.lock();
+            assert(rm_sp && "Resource manager expired");
+
+            // Get ResourceManager
+            auto* rm = dynamic_cast<eeng::ResourceManager*>(rm_sp.get());
+            assert(rm && "assign_meta_field: target.resource_manager is not an ResourceManager");
+
+            // Get root meta_any for asset
+            if (auto mh_opt = rm->storage().handle_for_guid(target.asset_guid); mh_opt.has_value())
             {
-                root /*auto any*/ = resource_manager.storage().get(*metah_opt);
-                // TODO -> check is_ref?
-                // TODO -> do inside modify scope?
-            }
+                bool ok = rm->storage().modify(*mh_opt, [&](entt::meta_any& root)
+                    {
+                        // Note: no re-entry to storage inside visitor lambda!
+
+                        assert(is_ref(root) && "Asset root meta_any is not a reference");
+#ifdef ASSIGN_META_FIELD_USE_STACKBASED
+                        return eeng::editor::assign_meta_field_stackbased(root, meta_path, value_any);
+#else
+                        return eeng::editor::assign_meta_field_recursive(root, meta_path, 0, value_any);
 #endif
-            //assert(false && "Asset field assignment not implemented yet");
-            return;
+                    });
+                assert(ok && "Failed to set field in asset");
+            }
+            else
+            {
+                assert(false && "Asset not found in storage");
+            }
         }
         else
         {
@@ -70,52 +96,28 @@ namespace
         }
 
         // Apply path and set new value
-        assert(!meta_path.entries.empty() && "MetaPath is empty");
-#ifdef ASSIGN_META_FIELD_USE_RECURSIVE
-        const bool ok = eeng::editor::assign_meta_field_recursive(root, meta_path, 0, value_any);
-#endif
-#ifdef ASSIGN_META_FIELD_USE_STACKBASED
-        const bool ok = eeng::editor::assign_meta_field_stackbased(root, meta_path, value_any);
-#endif
-        assert(ok && "Failed to set field");
+        // assert(!meta_path.entries.empty() && "MetaPath is empty");
+
 
         // TODO ->
         // Component is now modified - run per-field callbacks or emit events.
+        /*
+        Post-assign hooks:
+            run per-field/per-type callbacks (immediate, invariant maintenance)
+            emit FieldChangedEvent{ edit_copy } (systems can react)
+        */
+
+        /*
+            struct FieldChangedEvent
+            {
+                FieldEdit edit; // copy
+            };
+        */
     }
 }
 
 namespace eeng::editor
 {
-    //     void AssignFieldCommand::assign_meta_field(entt::meta_any& value_any)
-    //     {
-    //         // Get registry
-    //         auto registry_sp = registry.lock();
-    //         assert(registry_sp && "Registry expired");
-
-    //         // Get storage for component type
-    //         auto* storage = registry_sp->storage(component_id);
-    //         assert(storage && storage->contains(entity));
-
-    //         // Get ref meta_any to component
-    //         entt::meta_type meta_type = entt::resolve(component_id);
-    //         entt::meta_any root = meta_type.from_void(storage->value(entity));
-    //         assert(root && "Failed to get component as meta_any");
-    //         assert(is_ref(root) && "Component meta_any is not a reference");
-
-    //         // Apply path and set new value
-    //         assert(!meta_path.entries.empty() && "MetaPath is empty");
-    // #ifdef ASSIGN_META_FIELD_USE_RECURSIVE
-    //         const bool ok = assign_meta_field_recursive(root, meta_path, 0, value_any);
-    // #endif
-    // #ifdef ASSIGN_META_FIELD_USE_STACKBASED
-    //         const bool ok = assign_meta_field_stackbased(root, meta_path, value_any);
-    // #endif
-    //         assert(ok && "Failed to set field");
-
-    //         // TODO ->
-    //         // Component is now modified - run per-field callbacks or emit events.
-    //     }
-
     void AssignFieldCommand::execute()
     {
         assign_meta_field(edit.target, edit.meta_path, edit.new_value);
@@ -213,11 +215,11 @@ namespace eeng::editor
             if (entry.type == MetaFieldPath::Entry::Type::Index && entry.index < 0) return false;
             if (entry.type == MetaFieldPath::Entry::Type::Key && !entry.key_any) return false;
 
-            // Index/Key cannot be followed by another Index/Key
             bool this_is_index_or_key =
                 entry.type == MetaFieldPath::Entry::Type::Index ||
                 entry.type == MetaFieldPath::Entry::Type::Key;
-            // if (last_was_index_or_key && this_is_index_or_key) return false;
+            // Additional sequence checks maybe. Note that index/key entries can be repeated (e.g. nested containers)
+            // ...
             last_was_index_or_key = this_is_index_or_key;
         }
 
@@ -271,7 +273,7 @@ namespace eeng::editor
             meta::get_meta_type_display_name(entt::resolve(command.edit.target.component_id))
             + meta_path_to_string();
 
-        eeng::LogGlobals::log("[AssignFieldCommand] %s", command.edit.display_name.c_str());
+        eeng::LogGlobals::log("[build_component_command] %s", command.edit.display_name.c_str());
 
         return command;
     }
@@ -292,7 +294,7 @@ namespace eeng::editor
 
         // Display name
         command.edit.display_name = meta_path_to_string();
-        eeng::LogGlobals::log("[AssignFieldCommand] Command not implemented: %s", command.edit.display_name.c_str());
+        eeng::LogGlobals::log("[build_asset_command] %s", command.edit.display_name.c_str());
 
         return command;
     }

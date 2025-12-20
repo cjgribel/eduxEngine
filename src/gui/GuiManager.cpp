@@ -585,7 +585,7 @@ namespace eeng
                             // Generic access (any)
                             editor::AssignFieldCommandBuilder cmd_builder;
 
-                            auto any = resource_manager.storage().get(*metah_opt);
+                            auto any = resource_manager.storage().get_meta_ref(*metah_opt);
                             auto type_name = meta::get_meta_type_display_name(any.type());
                             // meta::inspect_any(any, insp, cmd, ctx);
 
