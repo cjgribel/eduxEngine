@@ -13,7 +13,7 @@
 #include "MockImporter.hpp" // --> ENGINE API
 #include "ecs/MockComponents.hpp"
 #include "mock/MockTypes.hpp"
-#include "ResourceTypes.hpp"
+#include "mock/MockAssetTypes.hpp"
 #include "ResourceManager.hpp" // Since we use the concrete type
 #include "BatchRegistry.hpp" // Since we use the concrete type
 #include "MetaSerialize.hpp"
@@ -87,11 +87,14 @@ namespace eeng::dev
                                 })
                         );
                     }
-
                     // Wait for import tasks to complete
                     std::vector<ModelRef> refs;
                     refs.reserve(num_tasks);
                     for (auto& f : futures) refs.push_back(f.get());
+
+                    // 2.2) Import a quads model (this thread)
+                    // EENG_LOG(ctx.get(), "[startup] Importing quads model on worker...");
+                    // auto model_ref = eeng::mock::ModelImporter::import_quads_modeldata(asset_root, ctx);
 
                     // 3) Run scan (don't wait)
                     auto nbr_assets = refs.size();

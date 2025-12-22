@@ -11,7 +11,7 @@
 // #include "MetaHelpers.hpp"
 
 #include "editor/AssetRefInspect.hpp"
-#include "ResourceTypes.hpp"
+#include "mock/MockAssetTypes.hpp"
 #include "Storage.hpp"
 #include "ResourceManager.hpp"
 
@@ -161,12 +161,14 @@ namespace eeng {
             // AssetRef<T> helper
             entt::meta_factory<AssetRef<T>>{}
             .template custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.AssetRef", .name = "AssetRef", .tooltip = "An asset reference." })
+                .traits(MetaFlags::none)
 
                 // (Serialize) (Clone)
                 // Guid
                 .template data<&AssetRef<T>::guid>("guid"_hs)
                 .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
                 .traits(MetaFlags::read_only)
+
                 // Handle<T>
                 // (Not serialized) (Not cloned)
 
@@ -194,6 +196,7 @@ namespace eeng {
 
         entt::meta_factory<AssetMetaData>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.AssetMetaData", .name = "AssetMetaData", .tooltip = "Metadata for an asset." })
+            .traits(MetaFlags::none)
 
             .data<&AssetMetaData::guid>("guid"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
@@ -230,6 +233,8 @@ namespace eeng {
         // register_asset<mock::Mesh>();
         entt::meta_factory<mock::Mesh>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.Mesh", .name = "Mesh", .tooltip = "This is a mock mesh type." })
+            .traits(MetaFlags::none)
+
             .data<&mock::Mesh::vertices>("vertices"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "vertices", "Vertices", "A vector of vertex positions." })
             .traits(MetaFlags::none)
@@ -242,6 +247,8 @@ namespace eeng {
         // register_asset<mock::Texture>();
         entt::meta_factory<mock::Texture>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.Texture", .name = "Texture", .tooltip = "This is a mock Texture type." })
+            .traits(MetaFlags::none)
+
             .data<&mock::Texture::name>("name"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the texture." })
             .traits(MetaFlags::read_only)
@@ -253,6 +260,7 @@ namespace eeng {
         // mock::Model
         entt::meta_factory<mock::Model>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.Model", .name = "Model", .tooltip = "This is a mock model type." })
+            .traits(MetaFlags::none)
 
             .data<&mock::Model::meshes>("meshes"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "meshes", "Meshes", "A vector of mesh references." })
@@ -278,6 +286,7 @@ namespace eeng {
         entt::meta_factory<mock::MockResource1>{}
         // .type("MockResource1"_hs)
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.mock.MockResource1", .name = "MockResource1", .tooltip = "This is a mock resource type." })
+            .traits(MetaFlags::none)
 
             // Register member 'x' with DisplayInfo and DataFlags
             .data<&mock::MockResource1::x>("x"_hs)
@@ -290,7 +299,7 @@ namespace eeng {
             .traits(MetaFlags::hidden | MetaFlags::read_only)
 
             // Required for all resource types
-            .template func<&assure_storage<mock::MockResource1>>(eeng::literals::assure_storage_hs)
+            // .template func<&assure_storage<mock::MockResource1>>(eeng::literals::assure_storage_hs)
 
             // Required only if resource has recursive references
             //.func<&visit_assets<MockResource1>>("visit_refs"_hs);

@@ -79,8 +79,8 @@ namespace eeng::meta
             registry.destroy(temp_entity);
 
             // std::cout << "Ceeated storage for " << get_meta_type_name(meta_type) << std::endl;
+        }
     }
-}
 #endif
     nlohmann::json serialize_any(const entt::meta_any& any)
     {
@@ -119,12 +119,14 @@ namespace eeng::meta
                 json = entry->first;
 #endif
                 json = enum_value_name(any);
-        }
+            }
             else
             {
                 // to_json() not available: traverse data members
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
+                    if (!traits::is_serializable(meta_data)) continue;
+
                     // JSON key name is the display name if present, or the id type
                     std::string key_name = get_meta_data_display_name(id, meta_data);
 
@@ -134,7 +136,7 @@ namespace eeng::meta
             }
 
             return json;
-    }
+        }
 
         // any is not a meta type
 
@@ -208,6 +210,8 @@ namespace eeng::meta
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
+                if (!traits::is_serializable(meta_type)) continue;
+
                 auto key_name = meta::get_meta_type_id_string(meta_type); // Better for serialization?
                 // auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
                 // auto type_name = get_meta_type_name(meta_type); // Display name or mangled name
@@ -377,13 +381,24 @@ namespace eeng::meta
             }
             else
             {
-                // from_json() not available: traverse data members
+                // Traverse & deserialize per data field
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
-                    // JSON key name is the display name if present, or the id type
+#if 1
+                    std::string key_name = get_meta_data_display_name(id, meta_data);
+                    if (json.contains(key_name))
+                    {
+                        assert(traits::is_serializable(meta_data) && "Non-serializable field was serialized");
+                    }
+                    else
+                    {
+                        assert(!traits::is_serializable(meta_data) && "Serializable field was not serialized");
+                    }
+#else
+                    // JSON key name is the field display name if present, or the id type
                     std::string key_name = get_meta_data_display_name(id, meta_data);
                     assert(json.contains(key_name));
-
+#endif
                     entt::meta_any field_any = meta_data.get(any);
                     deserialize_any(json[key_name], field_any, entity, context);
                     meta_data.set(any, field_any);
@@ -423,8 +438,8 @@ namespace eeng::meta
                 entt::meta_any elem_any = view[i]; // view[i].as_ref() works too
                 deserialize_any(json[i], elem_any, entity, context); // TODO: view[i] here if &&
 #endif
+            }
         }
-    }
 
         else if (any.type().is_associative_container())
         {
@@ -501,6 +516,8 @@ namespace eeng::meta
             if (auto meta_type = meta::resolve_by_type_id_string(key_str); meta_type)
                 // if (entt::meta_type meta_type = entt::resolve(comp_id); meta_type)
             {
+                assert(traits::is_serializable(meta_type) && "Non-serializable type was serialized");
+
                 // Default-construct and deserialize component
                 entt::meta_any any = meta_type.construct();
                 deserialize_any(component_json.value(), any, entity, ctx);
@@ -655,6 +672,6 @@ namespace eeng::meta
             }
         }
 #endif
-}
+    }
 #endif
 } // namespace eeng::meta

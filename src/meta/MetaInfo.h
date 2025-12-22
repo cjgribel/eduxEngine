@@ -49,8 +49,9 @@ namespace eeng
     enum class MetaFlags : std::uint16_t
     {
         none = 0,
-        read_only = 1 << 0,
-        hidden = 1 << 1,
+        read_only = 1 << 0,     // no editing / TODO -> no cloning (const meta_any -> inspect_*)
+        hidden = 1 << 1,        // skip inspection
+        no_serialize = 1 << 2,  // skip serilization
     };
 
     constexpr MetaFlags operator|(MetaFlags lhs, MetaFlags rhs)

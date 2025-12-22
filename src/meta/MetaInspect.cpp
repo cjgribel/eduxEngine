@@ -123,7 +123,7 @@ namespace eeng::meta {
     bool inspect_any(
         entt::meta_any& any,
         editor::InspectorState& inspector,
-        editor::AssignFieldCommandBuilder& cmd_builder,
+        editor::AssignFieldCommandBuilder& cmdb,
         EngineContext& ctx)
     {
         assert(any);
@@ -143,9 +143,11 @@ namespace eeng::meta {
 #ifdef USE_COMMANDS
                 // Invoke inspection meta function on a copy of the object
 
+                // TODO -> if readonly, try to avoid copy
                 auto copy_any = meta::clone_any(any, ctx.entity_selection->first());
                 //auto copy_any = any;
                 // auto res_any = meta_func.invoke({}, copy_any.base().data(), entt::forward_as_meta(inspector));
+                
                 auto res_any = meta_func.invoke(
                     {},
                     entt::forward_as_meta(copy_any),
@@ -160,8 +162,8 @@ namespace eeng::meta {
                 if (*res_ptr)
                 {
                     // Build & issue command
-                    cmd_builder.prev_value(any).new_value(copy_any);
-                    generate_command(*ctx.command_queue, cmd_builder);
+                    cmdb.prev_value(any).new_value(copy_any);
+                    generate_command(*ctx.command_queue, cmdb);
 
                     mod = true;
                 }
@@ -181,8 +183,8 @@ namespace eeng::meta {
                 if (inspect_enum_any(copy_any, inspector))
                 {
                     // Build & issue command
-                    cmd_builder.prev_value(any).new_value(copy_any);
-                    generate_command(*ctx.command_queue, cmd_builder);
+                    cmdb.prev_value(any).new_value(copy_any);
+                    generate_command(*ctx.command_queue, cmdb);
 
                     mod = true;
                 }
@@ -195,6 +197,8 @@ namespace eeng::meta {
                 // inspect() not available: traverse data members
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
+                    if (traits::is_hidden(meta_data)) continue;
+
                     std::string key_name = get_meta_data_display_name(id, meta_data);
 #ifdef INSPECTION_DEBUG_PRINT
                     std::cout << "inspecting data field: " << key_name << std::endl;
@@ -212,7 +216,7 @@ namespace eeng::meta {
                     {
 #ifdef USE_COMMANDS
                         // Push command meta path
-                        cmd_builder.push_path_data(id, key_name);
+                        cmdb.push_path_data(id, key_name);
 #endif
                         // Obtain copy of data value
                         entt::meta_any data_any = meta_data.get(any); //.as_ref() will yield REF to a TEMP VALUE if entt::as_ref_t is not used
@@ -224,7 +228,7 @@ namespace eeng::meta {
                         if (readonly) inspector.begin_disabled();
 
                         // Inspect
-                        mod |= inspect_any(data_any, inspector, cmd_builder, ctx);
+                        mod |= inspect_any(data_any, inspector, cmdb, ctx);
 #ifndef USE_COMMANDS
                         // Update data of the current object
                         meta_data.set(any, data_any);
@@ -233,7 +237,7 @@ namespace eeng::meta {
                         if (readonly) inspector.end_disabled();
 #ifdef USE_COMMANDS
                         // Pop command meta path
-                        cmd_builder.pop_path();
+                        cmdb.pop_path();
 #endif
                         inspector.end_node();
                     }
@@ -262,13 +266,13 @@ namespace eeng::meta {
                 {
 #ifdef USE_COMMANDS
                     // Push command meta path
-                    cmd_builder.push_path_index(count, std::to_string(count));
+                    cmdb.push_path_index(count, std::to_string(count));
 
                     // ImGui::SetNextItemWidth(-FLT_MIN);
-                    mod |= inspect_any(v, inspector, cmd_builder, ctx);
+                    mod |= inspect_any(v, inspector, cmdb, ctx);
 
                     // Pop command meta path
-                    cmd_builder.pop_path();
+                    cmdb.pop_path();
 #else
                     // ImGui::SetNextItemWidth(-FLT_MIN);
                     mod |= inspect_any(v, inspector, cmd_builder); // Will change the actual element
@@ -304,7 +308,7 @@ namespace eeng::meta {
                         // modified).
                         // Workaround: disable all key inspections explicitly
                         inspector.begin_disabled();
-                        inspect_any(key_any, inspector, cmd_builder, ctx); // key_any holds a const object
+                        inspect_any(key_any, inspector, cmdb, ctx); // key_any holds a const object
                         inspector.end_disabled();
                         inspector.end_node();
                     }
@@ -312,18 +316,18 @@ namespace eeng::meta {
                     {
 #ifdef USE_COMMANDS
                         // Push command meta path
-                        cmd_builder.push_path_key(key_any, std::to_string(count));
+                        cmdb.push_path_key(key_any, std::to_string(count));
 #endif
                         // Inspect mapped value
                         ImGui::SetNextItemOpen(true);
                         if (inspector.begin_node("[value]"))
                         {
-                            mod |= inspect_any(mapped_any, inspector, cmd_builder, ctx);
+                            mod |= inspect_any(mapped_any, inspector, cmdb, ctx);
                             inspector.end_node();
                         }
 #ifdef USE_COMMANDS
                         // Pop command meta path
-                        cmd_builder.pop_path();
+                        cmdb.pop_path();
 #endif
                     }
                     inspector.end_node();
@@ -352,8 +356,8 @@ namespace eeng::meta {
                 if (editor::inspect_type(value_copy, inspector))
                 {
                     // Build & issue command
-                    cmd_builder.prev_value(any).new_value(value_copy);
-                    generate_command(*ctx.command_queue, cmd_builder);
+                    cmdb.prev_value(any).new_value(value_copy);
+                    generate_command(*ctx.command_queue, cmdb);
 
                     mod = true;
                 }
@@ -379,7 +383,7 @@ namespace eeng::meta {
         EngineContext& ctx)
     {
         bool mod = false;
-        editor::AssignFieldCommandBuilder cmd_builder;
+        // editor::AssignFieldCommandBuilder cmd_builder;
 
         // TODO: Take ctx directly as an argument
         // auto context_sp = inspector.ctx.lock();
@@ -393,24 +397,31 @@ namespace eeng::meta {
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
-                auto type_name = get_meta_type_display_name(meta_type);
+                if (traits::is_hidden(meta_type)) continue;
 
+                auto type_name = get_meta_type_display_name(meta_type);
                 if (inspector.begin_node(type_name.c_str()))
                 {
 #ifdef USE_COMMANDS
                     // Reset meta command for component type
-                    cmd_builder.target_component(
+                    auto cmdb = editor::AssignFieldCommandBuilder{}.target_component(
                         ctx.entity_manager->registry_wptr(),
                         entity,
                         id
                     );
+                    // editor::AssignFieldCommandBuilder cmd_builder;
+                    // cmd_builder.target_component(
+                    //     ctx.entity_manager->registry_wptr(),
+                    //     entity,
+                    //     id
+                    // );
                     // cmd_builder.reset().
                     //     registry(ctx.entity_manager->registry_wptr())
                     //     .entity(entity)
                     //     .component(id);
 #endif
                     auto comp_any = meta_type.from_void(type.value(entity)); // ref
-                    mod |= inspect_any(comp_any, inspector, cmd_builder, ctx);
+                    mod |= inspect_any(comp_any, inspector, cmdb, ctx);
 
                     inspector.end_node();
                 }
@@ -468,7 +479,7 @@ namespace eeng::meta {
 #endif
         }
         return mod;
-}
+    }
 #endif
 
 } // namespace Editor

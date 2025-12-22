@@ -189,6 +189,30 @@ namespace eeng::meta
     }
 }
 
+namespace eeng::meta::traits
+{
+    template<class T>
+    bool is_hidden(const T& meta_elem)
+    {
+        const auto trait_flags = meta_elem.template traits<eeng::MetaFlags>();
+        return eeng::has_flag(trait_flags, eeng::MetaFlags::hidden);
+    }
+
+    template<class T>
+    bool is_readonly(const T& meta_elem)
+    {
+        const auto trait_flags = meta_elem.template traits<eeng::MetaFlags>();
+        return eeng::has_flag(trait_flags, eeng::MetaFlags::read_only);
+    }
+
+    template<class T>
+    bool is_serializable(const T& meta_elem)
+    {
+        const auto trait_flags = meta_elem.template traits<eeng::MetaFlags>();
+        return !eeng::has_flag(trait_flags, eeng::MetaFlags::no_serialize);
+    }
+}
+
 #if 0
 /// @brief Get inspector-friendly name of a meta_type
 /// @param meta_type 

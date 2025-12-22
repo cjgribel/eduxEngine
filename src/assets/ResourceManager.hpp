@@ -7,7 +7,7 @@
 #include "EngineContext.hpp"
 #include "Storage.hpp" // Can't pimpl-away since class is templated
 #include "AssetIndex.hpp"
-#include "ResourceTypes.hpp" // For AssetRef<T>, visit_asset_refs
+#include "mock/MockAssetTypes.hpp" // For AssetRef<T>, visit_asset_refs
 #include "AssetMetaData.hpp"
 #include "AssetRef.hpp"
 #include "MetaLiterals.h" // load_asset_hs, unload_asset_hs
@@ -156,7 +156,7 @@ namespace eeng
 
         // void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
 
-        // Must be thread-safe. Use static types, or lock meta paths.
+        // TODO -> Serialize via strand? Touches entt::meta, but assumed to be thread-safe
         /// @brief Import new resource to resource index
         /// @tparam T 
         /// @param t 
@@ -179,6 +179,7 @@ namespace eeng
                     _meta.contained_assets.push_back(ref.guid);
                 });
 
+            // Touches entt::meta
             asset_index_->serialize_to_file<T>(t, _meta, file_path, meta_file_path);
         }
 

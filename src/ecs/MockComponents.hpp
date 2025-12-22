@@ -4,7 +4,7 @@
 #ifndef MockComponents_hpp
 #define MockComponents_hpp
 
-#include "ResourceTypes.hpp"
+#include "mock/MockAssetTypes.hpp"
 #include "Guid.h"
 #include "LogGlobals.hpp" // DEBUG
 

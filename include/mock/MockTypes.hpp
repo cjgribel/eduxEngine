@@ -4,11 +4,7 @@
 #ifndef MockTypes_hpp
 #define MockTypes_hpp
 
-// #include "ResourceTypes.hpp"
-// #include "Guid.h"
 #include "LogGlobals.hpp" // DEBUG
-
-// #include "ecs/Entity.hpp"
 #include <string>
 #include <vector>
 #include <array>

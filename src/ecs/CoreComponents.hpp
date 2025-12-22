@@ -1,7 +1,7 @@
 #ifndef CoreComponents_hpp
 #define CoreComponents_hpp
 
-#include "ResourceTypes.hpp"
+//#include "ResourceTypes.hpp"
 
 // #include <cassert>
 // #include <array>

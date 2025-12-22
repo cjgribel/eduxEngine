@@ -16,7 +16,10 @@ namespace eeng
         std::string name;
         std::string type_id;
 
-        std::vector<Guid> contained_assets; // ???
+        // TODO/NOTE ->
+        // Direct references. A bit suspicious. 
+        // Skip or rename to direct_deps / direct_dependencies
+        std::vector<Guid> contained_assets;
 
         AssetMetaData() = default;
 

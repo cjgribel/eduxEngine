@@ -143,6 +143,7 @@ namespace eeng
         // --- Guid ------------------------------------------------------------
         entt::meta_factory<Guid>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.Guid", .name = "Guid", .tooltip = "A globally unique identifier." })
+            .traits(MetaFlags::none)
 
             .func<&serialize_Guid>(eeng::literals::serialize_hs)
             .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
@@ -157,6 +158,7 @@ namespace eeng
         // --- EntityRef -------------------------------------------------------
         entt::meta_factory<eeng::ecs::EntityRef>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.EntityRef", .name = "EntityRef", .tooltip = "A reference to an entity." })
+            .traits(MetaFlags::none)
 
             // (Serialize) (Clone)
             // Guid
@@ -182,6 +184,7 @@ namespace eeng
         // --- MockPlayerComponent ---------------------------------------------
         entt::meta_factory<eeng::ecs::mock::MockPlayerComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockPlayerComponent", .name = "MockPlayerComponent", .tooltip = "A mock player component for testing." })
+            .traits(MetaFlags::none)
 
             .data<&eeng::ecs::mock::MockPlayerComponent::position>("position"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Player position." })
@@ -206,6 +209,7 @@ namespace eeng
         // --- MockCameraComponent ---------------------------------------------
         entt::meta_factory<eeng::ecs::mock::MockCameraComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockCameraComponent", .name = "MockCameraComponent", .tooltip = "A mock camera component for testing." })
+            .traits(MetaFlags::none)
 
             .data<&eeng::ecs::mock::MockCameraComponent::position>("position"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Camera position." })
@@ -260,6 +264,7 @@ namespace eeng
 #endif
         entt::meta_factory<eeng::ecs::HeaderComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.HeaderComponent", .name = "HeaderComponent", .tooltip = "Metadata for HeaderComponent." })
+            .traits(MetaFlags::none)
 
             // Name
             .data<&eeng::ecs::HeaderComponent::name>("name"_hs)
@@ -284,7 +289,7 @@ namespace eeng
 
         entt::meta_factory<ecs::mock::MockUVcoords>()
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockUVcoords", .name = "MockUVcoords", .tooltip = "Metadata for MockUVcoords." })
-            // .type("UVcoords"_hs).prop(display_name_hs, "UVcoords")
+            .traits(MetaFlags::none)
 
             .data<&ecs::mock::MockUVcoords::u>("u"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "u", "U", "" }).traits(MetaFlags::none)
@@ -299,7 +304,7 @@ namespace eeng
 
         entt::meta_factory<ecs::mock::MockVec3>()
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockVec3", .name = "MockVec3", .tooltip = "Metadata for MockVec3." })
-            // .type("MockVec3"_hs).prop(display_name_hs, "MockVec3")
+            .traits(MetaFlags::none)
 
             .data<&ecs::mock::MockVec3::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "" }).traits(MetaFlags::none)
@@ -326,7 +331,7 @@ namespace eeng
 
         entt::meta_factory<ElementType>()
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ElementType", .name = "ElementType", .tooltip = "Metadata for ElementType." })
-            // .type("ElementType"_hs).prop(display_name_hs, "ElementType")
+            .traits(MetaFlags::none)
 
             .data<&ElementType::m>("m"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "m", "M", "" }).traits(MetaFlags::none)
@@ -346,6 +351,7 @@ namespace eeng
         entt::meta_factory<AnEnum>()
             // .type("AnEnum"_hs)
             .custom<TypeMetaInfo>(enum_info)
+            .traits(MetaFlags::none)
 
             .data<AnEnum::Hello>("Hello"_hs)
             .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hello", "Greeting in English." })
@@ -364,7 +370,7 @@ namespace eeng
         // register_component<MockMixComponent>();
         entt::meta_factory<MockMixComponent>()
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockMixComponent", .name = "MockMixComponent", .tooltip = "A mock component with mixed data types for testing." })
-            // .type("DebugClass"_hs).prop(display_name_hs, "DebugClass")
+            .traits(MetaFlags::none)
 
             .data<&MockMixComponent::flag/*, entt::as_ref_t*/>("flag"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "flag", "Flag", "A boolean flag." }).traits(MetaFlags::none)
