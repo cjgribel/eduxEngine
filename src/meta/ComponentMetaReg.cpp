@@ -10,9 +10,11 @@
 //#include "ResourceTypes.hpp"
 #include "ecs/TransformComponent.hpp"
 #include "ecs/HeaderComponent.hpp"
+#include "ecs/ModelComponent.hpp"
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
 #include "mock/MockTypes.hpp"
+#include "mock/CopySignaller.hpp"
 
 #include "editor/EntityRefInspect.hpp"
 #include "editor/GuidInspect.hpp"
@@ -28,6 +30,25 @@
 #include <entt/entt.hpp>
 // #include <entt/meta/pointer.hpp>
 #include <nlohmann/json.hpp> // -> TYPE HELPER
+
+    /*
+    Note:
+        Also note entt::as_cref_t
+
+        TL;DR
+        Avoiding (big) data members to be copied in the inspector:
+        use a read only trait (disabling editing via ImGui) + entt::as_ref_t
+        https://github.com/skypjack/entt/wiki/Runtime-reflection-system#user-defined-data
+
+        Without entt::as_ref_t -> meta_data.get() returns a value meta_any
+        With entt::as_ref_t -> meta_data.get() returns a reference meta_any
+
+        If a data member can be edited in the inspector, we should not use entt::as_ref_t
+        Why? Theory: the source data will be assigned directly, rather than a copy held by a command
+
+        If a data member is read only, we should be able to use entt::as_ref_t,
+        this avoiding copying, since no assignemt is made.
+    */
 
 namespace eeng
 {
@@ -181,7 +202,20 @@ namespace eeng
         // warm_start_meta_type<eeng::ecs::EntityRef>();
         // meta::type_id_map()["eeng.ecs.EntityRef"] = entt::resolve<eeng::ecs::EntityRef>().id();
 
+        // --- CopySignaller ---------------------------------------------------
+
+        entt::meta_factory<eeng::CopySignaller>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.CopySignaller", .name = "CopySignaller", .tooltip = "Logs copy & move ops." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::CopySignaller::data/*, entt::as_ref_t*/>("data"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "data", "data", "data" })
+            .traits(MetaFlags::none) // read_only -> as_ref_t
+            ;
+        register_component<eeng::CopySignaller>();
+
         // --- MockPlayerComponent ---------------------------------------------
+
         entt::meta_factory<eeng::ecs::mock::MockPlayerComponent>{}
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockPlayerComponent", .name = "MockPlayerComponent", .tooltip = "A mock player component for testing." })
             .traits(MetaFlags::none)
@@ -285,7 +319,26 @@ namespace eeng
         // warm_start_meta_type<eeng::ecs::HeaderComponent>();
         // meta::type_id_map()["eeng.ecs.HeaderComponent"] = entt::resolve<eeng::ecs::HeaderComponent>().id();
 
-            // --- MockMixComponent + nested types -----------------------------
+        // --- ModelComponent --------------------------------------------------
+        {
+            entt::meta_factory<eeng::ecs::ModelComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.ModelComponent", .name = "ModelComponent", .tooltip = "ModelComponent." })
+                .traits(MetaFlags::none)
+
+                // Name
+                .data<&eeng::ecs::ModelComponent::name>("name"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Entity name." })
+                .traits(MetaFlags::none)
+
+                // Guid
+                .data<&eeng::ecs::ModelComponent::model_ref>("model_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model reference", "Model Reference." })
+                .traits(MetaFlags::read_only)
+                ;
+            register_component<ecs::ModelComponent>();
+        }
+
+        // --- MockMixComponent + nested types ---------------------------------
 
         entt::meta_factory<ecs::mock::MockUVcoords>()
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockUVcoords", .name = "MockUVcoords", .tooltip = "Metadata for MockUVcoords." })

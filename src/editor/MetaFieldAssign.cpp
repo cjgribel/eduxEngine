@@ -259,7 +259,7 @@ namespace eeng::editor
             }
             else { assert(0); }
 #ifdef COMMAND_DEBUG_PRINTS
-            std::cout << "entry " << i << ": " << meta::get_meta_type_display_name(last_prop.meta_any.type())  << std::endl;
+            std::cout << "entry " << i << ": " << meta::get_meta_type_display_name(last_prop.meta_any.type()) << std::endl;
 #endif
         }
 
@@ -337,5 +337,5 @@ namespace eeng::editor
 #endif
 
         return true; // Throws on errors
-        }
-            } // namespace eeng::editor
+    }
+} // namespace eeng::editor

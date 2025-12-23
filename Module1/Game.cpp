@@ -11,9 +11,14 @@
 #include "MainThreadQueue.hpp"
 #include "AssimpImporter.hpp" // --> ENGINE API
 #include "MockImporter.hpp" // --> ENGINE API
+
+#include "ecs/ModelComponent.hpp"
+
 #include "ecs/MockComponents.hpp"
 #include "mock/MockTypes.hpp"
 #include "mock/MockAssetTypes.hpp"
+#include "mock/CopySignaller.hpp"
+
 #include "ResourceManager.hpp" // Since we use the concrete type
 #include "BatchRegistry.hpp" // Since we use the concrete type
 #include "MetaSerialize.hpp"
@@ -56,7 +61,7 @@ namespace eeng::dev
             ctx->thread_pool->queue_task([asset_root, batches_root, ctx]() {
                 try
                 {
-#if 1
+#if 0
                     // Just scan & load existing batch index
 
                     // Scan assets
@@ -93,8 +98,8 @@ namespace eeng::dev
                     for (auto& f : futures) refs.push_back(f.get());
 
                     // 2.2) Import a quads model (this thread)
-                    // EENG_LOG(ctx.get(), "[startup] Importing quads model on worker...");
-                    // auto model_ref = eeng::mock::ModelImporter::import_quads_modeldata(asset_root, ctx);
+                    EENG_LOG(ctx.get(), "[startup] Importing quads model on worker...");
+                    auto quadmodel_ref = eeng::mock::ModelImporter::import_quads_modeldata(asset_root, ctx);
 
                     // 3) Run scan (don't wait)
                     auto nbr_assets = refs.size();
@@ -174,6 +179,10 @@ namespace eeng::dev
 
                                 reg.emplace<ecs::mock::MockMixComponent>(er_player.entity);
                                 reg.emplace<ecs::mock::MockMixComponent>(er_camera.entity);
+
+                                reg.emplace<eeng::CopySignaller>(er_root.entity);
+
+                                reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, "Model", quadmodel_ref);
 
                                 // If Position has AssetRef<T> inside,
                                 // either:

@@ -1577,7 +1577,7 @@ void register_meta<ScriptedBehaviorComponent>(Editor::Context& context)
         .data<&BehaviorScript::on_collision/*, entt::as_ref_t*/>("on_collision"_hs).prop(display_name_hs, "on_collision")
 
         // inspect_hs
-        // We have this, and not one for sol::table, so that when a sol::table if edited,
+        // We have this, and not one for sol::table, so that when a sol::table is edited,
         // a deep copy of BehaviorScript is made, and not just the sol::table
         .func < [](void* ptr, Editor::InspectorState& inspector) {return Editor::inspect_type(*static_cast<BehaviorScript*>(ptr), inspector); } > (inspect_hs)
 

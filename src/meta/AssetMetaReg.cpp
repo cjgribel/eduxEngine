@@ -11,6 +11,8 @@
 // #include "MetaHelpers.hpp"
 
 #include "editor/AssetRefInspect.hpp"
+#include "editor/GLMInspect.hpp"
+#include "assets/types/ModelAssets.hpp"
 #include "mock/MockAssetTypes.hpp"
 #include "Storage.hpp"
 #include "ResourceManager.hpp"
@@ -227,7 +229,179 @@ namespace eeng {
         // meta::type_id_map()["eeng.AssetMetaData"] = entt::resolve<AssetMetaData>().id();
         /* -> */ //meta::TypeIdRegistry::register_type_from_meta<AssetMetaData>();
 
-        // === RESOURCES ===
+        // --- ASSETS ----------------------------------------------------------
+
+        // GpuModelState
+        {
+            auto enum_info = TypeMetaInfo
+            {
+                .id = "eeng.assets.GpuModelState",
+                .name = "GpuModelState",
+                .tooltip = "GPU Load States",
+                .underlying_type = entt::resolve<std::underlying_type_t<assets::GpuModelState>>()
+            };
+            entt::meta_factory<assets::GpuModelState>()
+                .custom<TypeMetaInfo>(enum_info)
+                .traits(MetaFlags::none)
+
+                .data<assets::GpuModelState::Uninitialized>("Uninitialized"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Uninitialized", "Uninitialized." })
+                .traits(MetaFlags::none)
+
+                .data<assets::GpuModelState::Queued>("Queued"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Queued", "Queued" })
+                .traits(MetaFlags::none)
+
+                .data<assets::GpuModelState::Ready>("Hola"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hola", "Hola." })
+                .traits(MetaFlags::none)
+
+                .data<assets::GpuModelState::Failed>("Failed"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Failed", "Failed." })
+                .traits(MetaFlags::none)
+                ;
+            register_helper_type<assets::GpuModelState>();
+        }
+
+        // GpuModelAsset
+        {
+            entt::meta_factory<assets::GpuModelAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.GpuModelAsset", .name = "GpuModelAsset", .tooltip = "GPU binding for a model asset" })
+                .traits(MetaFlags::none)
+
+                .data<&assets::GpuModelAsset::model_ref>("model_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model Reference", "Referenced Model asset" })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuModelAsset::state>("state"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State" })
+                .traits(MetaFlags::read_only)
+                ;
+            register_asset<assets::GpuModelAsset>();
+        }
+
+        // TextureAsset
+        {
+            entt::meta_factory<assets::TextureAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.TextureAsset", .name = "TextureAsset", .tooltip = "TextureAsset." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TextureAsset::source_path>("source_path"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "source_path", "Path", "Path." })
+                .traits(MetaFlags::read_only)
+                ;
+            register_asset<assets::TextureAsset>();
+        }
+
+        // glm::vec2
+        {
+            entt::meta_factory<glm::vec2>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "glm.vec2", .name = "Vec2", .tooltip = "Vec2." })
+                .traits(MetaFlags::none)
+
+                .data<&glm::vec2::x>("x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "X." }).traits(MetaFlags::none)
+
+                .data<&glm::vec2::y>("y"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "Y." }).traits(MetaFlags::none)
+
+                .template func<&eeng::editor::inspect_glmvec2>(eeng::literals::inspect_hs)
+                ;
+            register_asset<assets::TextureAsset>();
+        }
+
+        // glm::vec3
+        {
+            entt::meta_factory<glm::vec3>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "glm.vec3", .name = "Vec3", .tooltip = "Vec3." })
+                .traits(MetaFlags::none)
+
+                .data<&glm::vec3::x>("x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "X." }).traits(MetaFlags::none)
+
+                .data<&glm::vec3::y>("y"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "Y." }).traits(MetaFlags::none)
+
+                .data<&glm::vec3::z>("z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "z", "Z", "Z." }).traits(MetaFlags::none)
+
+                .template func<&eeng::editor::inspect_glmvec3>(eeng::literals::inspect_hs)
+                ;
+            register_asset<assets::TextureAsset>();
+        }
+
+        // MaterialAsset
+        {
+            entt::meta_factory<assets::MaterialAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.MaterialAsset", .name = "MaterialAsset", .tooltip = "MaterialAsset." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::MaterialAsset::Ka>("Ka"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "Ka", "Ambient Color", "Ambient Color." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::MaterialAsset::Kd>("Kd"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "Kd", "Diffuse Color", "Diffuse Color." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::MaterialAsset::Ks>("Ks"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "Ks", "Specular Color", "Specular Color." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::MaterialAsset::shininess>("shininess"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "shininess", "Shininess", "Shininess." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::MaterialAsset::textures>("textures"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "textures", "Textures", "Textures." })
+                .traits(MetaFlags::read_only)
+                ;
+            register_asset<assets::MaterialAsset>();
+        }
+
+        // ModelDataAsset
+        {
+            entt::meta_factory<assets::ModelDataAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.ModelDataAsset", .name = "ModelDataAsset", .tooltip = "ModelDataAsset." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::ModelDataAsset::positions>("positions"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "positions", "Positions", "Positions." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::ModelDataAsset::normals>("normals"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "normals", "Normals", "Normals." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::ModelDataAsset::tangents>("tangents"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "tangents", "Tangents", "Tangents." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::ModelDataAsset::binormals>("binormals"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "binormals", "Binormals", "Binormals." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::ModelDataAsset::texcoords>("texcoords"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "texcoords", "Texcoords", "Texcoords." })
+                .traits(MetaFlags::read_only)
+
+                // std::vector<SkinData> skin;
+                
+                .data<&assets::ModelDataAsset::indices>("indices"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "indices", "Indices", "Indices." })
+                .traits(MetaFlags::read_only)
+                
+                // std::vector<SubMesh> submeshes;
+
+                // VecTree<SkeletonNode> nodetree;
+                // std::vector<Bone> bones;
+                // std::vector<AnimClip> animations;
+
+                ;
+            register_asset<assets::ModelDataAsset>();
+        }
+
+        // === MOCK RESOURCES ===
 
         // mock::Mesh
         // register_asset<mock::Mesh>();

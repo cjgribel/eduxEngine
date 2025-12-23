@@ -218,6 +218,7 @@ namespace eeng::meta {
                         // Push command meta path
                         cmdb.push_path_data(id, key_name);
 #endif
+                        // meta_data.get returns any with entt::meta_any_policy::ref is field was registered with entt::as_ref_t
                         // Obtain copy of data value
                         entt::meta_any data_any = meta_data.get(any); //.as_ref() will yield REF to a TEMP VALUE if entt::as_ref_t is not used
                         //std::cout << key_name << ": is_ref " << (any.policy() == entt::meta_any_policy::ref) << ", " << (data_any.policy() == entt::meta_any_policy::ref) << std::endl;

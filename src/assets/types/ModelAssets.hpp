@@ -83,7 +83,7 @@ namespace eeng::assets
     struct TextureAsset
     {
         std::string source_path;
-        TextureImportSettings import_settings{};
+        TextureImportSettings import_settings{}; // not used yet
     };
 
     template<typename Visitor>
