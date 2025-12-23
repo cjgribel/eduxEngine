@@ -116,13 +116,19 @@ namespace eeng
         void register_component()
         {
             entt::meta_factory<T>()
+
+                // Assure entt storage
                 .template func<&assure_type_storage<T>, entt::as_void_t>(literals::assure_component_storage_hs)
 
+                // Collect asset references
                 .template func<&meta::collect_asset_guids<T>, entt::as_void_t>(literals::collect_asset_guids_hs)
 
+                // Bind referenced assets
                 .template func<&meta::bind_asset_refs<T>, entt::as_void_t>(literals::bind_asset_refs_hs)
                 .template func<&meta::bind_entity_refs<T>, entt::as_void_t>(literals::bind_entity_refs_hs)
-                // + unbind?
+                
+                // TODO -> Unbind referenced assets
+                // ...
 
                 ;
 

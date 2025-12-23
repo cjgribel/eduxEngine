@@ -8,7 +8,7 @@
 #include "EngineContext.hpp"
 #include "MetaInfo.h"
 #include "MetaLiterals.h"
-// #include "MetaHelpers.hpp"
+#include "meta/EntityMetaHelpers.hpp"
 
 #include "editor/AssetRefInspect.hpp"
 #include "editor/GLMInspect.hpp"
@@ -128,8 +128,13 @@ namespace eeng {
             warm_start_meta_type<T>();
 
             entt::meta_factory<T>()
-                // Assuring type storage
+                
+                // Assure type storage
                 .template func<&assure_storage<T>, entt::as_void_t>(eeng::literals::assure_storage_hs)
+                
+                // Collect asset references
+                .template func<&meta::collect_asset_guids<T>, entt::as_void_t>(literals::collect_asset_guids_hs)
+
                 // Type-safe loading
                 .template func<&load_asset<T>, entt::as_void_t>(eeng::literals::load_asset_hs)
                 .template func<&unload_asset<T>, entt::as_void_t>(eeng::literals::unload_asset_hs)

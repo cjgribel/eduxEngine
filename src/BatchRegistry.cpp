@@ -2,10 +2,113 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "BatchRegistry.hpp"
-#include "EntityMetaHelpers.hpp"
+#include "meta/EntityMetaHelpers.hpp"
 #include "MainThreadQueue.hpp"
 #include "ThreadPool.hpp"
 #include <fstream>
+
+namespace eeng::detail
+{
+    struct ClosureBuildResult
+    {
+        TaskResult tr{};
+        std::vector<Guid> closure{};
+        std::vector<Guid> loaded_now{}; // for rollback on failure
+    };
+
+    static ClosureBuildResult build_asset_closure_recursive(
+        const std::vector<Guid>& roots,
+        const std::vector<Guid>& already_in_closure,
+        const BatchId& batch_id,
+        EngineContext& ctx)
+    {
+        ClosureBuildResult out{};
+        out.tr.success = true;
+
+        auto& rm = *ctx.resource_manager;
+
+        std::unordered_set<Guid> seen;
+        seen.reserve(roots.size() * 2);
+
+        std::unordered_set<Guid> already;
+        already.reserve(already_in_closure.size() * 2);
+        for (const auto& g : already_in_closure)
+            already.insert(g);
+
+        std::vector<Guid> frontier;
+        frontier.reserve(roots.size());
+
+        for (const auto& g : roots)
+        {
+            if (!g.valid())
+                continue;
+
+            if (seen.insert(g).second)
+            {
+                out.closure.push_back(g);
+                frontier.push_back(g);
+            }
+        }
+
+        while (!frontier.empty() && out.tr.success)
+        {
+            // 1) Load/bind everything in this frontier that is not already in the batch closure.
+            std::vector<Guid> to_load;
+            to_load.reserve(frontier.size());
+
+            for (const auto& g : frontier)
+            {
+                if (already.find(g) == already.end())
+                    to_load.push_back(g);
+            }
+
+            if (!to_load.empty())
+            {
+                std::deque<Guid> dq(to_load.begin(), to_load.end());
+                auto r = rm.load_and_bind_async(dq, batch_id, ctx).get();
+                out.tr.success = out.tr.success && r.success;
+
+                if (!r.success)
+                {
+                    // Track what was attempted/added, so rollback can be selective if desired.
+                    out.loaded_now.insert(out.loaded_now.end(), to_load.begin(), to_load.end());
+                    break;
+                }
+
+                out.loaded_now.insert(out.loaded_now.end(), to_load.begin(), to_load.end());
+                for (const auto& g : to_load)
+                    already.insert(g);
+            }
+
+            // 2) Expand: for each GUID in this frontier, add its referenced GUIDs.
+            std::vector<Guid> next;
+            for (const auto& g : frontier)
+            {
+                // ResourceManager helper from section (2)
+                // auto refs = static_cast<eeng::ResourceManager&>(rm).collect_referenced_asset_guids(g);
+                auto refs = meta::collect_referenced_asset_guids(g, ctx);
+
+                for (const auto& child : refs)
+                {
+                    if (!child.valid())
+                        continue;
+
+                    if (seen.insert(child).second)
+                    {
+                        out.closure.push_back(child);
+                        next.push_back(child);
+                    }
+                }
+            }
+
+            frontier.swap(next);
+        }
+
+        std::sort(out.closure.begin(), out.closure.end());
+        out.closure.erase(std::unique(out.closure.begin(), out.closure.end()), out.closure.end());
+        return out;
+    }
+}
 
 namespace eeng::detail
 {
@@ -773,27 +876,30 @@ namespace eeng
                 TaskResult result{};
                 result.success = true;
 
-                // 1) Snapshot BatchInfo pointer, ensure Loaded
-                BatchInfo* B = nullptr;
+                // 1) Snapshot batch data needed for this job
+                std::vector<ecs::EntityRef> live_snapshot;
+                std::vector<Guid> old_closure;
+
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
                     if (it == batches_.end())
                     {
-                        // unknown batch
                         result.success = false;
                         return result;
                     }
+
                     if (it->second.state != BatchInfo::State::Loaded)
                     {
-                        // only rebind closure for loaded batches
                         result.success = false;
                         return result;
                     }
-                    B = &it->second;
+
+                    live_snapshot = it->second.live;
+                    old_closure = it->second.asset_closure_hdr;
                 }
 
-                // 2) Grab registry (shared_ptr) once
+                // 2) Grab registry once
                 auto registry_sp = ctx.entity_manager->registry_wptr().lock();
                 if (!registry_sp)
                 {
@@ -802,62 +908,120 @@ namespace eeng
                 }
                 auto& reg = *registry_sp;
 
-                // 3) Main-thread: recompute closure from live entities
-                std::vector<Guid> new_closure = ctx.main_thread_queue->push_and_wait([&]() {
-                    std::vector<Guid> guids;
-
-                    for (auto& er : B->live)
+                auto erase_invalid_guids = [](std::vector<Guid>& v)
                     {
-                        if (!er.is_bound()) continue;
-                        auto per_entity = eeng::meta::collect_asset_guids_for_entity(
-                            er.entity, reg);
-                        guids.insert(guids.end(), per_entity.begin(), per_entity.end());
+                        v.erase(
+                            std::remove_if(v.begin(), v.end(), [](const Guid& g) { return !g.valid(); }),
+                            v.end());
+                    };
+
+                auto sort_unique = [](std::vector<Guid>& v)
+                    {
+                        std::sort(v.begin(), v.end());
+                        v.erase(std::unique(v.begin(), v.end()), v.end());
+                    };
+
+                // 3) Main-thread: collect direct roots from live entities
+                std::vector<Guid> roots = ctx.main_thread_queue->push_and_wait([&]()
+                    {
+                        std::vector<Guid> guids;
+
+                        for (const auto& er : live_snapshot)
+                        {
+                            if (!er.is_bound())
+                            {
+                                continue;
+                            }
+
+                            auto per_entity = eeng::meta::collect_asset_guids_for_entity(er.entity, reg);
+                            guids.insert(guids.end(), per_entity.begin(), per_entity.end());
+                        }
+
+                        // Null/invalid GUIDs can exist (unassigned refs). Keep them for now,
+                        // but they must be removed before commit/unload.
+                        sort_unique(guids);
+                        return guids;
+                    });
+
+                // 4) Build transitive closure (entity roots + asset->asset refs recursively)
+                //    Helper is expected to call rm.load_and_bind_async for newly discovered assets.
+                auto built = eeng::detail::build_asset_closure_recursive(roots, old_closure, id, ctx);
+
+                result.success = result.success && built.tr.success;
+                if (!result.success)
+                {
+                    // Roll back assets that were newly bound during closure building.
+                    std::vector<Guid> rollback = std::move(built.loaded_now);
+                    erase_invalid_guids(rollback);
+                    sort_unique(rollback);
+
+                    if (!rollback.empty())
+                    {
+                        std::deque<Guid> dq(rollback.begin(), rollback.end());
+                        ctx.resource_manager->unbind_and_unload_async(dq, id, ctx).get();
                     }
 
-                    // dedup
-                    std::sort(guids.begin(), guids.end());
-                    guids.erase(std::unique(guids.begin(), guids.end()), guids.end());
-
-                    return guids;
-                    });
-                // for (auto& g : new_closure) { EENG_LOG(&ctx, "[queue_rebuild_closure] col. closure %s", g.to_string().c_str()); }
-
-                // 4) Compute diff vs old header closure
-                std::vector<Guid> old_closure;
-                {
-                    std::lock_guard lk(mtx_);
-                    old_closure = B->asset_closure_hdr;
+                    return result;
                 }
 
+                // 5) Late cleanup: remove invalid GUIDs and dedup
+                std::vector<Guid> new_closure = std::move(built.closure);
+
+                erase_invalid_guids(old_closure);
+                sort_unique(old_closure);
+
+                erase_invalid_guids(new_closure);
+                sort_unique(new_closure);
+
+                // 6) Diff vs old header closure
                 std::vector<Guid> to_add;
                 std::vector<Guid> to_remove;
                 eeng::detail::diff_sets(old_closure, new_closure, to_add, to_remove);
 
-                for (auto& g : B->asset_closure_hdr) { EENG_LOG(&ctx, "[queue_rebuild_closure] closure %s", g.to_string().c_str()); }
+                // Debug logs (optional)
+                // for (auto& g : old_closure)  { EENG_LOG(&ctx, "[queue_rebuild_closure] old %s", g.to_string().c_str()); }
+                // for (auto& g : new_closure)  { EENG_LOG(&ctx, "[queue_rebuild_closure] new %s", g.to_string().c_str()); }
+
                 for (auto& g : to_add) { EENG_LOG(&ctx, "[queue_rebuild_closure] + %s", g.to_string().c_str()); }
                 for (auto& g : to_remove) { EENG_LOG(&ctx, "[queue_rebuild_closure] - %s", g.to_string().c_str()); }
 
-                // 5) Adjust RM leases (idempotent at RM level)
-                auto& rm = *ctx.resource_manager;
-
-                if (!to_add.empty())
-                {
-                    std::deque<Guid> dq(to_add.begin(), to_add.end());
-                    auto r = rm.load_and_bind_async(dq, B->id, ctx).get();
-                    result.success = result.success && r.success;
-                }
+                // 7) Adjust RM leases
+                //
+                // Everything in to_add is already loaded/bound by build_asset_closure_recursive().
+                // Only unbind/unload removals here.
+                erase_invalid_guids(to_remove);
+                sort_unique(to_remove);
 
                 if (!to_remove.empty())
                 {
                     std::deque<Guid> dq(to_remove.begin(), to_remove.end());
-                    auto r = rm.unbind_and_unload_async(dq, B->id, ctx).get();
+                    auto r = ctx.resource_manager->unbind_and_unload_async(dq, id, ctx).get();
                     result.success = result.success && r.success;
                 }
 
-                // 6) Commit new closure to BatchInfo
+                if (!result.success)
+                {
+                    // Do not commit if unload failed; keeping the old closure allows a later retry.
+                    return result;
+                }
+
+                // 8) Commit new closure to BatchInfo
                 {
                     std::lock_guard lk(mtx_);
-                    B->asset_closure_hdr = std::move(new_closure);
+                    auto it = batches_.find(id);
+                    if (it == batches_.end())
+                    {
+                        result.success = false;
+                        return result;
+                    }
+
+                    if (it->second.state != BatchInfo::State::Loaded)
+                    {
+                        result.success = false;
+                        return result;
+                    }
+
+                    it->second.asset_closure_hdr = std::move(new_closure);
                 }
 
                 return result;
@@ -1054,8 +1218,8 @@ namespace eeng
                         ctx.entity_manager->queue_entity_for_destruction(er.get_entity());
                         er.clear_entity();
                     }
-                    }
-                });
+                }
+            });
     }
 #endif
 

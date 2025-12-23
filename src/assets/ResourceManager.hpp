@@ -118,6 +118,11 @@ namespace eeng
             return storage_->handle_for_guid<T>(guid);
         }
 
+        std::optional<eeng::MetaHandle> handle_for_guid(const Guid& guid) const
+        {
+            return storage_->handle_for_guid(guid);
+        }
+
         /// @brief Get a snapshot of asset index
         AssetIndexDataPtr get_index_data() const override;
 
@@ -438,7 +443,9 @@ namespace eeng
 
         // --- Helpers ---------------------------------------------------------
 
-    //public: // <- make private
+        // std::vector<Guid> collect_referenced_asset_guids(const Guid& guid);
+
+        //public: // <- make private
         template<typename T>
         std::optional<AssetRef<T>> ref_for_guid(const Guid& guid)
         {

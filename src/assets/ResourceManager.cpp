@@ -506,6 +506,33 @@ namespace eeng
         throw std::runtime_error("Unexpected return type form meta function validate_asset_recursive");
     }
 
+    // std::vector<Guid> ResourceManager::collect_referenced_asset_guids(const Guid& guid)
+    // {
+    //     std::vector<Guid> out;
+
+    //     auto mh_opt = storage_->handle_for_guid(guid); // Guid -> MetaHandle{ofs, ver, type}
+    //     if (!mh_opt || !mh_opt->valid())
+    //         return out;
+
+    //     storage_->modify(*mh_opt, [&](entt::meta_any any)
+    //         {
+    //             using namespace entt::literals;
+
+    //             if (auto mf = mh_opt->type.func(literals::collect_asset_guids_hs); mf)
+    //             {
+    //                 mf.invoke(
+    //                     {},
+    //                     entt::forward_as_meta(any),
+    //                     entt::forward_as_meta(out));
+    //             }
+    //         });
+
+    //     // optional: dedup/filter invalid
+    //     std::sort(out.begin(), out.end());
+    //     out.erase(std::unique(out.begin(), out.end()), out.end());
+    //     return out;
+    // }
+
     entt::meta_any ResourceManager::invoke_meta_function(
         const Guid& guid,
         EngineContext& ctx,

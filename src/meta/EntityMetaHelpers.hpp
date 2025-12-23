@@ -165,6 +165,7 @@ namespace eeng::meta
 }
     */
 
+    // Collect asset GUIDs referenced by entity
     inline std::vector<Guid>
         collect_asset_guids_for_entity(
             entt::entity e,
@@ -176,7 +177,6 @@ namespace eeng::meta
         for_each_component(e, reg, [&](entt::meta_type mt, entt::meta_any& any)
             {
                 LogGlobals::log("[collect_asset_guids_for_entity] comp type %s", meta::get_meta_type_display_name(mt).c_str());
-                using namespace entt::literals;
 
                 if (auto mf = mt.func(literals::collect_asset_guids_hs); mf)
                 {
@@ -188,6 +188,38 @@ namespace eeng::meta
             });
 
         return result;
+    }
+
+    // Collect asset GUIDs referenced by asset
+    inline std::vector<Guid>
+        collect_referenced_asset_guids(
+            const Guid& guid,
+            EngineContext& ctx)
+    {
+        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+        assert(rm);
+
+        std::vector<Guid> out;
+
+        auto mh_opt = rm->handle_for_guid(guid);
+        if (!mh_opt || !mh_opt->valid())
+            return out;
+
+        rm->storage().modify(*mh_opt, [&](entt::meta_any any)
+            {
+                if (auto mf = mh_opt->type.func(literals::collect_asset_guids_hs); mf)
+                {
+                    mf.invoke(
+                        {},
+                        entt::forward_as_meta(any),
+                        entt::forward_as_meta(out));
+                }
+            });
+
+        // (optional: dedup/filter invalid)
+        std::sort(out.begin(), out.end());
+        out.erase(std::unique(out.begin(), out.end()), out.end());
+        return out;
     }
 
 
