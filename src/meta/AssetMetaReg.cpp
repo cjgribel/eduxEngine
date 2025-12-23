@@ -229,9 +229,34 @@ namespace eeng {
         // meta::type_id_map()["eeng.AssetMetaData"] = entt::resolve<AssetMetaData>().id();
         /* -> */ //meta::TypeIdRegistry::register_type_from_meta<AssetMetaData>();
 
-        // --- ASSETS ----------------------------------------------------------
+        // --- Assets & Asset helpers ------------------------------------------
 
-        // GpuModelState
+        // GpuSubMesh (helper)
+        {
+            entt::meta_factory<assets::GpuSubMesh>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.GpuSubMesh", .name = "GpuSubMesh", .tooltip = "GpuSubMesh." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::GpuSubMesh::index_offset>("index_offset"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "index_offset", "Index Offset", "Index Offset." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuSubMesh::index_count>("index_count"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "index_count", "Index Count", "Index Count." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuSubMesh::base_vertex>("base_vertex"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "base_vertex", "Base Vertex", "Base Vertex." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuSubMesh::material>("material"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "material", "Material", "Material." })
+                .traits(MetaFlags::read_only)
+                ;
+            register_helper_type<assets::GpuSubMesh>();
+        }
+
+        // GpuModelState (helper)
         {
             auto enum_info = TypeMetaInfo
             {
@@ -249,7 +274,7 @@ namespace eeng {
                 .traits(MetaFlags::none)
 
                 .data<assets::GpuModelState::Queued>("Queued"_hs)
-                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Queued", "Queued" })
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Queued", "Queued." })
                 .traits(MetaFlags::none)
 
                 .data<assets::GpuModelState::Ready>("Hola"_hs)
@@ -266,16 +291,23 @@ namespace eeng {
         // GpuModelAsset
         {
             entt::meta_factory<assets::GpuModelAsset>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.GpuModelAsset", .name = "GpuModelAsset", .tooltip = "GPU binding for a model asset" })
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.GpuModelAsset", .name = "GpuModelAsset", .tooltip = "GPU binding for a model asset." })
                 .traits(MetaFlags::none)
 
                 .data<&assets::GpuModelAsset::model_ref>("model_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model Reference", "Referenced Model asset" })
                 .traits(MetaFlags::read_only)
 
-                .data<&assets::GpuModelAsset::state>("state"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State" })
-                .traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::state>("state"_hs).custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State." }).traits(MetaFlags::read_only)
+
+                .data<&assets::GpuModelAsset::vao>("vao"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vao", "VAO", "VAO." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vao>("vbo_pos"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_pos", "VAO Positions", "VAO Positions." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vbo_nrm>("vbo_nrm"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_nrm", "VBO Normals", "VBO Normals." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vbo_uv>("vbo_uv"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_uv", "VBO UV", "VBO UV." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::ibo>("ibo"_hs).custom<DataMetaInfo>(DataMetaInfo{ "ibo", "IBO", "IBO." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::submeshes>("submeshes"_hs).custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "SubMeshes", "SubMeshes." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vertex_count>("vertex_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vertex_count", "Vertex Count", "Vertex Count." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::index_count>("index_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "index_count", "Index Count", "Index Count." }).traits(MetaFlags::read_only)
                 ;
             register_asset<assets::GpuModelAsset>();
         }
@@ -293,7 +325,7 @@ namespace eeng {
             register_asset<assets::TextureAsset>();
         }
 
-        // glm::vec2
+        // glm::vec2 (helper)
         {
             entt::meta_factory<glm::vec2>{}
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "glm.vec2", .name = "Vec2", .tooltip = "Vec2." })
@@ -310,7 +342,7 @@ namespace eeng {
             register_asset<assets::TextureAsset>();
         }
 
-        // glm::vec3
+        // glm::vec3 (helper)
         {
             entt::meta_factory<glm::vec3>{}
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "glm.vec3", .name = "Vec3", .tooltip = "Vec3." })
@@ -359,6 +391,26 @@ namespace eeng {
             register_asset<assets::MaterialAsset>();
         }
 
+        // SubMesh (helper)
+        {
+            entt::meta_factory<assets::SubMesh>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "ssets.SubMesh", .name = "SubMesh", .tooltip = "SubMesh." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::SubMesh::base_index>("base_index"_hs).custom<DataMetaInfo>(DataMetaInfo{ "base_index", "Base Index", "Base Index." }).traits(MetaFlags::read_only)
+                .data<&assets::SubMesh::nbr_indices>("nbr_indices"_hs).custom<DataMetaInfo>(DataMetaInfo{ "nbr_indices", "Nbr Indices", "Nbr Indices." }).traits(MetaFlags::read_only)
+                .data<&assets::SubMesh::base_vertex>("base_vertex"_hs).custom<DataMetaInfo>(DataMetaInfo{ "base_vertex", "Base Vertex", "Base Vertex." }).traits(MetaFlags::read_only)
+                .data<&assets::SubMesh::nbr_vertices>("nbr_vertices"_hs).custom<DataMetaInfo>(DataMetaInfo{ "nbr_vertices", "Nbr Vertices", "Nbr Vertices." }).traits(MetaFlags::read_only)
+                .data<&assets::SubMesh::node_index>("node_index"_hs).custom<DataMetaInfo>(DataMetaInfo{ "node_index", "Node Index", "Node Index." }).traits(MetaFlags::read_only)
+                .data<&assets::SubMesh::is_skinned>("is_skinned"_hs).custom<DataMetaInfo>(DataMetaInfo{ "is_skinned", "Is Skinned", "Is Skinned." }).traits(MetaFlags::read_only)
+
+                .data<&assets::SubMesh::material>("material"_hs).custom<DataMetaInfo>(DataMetaInfo{ "material", "Material", "Material." }).traits(MetaFlags::read_only)
+
+                // .template func<&eeng::editor::inspect_glmvec3>(eeng::literals::inspect_hs)
+                ;
+            register_asset<assets::SubMesh>();
+        }
+
         // ModelDataAsset
         {
             entt::meta_factory<assets::ModelDataAsset>{}
@@ -386,12 +438,14 @@ namespace eeng {
                 .traits(MetaFlags::read_only)
 
                 // std::vector<SkinData> skin;
-                
+
                 .data<&assets::ModelDataAsset::indices>("indices"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "indices", "Indices", "Indices." })
                 .traits(MetaFlags::read_only)
-                
-                // std::vector<SubMesh> submeshes;
+
+                .data<&assets::ModelDataAsset::submeshes>("submeshes"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "Submeshes", "Submeshes." })
+                .traits(MetaFlags::read_only)
 
                 // VecTree<SkeletonNode> nodetree;
                 // std::vector<Bone> bones;

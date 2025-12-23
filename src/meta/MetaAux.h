@@ -104,6 +104,7 @@ namespace eeng::meta
     template<typename T>
     inline bool type_is_registered()
     {
+        // TODO -> this is always true for static type. Check for MetaTypeInfo instead.
         return type_is_registered(entt::resolve<T>());
     }
 

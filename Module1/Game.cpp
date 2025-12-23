@@ -61,7 +61,7 @@ namespace eeng::dev
             ctx->thread_pool->queue_task([asset_root, batches_root, ctx]() {
                 try
                 {
-#if 0
+#if 1
                     // Just scan & load existing batch index
 
                     // Scan assets

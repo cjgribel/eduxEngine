@@ -245,7 +245,7 @@ namespace eeng::mock {
 
         const auto tex_meta = AssetMetaData{
             tex_guid,
-            model_guid,
+            gpu_model_guid, // parent not used
             std::string("MockTexture") + std::to_string(value),
             meta::get_meta_type_id_string<TextureAsset>()
         };
@@ -264,7 +264,7 @@ namespace eeng::mock {
 
         const auto mtl_meta = AssetMetaData{
             mtl_guid,
-            model_guid,
+            gpu_model_guid, // parent not used
             std::string("MockMaterial") + std::to_string(value),
             meta::get_meta_type_id_string<MaterialAsset>()
         };
@@ -285,7 +285,7 @@ namespace eeng::mock {
 
         const auto model_meta = AssetMetaData{
             model_guid,
-            Guid::invalid(),
+            gpu_model_guid, // parent not used
             std::string("MockQuadsModel") + std::to_string(value),
             meta::get_meta_type_id_string<ModelDataAsset>()
         };
@@ -308,8 +308,8 @@ namespace eeng::mock {
             gpumodel_file_path.string(),
             AssetMetaData{
                 gpu_model_guid,
-                Guid::invalid(),
-                std::string("MockGpuModel") + std::to_string(value), // <- remove mock, there are real asste types
+                Guid::invalid(), // parent not used
+                std::string("MockGpuModel") + std::to_string(value), // <- remove mock, these are real asste types
                 meta::get_meta_type_id_string<GpuModelAsset>()
             },
             gpumodel_meta_file_path.string());

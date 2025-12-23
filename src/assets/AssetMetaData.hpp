@@ -11,7 +11,7 @@ namespace eeng
     struct AssetMetaData
     {
         Guid guid;
-        Guid guid_parent;   // remove ?
+        Guid guid_parent;   // TODO -> remove - not used for anything
 
         std::string name;
         std::string type_id;

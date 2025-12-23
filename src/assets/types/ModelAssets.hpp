@@ -29,7 +29,17 @@ namespace eeng::assets
     // GpuModelAsset
     // -------------------------------------------------------------------------
 
-    struct ModelDataAsset; // forward
+    struct ModelDataAsset;
+    struct MaterialAsset;
+
+    struct GpuSubMesh
+    {
+        u32 index_offset = 0;
+        u32 index_count = 0;
+        u32 base_vertex = 0;
+
+        AssetRef<assets::MaterialAsset> material; // or a future GpuMaterialAsset
+    };
 
     enum class GpuModelState : u8
     {
@@ -46,9 +56,17 @@ namespace eeng::assets
         // Runtime-only state (do not serialize)
         GpuModelState state = GpuModelState::Uninitialized;
 
-        // v1: no GL handles yet. Add later.
-        // GLuint vao = 0;
-        // ...
+        u32 vao = 0;
+        u32 vbo_pos = 0;
+        u32 vbo_nrm = 0;
+        u32 vbo_uv = 0;
+        u32 ibo = 0;
+
+        std::vector<GpuSubMesh> submeshes;
+
+        // Optional for safe teardown / debug
+        u32 vertex_count = 0;
+        u32 index_count = 0;
     };
 
     template<typename Visitor>
