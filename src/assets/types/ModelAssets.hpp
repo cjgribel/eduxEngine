@@ -58,8 +58,11 @@ namespace eeng::assets
 
         u32 vao = 0;
         u32 vbo_pos = 0;
-        u32 vbo_nrm = 0;
         u32 vbo_uv = 0;
+        u32 vbo_nrm = 0;
+        u32 vbo_bnrm = 0;
+        u32 vbo_tang = 0;
+        u32 vbo_bone = 0; // opt
         u32 ibo = 0;
 
         std::vector<GpuSubMesh> submeshes;
@@ -190,7 +193,8 @@ namespace eeng::assets
         std::array<float, bones_per_vertex> bone_weights{ 0.0f, 0.0f, 0.0f, 0.0f };
     };
 
-    struct NodeKeyframes
+    // One sequence of keyframes
+    struct AnimTrack
     {
         bool is_used = false;
         std::vector<glm::vec3> pos_keys;
@@ -205,7 +209,7 @@ namespace eeng::assets
         float ticks_per_second = 25.0f;
 
         // Indexed by VecTree node index
-        std::vector<NodeKeyframes> node_animations;
+        std::vector<AnimTrack> node_animations;
     };
 
     // -------------------------------------------------------------------------
@@ -229,13 +233,10 @@ namespace eeng::assets
     struct ModelDataAsset
     {
         std::vector<glm::vec3> positions;
+        std::vector<glm::vec2> texcoords;
         std::vector<glm::vec3> normals;
         std::vector<glm::vec3> tangents;
         std::vector<glm::vec3> binormals;
-        std::vector<glm::vec2> texcoords;
-
-        // Size should match positions.size() if skinning is present.
-        // v1: we resize to positions.size() always (zero weights = non-skinned).
         std::vector<SkinData> skin;
 
         std::vector<u32> indices;

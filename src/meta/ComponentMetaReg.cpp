@@ -336,7 +336,7 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Entity name." })
                 .traits(MetaFlags::none)
 
-                // Guid
+                // Model asset ref
                 .data<&eeng::ecs::ModelComponent::model_ref>("model_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model reference", "Model Reference." })
                 .traits(MetaFlags::read_only)

@@ -585,7 +585,7 @@ namespace eeng
                             // Generic access (any)
                             editor::AssignFieldCommandBuilder cmd_builder;
 
-                            auto any = resource_manager.storage().get_meta_ref(*metah_opt);
+                            auto any = resource_manager.storage().get_meta_ref(*metah_opt); // UNSAFE
                             auto type_name = meta::get_meta_type_display_name(any.type());
                             // meta::inspect_any(any, insp, cmd, ctx);
 
@@ -744,7 +744,7 @@ namespace eeng
                             if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
                             {
                                 // Use resource_manager.get_asset_ref/try_get_asset_ref -->
-                                auto mesh = resource_manager.storage().get_ref(*h_opt);
+                                auto mesh = resource_manager.storage().get_ref(*h_opt); // UNSAFE
                                 ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
                             }
                             //else ImGui::Text("Not a mock::Mesh");

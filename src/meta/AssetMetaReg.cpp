@@ -128,10 +128,10 @@ namespace eeng {
             warm_start_meta_type<T>();
 
             entt::meta_factory<T>()
-                
+
                 // Assure type storage
                 .template func<&assure_storage<T>, entt::as_void_t>(eeng::literals::assure_storage_hs)
-                
+
                 // Collect asset references
                 .template func<&meta::collect_asset_guids<T>, entt::as_void_t>(literals::collect_asset_guids_hs)
 
@@ -306,9 +306,12 @@ namespace eeng {
                 .data<&assets::GpuModelAsset::state>("state"_hs).custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State." }).traits(MetaFlags::read_only)
 
                 .data<&assets::GpuModelAsset::vao>("vao"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vao", "VAO", "VAO." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vao>("vbo_pos"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_pos", "VAO Positions", "VAO Positions." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vbo_nrm>("vbo_nrm"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_nrm", "VBO Normals", "VBO Normals." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vbo_uv>("vbo_uv"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_uv", "VBO UV", "VBO UV." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vbo_uv>("vbo_uv"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_uv", "VBO for texture coordinates", "VBO UV." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vao>("vbo_pos"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_pos", "VAO Positions", "VAO for positions." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vbo_nrm>("vbo_nrm"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_nrm", "VBO Normals", "VBO for normals." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vbo_bnrm>("vbo_binrm"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_bnrm", "VBO Binormals", "VBO for binormals." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vbo_tang>("vbo_tang"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_tang", "VBO Normals", "VBO for tangents." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vbo_bone>("vbo_bone"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_bone", "VBO Bones", "VBO for bone indices and weights." }).traits(MetaFlags::read_only)
                 .data<&assets::GpuModelAsset::ibo>("ibo"_hs).custom<DataMetaInfo>(DataMetaInfo{ "ibo", "IBO", "IBO." }).traits(MetaFlags::read_only)
                 .data<&assets::GpuModelAsset::submeshes>("submeshes"_hs).custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "SubMeshes", "SubMeshes." }).traits(MetaFlags::read_only)
                 .data<&assets::GpuModelAsset::vertex_count>("vertex_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vertex_count", "Vertex Count", "Vertex Count." }).traits(MetaFlags::read_only)

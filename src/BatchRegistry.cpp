@@ -1030,7 +1030,6 @@ namespace eeng
 
     // -------- Load / Unload implementations --------
 
-#if 1
     TaskResult BatchRegistry::do_load(BatchInfo& B, EngineContext& ctx)
     {
         // -- Mark batch as Loading
@@ -1130,8 +1129,6 @@ namespace eeng
         return res;
     }
 
-#endif
-#if 1
     TaskResult BatchRegistry::do_unload(BatchInfo& B, EngineContext& ctx)
     {
         B.state = BatchInfo::State::Unloading;
@@ -1166,7 +1163,6 @@ namespace eeng
 
         return res;
     }
-#endif
 
     SerialExecutor& BatchRegistry::strand(EngineContext& ctx)
     {

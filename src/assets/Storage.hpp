@@ -839,6 +839,28 @@ namespace eeng
             return pool.try_get_meta_ref(meta_handle);
         }
 
+         // --- Statically typed read -----------------------------------------
+
+        template<typename T, typename Fn>
+            requires std::invocable<Fn, const T&>
+        auto read(const Handle<T>& h, Fn&& f) const
+            -> std::invoke_result_t<Fn, const T&>
+        {
+            std::lock_guard lock{ storage_mutex };
+            const auto& pool = get_pool<T>();
+            const T& obj = pool.get_ref(h); // locks pool
+            if constexpr (std::is_void_v<std::invoke_result_t<Fn, const T&>>) {
+                std::forward<Fn>(f)(obj);
+            }
+            else {
+                return std::forward<Fn>(f)(obj);
+            }
+        }
+
+        // --- Meta typed read -----------------------------------------------
+
+        // ...
+
         // --- Meta typed modify -----------------------------------------------
 
         template<class Fn>

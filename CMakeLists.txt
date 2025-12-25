@@ -235,6 +235,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ResourceManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/AssimpImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/MockImporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/GpuAssetOps.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/Entity.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/EntityManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/SceneGraph.cpp

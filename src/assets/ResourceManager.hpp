@@ -211,7 +211,7 @@ namespace eeng
             /* add delay */ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             T asset = asset_index_->deserialize_from_file<T>(guid, ctx);
 
-            // Add to storage
+            // Add to storage (thread-safe)
             auto handle = storage_->add<T>(std::move(asset), guid);
         }
 
