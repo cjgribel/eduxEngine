@@ -61,7 +61,7 @@ namespace eeng::dev
             ctx->thread_pool->queue_task([asset_root, batches_root, ctx]() {
                 try
                 {
-#if 1
+#if 0
                     // Just scan & load existing batch index
 
                     // Scan assets
@@ -292,8 +292,8 @@ bool Game::init()
         // TODO: Ugly cast to concrete type from interface
         // - Use interface for parts of ResourceManager not part of IResourceManager (load etc)
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
-        std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/";
-        std::filesystem::path batches_root = "/Users/ag1498/GitHub/eduEngine/Module1/project1/batches/";
+        std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduxEngine/Module1/project1/imported_assets/";
+        std::filesystem::path batches_root = "/Users/ag1498/GitHub/eduxEngine/Module1/project1/batches/";
         //std::filesystem::path asset_root = "C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/";
 
         // 1.   IMPORT resources concurrently
