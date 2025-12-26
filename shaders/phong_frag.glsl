@@ -31,6 +31,8 @@ out vec4 fragcolor;
 
 void main()
 {
+    fragcolor = vec4(Kd, 1); return;
+
    vec3 N = normal;
    vec2 texflip = vec2(texcoord.x, texcoord.y);
    vec3 V = normalize(eyepos - wpos);

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "GpuAssetOps.hpp"
+#include <algorithm>
 #include "ResourceManager.hpp"
 #include "Storage.hpp"
 #include "assets/types/ModelAssets.hpp" // GpuModelAsset, ModelDataAsset, TextureAsset, MaterialAsset
@@ -182,26 +183,40 @@ namespace eeng::gl
             glVertexAttribPointer(loc_nrm, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
             // Tangents (location = 3)
-            glGenBuffers(1, reinterpret_cast<GLuint*>(&vbo_tang));
-            glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(vbo_tang));
-            glBufferData(
-                GL_ARRAY_BUFFER,
-                static_cast<GLsizeiptr>(cpu.tangents.size() * sizeof(glm::vec3)),
-                cpu.tangents.data(),
-                GL_STATIC_DRAW);
-            glEnableVertexAttribArray(loc_tang);
-            glVertexAttribPointer(loc_tang, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+            if (!cpu.tangents.empty())
+            {
+                glGenBuffers(1, reinterpret_cast<GLuint*>(&vbo_tang));
+                glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(vbo_tang));
+                glBufferData(
+                    GL_ARRAY_BUFFER,
+                    static_cast<GLsizeiptr>(cpu.tangents.size() * sizeof(glm::vec3)),
+                    cpu.tangents.data(),
+                    GL_STATIC_DRAW);
+                glEnableVertexAttribArray(loc_tang);
+                glVertexAttribPointer(loc_tang, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+            }
+            else
+            {
+                glDisableVertexAttribArray(loc_tang);
+            }
 
             // Binormals (location = 4)
-            glGenBuffers(1, reinterpret_cast<GLuint*>(&vbo_bnrm));
-            glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(vbo_bnrm));
-            glBufferData(
-                GL_ARRAY_BUFFER,
-                static_cast<GLsizeiptr>(cpu.binormals.size() * sizeof(glm::vec3)),
-                cpu.binormals.data(),
-                GL_STATIC_DRAW);
-            glEnableVertexAttribArray(loc_bnrm);
-            glVertexAttribPointer(loc_bnrm, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+            if (!cpu.binormals.empty())
+            {
+                glGenBuffers(1, reinterpret_cast<GLuint*>(&vbo_bnrm));
+                glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(vbo_bnrm));
+                glBufferData(
+                    GL_ARRAY_BUFFER,
+                    static_cast<GLsizeiptr>(cpu.binormals.size() * sizeof(glm::vec3)),
+                    cpu.binormals.data(),
+                    GL_STATIC_DRAW);
+                glEnableVertexAttribArray(loc_bnrm);
+                glVertexAttribPointer(loc_bnrm, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+            }
+            else
+            {
+                glDisableVertexAttribArray(loc_bnrm);
+            }
 
             // Bone indices & weights (opt)
             if (!cpu.skin.empty())

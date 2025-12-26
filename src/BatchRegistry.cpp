@@ -3,6 +3,8 @@
 
 #include "BatchRegistry.hpp"
 #include "meta/EntityMetaHelpers.hpp"
+#include "ResourceManager.hpp"
+#include "gpu/GpuAssetOps.hpp"
 #include "MainThreadQueue.hpp"
 #include "ThreadPool.hpp"
 #include <fstream>
@@ -1124,7 +1126,54 @@ namespace eeng
         }
 
         // 4) Main thread: Initialize GPU resources
-        // finalize_gpu(B);
+        {
+            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            assert(rm);
+
+            std::vector<Handle<assets::GpuModelAsset>> gpu_to_init;
+            gpu_to_init.reserve(B.asset_closure_hdr.size());
+
+            for (const auto& g : B.asset_closure_hdr)
+            {
+                if (!g.valid()) continue;
+
+                auto handle_opt = rm->handle_for_guid<assets::GpuModelAsset>(g);
+                if (!handle_opt) continue;
+
+                bool needs_init = false;
+                rm->storage().read(*handle_opt, [&](const assets::GpuModelAsset& gpu)
+                    {
+                        needs_init = (gpu.state == assets::GpuModelState::Uninitialized ||
+                            gpu.state == assets::GpuModelState::Failed);
+                    });
+
+                if (needs_init)
+                    gpu_to_init.push_back(*handle_opt);
+            }
+
+            if (!gpu_to_init.empty())
+            {
+                size_t ok_count = 0;
+                size_t fail_count = 0;
+                ctx.main_thread_queue->push_and_wait([&]()
+                    {
+                        for (const auto& h : gpu_to_init)
+                        {
+                            auto r = gl::init_gpu_model(h, ctx);
+                            if (!r.ok)
+                            {
+                                ++fail_count;
+                                EENG_LOG_ERROR(&ctx, "GpuModel init failed: %s", r.error.c_str());
+                            }
+                            else
+                            {
+                                ++ok_count;
+                            }
+                        }
+                    });
+                EENG_LOG_INFO(&ctx, "GpuModel init complete: %zu ok, %zu failed", ok_count, fail_count);
+            }
+        }
 
         return res;
     }

@@ -5,6 +5,7 @@
 #include "GameBase.h"
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
+#include "ecs/systems/RenderSystem.hpp"
 #include <entt/fwd.hpp> // For entt::registry - remove from here
 
 // --> ENGINE API
@@ -78,6 +79,9 @@ private:
 
     // Immediate-mode renderer for basic 2D or 3D primitives
     ShapeRendererPtr shapeRenderer;
+
+    // ECS renderer for ModelComponent
+    std::unique_ptr<eeng::ecs::systems::RenderSystem> renderSystem;
 
     // Entity registry - to use in labs
     std::shared_ptr<entt::registry> entity_registry; // unique + and out weak ptrs?

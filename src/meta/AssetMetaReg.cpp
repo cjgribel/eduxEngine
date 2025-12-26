@@ -282,8 +282,8 @@ namespace eeng {
                 .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Queued", "Queued." })
                 .traits(MetaFlags::none)
 
-                .data<assets::GpuModelState::Ready>("Hola"_hs)
-                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Hola", "Hola." })
+                .data<assets::GpuModelState::Ready>("Ready"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Ready", "Ready." })
                 .traits(MetaFlags::none)
 
                 .data<assets::GpuModelState::Failed>("Failed"_hs)

@@ -6,6 +6,7 @@
 #include "imgui.h"
 #include "LogMacros.h"
 #include <entt/entt.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 // FOR TESTS ->
 #include "MainThreadQueue.hpp"
@@ -61,7 +62,7 @@ namespace eeng::dev
             ctx->thread_pool->queue_task([asset_root, batches_root, ctx]() {
                 try
                 {
-#if 0
+#if 1
                     // Just scan & load existing batch index
 
                     // Scan assets
@@ -236,6 +237,9 @@ bool Game::init()
 
     shapeRenderer = std::make_shared<ShapeRendering::ShapeRenderer>();
     shapeRenderer->init();
+
+    renderSystem = std::make_unique<eeng::ecs::systems::RenderSystem>();
+    renderSystem->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
 
     // LEVEL CYCLE API TESTS
     {
@@ -987,6 +991,37 @@ void Game::render(
     // End rendering pass
     drawcallCount = forwardRenderer->endPass();
 
+    // "New" render system
+    if (renderSystem && renderSystem->initialized())
+    {
+        auto& registry = ctx->entity_manager->registry();
+        const auto proj_view = matrices.P * matrices.V;
+
+        renderSystem->render(
+            registry,
+            *ctx,
+            [&](GLuint program)
+            {
+                glUniformMatrix4fv(
+                    glGetUniformLocation(program, "ProjViewMatrix"),
+                    1,
+                    0,
+                    glm::value_ptr(proj_view));
+                glUniform3fv(glGetUniformLocation(program, "lightpos"), 1, glm::value_ptr(pointlight.pos));
+                glUniform3fv(glGetUniformLocation(program, "lightColor"), 1, glm::value_ptr(pointlight.color));
+                glUniform3fv(glGetUniformLocation(program, "eyepos"), 1, glm::value_ptr(camera.pos));
+            },
+            [&](GLuint program, entt::entity, const eeng::ecs::ModelComponent&)
+            {
+                const glm::mat4 world = glm::mat4(1.0f);
+                glUniformMatrix4fv(
+                    glGetUniformLocation(program, "WorldMatrix"),
+                    1,
+                    0,
+                    glm::value_ptr(world));
+            });
+    }
+
     // Draw player view ray
     if (player.viewRay)
     {
@@ -1113,7 +1148,8 @@ void Game::renderUI()
 
 void Game::destroy()
 {
-
+    if (renderSystem)
+        renderSystem->shutdown();
 }
 
 void Game::updateCamera()

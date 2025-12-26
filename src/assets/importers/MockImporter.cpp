@@ -53,28 +53,32 @@ namespace
         model.positions.push_back(p2);
         model.positions.push_back(p3);
 
-        model.normals.push_back(q.normal);
-        model.normals.push_back(q.normal);
-        model.normals.push_back(q.normal);
-        model.normals.push_back(q.normal);
-
         model.texcoords.push_back(glm::vec2(0.0f, 0.0f));
         model.texcoords.push_back(glm::vec2(1.0f, 0.0f));
         model.texcoords.push_back(glm::vec2(1.0f, 1.0f));
         model.texcoords.push_back(glm::vec2(0.0f, 1.0f));
+        
+        model.normals.push_back(q.normal);
+        model.normals.push_back(q.normal);
+        model.normals.push_back(q.normal);
+        model.normals.push_back(q.normal);
+
+        // model.tangents.resize(4);
+
+        // model.binormals.resize(4);
 
         // Optional channels empty for now (tangents/binormals)
         // Skin: keep sized == positions (zero weights = non-skinned)
-        model.skin.resize(model.positions.size());
+        // model.skin.resize(model.positions.size());
 
         // Two triangles (0,1,2) (0,2,3)
-        model.indices.push_back(base_vertex + 0);
-        model.indices.push_back(base_vertex + 1);
-        model.indices.push_back(base_vertex + 2);
+        model.indices.push_back(0);
+        model.indices.push_back(1);
+        model.indices.push_back(2);
 
-        model.indices.push_back(base_vertex + 0);
-        model.indices.push_back(base_vertex + 2);
-        model.indices.push_back(base_vertex + 3);
+        model.indices.push_back(0);
+        model.indices.push_back(2);
+        model.indices.push_back(3);
 
         SubMesh sm{};
         sm.base_vertex = base_vertex;
