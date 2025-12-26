@@ -263,7 +263,9 @@ namespace eeng::mock {
         // Material referencing the texture
 
         MaterialAsset mtl{};
-        mtl.Kd = glm::vec3(0.8f, 0.8f, 0.8f);
+        mtl.Ka = glm::vec3(1.0f, 0.0f, 0.0f);
+        mtl.Kd = glm::vec3(0.0f, 1.0f, 0.0f);
+        mtl.Ks = glm::vec3(0.0f, 0.0f, 1.0f);
         mtl.textures[static_cast<size_t>(MaterialTextureSlot::Diffuse)] = AssetRef<TextureAsset>{ tex_guid };
 
         const auto mtl_meta = AssetMetaData{

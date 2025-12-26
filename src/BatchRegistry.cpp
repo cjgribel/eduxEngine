@@ -984,8 +984,8 @@ namespace eeng
                 // for (auto& g : old_closure)  { EENG_LOG(&ctx, "[queue_rebuild_closure] old %s", g.to_string().c_str()); }
                 // for (auto& g : new_closure)  { EENG_LOG(&ctx, "[queue_rebuild_closure] new %s", g.to_string().c_str()); }
 
-                for (auto& g : to_add) { EENG_LOG(&ctx, "[queue_rebuild_closure] + %s", g.to_string().c_str()); }
-                for (auto& g : to_remove) { EENG_LOG(&ctx, "[queue_rebuild_closure] - %s", g.to_string().c_str()); }
+                // for (auto& g : to_add) { EENG_LOG(&ctx, "[queue_rebuild_closure] + %s", g.to_string().c_str()); }
+                // for (auto& g : to_remove) { EENG_LOG(&ctx, "[queue_rebuild_closure] - %s", g.to_string().c_str()); }
 
                 // 7) Adjust RM leases
                 //

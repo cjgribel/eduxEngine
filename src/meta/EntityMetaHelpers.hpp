@@ -22,7 +22,7 @@ namespace eeng::meta
     // void collect_asset_guids(T& self, std::vector<Guid>& out)
     void collect_asset_guids(entt::meta_any& any, std::vector<Guid>& out)
     {
-        LogGlobals::log("[collect_asset_guids]");
+        // LogGlobals::log("[collect_asset_guids]");
 
         auto self_ptr = any.try_cast<T>();
         assert(self_ptr && "[collect_asset_guids]: Could not cast meta_any to Guid");
@@ -69,7 +69,7 @@ namespace eeng::meta
                         auto guid_str = guid.to_string();
                         auto comp_tstr = meta::get_meta_type_display_name<T>();
                         auto asset_tstr = meta::get_meta_type_display_name<AssetType>();
-                        EENG_LOG(&ctx, "[bind_asset_refs] Could not bind asset %s (%s) to %s...", asset_tstr.c_str(), guid_str.c_str(), comp_tstr.c_str());
+                        // EENG_LOG(&ctx, "[bind_asset_refs] Could not bind asset %s (%s) to %s...", asset_tstr.c_str(), guid_str.c_str(), comp_tstr.c_str());
                     }
 
                     return;
@@ -107,7 +107,7 @@ namespace eeng::meta
 
                     auto guid_str = guid.to_string();
                     auto comp_tstr = meta::get_meta_type_display_name<T>();
-                    EENG_LOG(&ctx, "[bind_entity_refs] Could not bind entity %s to component %s...", guid_str.c_str(), comp_tstr.c_str());
+                    // EENG_LOG(&ctx, "[bind_entity_refs] Could not bind entity %s to component %s...", guid_str.c_str(), comp_tstr.c_str());
 
                     return;
                 }
@@ -176,7 +176,7 @@ namespace eeng::meta
 
         for_each_component(e, reg, [&](entt::meta_type mt, entt::meta_any& any)
             {
-                LogGlobals::log("[collect_asset_guids_for_entity] comp type %s", meta::get_meta_type_display_name(mt).c_str());
+                // LogGlobals::log("[collect_asset_guids_for_entity] comp type %s", meta::get_meta_type_display_name(mt).c_str());
 
                 if (auto mf = mt.func(literals::collect_asset_guids_hs); mf)
                 {
