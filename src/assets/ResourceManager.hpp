@@ -469,5 +469,19 @@ namespace eeng
             std::string_view function_label
         );
 
+        void try_invoke_asset_hook_on_main(
+            EngineContext& ctx,
+            const std::vector<Guid>& guids,
+            entt::hashed_string hook_id,
+            std::string_view label
+        );
+
+        std::optional<entt::meta_any> try_invoke_meta_function(
+            const Guid& guid,
+            EngineContext& ctx,
+            entt::hashed_string function_id,
+            std::string_view function_label
+        );
+
     };
 } // namespace eeng

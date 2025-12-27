@@ -4,8 +4,28 @@
 #include "ResourceManager.hpp"
 #include "AssetIndex.hpp"
 #include "ThreadPool.hpp"
+#include "MainThreadQueue.hpp"
 #include "EventQueue.h"
 #include "meta/MetaAux.h"
+#include "LogMacros.h"
+
+namespace
+{
+    std::vector<eeng::Guid> collect_hook_guids(
+        const std::deque<eeng::Guid>& guids,
+        const std::unordered_set<eeng::Guid>& failed)
+    {
+        std::vector<eeng::Guid> out;
+        out.reserve(guids.size());
+        for (const auto& g : guids)
+        {
+            if (failed.count(g)) continue;
+            out.push_back(g);
+        }
+        return out;
+    }
+
+}
 
 namespace eeng
 {
@@ -268,6 +288,12 @@ namespace eeng
         }
 #endif
 
+        // Optional asset hook after load/bind (main thread)
+        {
+            auto hook_guids = collect_hook_guids(guids, failed);
+            try_invoke_asset_hook_on_main(ctx, hook_guids, literals::on_create_hs, "on_create");
+        }
+
         return res;
     }
 
@@ -278,6 +304,7 @@ namespace eeng
     {
         using Op = OperationResult;
         TaskResult res; res.type = TaskResult::TaskType::Unload;
+        size_t destroy_hook_count = 0;
 
         // Optional determinism:
         // std::sort(guids.begin(), guids.end());
@@ -324,11 +351,20 @@ namespace eeng
 
             try
             {
+                // Optional asset hook before final unload (main thread)
+                bool invoked = false;
+                ctx.main_thread_queue->push_and_wait([&]()
+                    {
+                        invoked = try_invoke_meta_function(g, ctx, literals::on_destroy_hs, "on_destroy").has_value();
+                    });
+                if (invoked)
+                    ++destroy_hook_count;
+
                 this->unload_asset(g, ctx);
 
                 std::lock_guard lk(status_mutex_);
                 statuses_.erase(g);
-                res.add_result(g, true, "Unbind+Unload Ok");
+                res.add_result(g, true, "Unbind and Unload Ok");
             }
             catch (const std::exception& ex)
             {
@@ -338,6 +374,11 @@ namespace eeng
                 st.error_message = ex.what();
                 res.add_result(g, false, st.error_message);
             }
+        }
+
+        if (destroy_hook_count > 0)
+        {
+            EENG_LOG_INFO(&ctx, "Asset hook on_destroy complete: %zu invoked", destroy_hook_count);
         }
 
         return res;
@@ -595,5 +636,67 @@ namespace eeng
             throw std::runtime_error("Failed to invoke " + std::string(function_label) + " for type: " + type_name);
 
         return result;
+    }
+
+    std::optional<entt::meta_any> ResourceManager::try_invoke_meta_function(
+        const Guid& guid,
+        EngineContext& ctx,
+        entt::hashed_string function_id,
+        std::string_view function_label
+    )
+    {
+        auto index_data = asset_index_->get_index_data();
+        if (!index_data) return std::nullopt;
+
+        auto it = index_data->by_guid.find(guid);
+        if (it == index_data->by_guid.end() || !it->second)
+            return std::nullopt;
+
+        const auto& type_name = it->second->meta.type_id;
+
+        entt::meta_type type = meta::resolve_by_type_id_string(type_name);
+        if (!type) return std::nullopt;
+
+        auto fn = type.func(function_id);
+        if (!fn) return std::nullopt;
+
+        auto result = fn.invoke({}, entt::forward_as_meta(guid), entt::forward_as_meta(ctx));
+        if (!result)
+        {
+            if (fn.ret().id() == entt::resolve<void>().id())
+                return entt::meta_any{};
+
+            EENG_LOG_ERROR(&ctx, "%s failed for type: %s", std::string(function_label).c_str(), type_name.c_str());
+            return std::nullopt;
+        }
+
+        return result;
+    }
+
+    void ResourceManager::try_invoke_asset_hook_on_main(
+        EngineContext& ctx,
+        const std::vector<Guid>& guids,
+        entt::hashed_string hook_id,
+        std::string_view label
+    )
+    {
+        if (guids.empty())
+            return;
+
+        size_t invoked_count = 0;
+        ctx.main_thread_queue->push_and_wait([&]()
+            {
+                for (const auto& g : guids)
+                {
+                    if (try_invoke_meta_function(g, ctx, hook_id, label).has_value())
+                        ++invoked_count;
+                }
+            });
+
+        if (invoked_count > 0)
+        {
+            EENG_LOG_INFO(&ctx, "Asset hook %s complete: %zu invoked",
+                std::string(label).c_str(), invoked_count);
+        }
     }
 }

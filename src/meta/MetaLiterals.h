@@ -26,6 +26,10 @@ namespace eeng::literals
     constexpr entt::hashed_string validate_asset_hs = "validate_asset"_hs;
     constexpr entt::hashed_string validate_asset_recursive_hs = "validate_asset_recursive"_hs;
 
+    // Optional asset lifecycle hooks
+    constexpr entt::hashed_string on_create_hs = "on_create"_hs;
+    constexpr entt::hashed_string on_destroy_hs = "on_destroy"_hs;
+
     // Component types
     constexpr entt::hashed_string assure_component_storage_hs = "assure_component_storage"_hs;
     constexpr entt::hashed_string collect_asset_guids_hs = "collect_asset_guids"_hs;

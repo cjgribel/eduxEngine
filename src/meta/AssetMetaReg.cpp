@@ -13,9 +13,11 @@
 #include "editor/AssetRefInspect.hpp"
 #include "editor/GLMInspect.hpp"
 #include "assets/types/ModelAssets.hpp"
+#include "gpu/GpuAssetOps.hpp"
 #include "mock/MockAssetTypes.hpp"
 #include "Storage.hpp"
 #include "ResourceManager.hpp"
+#include "LogMacros.h"
 
 // #include <iostream>
 #include <entt/entt.hpp>
@@ -101,6 +103,47 @@ namespace eeng {
         {
             auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
             return rm.validate_asset_recursive<T>(guid);
+        }
+
+        void on_create_gpu_model(const Guid& guid, EngineContext& ctx)
+        {
+            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            if (!rm) return;
+
+            auto handle_opt = rm->handle_for_guid<assets::GpuModelAsset>(guid);
+            if (!handle_opt) return;
+
+            bool needs_init = false;
+            rm->storage().read(*handle_opt, [&](const assets::GpuModelAsset& gpu)
+                {
+                    needs_init = (gpu.state == assets::GpuModelState::Uninitialized ||
+                        gpu.state == assets::GpuModelState::Failed);
+                });
+
+            if (!needs_init) return;
+
+            auto r = gl::init_gpu_model(*handle_opt, ctx);
+            if (!r.ok)
+                EENG_LOG_ERROR(&ctx, "GpuModel init failed: %s", r.error.c_str());
+        }
+
+        void on_destroy_gpu_model(const Guid& guid, EngineContext& ctx)
+        {
+            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            if (!rm) return;
+
+            auto handle_opt = rm->handle_for_guid<assets::GpuModelAsset>(guid);
+            if (!handle_opt) return;
+
+            bool can_destroy = false;
+            rm->storage().read(*handle_opt, [&](const assets::GpuModelAsset& gpu)
+                {
+                    can_destroy = (gpu.state == assets::GpuModelState::Ready);
+                });
+
+            if (!can_destroy) return;
+
+            gl::destroy_gpu_model(*handle_opt, ctx);
         }
     }
 
@@ -316,6 +359,8 @@ namespace eeng {
                 .data<&assets::GpuModelAsset::submeshes>("submeshes"_hs).custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "SubMeshes", "SubMeshes." }).traits(MetaFlags::read_only)
                 .data<&assets::GpuModelAsset::vertex_count>("vertex_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vertex_count", "Vertex Count", "Vertex Count." }).traits(MetaFlags::read_only)
                 .data<&assets::GpuModelAsset::index_count>("index_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "index_count", "Index Count", "Index Count." }).traits(MetaFlags::read_only)
+                .func<&on_create_gpu_model>(literals::on_create_hs)
+                .func<&on_destroy_gpu_model>(literals::on_destroy_hs)
                 ;
             register_asset<assets::GpuModelAsset>();
         }
