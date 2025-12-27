@@ -204,6 +204,8 @@ namespace eeng::mock {
         assert(meta::type_is_registered<ModelDataAsset>());
         assert(meta::type_is_registered<MaterialAsset>());
         assert(meta::type_is_registered<TextureAsset>());
+        assert(meta::type_is_registered<GpuMaterialAsset>());
+        assert(meta::type_is_registered<GpuTextureAsset>());
 
         std::cout << "MockImporter::import_quads_modeldata\n";
 
@@ -217,11 +219,15 @@ namespace eeng::mock {
         const auto mtl_path = asset_path / "materials";
         const auto tex_path = asset_path / "textures";
         const auto gpumodel_path = asset_path / "gpu_model";
+        const auto gpumtl_path = asset_path / "gpu_materials";
+        const auto gputex_path = asset_path / "gpu_textures";
 
         std::filesystem::create_directories(model_path);
         std::filesystem::create_directories(mtl_path);
         std::filesystem::create_directories(tex_path);
         std::filesystem::create_directories(gpumodel_path);
+        std::filesystem::create_directories(gpumtl_path);
+        std::filesystem::create_directories(gputex_path);
 
         const auto model_file_path = model_path / "model_data.json";
         const auto model_meta_file_path = model_path / "model_data.meta.json";
@@ -235,11 +241,19 @@ namespace eeng::mock {
         const auto gpumodel_file_path = gpumodel_path / "gpu_model.json";
         const auto gpumodel_meta_file_path = gpumodel_path / "gpu_model.meta.json";
 
+        const auto gpumtl_file_path = gpumtl_path / "gpu_material.json";
+        const auto gpumtl_meta_file_path = gpumtl_path / "gpu_material.meta.json";
+
+        const auto gputex_file_path = gputex_path / "gpu_texture.json";
+        const auto gputex_meta_file_path = gputex_path / "gpu_texture.meta.json";
+
         // GUIDs
         const Guid model_guid = Guid::generate();
         const Guid mtl_guid = Guid::generate();
         const Guid tex_guid = Guid::generate();
         const Guid gpu_model_guid = Guid::generate();
+        const Guid gpu_mtl_guid = Guid::generate();
+        const Guid gpu_tex_guid = Guid::generate();
 
         // Optional texture asset (kept simple: reference a fake path)
 
@@ -249,7 +263,7 @@ namespace eeng::mock {
 
         const auto tex_meta = AssetMetaData{
             tex_guid,
-            gpu_model_guid, // parent not used
+            model_guid,
             std::string("MockTexture") + std::to_string(value),
             meta::get_meta_type_id_string<TextureAsset>()
         };
@@ -259,6 +273,24 @@ namespace eeng::mock {
             tex_file_path.string(),
             tex_meta,
             tex_meta_file_path.string());
+
+        // GpuTextureAsset referencing the TextureAsset
+
+        const auto gpu_tex = GpuTextureAsset{
+            .texture_ref = AssetRef<TextureAsset>{ tex_guid },
+            .state = GpuLoadState::Uninitialized
+        };
+
+        resource_manager.import(
+            gpu_tex,
+            gputex_file_path.string(),
+            AssetMetaData{
+                gpu_tex_guid,
+                tex_guid,
+                std::string("MockGpuTexture") + std::to_string(value),
+                meta::get_meta_type_id_string<GpuTextureAsset>()
+            },
+            gputex_meta_file_path.string());
 
         // Material referencing the texture
 
@@ -281,6 +313,27 @@ namespace eeng::mock {
             mtl_meta,
             mtl_meta_file_path.string());
 
+        // GpuMaterialAsset referencing the GpuTextureAsset
+
+        GpuMaterialAsset gpu_mtl{};
+        gpu_mtl.material_ref = AssetRef<MaterialAsset>{ mtl_guid };
+        gpu_mtl.Ka = mtl.Ka;
+        gpu_mtl.Kd = mtl.Kd;
+        gpu_mtl.Ks = mtl.Ks;
+        gpu_mtl.shininess = mtl.shininess;
+        gpu_mtl.textures[static_cast<size_t>(MaterialTextureSlot::Diffuse)] = AssetRef<GpuTextureAsset>{ gpu_tex_guid };
+
+        resource_manager.import(
+            gpu_mtl,
+            gpumtl_file_path.string(),
+            AssetMetaData{
+                gpu_mtl_guid,
+                mtl_guid,
+                std::string("MockGpuMaterial") + std::to_string(value),
+                meta::get_meta_type_id_string<GpuMaterialAsset>()
+            },
+            gpumtl_meta_file_path.string());
+
         // ModelData containing two quads, both using the same material
 
         ModelDataAsset model{};
@@ -302,20 +355,28 @@ namespace eeng::mock {
             model_meta,
             model_meta_file_path.string());
 
-        // GpuModelAsset referencing the ModelDataAsset
+        // GpuModelAsset referencing the ModelDataAsset and GPU materials
 
-        const auto gpu_model = GpuModelAsset{
-            .model_ref = AssetRef<ModelDataAsset>{ model_guid },
-            .state = GpuModelState::Uninitialized
-        };
+        GpuModelAsset gpu_model{};
+        gpu_model.model_ref = AssetRef<ModelDataAsset>{ model_guid };
+        gpu_model.state = GpuLoadState::Uninitialized;
+        for (const auto& sm : model.submeshes)
+        {
+            GpuSubMesh gsm{};
+            gsm.index_offset = sm.base_index;
+            gsm.index_count = sm.nbr_indices;
+            gsm.base_vertex = sm.base_vertex;
+            gsm.material = AssetRef<GpuMaterialAsset>{ gpu_mtl_guid };
+            gpu_model.submeshes.push_back(gsm);
+        }
 
         resource_manager.import(
             gpu_model,
             gpumodel_file_path.string(),
             AssetMetaData{
                 gpu_model_guid,
-                Guid::invalid(), // parent not used
-                std::string("MockGpuModel") + std::to_string(value), // <- remove mock, these are real asste types
+                model_guid,
+                std::string("MockGpuModel") + std::to_string(value),
                 meta::get_meta_type_id_string<GpuModelAsset>()
             },
             gpumodel_meta_file_path.string());

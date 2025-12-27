@@ -109,7 +109,7 @@ namespace eeng::ecs::systems
 
             rm->storage().read(model.model_ref.handle, [&](const assets::GpuModelAsset& gpu)
                 {
-                    if (gpu.state != assets::GpuModelState::Ready || gpu.vao == 0)
+                    if (gpu.state != assets::GpuLoadState::Ready || gpu.vao == 0)
                         return;
 
                     vao = gpu.vao;
@@ -134,11 +134,11 @@ namespace eeng::ecs::systems
                 if (sm.index_count == 0)
                     continue;
 
-                assets::MaterialAsset material{};
+                assets::GpuMaterialAsset material{};
                 bool has_material = false;
                 if (sm.material.is_bound())
                 {
-                    rm->storage().read(sm.material.handle, [&](const assets::MaterialAsset& mtl)
+                    rm->storage().read(sm.material.handle, [&](const assets::GpuMaterialAsset& mtl)
                         {
                             material = mtl;
                             has_material = true;
@@ -153,14 +153,23 @@ namespace eeng::ecs::systems
                 for (const auto& texture_desc : kTextureDescs)
                 {
                     bool has_texture = false;
+                    GLuint tex_id = 0;
+
                     if (has_material)
                     {
                         const auto& tex_ref = material.textures[static_cast<size_t>(texture_desc.slot)];
-                        has_texture = tex_ref.is_bound();
+                        if (tex_ref.is_bound())
+                        {
+                            rm->storage().read(tex_ref.handle, [&](const assets::GpuTextureAsset& tex)
+                                {
+                                    tex_id = tex.gl_id;
+                                    has_texture = (tex_id != 0 && tex.state == assets::GpuLoadState::Ready);
+                                });
+                        }
                     }
 
                     glActiveTexture(GL_TEXTURE0 + texture_desc.texture_unit);
-                    glBindTexture(GL_TEXTURE_2D, 0);
+                    glBindTexture(GL_TEXTURE_2D, tex_id);
                     glUniform1i(glGetUniformLocation(shader_program_, texture_desc.flag_name), has_texture);
                 }
 

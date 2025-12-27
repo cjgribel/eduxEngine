@@ -30,18 +30,27 @@ namespace eeng::assets
     // -------------------------------------------------------------------------
 
     struct ModelDataAsset;
+    struct GpuMaterialAsset;
     struct MaterialAsset;
+    struct TextureAsset;
 
+    /// @brief GPU-side submesh, used directly by the renderer.
+    /// Carries draw ranges and GPU material references.
     struct GpuSubMesh
     {
+        /// @brief Index offset into GPU index buffer.
         u32 index_offset = 0;
+        /// @brief Number of indices to draw.
         u32 index_count = 0;
+        /// @brief Base vertex offset into GPU vertex buffers.
         u32 base_vertex = 0;
 
-        AssetRef<assets::MaterialAsset> material; // or a future GpuMaterialAsset
+        /// @brief GPU material used for this submesh at draw time.
+        AssetRef<assets::GpuMaterialAsset> material;
     };
 
-    enum class GpuModelState : u8
+    /// @brief Generic GPU load state for runtime-bound assets.
+    enum class GpuLoadState : u8
     {
         Uninitialized = 0,   // loaded from disk, not yet gpu-initialized
         Queued,              // marked for gpu init
@@ -49,13 +58,17 @@ namespace eeng::assets
         Failed               // init failed (missing deps, GL error, etc.)
     };
 
+    /// @brief GPU binding for a model (runtime draw data).
+    /// Separate from ModelDataAsset (raw/authoring geometry).
     struct GpuModelAsset
     {
+        /// @brief Source CPU model data.
         AssetRef<ModelDataAsset> model_ref;
 
-        // Runtime-only state (do not serialize)
-        GpuModelState state = GpuModelState::Uninitialized;
+        /// @brief Runtime-only state (do not serialize).
+        GpuLoadState state = GpuLoadState::Uninitialized;
 
+        /// @brief GL handles for mesh buffers.
         u32 vao = 0;
         u32 vbo_pos = 0;
         u32 vbo_uv = 0;
@@ -65,9 +78,10 @@ namespace eeng::assets
         u32 vbo_bone = 0; // opt
         u32 ibo = 0;
 
+        /// @brief GPU draw ranges and material bindings.
         std::vector<GpuSubMesh> submeshes;
 
-        // Optional for safe teardown / debug
+        /// @brief Optional debug counts for validation/teardown.
         u32 vertex_count = 0;
         u32 index_count = 0;
     };
@@ -76,24 +90,122 @@ namespace eeng::assets
     void visit_asset_refs(GpuModelAsset& gm, Visitor&& visitor)
     {
         visitor(gm.model_ref);
+        for (auto& sm : gm.submeshes)
+        {
+            visitor(sm.material);
+        }
     }
 
     template<typename Visitor>
     void visit_asset_refs(const GpuModelAsset& gm, Visitor&& visitor)
     {
         visitor(gm.model_ref);
+        for (const auto& sm : gm.submeshes)
+        {
+            visitor(sm.material);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GpuTextureAsset
+    // -------------------------------------------------------------------------
+
+    /// @brief GPU binding for a texture (runtime sampler/handle data).
+    /// Separate from TextureAsset (raw/authoring source).
+    struct GpuTextureAsset
+    {
+        /// @brief Source CPU texture.
+        AssetRef<TextureAsset> texture_ref;
+
+        /// @brief Runtime-only state (do not serialize).
+        GpuLoadState state = GpuLoadState::Uninitialized;
+
+        /// @brief GL texture handle and resolved image info.
+        u32 gl_id = 0;
+        u32 width = 0;
+        u32 height = 0;
+        u32 channels = 0;
+    };
+
+    template<typename Visitor>
+    void visit_asset_refs(GpuTextureAsset& gt, Visitor&& visitor)
+    {
+        visitor(gt.texture_ref);
+    }
+
+    template<typename Visitor>
+    void visit_asset_refs(const GpuTextureAsset& gt, Visitor&& visitor)
+    {
+        visitor(gt.texture_ref);
+    }
+
+    // -------------------------------------------------------------------------
+    // Material slots (shared CPU/GPU)
+    // -------------------------------------------------------------------------
+
+    /// @brief Common texture slots for both CPU and GPU materials.
+    enum class MaterialTextureSlot : u8
+    {
+        Diffuse = 0,
+        Normal,
+        Specular,
+        Opacity,
+        Count
+    };
+
+    // -------------------------------------------------------------------------
+    // GpuMaterialAsset
+    // -------------------------------------------------------------------------
+
+    /// @brief GPU binding for a material (runtime uniform/texture refs).
+    /// Mirrors MaterialAsset fields for now, but is free to diverge later.
+    struct GpuMaterialAsset
+    {
+        /// @brief Source CPU material.
+        AssetRef<MaterialAsset> material_ref;
+
+        /// @brief Material constants for uniform binding.
+        glm::vec3 Ka = { 0.25f, 0.0f, 0.0f };
+        glm::vec3 Kd = { 0.75f, 0.0f, 0.0f };
+        glm::vec3 Ks = { 1.0f, 1.0f, 1.0f };
+        float shininess = 10.0f;
+
+        /// @brief GPU textures for each material slot.
+        std::array<AssetRef<GpuTextureAsset>, static_cast<size_t>(MaterialTextureSlot::Count)> textures{};
+    };
+
+    template<typename Visitor>
+    void visit_asset_refs(GpuMaterialAsset& m, Visitor&& visitor)
+    {
+        visitor(m.material_ref);
+        for (auto& t : m.textures)
+        {
+            visitor(t);
+        }
+    }
+
+    template<typename Visitor>
+    void visit_asset_refs(const GpuMaterialAsset& m, Visitor&& visitor)
+    {
+        visitor(m.material_ref);
+        for (auto& t : m.textures)
+        {
+            visitor(t);
+        }
     }
 
     // -------------------------------------------------------------------------
     // TextureAsset
     // -------------------------------------------------------------------------
 
+    /// @brief Intended color space for imported texture data.
     enum class TextureColorSpace : u8
     {
         Linear = 0,
         SRgb
     };
 
+    /// @brief Import-time settings (authoring data).
     struct TextureImportSettings
     {
         TextureColorSpace color_space = TextureColorSpace::SRgb;
@@ -101,8 +213,11 @@ namespace eeng::assets
         bool is_normal_map = false;
     };
 
+    /// @brief CPU-side texture asset (authoring/source data).
+    /// GPU state lives in GpuTextureAsset.
     struct TextureAsset
     {
+        /// @brief Path relative to the texture asset .json folder.
         std::string source_path;
         TextureImportSettings import_settings{}; // not used yet
     };
@@ -121,22 +236,17 @@ namespace eeng::assets
     // MaterialAsset
     // -------------------------------------------------------------------------
 
-    enum class MaterialTextureSlot : u8
-    {
-        Diffuse = 0,
-        Normal,
-        Specular,
-        Opacity,
-        Count
-    };
-
+    /// @brief CPU-side material asset (authoring/source data).
+    /// GPU state lives in GpuMaterialAsset.
     struct MaterialAsset
     {
+        /// @brief Raw material constants.
         glm::vec3 Ka = { 0.25f, 0.0f, 0.0f };
         glm::vec3 Kd = { 0.75f, 0.0f, 0.0f };
         glm::vec3 Ks = { 1.0f, 1.0f, 1.0f };
         float shininess = 10.0f;
 
+        /// @brief CPU texture references for each material slot.
         std::array<AssetRef<TextureAsset>, static_cast<size_t>(MaterialTextureSlot::Count)> textures{};
     };
 

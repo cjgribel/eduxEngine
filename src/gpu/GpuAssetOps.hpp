@@ -15,6 +15,12 @@ namespace eeng::gl
         std::string error;
     };
 
+    struct GpuTextureInitResult
+    {
+        bool ok = false;
+        std::string error;
+    };
+
     GpuModelInitResult
         init_gpu_model(
             const eeng::Handle<eeng::assets::GpuModelAsset>& gpu_handle,
@@ -23,5 +29,15 @@ namespace eeng::gl
     void
         destroy_gpu_model(
             const eeng::Handle<eeng::assets::GpuModelAsset>& gpu_handle,
+            EngineContext& ctx);
+
+    GpuTextureInitResult
+        init_gpu_texture(
+            const eeng::Handle<eeng::assets::GpuTextureAsset>& gpu_handle,
+            EngineContext& ctx);
+
+    void
+        destroy_gpu_texture(
+            const eeng::Handle<eeng::assets::GpuTextureAsset>& gpu_handle,
             EngineContext& ctx);
 }

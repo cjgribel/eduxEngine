@@ -50,25 +50,26 @@ namespace eeng::gl
     };
 
     static CpuUploadData snapshot_model_data(
-        eeng::Storage& storage,
+        eeng::ResourceManager& rm,
         const Handle<GpuModelAsset>& gpu_handle)
     {
         CpuUploadData out{};
 
         // 1) Read the GpuModelAsset to get the ModelData handle
         Handle<ModelDataAsset> model_handle{};
-        storage.read(gpu_handle, [&](const GpuModelAsset& gpu)
+        rm.storage().read(gpu_handle, [&](const GpuModelAsset& gpu)
             {
                 model_handle = gpu.model_ref.handle;
+                out.gpu_submeshes = gpu.submeshes;
             });
 
-        if (!storage.validate(model_handle))
+        if (!rm.storage().validate(model_handle))
         {
             throw std::runtime_error("GpuModel init failed: ModelDataAsset handle is invalid (not bound/loaded).");
         }
 
         // 2) Copy ModelDataAsset data while holding locks
-        storage.read(model_handle, [&](const ModelDataAsset& model)
+        rm.storage().read(model_handle, [&](const ModelDataAsset& model)
             {
                 out.positions = model.positions;
                 out.texcoords = model.texcoords;
@@ -82,17 +83,17 @@ namespace eeng::gl
                 out.vertex_count = static_cast<u32>(model.positions.size());
                 out.index_count = static_cast<u32>(model.indices.size());
 
-                out.gpu_submeshes.clear();
-                out.gpu_submeshes.reserve(model.submeshes.size());
-
-                for (const SubMesh& sm : model.submeshes)
+                if (out.gpu_submeshes.empty())
                 {
-                    GpuSubMesh gsm{};
-                    gsm.index_offset = sm.base_index;
-                    gsm.index_count = sm.nbr_indices;
-                    gsm.base_vertex = sm.base_vertex;
-                    gsm.material = sm.material; // AssetRef<MaterialAsset>
-                    out.gpu_submeshes.push_back(gsm);
+                    out.gpu_submeshes.reserve(model.submeshes.size());
+                    for (const SubMesh& sm : model.submeshes)
+                    {
+                        GpuSubMesh gsm{};
+                        gsm.index_offset = sm.base_index;
+                        gsm.index_count = sm.nbr_indices;
+                        gsm.base_vertex = sm.base_vertex;
+                        out.gpu_submeshes.push_back(gsm);
+                    }
                 }
             });
 
@@ -117,15 +118,15 @@ namespace eeng::gl
                     // Ready or Queued: don't proceed
                     // Uninitialized or Failed: proceed (new try)
 
-                    already_ready = (gpu.state == GpuModelState::Ready || gpu.state == GpuModelState::Queued);
+                    already_ready = (gpu.state == GpuLoadState::Ready || gpu.state == GpuLoadState::Queued);
 
                     if (!already_ready)
-                        gpu.state = GpuModelState::Queued;
+                        gpu.state = GpuLoadState::Queued;
                 });
 
             if (already_ready) { result.ok = true; return result; }
 
-            CpuUploadData cpu = snapshot_model_data(storage, gpu_handle);
+            CpuUploadData cpu = snapshot_model_data(*rm, gpu_handle);
 
             u32 vao = 0;
             u32 vbo_pos = 0;
@@ -272,7 +273,7 @@ namespace eeng::gl
                     gpu.vertex_count = cpu.vertex_count;
                     gpu.index_count = cpu.index_count;
 
-                    gpu.state = GpuModelState::Ready;
+                    gpu.state = GpuLoadState::Ready;
                 });
 
             result.ok = true;
@@ -283,7 +284,7 @@ namespace eeng::gl
             // Try to mark failed (best-effort)
             storage.modify(gpu_handle, [&](GpuModelAsset& gpu)
                 {
-                    gpu.state = GpuModelState::Failed;
+                    gpu.state = GpuLoadState::Failed;
                 });
 
             result.ok = false;
@@ -352,7 +353,57 @@ namespace eeng::gl
                 gpu.vertex_count = 0;
                 gpu.index_count = 0;
 
-                gpu.state = GpuModelState::Uninitialized;
+                gpu.state = GpuLoadState::Uninitialized;
+            });
+    }
+
+    GpuTextureInitResult init_gpu_texture(
+        const Handle<GpuTextureAsset>& gpu_handle,
+        EngineContext& ctx)
+    {
+        GpuTextureInitResult result{};
+
+        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+        assert(rm);
+
+        bool already_ready = false;
+        rm->storage().modify(gpu_handle, [&](GpuTextureAsset& gpu)
+            {
+                already_ready = (gpu.state == GpuLoadState::Ready || gpu.state == GpuLoadState::Queued);
+                if (!already_ready)
+                    gpu.state = GpuLoadState::Queued;
+            });
+
+        if (already_ready)
+        {
+            result.ok = true;
+            return result;
+        }
+
+        rm->storage().modify(gpu_handle, [&](GpuTextureAsset& gpu)
+            {
+                gpu.state = GpuLoadState::Failed;
+            });
+
+        result.ok = false;
+        result.error = "GpuTexture init not implemented";
+        return result;
+    }
+
+    void destroy_gpu_texture(
+        const Handle<GpuTextureAsset>& gpu_handle,
+        EngineContext& ctx)
+    {
+        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+        assert(rm);
+
+        rm->storage().modify(gpu_handle, [&](GpuTextureAsset& gpu)
+            {
+                gpu.gl_id = 0;
+                gpu.width = 0;
+                gpu.height = 0;
+                gpu.channels = 0;
+                gpu.state = GpuLoadState::Uninitialized;
             });
     }
 }

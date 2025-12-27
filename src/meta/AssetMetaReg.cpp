@@ -116,8 +116,8 @@ namespace eeng {
             bool needs_init = false;
             rm->storage().read(*handle_opt, [&](const assets::GpuModelAsset& gpu)
                 {
-                    needs_init = (gpu.state == assets::GpuModelState::Uninitialized ||
-                        gpu.state == assets::GpuModelState::Failed);
+                    needs_init = (gpu.state == assets::GpuLoadState::Uninitialized ||
+                        gpu.state == assets::GpuLoadState::Failed);
                 });
 
             if (!needs_init) return;
@@ -138,12 +138,53 @@ namespace eeng {
             bool can_destroy = false;
             rm->storage().read(*handle_opt, [&](const assets::GpuModelAsset& gpu)
                 {
-                    can_destroy = (gpu.state == assets::GpuModelState::Ready);
+                    can_destroy = (gpu.state == assets::GpuLoadState::Ready);
                 });
 
             if (!can_destroy) return;
 
             gl::destroy_gpu_model(*handle_opt, ctx);
+        }
+
+        void on_create_gpu_texture(const Guid& guid, EngineContext& ctx)
+        {
+            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            if (!rm) return;
+
+            auto handle_opt = rm->handle_for_guid<assets::GpuTextureAsset>(guid);
+            if (!handle_opt) return;
+
+            bool needs_init = false;
+            rm->storage().read(*handle_opt, [&](const assets::GpuTextureAsset& gpu)
+                {
+                    needs_init = (gpu.state == assets::GpuLoadState::Uninitialized ||
+                        gpu.state == assets::GpuLoadState::Failed);
+                });
+
+            if (!needs_init) return;
+
+            auto r = gl::init_gpu_texture(*handle_opt, ctx);
+            if (!r.ok)
+                EENG_LOG_ERROR(&ctx, "GpuTexture init failed: %s", r.error.c_str());
+        }
+
+        void on_destroy_gpu_texture(const Guid& guid, EngineContext& ctx)
+        {
+            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            if (!rm) return;
+
+            auto handle_opt = rm->handle_for_guid<assets::GpuTextureAsset>(guid);
+            if (!handle_opt) return;
+
+            bool can_destroy = false;
+            rm->storage().read(*handle_opt, [&](const assets::GpuTextureAsset& gpu)
+                {
+                    can_destroy = (gpu.state == assets::GpuLoadState::Ready);
+                });
+
+            if (!can_destroy) return;
+
+            gl::destroy_gpu_texture(*handle_opt, ctx);
         }
     }
 
@@ -311,29 +352,29 @@ namespace eeng {
                 .id = "eeng.assets.GpuModelState",
                 .name = "GpuModelState",
                 .tooltip = "GPU Load States",
-                .underlying_type = entt::resolve<std::underlying_type_t<assets::GpuModelState>>()
+                .underlying_type = entt::resolve<std::underlying_type_t<assets::GpuLoadState>>()
             };
-            entt::meta_factory<assets::GpuModelState>()
+            entt::meta_factory<assets::GpuLoadState>()
                 .custom<TypeMetaInfo>(enum_info)
                 .traits(MetaFlags::none)
 
-                .data<assets::GpuModelState::Uninitialized>("Uninitialized"_hs)
+                .data<assets::GpuLoadState::Uninitialized>("Uninitialized"_hs)
                 .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Uninitialized", "Uninitialized." })
                 .traits(MetaFlags::none)
 
-                .data<assets::GpuModelState::Queued>("Queued"_hs)
+                .data<assets::GpuLoadState::Queued>("Queued"_hs)
                 .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Queued", "Queued." })
                 .traits(MetaFlags::none)
 
-                .data<assets::GpuModelState::Ready>("Ready"_hs)
+                .data<assets::GpuLoadState::Ready>("Ready"_hs)
                 .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Ready", "Ready." })
                 .traits(MetaFlags::none)
 
-                .data<assets::GpuModelState::Failed>("Failed"_hs)
+                .data<assets::GpuLoadState::Failed>("Failed"_hs)
                 .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Failed", "Failed." })
                 .traits(MetaFlags::none)
                 ;
-            register_helper_type<assets::GpuModelState>();
+            register_helper_type<assets::GpuLoadState>();
         }
 
         // GpuModelAsset
@@ -363,6 +404,62 @@ namespace eeng {
                 .func<&on_destroy_gpu_model>(literals::on_destroy_hs)
                 ;
             register_asset<assets::GpuModelAsset>();
+        }
+
+        // GpuTextureAsset
+        {
+            entt::meta_factory<assets::GpuTextureAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.GpuTextureAsset", .name = "GpuTextureAsset", .tooltip = "GPU binding for a texture asset." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::GpuTextureAsset::texture_ref>("texture_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "texture_ref", "Texture Reference", "Referenced Texture asset" })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuTextureAsset::state>("state"_hs).custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State." }).traits(MetaFlags::read_only)
+
+                .data<&assets::GpuTextureAsset::gl_id>("gl_id"_hs).custom<DataMetaInfo>(DataMetaInfo{ "gl_id", "GL ID", "GL ID." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuTextureAsset::width>("width"_hs).custom<DataMetaInfo>(DataMetaInfo{ "width", "Width", "Width." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuTextureAsset::height>("height"_hs).custom<DataMetaInfo>(DataMetaInfo{ "height", "Height", "Height." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuTextureAsset::channels>("channels"_hs).custom<DataMetaInfo>(DataMetaInfo{ "channels", "Channels", "Channels." }).traits(MetaFlags::read_only)
+
+                .func<&on_create_gpu_texture>(literals::on_create_hs)
+                .func<&on_destroy_gpu_texture>(literals::on_destroy_hs)
+                ;
+            register_asset<assets::GpuTextureAsset>();
+        }
+
+        // GpuMaterialAsset
+        {
+            entt::meta_factory<assets::GpuMaterialAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.GpuMaterialAsset", .name = "GpuMaterialAsset", .tooltip = "GPU binding for a material asset." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::GpuMaterialAsset::material_ref>("material_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "material_ref", "Material Reference", "Referenced Material asset" })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuMaterialAsset::Ka>("Ka"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "Ka", "Ambient Color", "Ambient Color." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuMaterialAsset::Kd>("Kd"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "Kd", "Diffuse Color", "Diffuse Color." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuMaterialAsset::Ks>("Ks"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "Ks", "Specular Color", "Specular Color." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuMaterialAsset::shininess>("shininess"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "shininess", "Shininess", "Shininess." })
+                .traits(MetaFlags::read_only)
+
+                .data<&assets::GpuMaterialAsset::textures>("textures"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "textures", "Textures", "Textures." })
+                .traits(MetaFlags::read_only)
+                ;
+            register_asset<assets::GpuMaterialAsset>();
         }
 
         // TextureAsset
