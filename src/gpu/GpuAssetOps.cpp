@@ -3,9 +3,13 @@
 
 #include "GpuAssetOps.hpp"
 #include <algorithm>
+#include <filesystem>
 #include "ResourceManager.hpp"
 #include "Storage.hpp"
 #include "assets/types/ModelAssets.hpp" // GpuModelAsset, ModelDataAsset, TextureAsset, MaterialAsset
+#include "AssetIndexData.hpp"
+
+#include "stb_image.h"
 
 #include "glcommon.h"
 
@@ -98,6 +102,24 @@ namespace eeng::gl
             });
 
         return out;
+    }
+
+    static std::filesystem::path resolve_texture_path(
+        eeng::ResourceManager& rm,
+        const Guid& texture_guid,
+        std::string_view source_path)
+    {
+        auto index_data = rm.get_index_data();
+        if (!index_data)
+            throw std::runtime_error("GpuTexture init failed: asset index is not available");
+
+        auto it = index_data->by_guid.find(texture_guid);
+        if (it == index_data->by_guid.end() || !it->second)
+            throw std::runtime_error("GpuTexture init failed: texture GUID not found in asset index");
+
+        const auto& texture_entry = *it->second;
+        const auto texture_dir = texture_entry.absolute_path.parent_path();
+        return texture_dir / std::filesystem::path(std::string{ source_path });
     }
 
     GpuModelInitResult init_gpu_model(
@@ -380,14 +402,79 @@ namespace eeng::gl
             return result;
         }
 
-        rm->storage().modify(gpu_handle, [&](GpuTextureAsset& gpu)
-            {
-                gpu.state = GpuLoadState::Failed;
-            });
+        try
+        {
+            Guid texture_guid{};
+            Handle<TextureAsset> texture_handle{};
+            rm->storage().read(gpu_handle, [&](const GpuTextureAsset& gpu)
+                {
+                    texture_guid = gpu.texture_ref.guid;
+                    texture_handle = gpu.texture_ref.handle;
+                });
 
-        result.ok = false;
-        result.error = "GpuTexture init not implemented";
-        return result;
+            if (!rm->storage().validate(texture_handle))
+                throw std::runtime_error("GpuTexture init failed: TextureAsset handle is invalid (not bound/loaded).");
+
+            TextureAsset tex{};
+            rm->storage().read(texture_handle, [&](const TextureAsset& t)
+                {
+                    tex = t;
+                });
+
+            const auto texture_path = resolve_texture_path(*rm, texture_guid, tex.source_path);
+
+            int w = 0;
+            int h = 0;
+            int channels = 0;
+            unsigned char* image = stbi_load(texture_path.string().c_str(), &w, &h, &channels, 0);
+            if (!image)
+                throw std::runtime_error("GpuTexture init failed: could not load image " + texture_path.string());
+
+            GLuint internal_format = 0;
+            GLuint format = 0;
+            if (channels == 1) { internal_format = GL_R8; format = GL_RED; }
+            else if (channels == 2) { internal_format = GL_RG8; format = GL_RG; }
+            else if (channels == 3) { internal_format = GL_RGB8; format = GL_RGB; }
+            else if (channels == 4) { internal_format = GL_RGBA8; format = GL_RGBA; }
+            else
+                throw std::runtime_error("GpuTexture init failed: unsupported channel count " + std::to_string(channels));
+
+            GLuint tex_id = 0;
+            glGenTextures(1, &tex_id);
+            glBindTexture(GL_TEXTURE_2D, tex_id);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexImage2D(GL_TEXTURE_2D, 0, internal_format, w, h, 0, format, GL_UNSIGNED_BYTE, image);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            CheckAndThrowGLErrors();
+
+            stbi_image_free(image);
+
+            rm->storage().modify(gpu_handle, [&](GpuTextureAsset& gpu)
+                {
+                    gpu.gl_id = tex_id;
+                    gpu.width = static_cast<u32>(w);
+                    gpu.height = static_cast<u32>(h);
+                    gpu.channels = static_cast<u32>(channels);
+                    gpu.state = GpuLoadState::Ready;
+                });
+
+            result.ok = true;
+            return result;
+        }
+        catch (const std::exception& ex)
+        {
+            rm->storage().modify(gpu_handle, [&](GpuTextureAsset& gpu)
+                {
+                    gpu.state = GpuLoadState::Failed;
+                });
+            result.ok = false;
+            result.error = ex.what();
+            return result;
+        }
     }
 
     void destroy_gpu_texture(
@@ -396,6 +483,17 @@ namespace eeng::gl
     {
         auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
         assert(rm);
+
+        u32 gl_id = 0;
+        rm->storage().read(gpu_handle, [&](const GpuTextureAsset& gpu)
+            {
+                gl_id = gpu.gl_id;
+            });
+
+        if (gl_id != 0)
+        {
+            glDeleteTextures(1, reinterpret_cast<GLuint*>(&gl_id));
+        }
 
         rm->storage().modify(gpu_handle, [&](GpuTextureAsset& gpu)
             {

@@ -229,24 +229,6 @@ namespace eeng::mock {
         std::filesystem::create_directories(gpumtl_path);
         std::filesystem::create_directories(gputex_path);
 
-        const auto model_file_path = model_path / "model_data.json";
-        const auto model_meta_file_path = model_path / "model_data.meta.json";
-
-        const auto mtl_file_path = mtl_path / "material.json";
-        const auto mtl_meta_file_path = mtl_path / "material.meta.json";
-
-        const auto tex_file_path = tex_path / "texture.json";
-        const auto tex_meta_file_path = tex_path / "texture.meta.json";
-
-        const auto gpumodel_file_path = gpumodel_path / "gpu_model.json";
-        const auto gpumodel_meta_file_path = gpumodel_path / "gpu_model.meta.json";
-
-        const auto gpumtl_file_path = gpumtl_path / "gpu_material.json";
-        const auto gpumtl_meta_file_path = gpumtl_path / "gpu_material.meta.json";
-
-        const auto gputex_file_path = gputex_path / "gpu_texture.json";
-        const auto gputex_meta_file_path = gputex_path / "gpu_texture.meta.json";
-
         // GUIDs
         const Guid model_guid = Guid::generate();
         const Guid mtl_guid = Guid::generate();
@@ -255,10 +237,35 @@ namespace eeng::mock {
         const Guid gpu_mtl_guid = Guid::generate();
         const Guid gpu_tex_guid = Guid::generate();
 
+        const auto model_file_base = model_guid.to_string();
+        const auto mtl_file_base = mtl_guid.to_string();
+        const auto tex_file_base = tex_guid.to_string();
+        const auto gpu_model_file_base = gpu_model_guid.to_string();
+        const auto gpu_mtl_file_base = gpu_mtl_guid.to_string();
+        const auto gpu_tex_file_base = gpu_tex_guid.to_string();
+
+        const auto model_file_path = model_path / (model_file_base + ".json");
+        const auto model_meta_file_path = model_path / (model_file_base + ".meta.json");
+
+        const auto mtl_file_path = mtl_path / (mtl_file_base + ".json");
+        const auto mtl_meta_file_path = mtl_path / (mtl_file_base + ".meta.json");
+
+        const auto tex_file_path = tex_path / (tex_file_base + ".json");
+        const auto tex_meta_file_path = tex_path / (tex_file_base + ".meta.json");
+
+        const auto gpumodel_file_path = gpumodel_path / (gpu_model_file_base + ".json");
+        const auto gpumodel_meta_file_path = gpumodel_path / (gpu_model_file_base + ".meta.json");
+
+        const auto gpumtl_file_path = gpumtl_path / (gpu_mtl_file_base + ".json");
+        const auto gpumtl_meta_file_path = gpumtl_path / (gpu_mtl_file_base + ".meta.json");
+
+        const auto gputex_file_path = gputex_path / (gpu_tex_file_base + ".json");
+        const auto gputex_meta_file_path = gputex_path / (gpu_tex_file_base + ".meta.json");
+
         // Optional texture asset (kept simple: reference a fake path)
 
         TextureAsset tex{};
-        tex.source_path = "texture.png";
+        tex.source_path = tex_file_base + ".png";
         tex.import_settings.color_space = TextureColorSpace::SRgb;
 
         const auto tex_meta = AssetMetaData{
