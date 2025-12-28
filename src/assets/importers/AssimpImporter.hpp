@@ -5,72 +5,61 @@
 #ifndef ASSIMP_IMPORTER_HPP
 #define ASSIMP_IMPORTER_HPP
 
-#include <string>
-#include <vector>
+#include <filesystem>
 #include <memory>
-#include <optional>
-#include "Handle.h"
-#include "ThreadPool.hpp"
-#include "Storage.hpp"
-#include "Texture.hpp"
+#include <string>
+#include <unordered_map>
+#include <vector>
 
-// Placeholder resources
-namespace eeng
+#include "Guid.h"
+#include "AssetRef.hpp"
+#include "EngineContext.hpp"
+#include "assets/types/ModelAssets.hpp"
+
+namespace eeng::assets
 {
-    struct Mesh { size_t x; };
-    struct Material { size_t x; };
-    struct Skeleton { size_t x; };
-    struct AnimationClip { size_t x; };
-
-    using MeshHandle = Handle<Mesh>;
-    using MaterialHandle = Handle<Material>;
-    using TextureHandle = Handle<Texture2D>;
-    using SkeletonHandle = Handle<Skeleton>;
-    using AnimationClipHandle = Handle<AnimationClip>;
-
-    struct Model
-    {
-        std::vector<Handle<Mesh>> meshes;
-        std::vector<Handle<Texture2D>> textures;
-        std::vector<Handle<Material>> materials;
-        std::optional<Handle<Skeleton>> skeleton;
-        std::vector<Handle<AnimationClip>> animation_clips;
-
-        std::string source_file;
-        uint32_t loading_flags;
-    };
-    using ModelHandle = Handle<Model>;
-
-
-} // namespace eeng
-
-namespace eeng
-{
-    class Storage;
-    class ThreadPool;
-
     enum class ImportFlags : unsigned int
     {
         None = 0,
         GenerateTangents = 1 << 0,
         FlipUVs = 1 << 1,
         OptimizeMesh = 1 << 2,
-        // Extend as needed
+        GenerateNormals = 1 << 3,
+        GenerateUVs = 1 << 4,
+        SortByPType = 1 << 5,
+        OptimizeGraph = 1 << 6
     };
 
-    struct ModelImportOptions
+    /// @brief Import options for Assimp-backed model import.
+    struct AssimpImportOptions
     {
-        Handle<Model> model;                  // Valid handle, may refer to an empty model
-        bool append_animations = false;      // If true, importer only loads animation data
-        float scale = 1.0f;
-        ImportFlags flags = ImportFlags::None;
+        std::filesystem::path assets_root;
+        std::filesystem::path source_file;
+        std::string           model_name;
+        float                 scale = 1.0f;
+        ImportFlags           flags = ImportFlags::None;
+        bool                  append_animations = false;
     };
 
-    struct ModelImportResult
+    /// @brief Import result with primary asset handles.
+    struct AssimpImportResult
     {
         bool success = false;
         std::string error_message;
-        std::string source_path;
+        AssetRef<GpuModelAsset> gpu_model;
+        Guid model_guid = Guid::invalid();
+    };
+
+    /// @brief Parsed data extracted from Assimp before asset construction.
+    /// This mirrors the RenderableMesh extraction but stays CPU-only.
+    struct AssimpParseResult
+    {
+        ModelDataAsset model_data;
+        std::vector<MaterialAsset> materials;
+        std::vector<TextureAsset> textures;
+
+        // Maps aiMaterial index to material list index.
+        std::unordered_map<unsigned, size_t> material_index_map;
     };
 
     class AssimpImporter
@@ -79,23 +68,24 @@ namespace eeng
         AssimpImporter();
         ~AssimpImporter();
 
-        /**
-         * @brief Import a model or animation from a file.
-         *
-         * @param file_path Path to the FBX/OBJ/etc. file to import.
-         * @param options Import options, including target model and mode.
-         * @param registry Reference to the resource registry for creating/updating handles.
-         * @param thread_pool Optional thread pool for parallel processing (e.g., textures).
-         */
-        ModelImportResult import_model(const std::string& file_path,
-            const ModelImportOptions& options,
-            Storage& registry,
-            ThreadPool* thread_pool = nullptr);
+        AssimpImportResult import_model(
+            const AssimpImportOptions& options,
+            EngineContext& ctx);
 
     private:
         struct Impl;
-        std::unique_ptr<Impl> m_impl;
+        std::unique_ptr<Impl> impl_;
+
+        AssimpParseResult parse_scene(
+            const std::filesystem::path& source_file,
+            const AssimpImportOptions& options,
+            EngineContext& ctx);
+
+        AssimpImportResult build_assets(
+            const AssimpParseResult& parsed,
+            const AssimpImportOptions& options,
+            EngineContext& ctx);
     };
-} // namespace eeng
+} // namespace eeng::assets
 
 #endif // ASSIMP_IMPORTER_HPP

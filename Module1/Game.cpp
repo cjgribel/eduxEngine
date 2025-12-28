@@ -9,6 +9,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 // FOR TESTS ->
+#include "util/ThreadPool.hpp"
 #include "MainThreadQueue.hpp"
 #include "AssimpImporter.hpp" // --> ENGINE API
 #include "MockImporter.hpp" // --> ENGINE API
@@ -102,6 +103,23 @@ namespace eeng::dev
                     EENG_LOG(ctx.get(), "[startup] Importing quads model on worker...");
                     auto quadmodel_ref = eeng::mock::ModelImporter::import_quads_modeldata(asset_root, ctx);
 
+                    // 2.3 ASSIMP IMPORT TEST (this thread)
+                    eeng::assets::AssimpImporter importer;
+                    eeng::assets::AssimpImportOptions opts{};
+                    opts.assets_root = asset_root;
+                    opts.source_file = "/Users/ag1498/GitHub/eduxEngine/assets/Amy/Ch46_nonPBR.fbx";
+                    opts.model_name = "Amy";
+                    opts.flags = static_cast<eeng::assets::ImportFlags>(
+                        static_cast<unsigned>(eeng::assets::ImportFlags::GenerateTangents) |
+                        static_cast<unsigned>(eeng::assets::ImportFlags::GenerateNormals) |
+                        static_cast<unsigned>(eeng::assets::ImportFlags::GenerateUVs) |
+                        static_cast<unsigned>(eeng::assets::ImportFlags::SortByPType) |
+                        static_cast<unsigned>(eeng::assets::ImportFlags::FlipUVs) |
+                        static_cast<unsigned>(eeng::assets::ImportFlags::OptimizeGraph));
+                        // plus for cache locality maybe ImportFlags::OptimizeMesh
+                    auto import_result = importer.import_model(opts, *ctx);
+                    //
+
                     // 3) Run scan (don't wait)
                     auto nbr_assets = refs.size();
                     EENG_LOG(ctx.get(), "[startup] Imported %zu models. Scanning...", nbr_assets);
@@ -181,9 +199,11 @@ namespace eeng::dev
                                 reg.emplace<ecs::mock::MockMixComponent>(er_player.entity);
                                 reg.emplace<ecs::mock::MockMixComponent>(er_camera.entity);
 
-                                reg.emplace<eeng::CopySignaller>(er_root.entity);
+                                //reg.emplace<eeng::CopySignaller>(er_root.entity);
 
-                                reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, "Model", quadmodel_ref);
+                                // reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, "Model", quadmodel_ref);
+                                reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, "Model", import_result.gpu_model);
+                                reg.emplace<eeng::ecs::ModelComponent>(er_camera.entity, "Model", quadmodel_ref);
 
                                 // If Position has AssetRef<T> inside,
                                 // either:
@@ -350,7 +370,7 @@ bool Game::init()
                 EENG_LOG(ctx, "[Game::init()] Waiting for asset scan to finish...");
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
-}
+        }
 #endif
             // Get asset index snapshot and log it
             // auto asset_index = resource_manager.get_asset_entries_snapshot();
@@ -362,7 +382,7 @@ bool Game::init()
             //         entry.meta.type_name.c_str(),
             //         entry.relative_path.string().c_str());
             // }
-        }
+}
 #endif
 
 #if 0
@@ -1013,7 +1033,7 @@ void Game::render(
             },
             [&](GLuint program, entt::entity, const eeng::ecs::ModelComponent&)
             {
-                const glm::mat4 world = glm::mat4(1.0f);
+                const glm::mat4 world = glm_aux::S({ 0.05f, 0.05f, 0.05f }); // glm::mat4(1.0f);
                 glUniformMatrix4fv(
                     glGetUniformLocation(program, "WorldMatrix"),
                     1,
