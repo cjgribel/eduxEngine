@@ -22,16 +22,19 @@ namespace eeng::assets
     {
         constexpr int no_texture = -1;
 
+        /// @brief Convert Assimp vector to glm::vec3.
         inline glm::vec3 aivec_to_glmvec(const aiVector3D& vec)
         {
             return glm::vec3(vec.x, vec.y, vec.z);
         }
 
+        /// @brief Convert Assimp quaternion to glm::quat.
         inline glm::quat aiquat_to_glmquat(const aiQuaternion& aiq)
         {
             return glm::quat(aiq.w, aiq.x, aiq.y, aiq.z);
         }
 
+        /// @brief Convert Assimp matrix to glm::mat4 (column-major).
         inline glm::mat4 aimat_to_glmmat(const aiMatrix4x4& aim)
         {
             glm::mat4 glmm;
@@ -54,6 +57,7 @@ namespace eeng::assets
             return glmm;
         }
 
+        /// @brief Insert a bone weight into the 4-slot skin data, keeping max weights.
         inline void add_weight(SkinData& data, u32 bone_index, float bone_weight)
         {
             float min_weight = 1.0f;
@@ -73,6 +77,7 @@ namespace eeng::assets
             }
         }
 
+        /// @brief Ensure a filesystem path ends in a separator (for string concatenation).
         std::string ensure_trailing_separator(std::string path)
         {
             if (!path.empty())
@@ -86,6 +91,10 @@ namespace eeng::assets
             return path;
         }
 
+        /// @brief Resolve a material texture, creating a TextureAsset entry if needed.
+        /// @details Embedded textures are referenced by "*<index>" and exported on demand.
+        ///          External textures are resolved relative to the model path, with a
+        ///          fallback to filename-only if the authored path is missing.
         int load_texture(
             const aiMaterial* material,
             aiTextureType texture_type,
@@ -131,6 +140,7 @@ namespace eeng::assets
                 texture_rel_path.erase(0, 1);
 
             int embedded_texture_index = -1;
+            // Embedded textures are referenced by "*<index>" per Assimp convention.
             if (std::sscanf(texture_rel_path.c_str(), "*%d", &embedded_texture_index) == 1)
             {
                 if (!scene || embedded_texture_index < 0 || static_cast<size_t>(embedded_texture_index) >= scene->mNumTextures)
@@ -142,6 +152,7 @@ namespace eeng::assets
                 std::string texture_rawfilename = aitexture->mFilename.C_Str();
                 bool is_compressed = aitexture->mHeight == 0;
 
+                // Export embedded textures into the model's texture folder on demand.
                 std::string texture_filename = "embedded_" + std::to_string(embedded_texture_index) + ".";
                 if (!is_compressed)
                     texture_filename += "png";
@@ -184,6 +195,7 @@ namespace eeng::assets
             std::string source_path = texture_rel_path;
             if (!std::filesystem::exists(texture_abs_path))
             {
+                // Assimp often stores absolute/authoring paths; fall back to filename.
                 texture_abs_path = model_dir + texture_filename;
                 source_path = texture_filename;
             }
@@ -203,6 +215,7 @@ namespace eeng::assets
             return static_cast<int>(tex_it->second);
         }
 
+        /// @brief Build a flat node tree from Assimp's hierarchy (bind pose).
         void load_node(aiNode* ainode, VecTree<SkeletonNode>& nodetree)
         {
             std::string node_name = std::string(ainode->mName.C_Str());
@@ -302,6 +315,7 @@ namespace eeng::assets
             throw std::runtime_error(impl_->importer.GetErrorString());
         }
 
+        // Assimp scene sanity checks; fail early for unsupported inputs.
         if (!scene->HasMeshes())
             throw std::runtime_error("Scene has no meshes");
         if (!scene->HasMaterials())
@@ -493,6 +507,7 @@ namespace eeng::assets
             const int specular = load_texture(material, aiTextureType_SPECULAR, model_dir, scene, textures_dir, parsed.textures, texture_index_map, embedded_asset_indices);
             const int opacity = load_texture(material, aiTextureType_OPACITY, model_dir, scene, textures_dir, parsed.textures, texture_index_map, embedded_asset_indices);
 
+            // Assimp sometimes tags OBJ normal maps as HEIGHT; use that as a fallback.
             const int normal_fallback = (normal == no_texture)
                 ? load_texture(material, aiTextureType_HEIGHT, model_dir, scene, textures_dir, parsed.textures, texture_index_map, embedded_asset_indices)
                 : normal;

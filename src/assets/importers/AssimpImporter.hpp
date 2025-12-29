@@ -62,6 +62,13 @@ namespace eeng::assets
         std::unordered_map<unsigned, size_t> material_index_map;
     };
 
+    /// @brief Assimp-backed model importer that builds CPU/GPU assets.
+    ///
+    /// Policy notes:
+    /// - We keep ModelDataAsset as pure data; no GL calls happen in parse_scene.
+    /// - Embedded textures are handled lazily (only if a material references "*<index>").
+    /// - External textures are copied into the model's texture folder and stored as relative paths.
+    /// - Some Assimp format quirks are handled in parsing (e.g., normal maps in HEIGHT slot).
     class AssimpImporter
     {
     public:
