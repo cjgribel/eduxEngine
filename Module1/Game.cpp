@@ -260,6 +260,7 @@ bool Game::init()
 
     renderSystem = std::make_unique<eeng::ecs::systems::RenderSystem>();
     renderSystem->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
+    animationSystem = std::make_unique<eeng::ecs::systems::AnimationSystem>();
 
     // LEVEL CYCLE API TESTS
     {
@@ -914,6 +915,12 @@ void Game::update(
         { 3, 0, 0 },
         time * glm::radians(50.0f) * 0, { 0, 1, 0 },
         { 0.03f, 0.03f, 0.03f });
+
+    if (animationSystem)
+    {
+        auto& registry = ctx->entity_manager->registry();
+        animationSystem->update(registry, *ctx, deltaTime);
+    }
 
     // Intersect player view ray with AABBs of other objects 
     glm_aux::intersect_ray_AABB(player.viewRay, character_aabb2.min, character_aabb2.max);

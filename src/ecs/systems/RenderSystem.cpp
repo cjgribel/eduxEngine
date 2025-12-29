@@ -106,6 +106,8 @@ namespace eeng::ecs::systems
             GLuint ibo = 0;
             std::vector<assets::GpuSubMesh> submeshes;
             Handle<assets::ModelDataAsset> model_handle{};
+            std::vector<assets::SubMesh> cpu_submeshes;
+            size_t bone_count = 0;
 
             rm->storage().read(model.model_ref.handle, [&](const assets::GpuModelAsset& gpu)
                 {
@@ -121,6 +123,15 @@ namespace eeng::ecs::systems
             if (vao == 0 || ibo == 0 || submeshes.empty())
                 continue;
 
+            if (rm->storage().validate(model_handle))
+            {
+                rm->storage().read(model_handle, [&](const assets::ModelDataAsset& cpu_model)
+                    {
+                        cpu_submeshes = cpu_model.submeshes;
+                        bone_count = cpu_model.bones.size();
+                    });
+            }
+
             if (bind_entity_uniforms)
                 bind_entity_uniforms(shader_program_, entity, model);
             CheckAndThrowGLErrors();
@@ -128,6 +139,16 @@ namespace eeng::ecs::systems
             glBindVertexArray(vao);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
             CheckAndThrowGLErrors();
+
+            if (bone_count > 0 && !model.bone_matrices.empty())
+            {
+                const auto count = static_cast<GLsizei>(std::min(bone_count, model.bone_matrices.size()));
+                glUniformMatrix4fv(
+                    glGetUniformLocation(shader_program_, "BoneMatrices"),
+                    count,
+                    0,
+                    glm::value_ptr(model.bone_matrices[0]));
+            }
 
             for (const auto& sm : submeshes)
             {
@@ -173,7 +194,12 @@ namespace eeng::ecs::systems
                     glUniform1i(glGetUniformLocation(shader_program_, texture_desc.flag_name), has_texture);
                 }
 
-                glUniform1i(glGetUniformLocation(shader_program_, "u_is_skinned"), 0);
+                const size_t sm_index = &sm - submeshes.data();
+                const bool submesh_skinned = (sm_index < cpu_submeshes.size())
+                    ? cpu_submeshes[sm_index].is_skinned
+                    : false;
+                const bool use_skinning = submesh_skinned && !model.bone_matrices.empty();
+                glUniform1i(glGetUniformLocation(shader_program_, "u_is_skinned"), use_skinning ? 1 : 0);
 
                 CheckAndThrowGLErrors();
                 glDrawElementsBaseVertex(

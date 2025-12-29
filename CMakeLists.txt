@@ -243,6 +243,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/HeaderComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/CoreComponents.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/RenderSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/AnimationSystem.cpp
     #${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/AssignFieldCommand.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/MetaFieldAssign.cpp

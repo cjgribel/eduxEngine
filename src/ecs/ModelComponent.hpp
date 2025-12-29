@@ -18,6 +18,13 @@ namespace eeng::ecs
         // std::string chunk_tag; // PROBABLY SKIP
         // Guid guid;
         AssetRef<eeng::assets::GpuModelAsset> model_ref;
+        int clip_index = -1;
+        float clip_time = 0.0f;
+        float clip_speed = 1.0f;
+        bool loop = true;
+
+        std::vector<glm::mat4> bone_matrices;
+        std::vector<glm::mat4> node_global_matrices;
 
         ModelComponent() = default;
         ModelComponent(

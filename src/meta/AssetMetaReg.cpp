@@ -569,29 +569,29 @@ namespace eeng {
 
                 .data<&assets::ModelDataAsset::positions>("positions"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "positions", "Positions", "Positions." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::hidden)
 
                 .data<&assets::ModelDataAsset::normals>("normals"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "normals", "Normals", "Normals." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::hidden)
 
                 .data<&assets::ModelDataAsset::tangents>("tangents"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "tangents", "Tangents", "Tangents." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::hidden)
 
                 .data<&assets::ModelDataAsset::binormals>("binormals"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "binormals", "Binormals", "Binormals." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::hidden)
 
                 .data<&assets::ModelDataAsset::texcoords>("texcoords"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "texcoords", "Texcoords", "Texcoords." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::hidden)
 
                 // std::vector<SkinData> skin;
 
                 .data<&assets::ModelDataAsset::indices>("indices"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "indices", "Indices", "Indices." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::hidden)
 
                 .data<&assets::ModelDataAsset::submeshes>("submeshes"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "Submeshes", "Submeshes." })

@@ -5,6 +5,7 @@
 #include "GameBase.h"
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
+#include "ecs/systems/AnimationSystem.hpp"
 #include "ecs/systems/RenderSystem.hpp"
 #include <entt/fwd.hpp> // For entt::registry - remove from here
 
@@ -82,6 +83,7 @@ private:
 
     // ECS renderer for ModelComponent
     std::unique_ptr<eeng::ecs::systems::RenderSystem> renderSystem;
+    std::unique_ptr<eeng::ecs::systems::AnimationSystem> animationSystem;
 
     // Entity registry - to use in labs
     std::shared_ptr<entt::registry> entity_registry; // unique + and out weak ptrs?
