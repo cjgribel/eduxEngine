@@ -17,6 +17,7 @@
 #include "parseutil.h"
 #include "stb_image_write.h"
 #include "meta/MetaAux.h"
+#include "LogMacros.h"
 
 namespace eeng::assets
 {
@@ -347,7 +348,12 @@ namespace eeng::assets
                     for (const auto& entry : std::filesystem::directory_iterator(resolved))
                     {
                         if (entry.is_regular_file())
+                        {
+                            const auto filename = entry.path().filename().string();
+                            if (!filename.empty() && filename.front() == '.')
+                                continue;
                             expanded.push_back(entry.path());
+                        }
                     }
                 }
                 else
@@ -476,13 +482,23 @@ namespace eeng::assets
             result.success = false;
             result.error_message = ex.what();
         }
+        if (result.success)
+        {
+            EENG_LOG_INFO(&ctx, "Assimp import succeeded: %s", options.source_file.string().c_str());
+        }
+        else
+        {
+            EENG_LOG_ERROR(&ctx, "Assimp import failed: %s (%s)",
+                options.source_file.string().c_str(),
+                result.error_message.c_str());
+        }
         return result;
     }
 
     AssimpParseResult AssimpImporter::parse_scene(
         const std::filesystem::path& source_file,
         const AssimpImportOptions& options,
-        EngineContext&)
+        EngineContext& ctx)
     {
         AssimpParseResult parsed{};
 
@@ -687,14 +703,43 @@ namespace eeng::assets
                 source_file,
                 options.animation_sources);
 
+            std::vector<std::string> failed_sources;
+            size_t appended_sources = 0;
+            size_t appended_clips = 0;
             for (const auto& anim_source : extra_sources)
             {
-                Assimp::Importer anim_importer;
-                const unsigned int anim_flags = build_assimp_flags(options.flags);
-                const aiScene* anim_scene = anim_importer.ReadFile(anim_source.string(), anim_flags);
-                if (!anim_scene || !anim_scene->mRootNode)
-                    throw std::runtime_error(anim_importer.GetErrorString());
-                append_animation_clips(model, anim_scene, anim_source);
+                try
+                {
+                    Assimp::Importer anim_importer;
+                    const unsigned int anim_flags = build_assimp_flags(options.flags);
+                    const aiScene* anim_scene = anim_importer.ReadFile(anim_source.string(), anim_flags);
+                    if (!anim_scene || !anim_scene->mRootNode)
+                        throw std::runtime_error(anim_importer.GetErrorString());
+                    const size_t clips_before = model.animations.size();
+                    append_animation_clips(model, anim_scene, anim_source);
+                    appended_clips += model.animations.size() - clips_before;
+                    appended_sources++;
+                }
+                catch (const std::exception& ex)
+                {
+                    failed_sources.push_back(anim_source.string() + " (" + ex.what() + ")");
+                }
+            }
+
+            if (!failed_sources.empty())
+            {
+                EENG_LOG_WARN(&ctx, "Assimp import: skipped %zu animation source(s).", failed_sources.size());
+                for (const auto& msg : failed_sources)
+                    EENG_LOG_WARN(&ctx, "  %s", msg.c_str());
+            }
+            if (appended_sources > 0)
+            {
+                EENG_LOG_INFO(&ctx, "Assimp import: appended %zu clip(s) from %zu animation source(s).",
+                    appended_clips, appended_sources);
+            }
+            if (appended_sources == 0 && !extra_sources.empty())
+            {
+                EENG_LOG_WARN(&ctx, "Assimp import: no animations appended from animation_sources.");
             }
         }
 

@@ -123,11 +123,9 @@ namespace eeng::dev
                     auto import_result = importer.import_model_with_animations(
                         opts,
                         {
-                            //source_assets_root/"Amy/Locomotion Pack" // folder (.DS Store...)
-                            source_assets_root/"Amy/idle.fbx", // file
-                            source_assets_root/"Amy/jump.fbx" // file
-                            //"/Users/ag1498/GitHub/eduxEngine/assets/Amy/Anims" // folder
-                            //"/Users/ag1498/GitHub/eduxEngine/assets/Amy/Run.fbx" // file
+                            source_assets_root/"Amy/Locomotion Pack" // folder (.DS Store...)
+                            //source_assets_root/"Amy/idle.fbx", // file
+                            //source_assets_root/"Amy/jump.fbx" // file
                         },
                         *ctx);
                     assert(import_result.success);
