@@ -156,6 +156,49 @@ namespace eeng::detail
     }
 }
 
+namespace
+{
+    void bind_refs_for_entities_on_main(
+        const std::vector<eeng::ecs::EntityRef>& entities,
+        eeng::EngineContext& ctx)
+    {
+        if (!ctx.entity_manager)
+            return;
+        auto reg_sp = ctx.entity_manager->registry_wptr().lock();
+        if (!reg_sp)
+            return;
+
+        ctx.main_thread_queue->push_and_wait([&]()
+            {
+                for (const auto& er : entities)
+                {
+                    if (!er.is_bound())
+                        continue;
+                    eeng::meta::bind_asset_refs_for_entity(er.entity, ctx);
+                    eeng::meta::bind_entity_refs_for_entity(er.entity, ctx);
+                }
+            });
+    }
+
+    bool rebind_assets_in_closure(
+        const std::vector<eeng::Guid>& closure,
+        const eeng::BatchId& batch_id,
+        eeng::EngineContext& ctx)
+    {
+        if (closure.empty())
+            return true;
+
+        std::deque<eeng::Guid> dq(closure.begin(), closure.end());
+        auto tr = ctx.resource_manager->load_and_bind_async(
+            std::move(dq),
+            batch_id,
+            ctx
+        ).get();
+
+        return tr.success;
+    }
+}
+
 namespace eeng
 {
     void BatchRegistry::save_index(const std::filesystem::path& index_path)
@@ -588,11 +631,7 @@ namespace eeng
                 }
 
                 // 4) MT: bind AssetRef<> and EntityRef<> inside this entity’s components
-                ctx.main_thread_queue->push_and_wait([&]()
-                    {
-                        eeng::meta::bind_asset_refs_for_entity(entity_ref.entity, ctx);
-                        eeng::meta::bind_entity_refs_for_entity(entity_ref.entity, ctx);
-                    });
+                bind_refs_for_entities_on_main({ entity_ref }, ctx);
 
                 return true;
             });
@@ -693,11 +732,7 @@ namespace eeng
                 }
 
                 // 3) MT: bind refs in the spawned entity’s components
-                ctx.main_thread_queue->push_and_wait([&]()
-                    {
-                        eeng::meta::bind_asset_refs_for_entity(created.entity, ctx);
-                        eeng::meta::bind_entity_refs_for_entity(created.entity, ctx);
-                    });
+                bind_refs_for_entities_on_main({ created }, ctx);
 
                 return created;
             });
@@ -1005,7 +1040,11 @@ namespace eeng
                     return result;
                 }
 
-                // 8) Commit new closure to BatchInfo
+                // 8) Rebind asset refs now that the full closure is loaded
+                result.success = result.success &&
+                    rebind_assets_in_closure(new_closure, id, ctx);
+
+                // 9) Commit new closure to BatchInfo
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
@@ -1023,6 +1062,9 @@ namespace eeng
 
                     it->second.asset_closure_hdr = std::move(new_closure);
                 }
+
+                // 10) MT: rebind refs inside entities now that assets are loaded/bound
+                bind_refs_for_entities_on_main(live_snapshot, ctx);
 
                 return result;
             });
@@ -1104,24 +1146,7 @@ namespace eeng
         // ABORT IF ASSET LOAD FAILED ???
 
         // 3) Bind AssetRef<> + EntityRef<> inside components
-        if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
-        {
-            auto& reg = *reg_sp; // TODO -> us is instead of direct ref's in helpers?
-
-            ctx.main_thread_queue->push_and_wait([&]()
-                {
-                    for (auto& er : B.live)
-                    {
-                        if (!er.is_bound()) continue;
-                        auto e = er.entity;
-
-                        // Bind asset refs in this entity's components
-                        eeng::meta::bind_asset_refs_for_entity(e, ctx);
-                        // Bind entity refs (uses EM via ctx)
-                        eeng::meta::bind_entity_refs_for_entity(e, ctx);
-                    }
-                });
-        }
+        bind_refs_for_entities_on_main(B.live, ctx);
 
         return res;
     }
