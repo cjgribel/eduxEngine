@@ -171,7 +171,7 @@ namespace eeng::meta
             entt::entity e,
             entt::registry& reg)
     {
-        LogGlobals::log("[collect_asset_guids_for_entity]");
+        // LogGlobals::log("[collect_asset_guids_for_entity]");
         std::vector<Guid> result;
 
         for_each_component(e, reg, [&](entt::meta_type mt, entt::meta_any& any)
