@@ -19,12 +19,12 @@ namespace eeng::ecs
         // Guid guid;
         AssetRef<eeng::assets::GpuModelAsset> model_ref;
         int clip_index = -1;
-        float clip_time = 0.0f;
+        float clip_time = 0.0f; // runtime
         float clip_speed = 1.0f;
         bool loop = true;
 
-        std::vector<glm::mat4> bone_matrices;
-        std::vector<glm::mat4> node_global_matrices;
+        std::vector<glm::mat4> bone_matrices; // runtime
+        std::vector<glm::mat4> node_global_matrices; // runtime
 
         ModelComponent() = default;
         ModelComponent(

@@ -22,7 +22,11 @@
 // #include <iostream>
 #include <entt/entt.hpp>
 // #include <entt/meta/pointer.hpp>
-#include <nlohmann/json.hpp> // -> TYPE HELPER
+
+namespace eeng::serializers
+{
+    void register_modeldataasset_serialization();
+}
 
 namespace eeng {
 
@@ -587,7 +591,9 @@ namespace eeng {
                 .custom<DataMetaInfo>(DataMetaInfo{ "texcoords", "Texcoords", "Texcoords." })
                 .traits(MetaFlags::hidden)
 
-                // std::vector<SkinData> skin;
+                .data<&assets::ModelDataAsset::skin>("skin"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "skin", "Skin", "Skin." })
+                .traits(MetaFlags::hidden)
 
                 .data<&assets::ModelDataAsset::indices>("indices"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "indices", "Indices", "Indices." })
@@ -597,12 +603,20 @@ namespace eeng {
                 .custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "Submeshes", "Submeshes." })
                 .traits(MetaFlags::read_only)
 
-                // VecTree<SkeletonNode> nodetree;
-                // std::vector<Bone> bones;
-                // std::vector<AnimClip> animations;
+                .data<&assets::ModelDataAsset::nodetree>("nodetree"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "nodetree", "Node Tree", "Node Tree." })
+                .traits(MetaFlags::hidden)
 
+                .data<&assets::ModelDataAsset::bones>("bones"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "bones", "Bones", "Bones." })
+                .traits(MetaFlags::hidden)
+
+                .data<&assets::ModelDataAsset::animations>("animations"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "animations", "Animations", "Animations." })
+                .traits(MetaFlags::hidden)
                 ;
             register_asset<assets::ModelDataAsset>();
+            serializers::register_modeldataasset_serialization();
         }
 
         // === MOCK RESOURCES ===

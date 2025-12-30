@@ -126,7 +126,7 @@ namespace eeng
                 // Bind referenced assets
                 .template func<&meta::bind_asset_refs<T>, entt::as_void_t>(literals::bind_asset_refs_hs)
                 .template func<&meta::bind_entity_refs<T>, entt::as_void_t>(literals::bind_entity_refs_hs)
-                
+
                 // TODO -> Unbind referenced assets
                 // ...
 
@@ -340,6 +340,26 @@ namespace eeng
                 .data<&eeng::ecs::ModelComponent::model_ref>("model_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model reference", "Model Reference." })
                 .traits(MetaFlags::read_only)
+
+                // Anim clip index
+                .data<&eeng::ecs::ModelComponent::clip_index>("clip_index"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "clip_index", "Clip Index", "Clip Index." })
+                .traits(MetaFlags::none)
+
+                // Anim clip time
+                // .data<&eeng::ecs::ModelComponent::clip_time>("clip_time"_hs)
+                // .custom<DataMetaInfo>(DataMetaInfo{ "clip_time", "Clip Time", "Clip Time." })
+                // .traits(MetaFlags::none)
+
+                // Anim clip speed
+                .data<&eeng::ecs::ModelComponent::clip_speed>("clip_speed"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "clip_speed", "Clip Speed", "Clip Speed." })
+                .traits(MetaFlags::none)
+
+                // Anim clip loop
+                .data<&eeng::ecs::ModelComponent::loop>("loop"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "loop", "Loop", "Loop clip." })
+                .traits(MetaFlags::none)
                 ;
             register_component<ecs::ModelComponent>();
         }

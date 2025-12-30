@@ -63,35 +63,61 @@ namespace
         if (!track.is_used)
             return node.local_bind_tfm;
 
+        // Decompose bind pose for missing key channels.
+        const glm::vec3 bind_pos = glm::vec3(node.local_bind_tfm[3]);
+        glm::vec3 bind_scale;
+        bind_scale.x = glm::length(glm::vec3(node.local_bind_tfm[0]));
+        bind_scale.y = glm::length(glm::vec3(node.local_bind_tfm[1]));
+        bind_scale.z = glm::length(glm::vec3(node.local_bind_tfm[2]));
+        if (bind_scale.x == 0.0f) bind_scale.x = 1.0f;
+        if (bind_scale.y == 0.0f) bind_scale.y = 1.0f;
+        if (bind_scale.z == 0.0f) bind_scale.z = 1.0f;
+
+        glm::mat3 bind_rot_m(
+            glm::vec3(node.local_bind_tfm[0]) / bind_scale.x,
+            glm::vec3(node.local_bind_tfm[1]) / bind_scale.y,
+            glm::vec3(node.local_bind_tfm[2]) / bind_scale.z);
+        const glm::quat bind_rot = glm::quat_cast(bind_rot_m);
+
+        glm::vec3 blendpos = bind_pos;
+        glm::quat blendrot = bind_rot;
+        glm::vec3 blendscale = bind_scale;
+
         const size_t nbr_pos_keys = track.pos_keys.size();
+        if (nbr_pos_keys > 0)
+        {
+            const float pos_indexf = ntime * (nbr_pos_keys - 1u);
+            const size_t pos_index0 = static_cast<size_t>(std::floor(pos_indexf));
+            const size_t pos_index1 = std::min(pos_index0 + 1u, nbr_pos_keys - 1u);
+            blendpos = glm::mix(
+                track.pos_keys[pos_index0],
+                track.pos_keys[pos_index1],
+                pos_indexf - static_cast<float>(pos_index0));
+        }
+
         const size_t nbr_rot_keys = track.rot_keys.size();
+        if (nbr_rot_keys > 0)
+        {
+            const float rot_indexf = ntime * (nbr_rot_keys - 1u);
+            const size_t rot_index0 = static_cast<size_t>(std::floor(rot_indexf));
+            const size_t rot_index1 = std::min(rot_index0 + 1u, nbr_rot_keys - 1u);
+            blendrot = glm::slerp(
+                track.rot_keys[rot_index0],
+                track.rot_keys[rot_index1],
+                rot_indexf - static_cast<float>(rot_index0));
+        }
+
         const size_t nbr_scale_keys = track.scale_keys.size();
-        if (nbr_pos_keys == 0 || nbr_rot_keys == 0 || nbr_scale_keys == 0)
-            return node.local_bind_tfm;
-
-        const float pos_indexf = ntime * (nbr_pos_keys - 1u);
-        const size_t pos_index0 = static_cast<size_t>(std::floor(pos_indexf));
-        const size_t pos_index1 = std::min(pos_index0 + 1u, nbr_pos_keys - 1u);
-        const auto blendpos = glm::mix(
-            track.pos_keys[pos_index0],
-            track.pos_keys[pos_index1],
-            pos_indexf - static_cast<float>(pos_index0));
-
-        const float rot_indexf = ntime * (nbr_rot_keys - 1u);
-        const size_t rot_index0 = static_cast<size_t>(std::floor(rot_indexf));
-        const size_t rot_index1 = std::min(rot_index0 + 1u, nbr_rot_keys - 1u);
-        const auto blendrot = glm::slerp(
-            track.rot_keys[rot_index0],
-            track.rot_keys[rot_index1],
-            rot_indexf - static_cast<float>(rot_index0));
-
-        const float scale_indexf = ntime * (nbr_scale_keys - 1u);
-        const size_t scale_index0 = static_cast<size_t>(std::floor(scale_indexf));
-        const size_t scale_index1 = std::min(scale_index0 + 1u, nbr_scale_keys - 1u);
-        const auto blendscale = glm::mix(
-            track.scale_keys[scale_index0],
-            track.scale_keys[scale_index1],
-            scale_indexf - static_cast<float>(scale_index0));
+        if (nbr_scale_keys > 0)
+        {
+            const float scale_indexf = ntime * (nbr_scale_keys - 1u);
+            const size_t scale_index0 = static_cast<size_t>(std::floor(scale_indexf));
+            const size_t scale_index1 = std::min(scale_index0 + 1u, nbr_scale_keys - 1u);
+            blendscale = glm::mix(
+                track.scale_keys[scale_index0],
+                track.scale_keys[scale_index1],
+                scale_indexf - static_cast<float>(scale_index0));
+        }
 
         // Compose TRS in local/node space (translation * rotation * scale).
         const glm::mat4 translation_matrix = glm::translate(glm::mat4(1.0f), blendpos);
@@ -111,7 +137,7 @@ namespace eeng::ecs::systems
             return;
 
         auto view = registry.view<ecs::ModelComponent>();
-        for (auto [entity, model_component] : view.each())
+        for (auto&& [entity, model_component] : view.each())
         {
             if (!model_component.model_ref.is_bound())
                 continue;

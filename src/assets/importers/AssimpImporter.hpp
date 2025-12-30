@@ -39,6 +39,8 @@ namespace eeng::assets
         float                 scale = 1.0f;
         ImportFlags           flags = ImportFlags::None;
         bool                  append_animations = false;
+        // Additional animation files or folders to append during import.
+        std::vector<std::filesystem::path> animation_sources;
     };
 
     /// @brief Import result with primary asset handles.
@@ -48,6 +50,23 @@ namespace eeng::assets
         std::string error_message;
         AssetRef<GpuModelAsset> gpu_model;
         Guid model_guid = Guid::invalid();
+    };
+
+    /// @brief Result for appending animations to an existing model.
+    struct AssimpAppendResult
+    {
+        bool success = false;
+        std::string error_message;
+        Guid model_guid = Guid::invalid();
+        size_t appended_clips = 0;
+    };
+
+    /// @brief Options for appending animations to an existing model.
+    struct AssimpAppendOptions
+    {
+        std::filesystem::path source_file;
+        Guid target_model = Guid::invalid();
+        ImportFlags flags = ImportFlags::None;
     };
 
     /// @brief Parsed data extracted from Assimp before asset construction.
@@ -77,6 +96,15 @@ namespace eeng::assets
 
         AssimpImportResult import_model(
             const AssimpImportOptions& options,
+            EngineContext& ctx);
+
+        AssimpImportResult import_model_with_animations(
+            const AssimpImportOptions& options,
+            const std::vector<std::filesystem::path>& animation_inputs,
+            EngineContext& ctx);
+
+        AssimpAppendResult append_animations(
+            const AssimpAppendOptions& options,
             EngineContext& ctx);
 
     private:

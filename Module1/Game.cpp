@@ -46,29 +46,30 @@ namespace eeng::dev
 {
 
     void schedule_startup_import_and_scan(
-        const std::filesystem::path& asset_root,
+        const std::filesystem::path& source_assets_root,
+        const std::filesystem::path& imported_assets_root,
         const std::filesystem::path& batches_root,
         std::shared_ptr<eeng::EngineContext> ctx)
     {
         using ModelRef = eeng::AssetRef<eeng::mock::Model>;
 
         // 1) define task
-        auto startup_task = [asset_root, batches_root, ctx]() {
+        auto startup_task = [source_assets_root, imported_assets_root, batches_root, ctx]() {
             // If logging must be on main, do it here:
             // ctx->main_thread_queue->push([ctx]() {
             EENG_LOG(ctx.get(), "[startup] Begin startup worker on main...");
             // });
 
         // 2) run orchestrator on worker pool
-            ctx->thread_pool->queue_task([asset_root, batches_root, ctx]() {
+            ctx->thread_pool->queue_task([source_assets_root, imported_assets_root, batches_root, ctx]() {
                 try
                 {
-#if 1
+#if 0
                     // Just scan & load existing batch index
 
                     // Scan assets
                     EENG_LOG(ctx.get(), "[startup] Waiting for scan to complete before adding components...");
-                    auto scan_fut = ctx->resource_manager->scan_assets_async(asset_root, *ctx);
+                    auto scan_fut = ctx->resource_manager->scan_assets_async(imported_assets_root, *ctx);
 
                     // Create/load batch index
                     EENG_LOG(ctx.get(), "[startup] Loading/Creating batch index at: %s", batches_root.string().c_str());
@@ -88,9 +89,9 @@ namespace eeng::dev
                     for (int i = 0; i < num_tasks; ++i)
                     {
                         futures.emplace_back(
-                            ctx->thread_pool->queue_task([asset_root, ctx]()
+                            ctx->thread_pool->queue_task([imported_assets_root, ctx]()
                                 {
-                                    return eeng::mock::ModelImporter::import(asset_root, ctx);
+                                    return eeng::mock::ModelImporter::import(imported_assets_root, ctx);
                                 })
                         );
                     }
@@ -101,13 +102,14 @@ namespace eeng::dev
 
                     // 2.2) Import a quads model (this thread)
                     EENG_LOG(ctx.get(), "[startup] Importing quads model on worker...");
-                    auto quadmodel_ref = eeng::mock::ModelImporter::import_quads_modeldata(asset_root, ctx);
+                    auto quadmodel_ref = eeng::mock::ModelImporter::import_quads_modeldata(imported_assets_root, ctx);
 
                     // 2.3 ASSIMP IMPORT TEST (this thread)
                     eeng::assets::AssimpImporter importer;
                     eeng::assets::AssimpImportOptions opts{};
-                    opts.assets_root = asset_root;
-                    opts.source_file = "/Users/ag1498/GitHub/eduxEngine/assets/Amy/Ch46_nonPBR.fbx";
+                    opts.assets_root = imported_assets_root;
+                    // opts.source_file = "/Users/ag1498/GitHub/eduxEngine/assets/Amy/Ch46_nonPBR.fbx";
+                    opts.source_file = source_assets_root / "Amy/Ch46_nonPBR.fbx";
                     opts.model_name = "Amy";
                     opts.flags = static_cast<eeng::assets::ImportFlags>(
                         static_cast<unsigned>(eeng::assets::ImportFlags::GenerateTangents) |
@@ -116,14 +118,26 @@ namespace eeng::dev
                         static_cast<unsigned>(eeng::assets::ImportFlags::SortByPType) |
                         static_cast<unsigned>(eeng::assets::ImportFlags::FlipUVs) |
                         static_cast<unsigned>(eeng::assets::ImportFlags::OptimizeGraph));
-                        // plus for cache locality maybe ImportFlags::OptimizeMesh
-                    auto import_result = importer.import_model(opts, *ctx);
+                    // plus for cache locality maybe ImportFlags::OptimizeMesh
+                    //auto import_result = importer.import_model(opts, *ctx);
+                    auto import_result = importer.import_model_with_animations(
+                        opts,
+                        {
+                            //source_assets_root/"Amy/Locomotion Pack" // folder (.DS Store...)
+                            source_assets_root/"Amy/idle.fbx", // file
+                            source_assets_root/"Amy/jump.fbx" // file
+                            //"/Users/ag1498/GitHub/eduxEngine/assets/Amy/Anims" // folder
+                            //"/Users/ag1498/GitHub/eduxEngine/assets/Amy/Run.fbx" // file
+                        },
+                        *ctx);
+                    assert(import_result.success);
+                    assert(import_result.gpu_model.guid.valid());
                     //
 
                     // 3) Run scan (don't wait)
                     auto nbr_assets = refs.size();
                     EENG_LOG(ctx.get(), "[startup] Imported %zu models. Scanning...", nbr_assets);
-                    auto scan_fut = ctx->resource_manager->scan_assets_async(asset_root, *ctx);
+                    auto scan_fut = ctx->resource_manager->scan_assets_async(imported_assets_root, *ctx);
 
                     // Create a few batches
                     // Add a few entities to each batch
@@ -142,15 +156,17 @@ namespace eeng::dev
                     /* + DURING APP INIT */ //br.load_index_from_json(batches_root / "index.json");
                     //
                     auto batch_id1 = br.create_batch("Startup Batch 1"); assert(batch_id1.valid());
+
                     //
-                    // LOADING BATCHES
+                    // LOAD BATCHES
                     //
                     EENG_LOG(ctx.get(), "[startup] Loading batch 1...");
                     br.queue_load(batch_id1, *ctx).get();
                     EENG_LOG(ctx.get(), "[startup] Loading all batches...");
                     br.queue_load_all_async(*ctx).get();
+
                     //
-                    // SAVING BATCHES
+                    // SAVE BATCHES
                     //
                     EENG_LOG(ctx.get(), "[startup] Saving batch 1...");
                     br.queue_save_batch(batch_id1, *ctx).get();
@@ -202,7 +218,9 @@ namespace eeng::dev
                                 //reg.emplace<eeng::CopySignaller>(er_root.entity);
 
                                 // reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, "Model", quadmodel_ref);
-                                reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, "Model", import_result.gpu_model);
+                                auto aimodel = eeng::ecs::ModelComponent("Amy", import_result.gpu_model);
+                                aimodel.clip_index = 1;
+                                reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, aimodel);
                                 reg.emplace<eeng::ecs::ModelComponent>(er_camera.entity, "Model", quadmodel_ref);
 
                                 // If Position has AssetRef<T> inside,
@@ -300,7 +318,7 @@ bool Game::init()
 
             EENG_LOG(ctx, "[Game::init()] Created entity: %i", entity.to_integral());
             entities.push_back(entity);
-    }
+        }
 #endif
 
         // 2. ...
@@ -317,7 +335,9 @@ bool Game::init()
         // TODO: Ugly cast to concrete type from interface
         // - Use interface for parts of ResourceManager not part of IResourceManager (load etc)
         auto& resource_manager = static_cast<eeng::ResourceManager&>(*ctx->resource_manager);
-        std::filesystem::path asset_root = "/Users/ag1498/GitHub/eduxEngine/Module1/project1/imported_assets/";
+        std::filesystem::path project_root = "/Users/ag1498/GitHub/eduxEngine/";
+        std::filesystem::path source_assets_root = "/Users/ag1498/GitHub/eduxEngine/assets/";
+        std::filesystem::path imported_assets_root = "/Users/ag1498/GitHub/eduxEngine/Module1/project1/imported_assets/";
         std::filesystem::path batches_root = "/Users/ag1498/GitHub/eduxEngine/Module1/project1/batches/";
         //std::filesystem::path asset_root = "C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/";
 
@@ -354,7 +374,11 @@ bool Game::init()
         //     resource_manager.scan_assets_async("/Users/ag1498/GitHub/eduEngine/Module1/project1/imported_assets/", *ctx);
         //     });
 // eeng::dev::import_then_scan_async(asset_root, ctx);
-        eeng::dev::schedule_startup_import_and_scan(asset_root, batches_root, ctx);
+        eeng::dev::schedule_startup_import_and_scan(
+            source_assets_root,
+            imported_assets_root,
+            batches_root,
+            ctx);
         {
 #if 0
             EENG_LOG(ctx, "[Game::init()] Scanning assets...");
@@ -371,7 +395,7 @@ bool Game::init()
                 EENG_LOG(ctx, "[Game::init()] Waiting for asset scan to finish...");
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 // std::this_thread::yield(); // Yield to other threads
-        }
+            }
 #endif
             // Get asset index snapshot and log it
             // auto asset_index = resource_manager.get_asset_entries_snapshot();
@@ -383,7 +407,7 @@ bool Game::init()
             //         entry.meta.type_name.c_str(),
             //         entry.relative_path.string().c_str());
             // }
-}
+        }
 #endif
 
 #if 0
@@ -393,7 +417,7 @@ bool Game::init()
             });
         ctx->main_thread_queue->push([&]() {
             EENG_LOG(ctx, "[MainThreadQueue] another task executed on main thread.");
-            });
+        });
         // Enqueue dummy tasks to main thread - BLOCKING
         ctx->main_thread_queue->push_and_wait([&]() -> void {
             EENG_LOG(ctx, "[MainThreadQueue] blocking task executed on main thread.");
@@ -485,8 +509,8 @@ bool Game::init()
                     assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
-                }
-            }
+    }
+}
 #endif
         }
 #endif
@@ -1088,7 +1112,7 @@ void Game::render(
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
         ShapeRendering::DemoDraw(shapeRenderer);
         shapeRenderer->pop_states<glm::mat4>();
-}
+    }
 #endif
 
     // Draw shape batches

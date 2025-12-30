@@ -4,7 +4,9 @@
 #include "AssimpImporter.hpp"
 
 #include <cstdio>
+#include <algorithm>
 #include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
@@ -245,6 +247,198 @@ namespace eeng::assets
                 load_node(ainode->mChildren[i], nodetree);
             }
         }
+
+        struct RawAnimClip
+        {
+            std::string name;
+            float duration_ticks = 0.0f;
+            float ticks_per_second = 25.0f;
+            std::vector<std::pair<std::string, AnimTrack>> tracks;
+        };
+
+        /// @brief Extract animation clips with node-name keyed tracks.
+        std::vector<RawAnimClip> extract_animation_clips(const aiScene* scene)
+        {
+            std::vector<RawAnimClip> clips;
+            if (!scene)
+                return clips;
+
+            clips.reserve(scene->mNumAnimations);
+            for (u32 i = 0; i < scene->mNumAnimations; i++)
+            {
+                aiAnimation* aianim = scene->mAnimations[i];
+                RawAnimClip clip{};
+                clip.name = std::string(aianim->mName.C_Str());
+                clip.duration_ticks = static_cast<float>(aianim->mDuration);
+                clip.ticks_per_second = static_cast<float>(aianim->mTicksPerSecond);
+                clip.tracks.reserve(aianim->mNumChannels);
+
+                for (u32 j = 0; j < aianim->mNumChannels; j++)
+                {
+                    aiNodeAnim* ainode_anim = aianim->mChannels[j];
+                    AnimTrack track{};
+                    track.is_used = true;
+
+                    const std::string node_name = std::string(ainode_anim->mNodeName.C_Str());
+                    track.pos_keys.reserve(ainode_anim->mNumPositionKeys);
+                    track.scale_keys.reserve(ainode_anim->mNumScalingKeys);
+                    track.rot_keys.reserve(ainode_anim->mNumRotationKeys);
+
+                    for (u32 k = 0; k < ainode_anim->mNumPositionKeys; k++)
+                        track.pos_keys.push_back(aivec_to_glmvec(ainode_anim->mPositionKeys[k].mValue));
+                    for (u32 k = 0; k < ainode_anim->mNumScalingKeys; k++)
+                        track.scale_keys.push_back(aivec_to_glmvec(ainode_anim->mScalingKeys[k].mValue));
+                    for (u32 k = 0; k < ainode_anim->mNumRotationKeys; k++)
+                        track.rot_keys.push_back(aiquat_to_glmquat(ainode_anim->mRotationKeys[k].mValue));
+
+                    clip.tracks.emplace_back(node_name, std::move(track));
+                }
+
+                clips.push_back(std::move(clip));
+            }
+
+            return clips;
+        }
+
+        std::string normalize_assimp_node_name(std::string name)
+        {
+            const auto fbx_marker = name.find("_$AssimpFbx$");
+            if (fbx_marker != std::string::npos)
+                name.erase(fbx_marker);
+            return name;
+        }
+
+        size_t resolve_node_index(
+            const VecTree<SkeletonNode>& nodetree,
+            const std::string& name)
+        {
+            SkeletonNode find_node{};
+            find_node.name = name;
+            size_t index = nodetree.find_node_index(find_node);
+            if (index != VecTree_NullIndex)
+                return index;
+
+            const std::string normalized = normalize_assimp_node_name(name);
+            if (normalized != name)
+            {
+                find_node.name = normalized;
+                index = nodetree.find_node_index(find_node);
+            }
+            return index;
+        }
+
+        std::vector<std::filesystem::path> expand_animation_inputs(
+            const std::filesystem::path& base_dir,
+            const std::filesystem::path& source_file,
+            const std::vector<std::filesystem::path>& inputs)
+        {
+            std::vector<std::filesystem::path> expanded;
+            for (const auto& input : inputs)
+            {
+                auto resolved = input;
+                if (resolved.is_relative())
+                    resolved = base_dir / resolved;
+
+                if (!std::filesystem::exists(resolved))
+                    throw std::runtime_error("Animation source not found: " + resolved.string());
+
+                if (std::filesystem::is_directory(resolved))
+                {
+                    for (const auto& entry : std::filesystem::directory_iterator(resolved))
+                    {
+                        if (entry.is_regular_file())
+                            expanded.push_back(entry.path());
+                    }
+                }
+                else
+                {
+                    expanded.push_back(resolved);
+                }
+            }
+
+            expanded.erase(
+                std::remove_if(
+                    expanded.begin(),
+                    expanded.end(),
+                    [&](const std::filesystem::path& path)
+                    {
+                        std::error_code ec;
+                        if (!source_file.empty() && std::filesystem::equivalent(path, source_file, ec))
+                            return !ec;
+                        return false;
+                    }),
+                expanded.end());
+
+            std::sort(expanded.begin(), expanded.end());
+            expanded.erase(std::unique(expanded.begin(), expanded.end()), expanded.end());
+            return expanded;
+        }
+
+        void append_animation_clips(
+            ModelDataAsset& model,
+            const aiScene* scene,
+            const std::filesystem::path& source_path)
+        {
+            const auto raw_clips = extract_animation_clips(scene);
+            if (raw_clips.empty())
+                throw std::runtime_error("Animation source has no clips: " + source_path.string());
+
+            for (const auto& raw : raw_clips)
+            {
+                AnimClip clip{};
+                clip.name = raw.name;
+                clip.duration_ticks = raw.duration_ticks;
+                clip.ticks_per_second = raw.ticks_per_second > 0.0f ? raw.ticks_per_second : 25.0f;
+                clip.node_animations.resize(model.nodetree.size());
+
+                for (const auto& [node_name, track] : raw.tracks)
+                {
+                    const auto index = resolve_node_index(model.nodetree, node_name);
+                    if (index == VecTree_NullIndex)
+                        throw std::runtime_error("Animation node not found in target model: " + node_name);
+                    auto& dst_track = clip.node_animations[index];
+                    if (!dst_track.is_used)
+                    {
+                        dst_track = track;
+                    }
+                    else
+                    {
+                        if (dst_track.pos_keys.empty())
+                            dst_track.pos_keys = track.pos_keys;
+                        if (dst_track.scale_keys.empty())
+                            dst_track.scale_keys = track.scale_keys;
+                        if (dst_track.rot_keys.empty())
+                            dst_track.rot_keys = track.rot_keys;
+                        dst_track.is_used = dst_track.is_used || track.is_used;
+                    }
+                }
+
+                model.animations.push_back(std::move(clip));
+            }
+        }
+
+        unsigned int build_assimp_flags(ImportFlags flags)
+        {
+            unsigned int assimp_flags = aiProcess_Triangulate | aiProcess_JoinIdenticalVertices;
+            if (flags != ImportFlags::None)
+            {
+                if ((static_cast<unsigned>(flags) & static_cast<unsigned>(ImportFlags::GenerateTangents)) != 0)
+                    assimp_flags |= aiProcess_CalcTangentSpace;
+                if ((static_cast<unsigned>(flags) & static_cast<unsigned>(ImportFlags::FlipUVs)) != 0)
+                    assimp_flags |= aiProcess_FlipUVs;
+                if ((static_cast<unsigned>(flags) & static_cast<unsigned>(ImportFlags::OptimizeMesh)) != 0)
+                    assimp_flags |= aiProcess_ImproveCacheLocality;
+                if ((static_cast<unsigned>(flags) & static_cast<unsigned>(ImportFlags::GenerateNormals)) != 0)
+                    assimp_flags |= aiProcess_GenNormals;
+                if ((static_cast<unsigned>(flags) & static_cast<unsigned>(ImportFlags::GenerateUVs)) != 0)
+                    assimp_flags |= aiProcess_GenUVCoords;
+                if ((static_cast<unsigned>(flags) & static_cast<unsigned>(ImportFlags::SortByPType)) != 0)
+                    assimp_flags |= aiProcess_SortByPType;
+                if ((static_cast<unsigned>(flags) & static_cast<unsigned>(ImportFlags::OptimizeGraph)) != 0)
+                    assimp_flags |= aiProcess_OptimizeGraph;
+            }
+            return assimp_flags;
+        }
     }
 
     struct AssimpImporter::Impl
@@ -272,7 +466,9 @@ namespace eeng::assets
 
         try
         {
+            // Phase 1: parse file into CPU data (meshes, nodes, animations, materials/textures).
             AssimpParseResult parsed = parse_scene(options.source_file, options, ctx);
+            // Phase 2: build CPU/GPU assets and serialize into the asset database.
             result = build_assets(parsed, options, ctx);
         }
         catch (const std::exception& ex)
@@ -290,24 +486,7 @@ namespace eeng::assets
     {
         AssimpParseResult parsed{};
 
-        unsigned int assimp_flags = aiProcess_Triangulate | aiProcess_JoinIdenticalVertices;
-        if (options.flags != ImportFlags::None)
-        {
-            if ((static_cast<unsigned>(options.flags) & static_cast<unsigned>(ImportFlags::GenerateTangents)) != 0)
-                assimp_flags |= aiProcess_CalcTangentSpace;
-            if ((static_cast<unsigned>(options.flags) & static_cast<unsigned>(ImportFlags::FlipUVs)) != 0)
-                assimp_flags |= aiProcess_FlipUVs;
-            if ((static_cast<unsigned>(options.flags) & static_cast<unsigned>(ImportFlags::OptimizeMesh)) != 0)
-                assimp_flags |= aiProcess_ImproveCacheLocality;
-            if ((static_cast<unsigned>(options.flags) & static_cast<unsigned>(ImportFlags::GenerateNormals)) != 0)
-                assimp_flags |= aiProcess_GenNormals;
-            if ((static_cast<unsigned>(options.flags) & static_cast<unsigned>(ImportFlags::GenerateUVs)) != 0)
-                assimp_flags |= aiProcess_GenUVCoords;
-            if ((static_cast<unsigned>(options.flags) & static_cast<unsigned>(ImportFlags::SortByPType)) != 0)
-                assimp_flags |= aiProcess_SortByPType;
-            if ((static_cast<unsigned>(options.flags) & static_cast<unsigned>(ImportFlags::OptimizeGraph)) != 0)
-                assimp_flags |= aiProcess_OptimizeGraph;
-        }
+        unsigned int assimp_flags = build_assimp_flags(options.flags);
 
         const aiScene* scene = impl_->importer.ReadFile(source_file.string(), assimp_flags);
         if (!scene || !scene->mRootNode)
@@ -335,6 +514,7 @@ namespace eeng::assets
         std::unordered_map<std::string, size_t> texture_index_map;
         std::vector<int> embedded_asset_indices(scene->mNumTextures, -1);
 
+        // Phase: mesh topology and vertex/index streams.
         model.submeshes.resize(scene_nbr_meshes);
 
         u32 scene_nbr_vertices = 0;
@@ -363,13 +543,13 @@ namespace eeng::assets
             scene_nbr_indices += mesh_nbr_indices;
         }
 
-        model.positions.reserve(scene_nbr_vertices);
-        model.normals.reserve(scene_nbr_vertices);
-        model.tangents.reserve(scene_nbr_vertices);
-        model.binormals.reserve(scene_nbr_vertices);
-        model.texcoords.reserve(scene_nbr_vertices);
+        model.positions.resize(scene_nbr_vertices);
+        model.normals.resize(scene_nbr_vertices);
+        model.tangents.resize(scene_nbr_vertices);
+        model.binormals.resize(scene_nbr_vertices);
+        model.texcoords.resize(scene_nbr_vertices);
         model.skin.resize(scene_nbr_vertices);
-        model.indices.reserve(scene_nbr_indices);
+        model.indices.resize(scene_nbr_indices);
 
         std::unordered_map<std::string, u32> bone_index_map;
 
@@ -377,19 +557,30 @@ namespace eeng::assets
         for (u32 i = 0; i < scene_nbr_meshes; i++)
         {
             const aiMesh* mesh = scene->mMeshes[i];
+            const u32 base_vertex = model.submeshes[i].base_vertex;
+            const u32 base_index = model.submeshes[i].base_index;
+            const bool has_normals = mesh->HasNormals();
+            const bool has_tangents = mesh->HasTangentsAndBitangents();
+            const bool has_texcoords = mesh->HasTextureCoords(0);
+            const aiVector3D* normals = has_normals ? mesh->mNormals : nullptr;
+            const aiVector3D* tangents = has_tangents ? mesh->mTangents : nullptr;
+            const aiVector3D* binormals = has_tangents ? mesh->mBitangents : nullptr;
+            const aiVector3D* texcoords = has_texcoords ? mesh->mTextureCoords[0] : nullptr;
+
             for (u32 j = 0; j < mesh->mNumVertices; j++)
             {
-                const aiVector3D* pPos = &(mesh->mVertices[j]);
-                const aiVector3D* pNormal = (mesh->HasNormals() ? &(mesh->mNormals[j]) : &v3zero);
-                const aiVector3D* pTangent = (mesh->HasTangentsAndBitangents() ? &(mesh->mTangents[j]) : &v3zero);
-                const aiVector3D* pBinormal = (mesh->HasTangentsAndBitangents() ? &(mesh->mBitangents[j]) : &v3zero);
-                const aiVector3D* pTexCoord = (mesh->HasTextureCoords(0) ? &(mesh->mTextureCoords[0][j]) : &v3zero);
+                const u32 dst = base_vertex + j;
+                const aiVector3D& pPos = mesh->mVertices[j];
+                const aiVector3D& pNormal = normals ? normals[j] : v3zero;
+                const aiVector3D& pTangent = tangents ? tangents[j] : v3zero;
+                const aiVector3D& pBinormal = binormals ? binormals[j] : v3zero;
+                const aiVector3D& pTexCoord = texcoords ? texcoords[j] : v3zero;
 
-                model.positions.push_back({ pPos->x, pPos->y, pPos->z });
-                model.normals.push_back({ pNormal->x, pNormal->y, pNormal->z });
-                model.tangents.push_back({ pTangent->x, pTangent->y, pTangent->z });
-                model.binormals.push_back({ pBinormal->x, pBinormal->y, pBinormal->z });
-                model.texcoords.push_back({ pTexCoord->x, pTexCoord->y });
+                model.positions[dst] = { pPos.x, pPos.y, pPos.z };
+                model.normals[dst] = { pNormal.x, pNormal.y, pNormal.z };
+                model.tangents[dst] = { pTangent.x, pTangent.y, pTangent.z };
+                model.binormals[dst] = { pBinormal.x, pBinormal.y, pBinormal.z };
+                model.texcoords[dst] = { pTexCoord.x, pTexCoord.y };
             }
 
             for (u32 b = 0; b < mesh->mNumBones; b++)
@@ -423,12 +614,14 @@ namespace eeng::assets
             for (u32 f = 0; f < mesh->mNumFaces; f++)
             {
                 const aiFace& face = mesh->mFaces[f];
-                model.indices.push_back(face.mIndices[0]);
-                model.indices.push_back(face.mIndices[1]);
-                model.indices.push_back(face.mIndices[2]);
+                const u32 out_index = base_index + (f * 3);
+                model.indices[out_index] = face.mIndices[0];
+                model.indices[out_index + 1] = face.mIndices[1];
+                model.indices[out_index + 2] = face.mIndices[2];
             }
         }
 
+        // Phase: node hierarchy and bone links.
         load_node(scene->mRootNode, model.nodetree);
 
         model.nodetree.traverse_depthfirst([&](SkeletonNode& node, size_t i, size_t)
@@ -451,6 +644,7 @@ namespace eeng::assets
                 }
             });
 
+        // Phase: animation clips (embedded in the main model file).
         for (u32 i = 0; i < scene->mNumAnimations; i++)
         {
             aiAnimation* aianim = scene->mAnimations[i];
@@ -477,9 +671,7 @@ namespace eeng::assets
                 for (u32 k = 0; k < ainode_anim->mNumRotationKeys; k++)
                     node_anim.rot_keys.push_back(aiquat_to_glmquat(ainode_anim->mRotationKeys[k].mValue));
 
-                SkeletonNode find_node{};
-                find_node.name = name;
-                auto index = model.nodetree.find_node_index(find_node);
+                auto index = resolve_node_index(model.nodetree, name);
                 if (index != VecTree_NullIndex)
                     anim.node_animations[index] = std::move(node_anim);
             }
@@ -487,6 +679,26 @@ namespace eeng::assets
             model.animations.push_back(std::move(anim));
         }
 
+        // Phase: append extra animation sources (files or folders).
+        if (!options.animation_sources.empty())
+        {
+            const auto extra_sources = expand_animation_inputs(
+                source_file.parent_path(),
+                source_file,
+                options.animation_sources);
+
+            for (const auto& anim_source : extra_sources)
+            {
+                Assimp::Importer anim_importer;
+                const unsigned int anim_flags = build_assimp_flags(options.flags);
+                const aiScene* anim_scene = anim_importer.ReadFile(anim_source.string(), anim_flags);
+                if (!anim_scene || !anim_scene->mRootNode)
+                    throw std::runtime_error(anim_importer.GetErrorString());
+                append_animation_clips(model, anim_scene, anim_source);
+            }
+        }
+
+        // Phase: materials and texture bindings.
         parsed.materials.resize(scene->mNumMaterials);
         for (u32 i = 0; i < scene->mNumMaterials; i++)
         {
@@ -530,6 +742,100 @@ namespace eeng::assets
         }
 
         return parsed;
+    }
+
+    AssimpAppendResult AssimpImporter::append_animations(
+        const AssimpAppendOptions& options,
+        EngineContext& ctx)
+    {
+        AssimpAppendResult result;
+        if (options.source_file.empty())
+        {
+            result.error_message = "Assimp append failed: source_file is empty";
+            return result;
+        }
+        if (!options.target_model.valid())
+        {
+            result.error_message = "Assimp append failed: target_model GUID is invalid";
+            return result;
+        }
+
+        try
+        {
+            const unsigned int assimp_flags = build_assimp_flags(options.flags);
+            const aiScene* scene = impl_->importer.ReadFile(options.source_file.string(), assimp_flags);
+            if (!scene || !scene->mRootNode)
+                throw std::runtime_error(impl_->importer.GetErrorString());
+            if (scene->mNumAnimations == 0)
+                throw std::runtime_error("Assimp append failed: scene has no animations");
+
+            const auto raw_clips = extract_animation_clips(scene);
+
+            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+            auto handle_opt = resource_manager.handle_for_guid<ModelDataAsset>(options.target_model);
+            if (!handle_opt)
+                throw std::runtime_error("Assimp append failed: target model asset is not loaded (use batch load first)");
+
+            size_t appended = 0;
+            resource_manager.storage().modify(*handle_opt, [&](ModelDataAsset& model)
+                {
+                    std::vector<AnimClip> new_clips;
+                    new_clips.reserve(raw_clips.size());
+
+                    for (const auto& raw : raw_clips)
+                    {
+                        AnimClip clip{};
+                        clip.name = raw.name;
+                        clip.duration_ticks = raw.duration_ticks;
+                        clip.ticks_per_second = raw.ticks_per_second > 0.0f ? raw.ticks_per_second : 25.0f;
+                        clip.node_animations.resize(model.nodetree.size());
+
+                        for (const auto& [node_name, track] : raw.tracks)
+                        {
+                            SkeletonNode find_node{};
+                            find_node.name = node_name;
+                            const auto index = model.nodetree.find_node_index(find_node);
+                            if (index == VecTree_NullIndex)
+                                throw std::runtime_error("Assimp append failed: node not found in target model: " + node_name);
+                            clip.node_animations[index] = track;
+                        }
+
+                        new_clips.push_back(std::move(clip));
+                    }
+
+                    appended = new_clips.size();
+                    model.animations.insert(
+                        model.animations.end(),
+                        std::make_move_iterator(new_clips.begin()),
+                        std::make_move_iterator(new_clips.end()));
+                });
+
+            resource_manager.save_loaded_asset<ModelDataAsset>(options.target_model);
+
+            result.success = true;
+            result.model_guid = options.target_model;
+            result.appended_clips = appended;
+        }
+        catch (const std::exception& ex)
+        {
+            result.success = false;
+            result.error_message = ex.what();
+        }
+
+        return result;
+    }
+
+    AssimpImportResult AssimpImporter::import_model_with_animations(
+        const AssimpImportOptions& options,
+        const std::vector<std::filesystem::path>& animation_inputs,
+        EngineContext& ctx)
+    {
+        AssimpImportOptions merged = options;
+        merged.animation_sources.insert(
+            merged.animation_sources.end(),
+            animation_inputs.begin(),
+            animation_inputs.end());
+        return import_model(merged, ctx);
     }
 
     AssimpImportResult AssimpImporter::build_assets(

@@ -12,6 +12,8 @@
 #include "AssetRef.hpp"
 #include "MetaLiterals.h" // load_asset_hs, unload_asset_hs
 #include "LogMacros.h"
+#include <filesystem>
+#include <stdexcept>
 #include <string>
 #include <mutex> // std::mutex - > maybe AssetIndex
 
@@ -226,6 +228,41 @@ namespace eeng
             // Remove from storage
             // /* add short delay */ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             storage_->remove_now(*handle_opt);
+        }
+
+        /// @brief Re-serialize a loaded asset to disk using its existing GUID/path.
+        /// @note Updates AssetMetaData::contained_assets based on current AssetRef links.
+        template<typename T>
+        void save_loaded_asset(const Guid& guid)
+        {
+            auto index = asset_index_->get_index_data();
+            if (!index)
+                throw std::runtime_error("save_loaded_asset failed: asset index not available");
+
+            auto it = index->by_guid.find(guid);
+            if (it == index->by_guid.end() || !it->second)
+                throw std::runtime_error("save_loaded_asset failed: GUID not found in index");
+
+            const auto& entry = *it->second;
+            const auto asset_path = entry.absolute_path;
+            const auto meta_path = asset_path.parent_path() /
+                (asset_path.stem().string() + ".meta.json");
+
+            auto handle_opt = storage_->handle_for_guid<T>(guid);
+            if (!handle_opt)
+                throw std::runtime_error("save_loaded_asset failed: asset is not loaded");
+
+            storage_->read(*handle_opt, [&](const T& asset)
+                {
+                    auto meta = entry.meta;
+                    meta.contained_assets.clear();
+                    visit_asset_refs(asset, [&](const auto& ref)
+                        {
+                            meta.contained_assets.push_back(ref.guid);
+                        });
+
+                    asset_index_->serialize_to_file<T>(asset, meta, asset_path, meta_path);
+                });
         }
 
     private:
