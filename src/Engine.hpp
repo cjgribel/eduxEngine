@@ -100,6 +100,7 @@ namespace eeng
         void on_set_wireframe(const SetWireFrameRenderingEvent& e);
         void on_set_min_frametime(const SetMinFrameTimeEvent& e);
         void on_resource_task_completed(const ResourceTaskCompletedEvent& e);
+        void on_batch_task_completed(const BatchTaskCompletedEvent& e);
 
     };
 

@@ -10,6 +10,9 @@
 #include "IInputManager.hpp"
 #include "ILogManager.hpp"
 #include "Guid.h"
+#include <cstddef>
+#include <cstdint>
+#include <string>
 #include <memory>
 
 class MainThreadQueue;
@@ -43,6 +46,43 @@ namespace eeng
     struct SetWireFrameRenderingEvent { bool enabled; };
     struct SetMinFrameTimeEvent { float dt; };
     struct ResourceTaskCompletedEvent { TaskResult result; };
+
+    enum class BatchTaskType : uint8_t
+    {
+        Load,
+        LoadAll,
+        Unload,
+        UnloadAll,
+        Save,
+        SaveAll,
+        RebuildClosure,
+        CreateEntity,
+        DestroyEntity,
+        AttachEntity,
+        DetachEntity,
+        SpawnEntity,
+        Unknown
+    };
+
+    struct BatchTaskCompletedEvent
+    {
+        BatchTaskType type{ BatchTaskType::Unknown };
+        BatchId batch_id{};
+        std::string batch_name{};
+        bool success = false;
+        size_t batch_count = 0;
+
+        size_t live_entities = 0;
+        size_t asset_closure_size = 0;
+
+        bool has_closure_delta = false;
+        size_t closure_roots = 0;
+        size_t closure_old = 0;
+        size_t closure_new = 0;
+        size_t closure_added = 0;
+        size_t closure_removed = 0;
+        bool assets_rebound = false;
+    };
 
     enum class EngineFlag : uint8_t
     {

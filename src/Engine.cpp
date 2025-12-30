@@ -106,6 +106,7 @@ namespace eeng
         ctx->event_queue->register_callback([&](const SetWireFrameRenderingEvent& event) { this->on_set_wireframe(event); });
         ctx->event_queue->register_callback([&](const SetMinFrameTimeEvent& event) { this->on_set_min_frametime(event); });
         ctx->event_queue->register_callback([&](const ResourceTaskCompletedEvent& event) { this->on_resource_task_completed(event); });
+        ctx->event_queue->register_callback([&](const BatchTaskCompletedEvent& event) { this->on_batch_task_completed(event); });
 
         // Engine config
         ctx->engine_config->set_flag(EngineFlag::VSync, true);
@@ -464,6 +465,133 @@ namespace eeng
         // {
         //     EENG_LOG_INFO(ctx, "All operations completed successfully.");
         // }
+    }
+
+    void Engine::on_batch_task_completed(const BatchTaskCompletedEvent& e)
+    {
+        const char* task_name = "Unknown";
+        switch (e.type)
+        {
+        case BatchTaskType::Load:
+            task_name = "Load";
+            break;
+        case BatchTaskType::LoadAll:
+            task_name = "LoadAll";
+            break;
+        case BatchTaskType::Unload:
+            task_name = "Unload";
+            break;
+        case BatchTaskType::UnloadAll:
+            task_name = "UnloadAll";
+            break;
+        case BatchTaskType::Save:
+            task_name = "Save";
+            break;
+        case BatchTaskType::SaveAll:
+            task_name = "SaveAll";
+            break;
+        case BatchTaskType::RebuildClosure:
+            task_name = "RebuildClosure";
+            break;
+        case BatchTaskType::CreateEntity:
+            task_name = "CreateEntity";
+            break;
+        case BatchTaskType::DestroyEntity:
+            task_name = "DestroyEntity";
+            break;
+        case BatchTaskType::AttachEntity:
+            task_name = "AttachEntity";
+            break;
+        case BatchTaskType::DetachEntity:
+            task_name = "DetachEntity";
+            break;
+        case BatchTaskType::SpawnEntity:
+            task_name = "SpawnEntity";
+            break;
+        case BatchTaskType::Unknown:
+        default:
+            task_name = "Unknown";
+            break;
+        }
+
+        std::string batch_label = e.batch_id.valid()
+            ? e.batch_id.to_string()
+            : std::string("<n/a>");
+        if (!e.batch_name.empty() && e.batch_id.valid())
+        {
+            batch_label = e.batch_name + " (" + batch_label + ")";
+        }
+
+        if (e.type == BatchTaskType::LoadAll ||
+            e.type == BatchTaskType::UnloadAll ||
+            e.type == BatchTaskType::SaveAll)
+        {
+            if (e.success)
+            {
+                EENG_LOG_INFO(ctx,
+                    "[batch] %s ok: batches=%zu",
+                    task_name,
+                    e.batch_count);
+            }
+            else
+            {
+                EENG_LOG_WARN(ctx,
+                    "[batch] %s fail: batches=%zu",
+                    task_name,
+                    e.batch_count);
+            }
+            return;
+        }
+
+        if (e.type == BatchTaskType::RebuildClosure && e.has_closure_delta)
+        {
+            if (e.success)
+            {
+                EENG_LOG_INFO(ctx,
+                    "[batch] %s ok: %s roots=%zu old=%zu new=%zu +%zu -%zu assets_rebind=%s",
+                    task_name,
+                    batch_label.c_str(),
+                    e.closure_roots,
+                    e.closure_old,
+                    e.closure_new,
+                    e.closure_added,
+                    e.closure_removed,
+                    e.assets_rebound ? "ok" : "fail");
+            }
+            else
+            {
+                EENG_LOG_WARN(ctx,
+                    "[batch] %s fail: %s roots=%zu old=%zu new=%zu +%zu -%zu assets_rebind=%s",
+                    task_name,
+                    batch_label.c_str(),
+                    e.closure_roots,
+                    e.closure_old,
+                    e.closure_new,
+                    e.closure_added,
+                    e.closure_removed,
+                    e.assets_rebound ? "ok" : "fail");
+            }
+            return;
+        }
+
+        if (e.success)
+        {
+            EENG_LOG_INFO(ctx,
+                "[batch] %s ok: %s live=%zu closure=%zu",
+                task_name,
+                batch_label.c_str(),
+                e.live_entities,
+                e.asset_closure_size);
+        }
+        else
+        {
+            EENG_LOG_WARN(ctx,
+                "[batch] %s fail: %s live=%zu closure=%zu",
+                task_name,
+                batch_label.c_str(),
+                e.live_entities,
+                e.asset_closure_size);
+        }
     }
 
 } // namespace eeng

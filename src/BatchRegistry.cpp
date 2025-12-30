@@ -4,6 +4,7 @@
 #include "BatchRegistry.hpp"
 #include "meta/EntityMetaHelpers.hpp"
 #include "MainThreadQueue.hpp"
+#include "EventQueue.h"
 #include "ThreadPool.hpp"
 #include <fstream>
 
@@ -180,6 +181,51 @@ namespace
             });
     }
 
+    void fill_batch_event_from_info(
+        eeng::BatchTaskCompletedEvent& event,
+        const eeng::BatchInfo& info)
+    {
+        event.batch_name = info.name;
+        event.live_entities = info.live.size();
+        event.asset_closure_size = info.asset_closure_hdr.size();
+        if (event.batch_count == 0)
+            event.batch_count = 1;
+    }
+
+    eeng::BatchTaskCompletedEvent make_batch_event(
+        eeng::BatchTaskType type,
+        bool success,
+        const eeng::BatchId& batch_id = eeng::BatchId{})
+    {
+        eeng::BatchTaskCompletedEvent event{};
+        event.type = type;
+        event.batch_id = batch_id;
+        event.success = success;
+        return event;
+    }
+
+    void enqueue_batch_event(
+        eeng::EngineContext& ctx,
+        const eeng::BatchTaskCompletedEvent& event)
+    {
+        if (ctx.event_queue)
+        {
+            ctx.event_queue->enqueue_event(event);
+        }
+    }
+
+    void enqueue_batch_event(
+        eeng::EngineContext& ctx,
+        eeng::BatchTaskType type,
+        bool success,
+        const eeng::BatchId& batch_id = eeng::BatchId{},
+        size_t batch_count = 0)
+    {
+        auto event = make_batch_event(type, success, batch_id);
+        event.batch_count = batch_count;
+        enqueue_batch_event(ctx, event);
+    }
+
     bool rebind_assets_in_closure(
         const std::vector<eeng::Guid>& closure,
         const eeng::BatchId& batch_id,
@@ -291,6 +337,14 @@ namespace eeng
         return strand(ctx).submit([this, id, &ctx]() -> TaskResult {
             TaskResult tr{};
             tr.success = this->save_batch(id, ctx);
+            auto event = make_batch_event(BatchTaskType::Save, tr.success, id);
+            {
+                std::lock_guard lk(mtx_);
+                auto it = batches_.find(id);
+                if (it != batches_.end())
+                    fill_batch_event_from_info(event, it->second);
+            }
+            enqueue_batch_event(ctx, event);
             return tr;
             });
     }
@@ -407,6 +461,8 @@ namespace eeng
                     // Can merge sub-results here as well
                 }
 
+                enqueue_batch_event(ctx, BatchTaskType::LoadAll, merged.success, BatchId{}, ids.size());
+
                 return merged;
             });
 
@@ -446,6 +502,8 @@ namespace eeng
                     merged.success &= r.success;
                 }
 
+                enqueue_batch_event(ctx, BatchTaskType::UnloadAll, merged.success, BatchId{}, ids.size());
+
                 return merged;
             });
 
@@ -476,6 +534,8 @@ namespace eeng
                     merged.success &= r.success;
                 }
 
+                enqueue_batch_event(ctx, BatchTaskType::SaveAll, merged.success, BatchId{}, ids.size());
+
                 return merged;
             });
 
@@ -491,12 +551,25 @@ namespace eeng
     {
         return strand(ctx).submit([this, id, name, parent, &ctx]() -> ecs::EntityRef
             {
+                BatchTaskCompletedEvent event{};
+                event.type = BatchTaskType::CreateEntity;
+                event.batch_id = id;
+
+                auto emit_and_return = [&](ecs::EntityRef er, const BatchInfo* info) -> ecs::EntityRef
+                    {
+                        event.success = er.is_bound();
+                        if (info)
+                            fill_batch_event_from_info(event, *info);
+                        enqueue_batch_event(ctx, event);
+                        return er;
+                    };
+
                 BatchInfo* B = nullptr;
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
-                        return ecs::EntityRef{ Guid::invalid() };      // require loaded batch
+                        return emit_and_return(ecs::EntityRef{ Guid::invalid() }, (it != batches_.end()) ? &it->second : nullptr);      // require loaded batch
                     B = &it->second;
                 }
 
@@ -527,7 +600,7 @@ namespace eeng
 
                 // No components yet → no asset refs yet → no closure update now
 
-                return created;
+                return emit_and_return(created, B);
             });
     }
 
@@ -539,12 +612,25 @@ namespace eeng
     {
         return strand(ctx).submit([this, id, entity_ref, &ctx]() -> bool
             {
+                BatchTaskCompletedEvent event{};
+                event.type = BatchTaskType::DestroyEntity;
+                event.batch_id = id;
+
+                auto emit_and_return = [&](bool ok, const BatchInfo* info) -> bool
+                    {
+                        event.success = ok;
+                        if (info)
+                            fill_batch_event_from_info(event, *info);
+                        enqueue_batch_event(ctx, event);
+                        return ok;
+                    };
+
                 BatchInfo* B = nullptr;
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
-                        return false;
+                        return emit_and_return(false, (it != batches_.end()) ? &it->second : nullptr);
                     B = &it->second;
 
                     // Remove from live list
@@ -568,7 +654,7 @@ namespace eeng
 
                 // NOTE: we do NOT shrink asset_closure_hdr here.
                 // Over-approx closure is fine; RM will ref-count correctly.
-                return true;
+                return emit_and_return(true, B);
             });
     }
 
@@ -580,12 +666,25 @@ namespace eeng
     {
         return strand(ctx).submit([this, id, entity_ref, &ctx]() -> bool
             {
+                BatchTaskCompletedEvent event{};
+                event.type = BatchTaskType::AttachEntity;
+                event.batch_id = id;
+
+                auto emit_and_return = [&](bool ok, const BatchInfo* info) -> bool
+                    {
+                        event.success = ok;
+                        if (info)
+                            fill_batch_event_from_info(event, *info);
+                        enqueue_batch_event(ctx, event);
+                        return ok;
+                    };
+
                 BatchInfo* B = nullptr;
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
-                        return false;
+                        return emit_and_return(false, (it != batches_.end()) ? &it->second : nullptr);
 
                     B = &it->second;
                     B->live.push_back(entity_ref);
@@ -594,7 +693,7 @@ namespace eeng
                 // If entity isn't live or registry is gone, nothing more to do.
                 auto registry_sp = ctx.entity_manager->registry_wptr().lock();
                 if (!registry_sp || !entity_ref.is_bound())
-                    return true;
+                    return emit_and_return(true, B);
 
                 auto& reg = *registry_sp;
 
@@ -633,7 +732,7 @@ namespace eeng
                 // 4) MT: bind AssetRef<> and EntityRef<> inside this entity’s components
                 bind_refs_for_entities_on_main({ entity_ref }, ctx);
 
-                return true;
+                return emit_and_return(true, B);
             });
     }
 
@@ -643,12 +742,25 @@ namespace eeng
             ecs::EntityRef entity_ref,
             EngineContext& ctx)
     {
-        return strand(ctx).submit([this, id, entity_ref]() -> bool
+        return strand(ctx).submit([this, id, entity_ref, &ctx]() -> bool
             {
+                BatchTaskCompletedEvent event{};
+                event.type = BatchTaskType::DetachEntity;
+                event.batch_id = id;
+
+                auto emit_and_return = [&](bool ok, const BatchInfo* info) -> bool
+                    {
+                        event.success = ok;
+                        if (info)
+                            fill_batch_event_from_info(event, *info);
+                        enqueue_batch_event(ctx, event);
+                        return ok;
+                    };
+
                 std::lock_guard lk(mtx_);
                 auto it = batches_.find(id);
                 if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
-                    return false;
+                    return emit_and_return(false, (it != batches_.end()) ? &it->second : nullptr);
 
                 auto& live = it->second.live;
                 auto old_size = live.size();
@@ -658,7 +770,7 @@ namespace eeng
                         return er.guid == entity_ref.guid;
                     }),
                     live.end());
-                return live.size() != old_size;
+                return emit_and_return(live.size() != old_size, &it->second);
             });
     }
 
@@ -670,12 +782,25 @@ namespace eeng
     {
         return strand(ctx).submit([this, id, desc = std::move(desc), &ctx]() mutable -> ecs::EntityRef
             {
+                BatchTaskCompletedEvent event{};
+                event.type = BatchTaskType::SpawnEntity;
+                event.batch_id = id;
+
+                auto emit_and_return = [&](ecs::EntityRef er, const BatchInfo* info) -> ecs::EntityRef
+                    {
+                        event.success = er.is_bound();
+                        if (info)
+                            fill_batch_event_from_info(event, *info);
+                        enqueue_batch_event(ctx, event);
+                        return er;
+                    };
+
                 BatchInfo* B = nullptr;
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
-                        return ecs::EntityRef{}; // require loaded batch
+                        return emit_and_return(ecs::EntityRef{}, (it != batches_.end()) ? &it->second : nullptr); // require loaded batch
                     B = &it->second;
                 }
 
@@ -688,7 +813,7 @@ namespace eeng
                     });
 
                 if (!created.is_bound())
-                    return created;
+                    return emit_and_return(created, B);
 
                 {
                     std::lock_guard lk(mtx_);
@@ -697,7 +822,7 @@ namespace eeng
 
                 auto registry_sp = ctx.entity_manager->registry_wptr().lock();
                 if (!registry_sp)
-                    return created;
+                    return emit_and_return(created, B);
 
                 auto& reg = *registry_sp;
 
@@ -734,7 +859,7 @@ namespace eeng
                 // 3) MT: bind refs in the spawned entity’s components
                 bind_refs_for_entities_on_main({ created }, ctx);
 
-                return created;
+                return emit_and_return(created, B);
             });
     }
 
@@ -839,6 +964,9 @@ namespace eeng
                 B->state = BatchInfo::State::Queued;
             }
             auto res = do_load(*B, ctx);
+            BatchTaskCompletedEvent event{};
+            event.type = BatchTaskType::Load;
+            event.batch_id = id;
             {
                 std::lock_guard lk(mtx_);
                 B->last_result = res;
@@ -846,7 +974,10 @@ namespace eeng
                 //     B->last_result.results.end(),
                 //     [](auto& r) { return !r.success; }));
                 B->state = (res.success ? BatchInfo::State::Loaded : BatchInfo::State::Error);
+                fill_batch_event_from_info(event, *B);
             }
+            event.success = res.success;
+            enqueue_batch_event(ctx, event);
             return res;
             });
     }
@@ -857,6 +988,9 @@ namespace eeng
         return strand(ctx).submit([this, id, &ctx]() -> TaskResult
             {
                 BatchInfo* B = nullptr;
+                BatchTaskCompletedEvent event{};
+                event.type = BatchTaskType::Unload;
+                event.batch_id = id;
                 {
                     std::lock_guard lk(mtx_);
                     auto it = batches_.find(id);
@@ -864,6 +998,8 @@ namespace eeng
                     {
                         TaskResult tr{};
                         tr.success = false;
+                        event.success = false;
+                        enqueue_batch_event(ctx, event);
                         return tr; // unknown batch
                     }
                     B = &it->second;
@@ -872,6 +1008,9 @@ namespace eeng
                     {
                         TaskResult tr{};
                         tr.success = true; // nothing to do
+                        fill_batch_event_from_info(event, *B);
+                        event.success = true;
+                        enqueue_batch_event(ctx, event);
                         return tr;
                     }
 
@@ -885,8 +1024,11 @@ namespace eeng
                     B->last_result = res;
                     B->state = (res.success ? BatchInfo::State::Unloaded
                         : BatchInfo::State::Error);
+                    fill_batch_event_from_info(event, *B);
                 }
 
+                event.success = res.success;
+                enqueue_batch_event(ctx, event);
                 return res;
             });
     }
@@ -910,6 +1052,16 @@ namespace eeng
             {
                 TaskResult result{};
                 result.success = true;
+                BatchTaskCompletedEvent event{};
+                event.type = BatchTaskType::RebuildClosure;
+                event.batch_id = id;
+
+                auto emit_and_return = [&]() -> TaskResult
+                    {
+                        event.success = result.success;
+                        enqueue_batch_event(ctx, event);
+                        return result;
+                    };
 
                 // 1) Snapshot batch data needed for this job
                 std::vector<ecs::EntityRef> live_snapshot;
@@ -921,25 +1073,29 @@ namespace eeng
                     if (it == batches_.end())
                     {
                         result.success = false;
-                        return result;
+                        return emit_and_return();
                     }
 
                     if (it->second.state != BatchInfo::State::Loaded)
                     {
                         result.success = false;
-                        return result;
+                        return emit_and_return();
                     }
 
                     live_snapshot = it->second.live;
                     old_closure = it->second.asset_closure_hdr;
+                    event.batch_name = it->second.name;
+                    event.batch_count = 1;
                 }
+                event.live_entities = live_snapshot.size();
+                event.asset_closure_size = old_closure.size();
 
                 // 2) Grab registry once
                 auto registry_sp = ctx.entity_manager->registry_wptr().lock();
                 if (!registry_sp)
                 {
                     result.success = false;
-                    return result;
+                    return emit_and_return();
                 }
                 auto& reg = *registry_sp;
 
@@ -996,7 +1152,7 @@ namespace eeng
                         ctx.resource_manager->unbind_and_unload_async(dq, id, ctx).get();
                     }
 
-                    return result;
+                    return emit_and_return();
                 }
 
                 // 5) Late cleanup: remove invalid GUIDs and dedup
@@ -1012,6 +1168,14 @@ namespace eeng
                 std::vector<Guid> to_add;
                 std::vector<Guid> to_remove;
                 eeng::detail::diff_sets(old_closure, new_closure, to_add, to_remove);
+
+                event.has_closure_delta = true;
+                event.closure_roots = roots.size();
+                event.closure_old = old_closure.size();
+                event.closure_new = new_closure.size();
+                event.closure_added = to_add.size();
+                event.closure_removed = to_remove.size();
+                event.asset_closure_size = event.closure_new;
 
                 // Debug logs (optional)
                 // for (auto& g : old_closure)  { EENG_LOG(&ctx, "[queue_rebuild_closure] old %s", g.to_string().c_str()); }
@@ -1037,12 +1201,12 @@ namespace eeng
                 if (!result.success)
                 {
                     // Do not commit if unload failed; keeping the old closure allows a later retry.
-                    return result;
+                    return emit_and_return();
                 }
 
                 // 8) Rebind asset refs now that the full closure is loaded
-                result.success = result.success &&
-                    rebind_assets_in_closure(new_closure, id, ctx);
+                const bool asset_rebind_ok = rebind_assets_in_closure(new_closure, id, ctx);
+                result.success = result.success && asset_rebind_ok;
 
                 // 9) Commit new closure to BatchInfo
                 {
@@ -1051,13 +1215,13 @@ namespace eeng
                     if (it == batches_.end())
                     {
                         result.success = false;
-                        return result;
+                        return emit_and_return();
                     }
 
                     if (it->second.state != BatchInfo::State::Loaded)
                     {
                         result.success = false;
-                        return result;
+                        return emit_and_return();
                     }
 
                     it->second.asset_closure_hdr = std::move(new_closure);
@@ -1066,7 +1230,8 @@ namespace eeng
                 // 10) MT: rebind refs inside entities now that assets are loaded/bound
                 bind_refs_for_entities_on_main(live_snapshot, ctx);
 
-                return result;
+                event.assets_rebound = asset_rebind_ok;
+                return emit_and_return();
             });
     }
 
@@ -1204,46 +1369,5 @@ namespace eeng
 
     // -------- Main-thread helpers (sketches) --------
 
-#if 0
-    void BatchRegistry::spawn_entities_on_main(BatchInfo& B, EngineContext& ctx)
-    {
-        // If MainThreadQueue runs immediately on the main thread tick,
-        // can either push and block until processed, or just call directly if already on main.
-        ctx.main_thread_queue->push([&, id = B.id]()
-            {
-                // Example: for each EntityRef, if entity is null, create and attach components
-                // using the batch’s closure-driven data.
-                for (auto& er : batches_.at(id).entities)
-                {
-                    if (!er.has_entity()) // is it an error if entity already exists?
-                    {
-                        er.set_entity(ctx.entity_manager->create_entity("default_chunk", "entity", ecs::Entity::EntityNull, ecs::Entity::EntityNull));
-                        // ... add components ...
-
-                        // populate components from level JSON, etc.
-                    }
-                }
-            });
-
-        // wait until the work is actually done if strict sequencing is needed:
-        // (Provide a barrier or future-returning push in your MainThreadQueue.)
-    }
-#endif
-#if 0
-    void BatchRegistry::despawn_entities_on_main(BatchInfo& B, EngineContext& ctx)
-    {
-        ctx.main_thread_queue->push_and_wait([&, id = B.id]()
-            {
-                for (auto& er : batches_.at(id).live)
-                {
-                    if (er.has_entity()) // <- is it an error if entity is already null?
-                    {
-                        ctx.entity_manager->queue_entity_for_destruction(er.get_entity());
-                        er.clear_entity();
-                    }
-                }
-            });
-    }
-#endif
 
 } // namespace eeng
