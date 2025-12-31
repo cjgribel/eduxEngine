@@ -579,7 +579,7 @@ namespace eeng
                 // MT: create entity with a HeaderComponent and proper registration
                 ecs::EntityRef created = ctx.main_thread_queue->push_and_wait([&]() -> ecs::EntityRef
                     {
-                        // Chunk tag = batch id string (or B->name, your call)
+                        // Chunk tag = batch id string (or B->name)
                         std::string batch_tag = id.to_string();
 
                         auto& em = ctx.entity_manager;

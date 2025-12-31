@@ -119,7 +119,7 @@ namespace eeng
         EventQueue& event_queue;
     };
 
-    struct EngineContext
+    struct EngineContext : public std::enable_shared_from_this<EngineContext>
     {
         EngineContext(
             std::unique_ptr<IEntityManager>     entity_manager,

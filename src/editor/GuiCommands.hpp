@@ -15,21 +15,24 @@
 #include "Command.hpp"
 #include "AssignFieldCommand.hpp"
 #include "MetaSerialize.hpp"
-#include <deque>
+#include <entt/fwd.hpp>
+#include <vector>
 
 namespace eeng::editor {
 
     class CreateEntityCommand : public Command
     {
         ecs::Entity created_entity;
+        Guid created_guid;
         ecs::Entity parent_entity;
-        std::weak_ptr<EngineContext> ctx;
+        nlohmann::json entity_json{};
+        EngineContextWeakPtr ctx;
         std::string display_name;
 
     public:
         CreateEntityCommand(
             const ecs::Entity& parent_entity,
-            const Context& context);
+            EngineContextWeakPtr ctx);
 
         void execute() override;
 
@@ -43,14 +46,38 @@ namespace eeng::editor {
     class DestroyEntityCommand : public Command
     {
         ecs::Entity entity;
+        Guid entity_guid;
         nlohmann::json entity_json{};
-        Context context;
+        EngineContextWeakPtr ctx;
         std::string display_name;
 
     public:
         DestroyEntityCommand(
             const ecs::Entity& entity,
-            const Context& context
+            EngineContextWeakPtr ctx
+        );
+
+        void execute() override;
+
+        void undo() override;
+
+        std::string get_name() const override;
+    };
+
+    // --- DestroyEntityBranchCommand ----------------------------------------
+
+    class DestroyEntityBranchCommand : public Command
+    {
+        ecs::Entity root_entity;
+        Guid root_guid;
+        nlohmann::json branch_json{};
+        EngineContextWeakPtr ctx;
+        std::string display_name;
+
+    public:
+        DestroyEntityBranchCommand(
+            const ecs::Entity& entity,
+            EngineContextWeakPtr ctx
         );
 
         void execute() override;
@@ -66,13 +93,15 @@ namespace eeng::editor {
     {
         ecs::Entity entity_source;
         ecs::Entity entity_copy;
-        Context context;
+        Guid source_guid;
+        nlohmann::json copy_json{};
+        EngineContextWeakPtr ctx;
         std::string display_name;
 
     public:
         CopyEntityCommand(
             const ecs::Entity& entity,
-            const Context& context);
+            EngineContextWeakPtr ctx);
 
         void execute() override;
 
@@ -86,15 +115,15 @@ namespace eeng::editor {
     class CopyEntityBranchCommand : public Command
     {
         ecs::Entity root_entity;
-        std::deque<ecs::Entity> source_entities; // top-down
-        std::deque<ecs::Entity> copied_entities; // top-down
-        Context context;
+        Guid root_guid;
+        nlohmann::json branch_json{};
+        EngineContextWeakPtr ctx;
         std::string display_name;
 
     public:
         CopyEntityBranchCommand(
             const ecs::Entity& entity,
-            const Context& context);
+            EngineContextWeakPtr ctx);
 
         void execute() override;
 
@@ -108,16 +137,19 @@ namespace eeng::editor {
     class ReparentEntityBranchCommand : public Command
     {
         ecs::Entity entity;
+        Guid entity_guid;
         ecs::Entity prev_parent_entity;
+        Guid prev_parent_guid;
         ecs::Entity new_parent_entity;
-        Context context;
+        Guid new_parent_guid;
+        EngineContextWeakPtr ctx;
         std::string display_name;
 
     public:
         ReparentEntityBranchCommand(
             const ecs::Entity& entity,
             const ecs::Entity& parent_entity,
-            const Context& context);
+            EngineContextWeakPtr ctx);
 
         void execute() override;
 
@@ -154,15 +186,16 @@ namespace eeng::editor {
     class AddComponentToEntityCommand : public Command
     {
         ecs::Entity entity;
+        Guid entity_guid;
         entt::id_type comp_id;
-        Context context;
+        EngineContextWeakPtr ctx;
         std::string display_name;
 
     public:
         AddComponentToEntityCommand(
             const ecs::Entity& entity,
             entt::id_type comp_id,
-            const Context& context);
+            EngineContextWeakPtr ctx);
 
         void execute() override;
 
@@ -176,16 +209,17 @@ namespace eeng::editor {
     class RemoveComponentFromEntityCommand : public Command
     {
         ecs::Entity entity;
+        Guid entity_guid;
         entt::id_type comp_id;
         nlohmann::json comp_json{};
-        Context context;
+        EngineContextWeakPtr ctx;
         std::string display_name;
 
     public:
         RemoveComponentFromEntityCommand(
             const ecs::Entity& entity,
             entt::id_type comp_id,
-            const Context& context);
+            EngineContextWeakPtr ctx);
 
         void execute() override;
 

@@ -29,7 +29,7 @@ namespace eeng::gui
                 return;
             }
 
-            const size_t total = queue->size();
+            size_t total = queue->size();
             size_t current_index = queue->get_current_index();
             if (current_index > total)
                 current_index = total;
@@ -45,10 +45,13 @@ namespace eeng::gui
             const bool can_redo = queue->commands_pending();
             const bool can_clear = total > 0;
 
+            bool queue_changed = false;
+
             if (!can_undo) ImGui::BeginDisabled();
             if (ImGui::Button("Undo"))
             {
                 queue->undo_last();
+                queue_changed = true;
             }
             if (!can_undo) ImGui::EndDisabled();
 
@@ -58,6 +61,7 @@ namespace eeng::gui
             if (ImGui::Button("Redo"))
             {
                 queue->execute_next();
+                queue_changed = true;
             }
             if (!can_redo) ImGui::EndDisabled();
 
@@ -67,10 +71,19 @@ namespace eeng::gui
             if (ImGui::Button("Clear"))
             {
                 queue->clear();
+                queue_changed = true;
             }
             if (!can_clear) ImGui::EndDisabled();
 
             ImGui::Separator();
+
+            if (queue_changed)
+            {
+                total = queue->size();
+                current_index = queue->get_current_index();
+                if (current_index > total)
+                    current_index = total;
+            }
 
             if (ImGui::BeginChild("CommandQueueList", ImVec2(0.0f, 0.0f), true))
             {
@@ -85,6 +98,8 @@ namespace eeng::gui
 
                     for (size_t i = 0; i < total; ++i)
                     {
+                        if (i >= queue->size())
+                            break;
                         const bool is_executed = queue->is_executed(i);
                         const bool is_next = (i == current_index);
                         const ImVec4& color = is_executed ? executed_color : pending_color;
