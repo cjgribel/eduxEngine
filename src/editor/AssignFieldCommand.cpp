@@ -240,7 +240,7 @@ namespace eeng::editor
                 path_str += "[" + std::to_string(entry.index) + "]";
             }
             else if (entry.type == MetaFieldPath::Entry::Type::Key) {
-                if (auto j_new = meta::serialize_any(entry.key_any); !j_new.is_null())
+                if (auto j_new = meta::serialize_any(entry.key_any, meta::SerializationPurpose::display); !j_new.is_null())
                     path_str += "[" + j_new.dump() + "]";
                 else
                     path_str += "[]";
@@ -248,7 +248,7 @@ namespace eeng::editor
         }
 
         // Serialize new value for display
-        if (auto j_new = meta::serialize_any(command.edit.new_value); !j_new.is_null())
+        if (auto j_new = meta::serialize_any(command.edit.new_value, meta::SerializationPurpose::display); !j_new.is_null())
             path_str += " = " + j_new.dump();
 
         return path_str;

@@ -193,24 +193,40 @@ namespace eeng::meta
 namespace eeng::meta::traits
 {
     template<class T>
-    bool is_hidden(const T& meta_elem)
+    bool is_no_inspection(const T& meta_elem)
     {
         const auto trait_flags = meta_elem.template traits<eeng::MetaFlags>();
-        return eeng::has_flag(trait_flags, eeng::MetaFlags::hidden);
+        return eeng::has_flag(trait_flags, eeng::MetaFlags::no_inspection);
     }
 
     template<class T>
-    bool is_readonly(const T& meta_elem)
+    bool is_readonly_inspection(const T& meta_elem)
     {
         const auto trait_flags = meta_elem.template traits<eeng::MetaFlags>();
-        return eeng::has_flag(trait_flags, eeng::MetaFlags::read_only);
+        return eeng::has_flag(trait_flags, eeng::MetaFlags::readonly_inspection);
     }
 
     template<class T>
-    bool is_serializable(const T& meta_elem)
+    bool is_serializable(
+        const T& meta_elem,
+        SerializationPurpose purpose = SerializationPurpose::generic)
     {
         const auto trait_flags = meta_elem.template traits<eeng::MetaFlags>();
-        return !eeng::has_flag(trait_flags, eeng::MetaFlags::no_serialize);
+        if (eeng::has_flag(trait_flags, eeng::MetaFlags::no_serialize))
+            return false;
+
+        switch (purpose)
+        {
+        case SerializationPurpose::file:
+            return !eeng::has_flag(trait_flags, eeng::MetaFlags::no_serialize_file);
+        case SerializationPurpose::undo:
+            return !eeng::has_flag(trait_flags, eeng::MetaFlags::no_serialize_undo);
+        case SerializationPurpose::display:
+            return !eeng::has_flag(trait_flags, eeng::MetaFlags::no_serialize_display);
+        case SerializationPurpose::generic:
+        default:
+            return true;
+        }
     }
 }
 

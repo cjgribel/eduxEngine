@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "editor/MetaFieldAssign.hpp"
+#include "MetaSerialize.hpp"
 #include <entt/entt.hpp>
 
 namespace
@@ -149,7 +150,7 @@ namespace eeng::editor
 
 #ifdef COMMAND_DEBUG_PRINTS
         auto any_to_string = [](const entt::meta_any any) -> std::string {
-            if (auto j = Meta::serialize_any(any); !j.is_null())
+            if (auto j = Meta::serialize_any(any, eeng::meta::SerializationPurpose::display); !j.is_null())
                 return j.dump();
             return "n/a";
             };

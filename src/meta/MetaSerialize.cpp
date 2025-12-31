@@ -82,7 +82,9 @@ namespace eeng::meta
         }
     }
 #endif
-    nlohmann::json serialize_any(const entt::meta_any& any)
+    nlohmann::json serialize_any(
+        const entt::meta_any& any,
+        SerializationPurpose purpose)
     {
         assert(any);
         nlohmann::json json;
@@ -94,9 +96,17 @@ namespace eeng::meta
                 auto res = meta_func.invoke(
                     {},
                     entt::forward_as_meta(json),
-                    entt::forward_as_meta(any)
-                    // any.base().data()
+                    entt::forward_as_meta(any),
+                    entt::forward_as_meta(purpose)
                 );
+                if (!res)
+                {
+                    res = meta_func.invoke(
+                        {},
+                        entt::forward_as_meta(json),
+                        entt::forward_as_meta(any)
+                    );
+                }
                 assert(res && "Failed to invoke serialize");
 #ifdef SERIALIZATION_DEBUG_PRINTS
                 std::cout << "serialize invoked: " << json.dump() << std::endl;
@@ -125,13 +135,13 @@ namespace eeng::meta
                 // to_json() not available: traverse data members
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
-                    if (!traits::is_serializable(meta_data)) continue;
+                    if (!traits::is_serializable(meta_data, purpose)) continue;
 
                     // JSON key name is the display name if present, or the id type
                     std::string key_name = get_meta_data_display_name(id, meta_data);
 
                     auto field_any = meta_data.get(any);
-                    json[key_name] = serialize_any(field_any);
+                    json[key_name] = serialize_any(field_any, purpose);
                 }
             }
 
@@ -148,7 +158,7 @@ namespace eeng::meta
             auto json_array = nlohmann::json::array();
             for (auto&& v : view)
             {
-                json_array.push_back(serialize_any(v));
+                json_array.push_back(serialize_any(v, purpose));
             }
             json = json_array;
         }
@@ -168,13 +178,13 @@ namespace eeng::meta
                 {
                     // Store key & value as a sub-array in the container array
                     nlohmann::json json_elem{
-                        serialize_any(key_any), serialize_any(mapped_any)
+                        serialize_any(key_any, purpose), serialize_any(mapped_any, purpose)
                     };
                     json_array.push_back(json_elem);
                 }
                 else
                     // Store key in the container array
-                    json_array.push_back(serialize_any(key_any));
+                    json_array.push_back(serialize_any(key_any, purpose));
             }
             json = json_array;
         }
@@ -194,7 +204,8 @@ namespace eeng::meta
 
     nlohmann::json serialize_entity(
         const ecs::EntityRef& entity_ref,
-        std::shared_ptr<entt::registry>& registry)
+        std::shared_ptr<entt::registry>& registry,
+        SerializationPurpose purpose)
     {
         //        std::cout << "Serializing entity "
         //            << entity_ref.to_integral() << std::endl;
@@ -210,13 +221,14 @@ namespace eeng::meta
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
-                if (!traits::is_serializable(meta_type)) continue;
+                if (!traits::is_serializable(meta_type, purpose)) continue;
 
                 auto key_name = meta::get_meta_type_id_string(meta_type); // Better for serialization?
                 // auto key_name = std::string{ meta_type.info().name() }; // Better for serialization?
                 // auto type_name = get_meta_type_name(meta_type); // Display name or mangled name
 
-                entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity_ref.entity)));
+                entity_json["components"][key_name] =
+                    serialize_any(meta_type.from_void(type.value(entity_ref.entity)), purpose);
             }
             else
             {
@@ -252,17 +264,20 @@ namespace eeng::meta
     nlohmann::json serialize_entities(
         Entity* entity_first,
         int count,
-        std::shared_ptr<entt::registry>& registry)
+        std::shared_ptr<entt::registry>& registry,
+        SerializationPurpose purpose)
     {
         nlohmann::json json = nlohmann::json::array();
 
         for (int i = 0; i < count; i++)
-            json.push_back(serialize_entity(*(entity_first + i), registry));
+            json.push_back(serialize_entity(*(entity_first + i), registry, purpose));
 
         return json;
     }
 
-    nlohmann::json serialize_registry(std::shared_ptr<entt::registry>& registry)
+    nlohmann::json serialize_registry(
+        std::shared_ptr<entt::registry>& registry,
+        SerializationPurpose purpose)
     {
 #if 1
         std::vector<Entity> entities;
@@ -272,7 +287,7 @@ namespace eeng::meta
         for (auto entity : view)
             entities.push_back(Entity{ entity });
 
-        return serialize_entities(entities.data(), entities.size(), registry);
+        return serialize_entities(entities.data(), entities.size(), registry, purpose);
 #else
         nlohmann::json json = nlohmann::json::array();
 
@@ -280,7 +295,7 @@ namespace eeng::meta
         for (auto entity : view)
         {
 #if 1
-            json.push_back(serialize_entity(entity, registry));
+            json.push_back(serialize_entity(entity, registry, purpose));
 #else
             std::cout << "Serializing entity "
                 << entt::to_integral(entity) << std::endl;
@@ -298,7 +313,8 @@ namespace eeng::meta
                     auto key_name = meta::get_meta_type_id_string(meta_type); // Better for serialization?
                     // auto type_name = get_meta_type_name(meta_type); // Inspector-friendly version
 
-                    entity_json["components"][key_name] = serialize_any(meta_type.from_void(type.value(entity)));
+                    entity_json["components"][key_name] =
+                        serialize_any(meta_type.from_void(type.value(entity)), purpose);
                 }
                 else
                 {
@@ -317,7 +333,8 @@ namespace eeng::meta
         const nlohmann::json& json,
         entt::meta_any& any,
         const ecs::Entity& entity, // SKIP THIS SOMEHOW?
-        EngineContext& context)
+        EngineContext& context,
+        SerializationPurpose purpose)
     {
         assert(any);
 
@@ -325,15 +342,36 @@ namespace eeng::meta
         {
             if (entt::meta_func meta_func = meta_type.func(literals::deserialize_hs); meta_func)
             {
-                // 1) Try signature (json, any)
+                // 1) Try signature (json, any, purpose)
                 entt::meta_any res = meta_func.invoke(
                     {},
                     entt::forward_as_meta(json),
-                    entt::forward_as_meta(any)
+                    entt::forward_as_meta(any),
+                    entt::forward_as_meta(purpose)
                 );
 
                 if (!res) {
-                    // 2) Try signature (json, any, context)
+                    // 2) Try signature (json, any)
+                    res = meta_func.invoke(
+                        {},
+                        entt::forward_as_meta(json),
+                        entt::forward_as_meta(any)
+                    );
+                }
+
+                if (!res) {
+                    // 3) Try signature (json, any, context, purpose)
+                    res = meta_func.invoke(
+                        {},
+                        entt::forward_as_meta(json),
+                        entt::forward_as_meta(any),
+                        entt::forward_as_meta(context),
+                        entt::forward_as_meta(purpose)
+                    );
+                }
+
+                if (!res) {
+                    // 4) Try signature (json, any, context)
                     res = meta_func.invoke(
                         {},
                         entt::forward_as_meta(json),
@@ -343,7 +381,19 @@ namespace eeng::meta
                 }
 
                 if (!res) {
-                    // 3) Try signature (json, any, entity, context)
+                    // 5) Try signature (json, any, entity, context, purpose)
+                    res = meta_func.invoke(
+                        {},
+                        entt::forward_as_meta(json),
+                        entt::forward_as_meta(any),
+                        entt::forward_as_meta(entity),
+                        entt::forward_as_meta(context),
+                        entt::forward_as_meta(purpose)
+                    );
+                }
+
+                if (!res) {
+                    // 6) Try signature (json, any, entity, context)
                     res = meta_func.invoke(
                         {},
                         entt::forward_as_meta(json),
@@ -388,11 +438,11 @@ namespace eeng::meta
                     std::string key_name = get_meta_data_display_name(id, meta_data);
                     if (json.contains(key_name))
                     {
-                        assert(traits::is_serializable(meta_data) && "Non-serializable field was serialized");
+                        assert(traits::is_serializable(meta_data, purpose) && "Non-serializable field was serialized");
                     }
                     else
                     {
-                        assert(!traits::is_serializable(meta_data) && "Serializable field was not serialized");
+                        assert(!traits::is_serializable(meta_data, purpose) && "Serializable field was not serialized");
                     }
 #else
                     // JSON key name is the field display name if present, or the id type
@@ -400,7 +450,7 @@ namespace eeng::meta
                     assert(json.contains(key_name));
 #endif
                     entt::meta_any field_any = meta_data.get(any);
-                    deserialize_any(json[key_name], field_any, entity, context);
+                    deserialize_any(json[key_name], field_any, entity, context, purpose);
                     meta_data.set(any, field_any);
                 }
             }
@@ -432,11 +482,11 @@ namespace eeng::meta
             {
 #ifndef SEQDESER_ALT
                 entt::meta_any elem_any = view.value_type().construct();
-                deserialize_any(json[i], elem_any, entity, context);
+                deserialize_any(json[i], elem_any, entity, context, purpose);
                 view.insert(view.end(), elem_any);
 #else
                 entt::meta_any elem_any = view[i]; // view[i].as_ref() works too
-                deserialize_any(json[i], elem_any, entity, context); // TODO: view[i] here if &&
+                deserialize_any(json[i], elem_any, entity, context, purpose); // TODO: view[i] here if &&
 #endif
             }
         }
@@ -461,14 +511,14 @@ namespace eeng::meta
                 {
                     entt::meta_any key_any = view.key_type().construct();
                     entt::meta_any mapped_any = view.mapped_type().construct();
-                    deserialize_any(json_elem[0], key_any, entity, context);
-                    deserialize_any(json_elem[1], mapped_any, entity, context);
+                    deserialize_any(json_elem[0], key_any, entity, context, purpose);
+                    deserialize_any(json_elem[1], mapped_any, entity, context, purpose);
                     view.insert(key_any, mapped_any);
                 }
                 else // Just key
                 {
                     entt::meta_any key_any = view.key_type().construct();
-                    deserialize_any(json_elem, key_any, entity, context);
+                    deserialize_any(json_elem, key_any, entity, context, purpose);
                     view.insert(key_any);
                 }
             }
@@ -493,7 +543,8 @@ namespace eeng::meta
 
     ecs::EntityRef deserialize_entity(
         const nlohmann::json& json,
-        EngineContext& ctx
+        EngineContext& ctx,
+        SerializationPurpose purpose
     )
     {
         // Fetch entity GUID and create EntityRef
@@ -516,11 +567,11 @@ namespace eeng::meta
             if (auto meta_type = meta::resolve_by_type_id_string(key_str); meta_type)
                 // if (entt::meta_type meta_type = entt::resolve(comp_id); meta_type)
             {
-                assert(traits::is_serializable(meta_type) && "Non-serializable type was serialized");
+                assert(traits::is_serializable(meta_type, purpose) && "Non-serializable type was serialized");
 
                 // Default-construct and deserialize component
                 entt::meta_any any = meta_type.construct();
-                deserialize_any(component_json.value(), any, entity, ctx);
+                deserialize_any(component_json.value(), any, entity, ctx, purpose);
 
                 // Add component to entity
                 auto& registry = ctx.entity_manager->registry();
@@ -564,7 +615,8 @@ namespace eeng::meta
 
     ecs::EntityRef spawn_entity_from_desc(
         const EntitySpawnDesc& desc,
-        EngineContext& ctx
+        EngineContext& ctx,
+        SerializationPurpose purpose
     )
     {
         auto& em = *ctx.entity_manager;
@@ -582,7 +634,7 @@ namespace eeng::meta
             if (!mt) continue;
 
             entt::meta_any any = mt.construct();
-            eeng::meta::deserialize_any(cd.data, any, e, ctx);
+            eeng::meta::deserialize_any(cd.data, any, e, ctx, purpose);
 
             auto comp_id = mt.id();
             eeng::meta::ensure_storage(reg, comp_id);

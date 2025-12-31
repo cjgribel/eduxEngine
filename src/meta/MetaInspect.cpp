@@ -197,7 +197,7 @@ namespace eeng::meta {
                 // inspect() not available: traverse data members
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
-                    if (traits::is_hidden(meta_data)) continue;
+                    if (traits::is_no_inspection(meta_data)) continue;
 
                     std::string key_name = get_meta_data_display_name(id, meta_data);
 #ifdef INSPECTION_DEBUG_PRINT
@@ -225,7 +225,7 @@ namespace eeng::meta {
                         // Check & set readonly
                         //bool readonly = true; // get_meta_data_prop<bool, ReadonlyDefault>(meta_data, readonly_hs);
                         const auto trait_flags = meta_data.traits<MetaFlags>();
-                        bool readonly = has_flag(trait_flags, MetaFlags::read_only);
+                        bool readonly = has_flag(trait_flags, MetaFlags::readonly_inspection);
                         if (readonly) inspector.begin_disabled();
 
                         // Inspect
@@ -398,7 +398,7 @@ namespace eeng::meta {
 
             if (entt::meta_type meta_type = entt::resolve(id); meta_type)
             {
-                if (traits::is_hidden(meta_type)) continue;
+                if (traits::is_no_inspection(meta_type)) continue;
 
                 auto type_name = get_meta_type_display_name(meta_type);
                 if (inspector.begin_node(type_name.c_str()))

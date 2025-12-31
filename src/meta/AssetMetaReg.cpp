@@ -246,10 +246,10 @@ namespace eeng {
             entt::meta_factory<Handle<T>>{}
             .data<&Handle<T>::idx>("idx"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "idx", "Index", "The index of the handle in storage." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
                 .data<&Handle<T>::ver>("ver"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "ver", "Version", "The version of the handle." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
                 ;
 #endif
 
@@ -262,7 +262,7 @@ namespace eeng {
                 // Guid
                 .template data<&AssetRef<T>::guid>("guid"_hs)
                 .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 // Handle<T>
                 // (Not serialized) (Not cloned)
@@ -295,27 +295,27 @@ namespace eeng {
 
             .data<&AssetMetaData::guid>("guid"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             .data<&AssetMetaData::guid_parent>("guid_parent"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "parent_guid", "Parent Guid", "The GUID of the parent asset." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             .data<&AssetMetaData::name>("name"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the asset." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             .data<&AssetMetaData::type_id>("type_id"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "type_id", "Type ID", "The type ID of the asset." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             .data<&AssetMetaData::contained_assets>("contained_assets"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "contained_assets", "Contained Assets", "Contained assets." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             // .data<&AssetMetaData::file_path>("file_path"_hs)
             // .custom<DataMetaInfo>(DataMetaInfo{ "file_path", "File Path", "The file path of the asset." })
-            // .traits(MetaFlags::read_only)
+            // .traits(MetaFlags::readonly_inspection)
             ;
         register_helper_type<AssetMetaData>();
         // warm_start_meta_type<AssetMetaData>();
@@ -332,19 +332,19 @@ namespace eeng {
 
                 .data<&assets::GpuSubMesh::index_offset>("index_offset"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "index_offset", "Index Offset", "Index Offset." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuSubMesh::index_count>("index_count"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "index_count", "Index Count", "Index Count." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuSubMesh::base_vertex>("base_vertex"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "base_vertex", "Base Vertex", "Base Vertex." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuSubMesh::material>("material"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "material", "Material", "Material." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
                 ;
             register_helper_type<assets::GpuSubMesh>();
         }
@@ -389,21 +389,21 @@ namespace eeng {
 
                 .data<&assets::GpuModelAsset::model_ref>("model_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model Reference", "Referenced Model asset" })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
-                .data<&assets::GpuModelAsset::state>("state"_hs).custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::state>("state"_hs).custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State." }).traits(MetaFlags::readonly_inspection)
 
-                .data<&assets::GpuModelAsset::vao>("vao"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vao", "VAO", "VAO." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vbo_uv>("vbo_uv"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_uv", "VBO for texture coordinates", "VBO UV." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vao>("vbo_pos"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_pos", "VAO Positions", "VAO for positions." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vbo_nrm>("vbo_nrm"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_nrm", "VBO Normals", "VBO for normals." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vbo_bnrm>("vbo_binrm"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_bnrm", "VBO Binormals", "VBO for binormals." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vbo_tang>("vbo_tang"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_tang", "VBO Normals", "VBO for tangents." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vbo_bone>("vbo_bone"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_bone", "VBO Bones", "VBO for bone indices and weights." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::ibo>("ibo"_hs).custom<DataMetaInfo>(DataMetaInfo{ "ibo", "IBO", "IBO." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::submeshes>("submeshes"_hs).custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "SubMeshes", "SubMeshes." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::vertex_count>("vertex_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vertex_count", "Vertex Count", "Vertex Count." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuModelAsset::index_count>("index_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "index_count", "Index Count", "Index Count." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuModelAsset::vao>("vao"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vao", "VAO", "VAO." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::vbo_uv>("vbo_uv"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_uv", "VBO for texture coordinates", "VBO UV." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::vao>("vbo_pos"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_pos", "VAO Positions", "VAO for positions." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::vbo_nrm>("vbo_nrm"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_nrm", "VBO Normals", "VBO for normals." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::vbo_bnrm>("vbo_binrm"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_bnrm", "VBO Binormals", "VBO for binormals." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::vbo_tang>("vbo_tang"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_tang", "VBO Normals", "VBO for tangents." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::vbo_bone>("vbo_bone"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vbo_bone", "VBO Bones", "VBO for bone indices and weights." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::ibo>("ibo"_hs).custom<DataMetaInfo>(DataMetaInfo{ "ibo", "IBO", "IBO." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::submeshes>("submeshes"_hs).custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "SubMeshes", "SubMeshes." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::vertex_count>("vertex_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "vertex_count", "Vertex Count", "Vertex Count." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuModelAsset::index_count>("index_count"_hs).custom<DataMetaInfo>(DataMetaInfo{ "index_count", "Index Count", "Index Count." }).traits(MetaFlags::readonly_inspection)
                 .func<&on_create_gpu_model>(literals::on_create_hs)
                 .func<&on_destroy_gpu_model>(literals::on_destroy_hs)
                 ;
@@ -418,14 +418,14 @@ namespace eeng {
 
                 .data<&assets::GpuTextureAsset::texture_ref>("texture_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "texture_ref", "Texture Reference", "Referenced Texture asset" })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
-                .data<&assets::GpuTextureAsset::state>("state"_hs).custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuTextureAsset::state>("state"_hs).custom<DataMetaInfo>(DataMetaInfo{ "state", "Load State", "GPU Load State." }).traits(MetaFlags::readonly_inspection)
 
-                .data<&assets::GpuTextureAsset::gl_id>("gl_id"_hs).custom<DataMetaInfo>(DataMetaInfo{ "gl_id", "GL ID", "GL ID." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuTextureAsset::width>("width"_hs).custom<DataMetaInfo>(DataMetaInfo{ "width", "Width", "Width." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuTextureAsset::height>("height"_hs).custom<DataMetaInfo>(DataMetaInfo{ "height", "Height", "Height." }).traits(MetaFlags::read_only)
-                .data<&assets::GpuTextureAsset::channels>("channels"_hs).custom<DataMetaInfo>(DataMetaInfo{ "channels", "Channels", "Channels." }).traits(MetaFlags::read_only)
+                .data<&assets::GpuTextureAsset::gl_id>("gl_id"_hs).custom<DataMetaInfo>(DataMetaInfo{ "gl_id", "GL ID", "GL ID." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuTextureAsset::width>("width"_hs).custom<DataMetaInfo>(DataMetaInfo{ "width", "Width", "Width." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuTextureAsset::height>("height"_hs).custom<DataMetaInfo>(DataMetaInfo{ "height", "Height", "Height." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::GpuTextureAsset::channels>("channels"_hs).custom<DataMetaInfo>(DataMetaInfo{ "channels", "Channels", "Channels." }).traits(MetaFlags::readonly_inspection)
 
                 .func<&on_create_gpu_texture>(literals::on_create_hs)
                 .func<&on_destroy_gpu_texture>(literals::on_destroy_hs)
@@ -441,27 +441,27 @@ namespace eeng {
 
                 .data<&assets::GpuMaterialAsset::material_ref>("material_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "material_ref", "Material Reference", "Referenced Material asset" })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuMaterialAsset::Ka>("Ka"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "Ka", "Ambient Color", "Ambient Color." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuMaterialAsset::Kd>("Kd"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "Kd", "Diffuse Color", "Diffuse Color." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuMaterialAsset::Ks>("Ks"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "Ks", "Specular Color", "Specular Color." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuMaterialAsset::shininess>("shininess"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "shininess", "Shininess", "Shininess." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuMaterialAsset::textures>("textures"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "textures", "Textures", "Textures." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
                 ;
             register_asset<assets::GpuMaterialAsset>();
         }
@@ -474,7 +474,7 @@ namespace eeng {
 
                 .data<&assets::TextureAsset::source_path>("source_path"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "source_path", "Path", "Path." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
                 ;
             register_asset<assets::TextureAsset>();
         }
@@ -524,23 +524,23 @@ namespace eeng {
 
                 .data<&assets::MaterialAsset::Ka>("Ka"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "Ka", "Ambient Color", "Ambient Color." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::MaterialAsset::Kd>("Kd"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "Kd", "Diffuse Color", "Diffuse Color." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::MaterialAsset::Ks>("Ks"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "Ks", "Specular Color", "Specular Color." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::MaterialAsset::shininess>("shininess"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "shininess", "Shininess", "Shininess." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::MaterialAsset::textures>("textures"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "textures", "Textures", "Textures." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
                 ;
             register_asset<assets::MaterialAsset>();
         }
@@ -551,14 +551,14 @@ namespace eeng {
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "ssets.SubMesh", .name = "SubMesh", .tooltip = "SubMesh." })
                 .traits(MetaFlags::none)
 
-                .data<&assets::SubMesh::base_index>("base_index"_hs).custom<DataMetaInfo>(DataMetaInfo{ "base_index", "Base Index", "Base Index." }).traits(MetaFlags::read_only)
-                .data<&assets::SubMesh::nbr_indices>("nbr_indices"_hs).custom<DataMetaInfo>(DataMetaInfo{ "nbr_indices", "Nbr Indices", "Nbr Indices." }).traits(MetaFlags::read_only)
-                .data<&assets::SubMesh::base_vertex>("base_vertex"_hs).custom<DataMetaInfo>(DataMetaInfo{ "base_vertex", "Base Vertex", "Base Vertex." }).traits(MetaFlags::read_only)
-                .data<&assets::SubMesh::nbr_vertices>("nbr_vertices"_hs).custom<DataMetaInfo>(DataMetaInfo{ "nbr_vertices", "Nbr Vertices", "Nbr Vertices." }).traits(MetaFlags::read_only)
-                .data<&assets::SubMesh::node_index>("node_index"_hs).custom<DataMetaInfo>(DataMetaInfo{ "node_index", "Node Index", "Node Index." }).traits(MetaFlags::read_only)
-                .data<&assets::SubMesh::is_skinned>("is_skinned"_hs).custom<DataMetaInfo>(DataMetaInfo{ "is_skinned", "Is Skinned", "Is Skinned." }).traits(MetaFlags::read_only)
+                .data<&assets::SubMesh::base_index>("base_index"_hs).custom<DataMetaInfo>(DataMetaInfo{ "base_index", "Base Index", "Base Index." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::SubMesh::nbr_indices>("nbr_indices"_hs).custom<DataMetaInfo>(DataMetaInfo{ "nbr_indices", "Nbr Indices", "Nbr Indices." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::SubMesh::base_vertex>("base_vertex"_hs).custom<DataMetaInfo>(DataMetaInfo{ "base_vertex", "Base Vertex", "Base Vertex." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::SubMesh::nbr_vertices>("nbr_vertices"_hs).custom<DataMetaInfo>(DataMetaInfo{ "nbr_vertices", "Nbr Vertices", "Nbr Vertices." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::SubMesh::node_index>("node_index"_hs).custom<DataMetaInfo>(DataMetaInfo{ "node_index", "Node Index", "Node Index." }).traits(MetaFlags::readonly_inspection)
+                .data<&assets::SubMesh::is_skinned>("is_skinned"_hs).custom<DataMetaInfo>(DataMetaInfo{ "is_skinned", "Is Skinned", "Is Skinned." }).traits(MetaFlags::readonly_inspection)
 
-                .data<&assets::SubMesh::material>("material"_hs).custom<DataMetaInfo>(DataMetaInfo{ "material", "Material", "Material." }).traits(MetaFlags::read_only)
+                .data<&assets::SubMesh::material>("material"_hs).custom<DataMetaInfo>(DataMetaInfo{ "material", "Material", "Material." }).traits(MetaFlags::readonly_inspection)
 
                 // .template func<&eeng::editor::inspect_glmvec3>(eeng::literals::inspect_hs)
                 ;
@@ -573,47 +573,47 @@ namespace eeng {
 
                 .data<&assets::ModelDataAsset::positions>("positions"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "positions", "Positions", "Positions." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::normals>("normals"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "normals", "Normals", "Normals." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::tangents>("tangents"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "tangents", "Tangents", "Tangents." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::binormals>("binormals"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "binormals", "Binormals", "Binormals." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::texcoords>("texcoords"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "texcoords", "Texcoords", "Texcoords." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::skin>("skin"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "skin", "Skin", "Skin." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::indices>("indices"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "indices", "Indices", "Indices." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::submeshes>("submeshes"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "Submeshes", "Submeshes." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::ModelDataAsset::nodetree>("nodetree"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "nodetree", "Node Tree", "Node Tree." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::bones>("bones"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "bones", "Bones", "Bones." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
 
                 .data<&assets::ModelDataAsset::animations>("animations"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "animations", "Animations", "Animations." })
-                .traits(MetaFlags::hidden)
+                .traits(MetaFlags::no_inspection)
                 ;
             register_asset<assets::ModelDataAsset>();
             serializers::register_modeldataasset_serialization();
@@ -643,7 +643,7 @@ namespace eeng {
 
             .data<&mock::Texture::name>("name"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "The name of the texture." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
             ;
         // warm_start_meta_type<mock::Texture>();
         // meta::type_id_map()["eeng.mock.Texture"] = entt::resolve<mock::Texture>().id();
@@ -683,12 +683,12 @@ namespace eeng {
             // Register member 'x' with DisplayInfo and DataFlags
             .data<&mock::MockResource1::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "An integer member 'x'" })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             // Register member 'y' with DisplayInfo and multiple DataFlags
             .data<&mock::MockResource1::y>("y"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "A float member 'y'" })
-            .traits(MetaFlags::hidden | MetaFlags::read_only)
+            .traits(MetaFlags::no_inspection | MetaFlags::readonly_inspection)
 
             // Required for all resource types
             // .template func<&assure_storage<mock::MockResource1>>(eeng::literals::assure_storage_hs)

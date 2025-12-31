@@ -393,7 +393,8 @@ namespace eeng
 
                 nlohmann::json ejson = eeng::meta::serialize_entity(
                     er,
-                    registry_sptr  // <- change to your actual API
+                    registry_sptr,  // <- change to your actual API
+                    eeng::meta::SerializationPurpose::file
                 );
                 arr.push_back(std::move(ejson));
             }
@@ -807,7 +808,10 @@ namespace eeng
                 // 1) MT: spawn + register entity from desc
                 ecs::EntityRef created = ctx.main_thread_queue->push_and_wait([&]() -> ecs::EntityRef
                     {
-                        auto er = eeng::meta::spawn_entity_from_desc(desc, ctx);
+                        auto er = eeng::meta::spawn_entity_from_desc(
+                            desc,
+                            ctx,
+                            eeng::meta::SerializationPurpose::file);
                         ctx.entity_manager->register_entity(er.entity);
                         return er;
                     });
@@ -1300,7 +1304,10 @@ namespace eeng
 
                 for (const auto& desc : entity_descs)
                 {
-                    auto er = eeng::meta::spawn_entity_from_desc(desc, ctx);
+                    auto er = eeng::meta::spawn_entity_from_desc(
+                        desc,
+                        ctx,
+                        eeng::meta::SerializationPurpose::file);
                     // ctx.entity_manager->register_entity(er.get_entity());
                     B.live.push_back(er);
                     new_entities.push_back(er.entity);

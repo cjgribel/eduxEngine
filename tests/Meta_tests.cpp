@@ -89,11 +89,11 @@ protected:
 
             .data<&MockType::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "Integer member x." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             .data<&MockType::y>("y"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "Float member y." })
-            .traits(MetaFlags::read_only | MetaFlags::hidden)
+            .traits(MetaFlags::readonly_inspection | MetaFlags::no_inspection)
 
             // enum
 
@@ -305,14 +305,14 @@ TEST_F(MetaRegistrationTest, VerifyMetaInformation)
         if (member_info->name == "x")
         {
             EXPECT_EQ(member_info->tooltip, "Integer member x.");
-            EXPECT_TRUE((flags & MetaFlags::read_only) == MetaFlags::read_only);
-            EXPECT_FALSE(any(flags & MetaFlags::hidden));
+            EXPECT_TRUE((flags & MetaFlags::readonly_inspection) == MetaFlags::readonly_inspection);
+            EXPECT_FALSE(any(flags & MetaFlags::no_inspection));
         }
         else if (member_info->name == "y")
         {
             EXPECT_EQ(member_info->tooltip, "Float member y.");
-            EXPECT_TRUE((flags & MetaFlags::read_only) == MetaFlags::read_only);
-            EXPECT_TRUE((flags & MetaFlags::hidden) == MetaFlags::hidden);
+            EXPECT_TRUE((flags & MetaFlags::readonly_inspection) == MetaFlags::readonly_inspection);
+            EXPECT_TRUE((flags & MetaFlags::no_inspection) == MetaFlags::no_inspection);
         }
         else
         {

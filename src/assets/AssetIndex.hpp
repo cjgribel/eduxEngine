@@ -48,8 +48,12 @@ namespace eeng
             const std::filesystem::path& meta_path)
         {
             // Serialize data first
-            nlohmann::json j_asset = meta::serialize_any(entt::forward_as_meta(asset));
-            nlohmann::json j_meta = meta::serialize_any(entt::forward_as_meta(meta));
+            nlohmann::json j_asset = meta::serialize_any(
+                entt::forward_as_meta(asset),
+                meta::SerializationPurpose::file);
+            nlohmann::json j_meta = meta::serialize_any(
+                entt::forward_as_meta(meta),
+                meta::SerializationPurpose::file);
 
             // Write asset first (may be large)
             {
@@ -97,10 +101,10 @@ namespace eeng
 
             entt::meta_any t = T{};
             // entt::meta_any any = entt::resolve<T>().construct(); // meta based
-            meta::deserialize_any(j, t, ecs::Entity{}, ctx);
+            meta::deserialize_any(j, t, ecs::Entity{}, ctx, meta::SerializationPurpose::file);
             return t.cast<T>();
             //T result;
-            // meta::deserialize_any(j, entt::forward_as_meta(result), Entity{}, ctx);
+            // meta::deserialize_any(j, entt::forward_as_meta(result), Entity{}, ctx, meta::SerializationPurpose::file);
             // return result;
         }
 

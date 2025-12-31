@@ -380,7 +380,9 @@ namespace eeng::editor {
         // Fetch component
         auto comp_any = comp_type.from_void(storage->value(entity));
         // Serialize component
-        comp_json = Meta::serialize_any(comp_type.from_void(storage->value(entity)));
+        comp_json = Meta::serialize_any(
+            comp_type.from_void(storage->value(entity)),
+            eeng::meta::SerializationPurpose::undo);
         // Remove component from entity
         storage->remove(entity);
     }
@@ -396,7 +398,12 @@ namespace eeng::editor {
         // Default-construct component
         auto comp_any = comp_type.construct();
         // Deserialize component
-        Meta::deserialize_any(comp_json, comp_any, entity, context);
+        Meta::deserialize_any(
+            comp_json,
+            comp_any,
+            entity,
+            context,
+            eeng::meta::SerializationPurpose::undo);
         // Add component to entity
         storage->push(entity, comp_any.data());
     }

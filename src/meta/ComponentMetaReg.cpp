@@ -192,7 +192,7 @@ namespace eeng
             .template data<&eeng::ecs::EntityRef::guid>("guid"_hs)
             // .template data<&eeng::ecs::EntityRef::set_guid, &eeng::ecs::EntityRef::get_guid>("guid"_hs)
             .template custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
             // Entity
             // (Not serialized) (Not cloned)
 
@@ -202,7 +202,7 @@ namespace eeng
 
             //     .template data<&eeng::ecs::EntityRef::entity>("entity"_hs)
             //     .template custom<DataMetaInfo>(DataMetaInfo{ "entity", "Entity", "The referenced entity." })
-            //     .traits(MetaFlags::read_only)   
+            //     .traits(MetaFlags::readonly_inspection)   
             ;
         register_helper_type<eeng::ecs::EntityRef>();
         // warm_start_meta_type<eeng::ecs::EntityRef>();
@@ -216,7 +216,7 @@ namespace eeng
 
             .data<&eeng::CopySignaller::data/*, entt::as_ref_t*/>("data"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "data", "data", "data" })
-            .traits(MetaFlags::none) // read_only -> as_ref_t
+            .traits(MetaFlags::none) // readonly_inspection -> as_ref_t
             ;
         register_component<eeng::CopySignaller>();
 
@@ -314,12 +314,12 @@ namespace eeng
             // Guid
             .data<&eeng::ecs::HeaderComponent::guid>("guid"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "guid", "Guid", "A globally unique identifier." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             // Parent Entity
             .data<&eeng::ecs::HeaderComponent::parent_entity>("parent_entity"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "parent_entity", "Parent Entity", "The parent entity of this entity." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
             ;
         register_component<ecs::HeaderComponent>();
         // warm_start_meta_type<eeng::ecs::HeaderComponent>();
@@ -339,7 +339,7 @@ namespace eeng
                 // Model asset ref
                 .data<&eeng::ecs::ModelComponent::model_ref>("model_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model reference", "Model Reference." })
-                .traits(MetaFlags::read_only)
+                .traits(MetaFlags::readonly_inspection)
 
                 // Anim clip index
                 .data<&eeng::ecs::ModelComponent::clip_index>("clip_index"_hs)

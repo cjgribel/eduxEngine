@@ -11,6 +11,7 @@
 // where <nlohmann/json.hpp> is included anyway.
 #include <nlohmann/json.hpp>
 
+#include "MetaInfo.h"
 #include "ecs/Entity.hpp"
 #include "EngineContext.hpp"
 
@@ -30,33 +31,39 @@ namespace eeng::meta
     };
 
     nlohmann::json serialize_any(
-        const entt::meta_any& meta_any);
+        const entt::meta_any& meta_any,
+        SerializationPurpose purpose = SerializationPurpose::generic);
 
     nlohmann::json serialize_entity(
         const ecs::EntityRef& entity_ref,
-        std::shared_ptr<entt::registry>& registry);
+        std::shared_ptr<entt::registry>& registry,
+        SerializationPurpose purpose = SerializationPurpose::generic);
 
 #if 0
     nlohmann::json serialize_entities(
         Entity* entity_first,
         int count,
-        std::shared_ptr<entt::registry>& registry);
+        std::shared_ptr<entt::registry>& registry,
+        SerializationPurpose purpose = SerializationPurpose::generic);
 
     nlohmann::json serialize_registry(
-        std::shared_ptr<entt::registry>& registry);
+        std::shared_ptr<entt::registry>& registry,
+        SerializationPurpose purpose = SerializationPurpose::generic);
 #endif
     void deserialize_any(
         const nlohmann::json& json,
         entt::meta_any& meta_any,
         const ecs::Entity& entity, // SKIP THIS SOMEHOW?
-        EngineContext& context
+        EngineContext& context,
+        SerializationPurpose purpose = SerializationPurpose::generic
     );
 
     /// One-shot deserialize-and-create entity from JSON
     // Entity is not registered to scene graph or chunk
     ecs::EntityRef deserialize_entity(
         const nlohmann::json& json,
-        EngineContext& ctx
+        EngineContext& ctx,
+        SerializationPurpose purpose = SerializationPurpose::generic
     );
 
     // Can be called off main-thread (does not touch entt::meta or entt::registry)
@@ -67,7 +74,8 @@ namespace eeng::meta
     // Main-thread (touches entt::meta and entt::registry)
     ecs::EntityRef spawn_entity_from_desc(
         const EntitySpawnDesc& desc,
-        EngineContext& ctx
+        EngineContext& ctx,
+        SerializationPurpose purpose = SerializationPurpose::generic
     );
 
 #if 0

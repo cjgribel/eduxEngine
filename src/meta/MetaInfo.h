@@ -49,10 +49,24 @@ namespace eeng
     enum class MetaFlags : std::uint16_t
     {
         none = 0,
-        read_only = 1 << 0,     // no editing / TODO -> no cloning (const meta_any -> inspect_*)
-        hidden = 1 << 1,        // skip inspection
-        no_serialize = 1 << 2,  // skip serilization
+        readonly_inspection = 1 << 0,  // no editing / TODO -> no cloning (const meta_any -> inspect_*)
+        no_inspection = 1 << 1,        // skip inspection
+        no_serialize = 1 << 2,         // skip serialization for all purposes
+        no_serialize_file = 1 << 3,    // skip serialization for file persistence
+        no_serialize_undo = 1 << 4,    // skip serialization for undo/redo
+        no_serialize_display = 1 << 5, // skip serialization for display
     };
+
+    namespace meta
+    {
+        enum class SerializationPurpose : std::uint8_t
+        {
+            generic = 0,
+            file,
+            undo,
+            display,
+        };
+    } // namespace meta
 
     constexpr MetaFlags operator|(MetaFlags lhs, MetaFlags rhs)
     {

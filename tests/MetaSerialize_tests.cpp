@@ -379,15 +379,15 @@ protected:
 
             .data<&MockType2::x>("x"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "Integer member x." })
-            .traits(MetaFlags::read_only)
+            .traits(MetaFlags::readonly_inspection)
 
             .data<&MockType2::y>("y"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "Float member y." })
-            .traits(MetaFlags::read_only | MetaFlags::hidden)
+            .traits(MetaFlags::readonly_inspection | MetaFlags::no_inspection)
 
             .data<&MockType2::an_enum>("an_enum"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "an_enum", "AnEnum", "Enum member" })
-            .traits(MetaFlags::read_only | MetaFlags::hidden)
+            .traits(MetaFlags::readonly_inspection | MetaFlags::no_inspection)
 
             .template func<&assure_type_storage<MockType2>, entt::as_void_t>(literals::assure_component_storage_hs)
             ;

@@ -145,26 +145,6 @@ namespace eeng::meta
         }
     }
 
-    /*
-    1) WHEN AN ENTITY WITH COMPS IS ATTACHED
-    2) WHEN A COMP IS ATTACHED TO AN ENTITY ALREADY IN A BATCH
-
-    Usage in BatchRegistry when an entity is attached/created:
-
-    if (auto reg_sp = ctx.entity_manager->registry_wptr().lock();
-    reg_sp && created.has_entity())
-{
-    auto guids = eeng::meta::collect_asset_guids_for_entity(
-        created.get_entity(), *reg_sp);
-
-    std::lock_guard lk(mtx_);
-    auto& closure = B->asset_closure_hdr;
-    for (auto& g : guids)
-        if (std::find(closure.begin(), closure.end(), g) == closure.end())
-            closure.push_back(g);
-}
-    */
-
     // Collect asset GUIDs referenced by entity
     inline std::vector<Guid>
         collect_asset_guids_for_entity(
@@ -222,22 +202,6 @@ namespace eeng::meta
         return out;
     }
 
-
-    /*
-Usage after a batch has loaded and all entities are spawned + registered:
-
-if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
-{
-    auto& reg = *reg_sp;
-    auto& em  = *ctx.entity_manager;
-
-    for (auto& er : B.live)
-    {
-        if (!er.has_entity()) continue;
-        eeng::meta::resolve_entity_refs_for_entity(er.get_entity(), reg, em);
-    }
-}
-    */
     inline void
         bind_entity_refs_for_entity(
             entt::entity e,
@@ -259,21 +223,6 @@ if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
             });
     }
 
-    /*
-    Usage after RM has loaded/bound the batch’s asset closure:
-
-    if (auto reg_sp = ctx.entity_manager->registry_wptr().lock())
-{
-    auto& reg = *reg_sp;
-    auto& rm  = *ctx.resource_manager;
-
-    for (auto& er : B.live)
-    {
-        if (!er.has_entity()) continue;
-        eeng::meta::resolve_asset_refs_for_entity(er.get_entity(), reg, rm, ctx);
-    }
-}
-    */
     inline void
         bind_asset_refs_for_entity(
             entt::entity e,
