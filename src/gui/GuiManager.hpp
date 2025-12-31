@@ -32,6 +32,7 @@ namespace eeng
         void draw_batch_registry(EngineContext& ctx) const;
         void draw_task_monitor(EngineContext& ctx) const;
         void draw_engine_info(EngineContext& ctx) const;
+        void draw_command_queue(EngineContext& ctx) const;
 
         void draw_scene_graph(EngineContext& ctx) const;
 

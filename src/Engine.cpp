@@ -122,6 +122,7 @@ namespace eeng
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEntityInspector, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowBatchRegistry, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowTaskMonitor, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowCommandQueue, true);
 
         EENG_LOG(ctx, "Engine initialized successfully.");
         return true;

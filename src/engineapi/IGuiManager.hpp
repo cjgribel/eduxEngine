@@ -17,7 +17,8 @@ namespace eeng
         ShowBatchRegistry,
         ShowSceneGraph,
         ShowEntityInspector,
-        ShowTaskMonitor
+        ShowTaskMonitor,
+        ShowCommandQueue
         // ShowRenderStats,
         // ShowInputDebugger,
         // ...

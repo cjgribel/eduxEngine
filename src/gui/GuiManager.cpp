@@ -10,6 +10,7 @@
 #include "gui/SceneHierarchyWidget.hpp"
 #include "gui/SceneHierarchyToolbarWidget.hpp"
 #include "gui/EntityInspectorWidget.hpp"
+#include "gui/CommandQueueWidget.hpp"
 
 #include "AssetTreeViews.hpp"
 
@@ -104,6 +105,9 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowTaskMonitor))
             draw_task_monitor(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowCommandQueue))
+            draw_command_queue(ctx);
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowSceneGraph))
             draw_scene_graph(ctx);
@@ -1090,6 +1094,16 @@ namespace eeng
                 ImGui::PopID();
             }
         }
+
+        ImGui::End();
+    }
+
+    void GuiManager::draw_command_queue(EngineContext& ctx) const
+    {
+        ImGui::Begin("Command Queue");
+
+        gui::CommandQueueWidget widget{ ctx };
+        widget.draw();
 
         ImGui::End();
     }
