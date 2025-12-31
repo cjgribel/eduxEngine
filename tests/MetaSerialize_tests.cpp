@@ -217,6 +217,85 @@ namespace
         }
     };
 
+    struct PurposeFilterType
+    {
+        int a = 1;
+        int b = 2;
+        int c = 3;
+        int d = 4;
+        int e = 5;
+    };
+
+    struct PurposeAwareType
+    {
+        int value = 7;
+    };
+
+    const char* purpose_to_string(meta::SerializationPurpose purpose)
+    {
+        switch (purpose)
+        {
+        case meta::SerializationPurpose::generic:
+            return "generic";
+        case meta::SerializationPurpose::file:
+            return "file";
+        case meta::SerializationPurpose::undo:
+            return "undo";
+        case meta::SerializationPurpose::display:
+            return "display";
+        default:
+            return "unknown";
+        }
+    }
+
+    void serialize_purpose_aware(
+        nlohmann::json& j,
+        const entt::meta_any& any,
+        meta::SerializationPurpose purpose)
+    {
+        auto ptr = any.try_cast<PurposeAwareType>();
+        assert(ptr && "serialize_purpose_aware: could not cast meta_any to PurposeAwareType");
+        j = {
+            { "value", ptr->value },
+            { "purpose", purpose_to_string(purpose) }
+        };
+    }
+
+    void register_purpose_meta_types()
+    {
+        static bool registered = false;
+        if (registered)
+            return;
+        registered = true;
+
+        entt::meta_factory<PurposeFilterType>()
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "PurposeFilterType", .name = "PurposeFilterType", .tooltip = "Purpose-filtered fields." })
+            .data<&PurposeFilterType::a>("a"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "a", "a", "" })
+            .traits(MetaFlags::none)
+            .data<&PurposeFilterType::b>("b"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "b", "b", "" })
+            .traits(MetaFlags::no_serialize_file)
+            .data<&PurposeFilterType::c>("c"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "c", "c", "" })
+            .traits(MetaFlags::no_serialize_undo)
+            .data<&PurposeFilterType::d>("d"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "d", "d", "" })
+            .traits(MetaFlags::no_serialize_display)
+            .data<&PurposeFilterType::e>("e"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "e", "e", "" })
+            .traits(MetaFlags::no_serialize)
+            ;
+
+        entt::meta_factory<PurposeAwareType>()
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "PurposeAwareType", .name = "PurposeAwareType", .tooltip = "Purpose-aware serializer." })
+            .data<&PurposeAwareType::value>("value"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "value", "value", "" })
+            .traits(MetaFlags::none)
+            .template func<&serialize_purpose_aware, entt::as_void_t>(literals::serialize_hs)
+            ;
+    }
+
     template<typename T>
     void assure_type_storage(entt::registry& registry)
     {
@@ -520,6 +599,61 @@ TEST_F(MetaSerializationTest, SerializeMockType2)
 {
     MockType2 t;
     test_type(t, ctx);
+}
+
+TEST_F(MetaSerializationTest, SerializePurposeFiltersFields)
+{
+    register_purpose_meta_types();
+    PurposeFilterType t{};
+
+    auto j_file = meta::serialize_any_for_file(t);
+    EXPECT_TRUE(j_file.contains("a"));
+    EXPECT_FALSE(j_file.contains("b"));
+    EXPECT_TRUE(j_file.contains("c"));
+    EXPECT_TRUE(j_file.contains("d"));
+    EXPECT_FALSE(j_file.contains("e"));
+
+    auto j_undo = meta::serialize_any_for_undo(t);
+    EXPECT_TRUE(j_undo.contains("a"));
+    EXPECT_TRUE(j_undo.contains("b"));
+    EXPECT_FALSE(j_undo.contains("c"));
+    EXPECT_TRUE(j_undo.contains("d"));
+    EXPECT_FALSE(j_undo.contains("e"));
+
+    auto j_display = meta::serialize_any_for_display(t);
+    EXPECT_TRUE(j_display.contains("a"));
+    EXPECT_TRUE(j_display.contains("b"));
+    EXPECT_TRUE(j_display.contains("c"));
+    EXPECT_FALSE(j_display.contains("d"));
+    EXPECT_FALSE(j_display.contains("e"));
+
+    auto j_generic = meta::serialize_any(t, meta::SerializationPurpose::generic);
+    EXPECT_TRUE(j_generic.contains("a"));
+    EXPECT_TRUE(j_generic.contains("b"));
+    EXPECT_TRUE(j_generic.contains("c"));
+    EXPECT_TRUE(j_generic.contains("d"));
+    EXPECT_FALSE(j_generic.contains("e"));
+}
+
+TEST_F(MetaSerializationTest, SerializePurposeAwareCustomFunction)
+{
+    register_purpose_meta_types();
+    PurposeAwareType t{};
+    t.value = 11;
+
+    auto j_file = meta::serialize_any(t, meta::SerializationPurpose::file);
+    EXPECT_EQ(j_file["purpose"].get<std::string>(), "file");
+
+    auto j_display = meta::serialize_any(t, meta::SerializationPurpose::display);
+    EXPECT_EQ(j_display["purpose"].get<std::string>(), "display");
+}
+
+TEST_F(MetaSerializationTest, SerializePurposeFallbackToLegacySignature)
+{
+    vec2 v{ 1.0f, 2.0f };
+    auto j = meta::serialize_any(v, meta::SerializationPurpose::file);
+    EXPECT_FLOAT_EQ(j["x"].get<float>(), v.x);
+    EXPECT_FLOAT_EQ(j["y"].get<float>(), v.y);
 }
 
 TEST_F(MetaSerializationTest, ConcurrentSerializeAny) {

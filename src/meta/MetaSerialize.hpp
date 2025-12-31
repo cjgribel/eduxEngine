@@ -78,6 +78,112 @@ namespace eeng::meta
         SerializationPurpose purpose = SerializationPurpose::generic
     );
 
+    // Purpose wrappers (keep call sites intention-revealing).
+    inline nlohmann::json serialize_any_for_file(const entt::meta_any& meta_any)
+    {
+        return serialize_any(meta_any, SerializationPurpose::file);
+    }
+
+    inline nlohmann::json serialize_any_for_undo(const entt::meta_any& meta_any)
+    {
+        return serialize_any(meta_any, SerializationPurpose::undo);
+    }
+
+    inline nlohmann::json serialize_any_for_display(const entt::meta_any& meta_any)
+    {
+        return serialize_any(meta_any, SerializationPurpose::display);
+    }
+
+    inline void deserialize_any_for_file(
+        const nlohmann::json& json,
+        entt::meta_any& meta_any,
+        const ecs::Entity& entity,
+        EngineContext& context)
+    {
+        deserialize_any(json, meta_any, entity, context, SerializationPurpose::file);
+    }
+
+    inline void deserialize_any_for_undo(
+        const nlohmann::json& json,
+        entt::meta_any& meta_any,
+        const ecs::Entity& entity,
+        EngineContext& context)
+    {
+        deserialize_any(json, meta_any, entity, context, SerializationPurpose::undo);
+    }
+
+    inline void deserialize_any_for_display(
+        const nlohmann::json& json,
+        entt::meta_any& meta_any,
+        const ecs::Entity& entity,
+        EngineContext& context)
+    {
+        deserialize_any(json, meta_any, entity, context, SerializationPurpose::display);
+    }
+
+    inline nlohmann::json serialize_entity_for_file(
+        const ecs::EntityRef& entity_ref,
+        std::shared_ptr<entt::registry>& registry)
+    {
+        return serialize_entity(entity_ref, registry, SerializationPurpose::file);
+    }
+
+    inline nlohmann::json serialize_entity_for_undo(
+        const ecs::EntityRef& entity_ref,
+        std::shared_ptr<entt::registry>& registry)
+    {
+        return serialize_entity(entity_ref, registry, SerializationPurpose::undo);
+    }
+
+    inline nlohmann::json serialize_entity_for_display(
+        const ecs::EntityRef& entity_ref,
+        std::shared_ptr<entt::registry>& registry)
+    {
+        return serialize_entity(entity_ref, registry, SerializationPurpose::display);
+    }
+
+    inline ecs::EntityRef deserialize_entity_for_file(
+        const nlohmann::json& json,
+        EngineContext& ctx)
+    {
+        return deserialize_entity(json, ctx, SerializationPurpose::file);
+    }
+
+    inline ecs::EntityRef deserialize_entity_for_undo(
+        const nlohmann::json& json,
+        EngineContext& ctx)
+    {
+        return deserialize_entity(json, ctx, SerializationPurpose::undo);
+    }
+
+    inline ecs::EntityRef deserialize_entity_for_display(
+        const nlohmann::json& json,
+        EngineContext& ctx)
+    {
+        return deserialize_entity(json, ctx, SerializationPurpose::display);
+    }
+
+    inline ecs::EntityRef spawn_entity_from_desc_for_file(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx)
+    {
+        return spawn_entity_from_desc(desc, ctx, SerializationPurpose::file);
+    }
+
+    inline ecs::EntityRef spawn_entity_from_desc_for_undo(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx)
+    {
+        return spawn_entity_from_desc(desc, ctx, SerializationPurpose::undo);
+    }
+
+    inline ecs::EntityRef spawn_entity_from_desc_for_display(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx)
+    {
+        return spawn_entity_from_desc(desc, ctx, SerializationPurpose::display);
+    }
+
 #if 0
     void deserialize_entities(
         const nlohmann::json& json,
