@@ -686,7 +686,7 @@ namespace eeng::editor {
         auto er = deserialize_entity(
             copy_json,
             *ctx_sp);
-        entity_copy = er.entity;
+        const auto entity_copy = er.entity;
         ctx_sp->entity_manager->register_entity(entity_copy);
         reparent_if_possible(entity_copy, *ctx_sp);
         bind_refs_for_entity(entity_copy, *ctx_sp);
@@ -909,12 +909,10 @@ namespace eeng::editor {
 
         if (scenegraph.is_root(entity_current))
         {
-            prev_parent_entity = Entity{};
             prev_parent_guid = Guid::invalid();
         }
         else
         {
-            prev_parent_entity = scenegraph.get_parent(entity_current);
             prev_parent_guid = em.get_entity_parent(entity_current).guid;
         }
 

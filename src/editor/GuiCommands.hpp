@@ -92,7 +92,6 @@ namespace eeng::editor {
     class CopyEntityCommand : public Command
     {
         ecs::Entity entity_source;
-        ecs::Entity entity_copy;
         Guid source_guid;
         nlohmann::json copy_json{};
         EngineContextWeakPtr ctx;
@@ -138,7 +137,6 @@ namespace eeng::editor {
     {
         ecs::Entity entity;
         Guid entity_guid;
-        ecs::Entity prev_parent_entity;
         Guid prev_parent_guid;
         ecs::Entity new_parent_entity;
         Guid new_parent_guid;
