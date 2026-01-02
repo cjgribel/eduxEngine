@@ -110,7 +110,7 @@ namespace
 
     bool try_capture_guid(EntityManager& em, const Entity& entity, Guid& guid)
     {
-        if (!entity.valid())
+        if (!entity.has_id())
             return false;
         if (!em.entity_valid(entity))
             return false;
@@ -125,7 +125,7 @@ namespace
         if (!guid.valid())
             return Entity{};
         auto entity_opt = em.get_entity_from_guid(guid);
-        if (!entity_opt || !entity_opt->valid())
+        if (!entity_opt || !entity_opt->has_id())
             return Entity{};
         if (!em.entity_valid(*entity_opt))
             return Entity{};
@@ -134,7 +134,7 @@ namespace
 
     void reparent_if_possible(Entity entity, EngineContext& ctx)
     {
-        if (!entity.valid())
+        if (!entity.has_id())
             return;
 
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
@@ -144,7 +144,7 @@ namespace
             return;
 
         auto parent_entity = resolve_entity_from_guid(em, parent_guid);
-        if (!parent_entity.valid())
+        if (!parent_entity.has_id())
             return;
         if (!scenegraph.contains(parent_entity))
             return;
@@ -166,30 +166,30 @@ namespace
             return false;
 
         auto update_guid_field = [&](nlohmann::json& comp_json) -> bool
-        {
-            if (!comp_json.is_object())
+            {
+                if (!comp_json.is_object())
+                    return false;
+
+                if (!keys.guid_key.empty() && comp_json.contains(keys.guid_key))
+                {
+                    comp_json[keys.guid_key] = guid.raw();
+                    return true;
+                }
+
+                if (comp_json.contains("Guid"))
+                {
+                    comp_json["Guid"] = guid.raw();
+                    return true;
+                }
+
+                if (comp_json.contains("guid"))
+                {
+                    comp_json["guid"] = guid.raw();
+                    return true;
+                }
+
                 return false;
-
-            if (!keys.guid_key.empty() && comp_json.contains(keys.guid_key))
-            {
-                comp_json[keys.guid_key] = guid.raw();
-                return true;
-            }
-
-            if (comp_json.contains("Guid"))
-            {
-                comp_json["Guid"] = guid.raw();
-                return true;
-            }
-
-            if (comp_json.contains("guid"))
-            {
-                comp_json["guid"] = guid.raw();
-                return true;
-            }
-
-            return false;
-        };
+            };
 
         if (!keys.type_id.empty())
         {
@@ -365,29 +365,26 @@ namespace eeng::editor {
     using ecs::Entity;
 
     CreateEntityCommand::CreateEntityCommand(
-        // const CreateEntityFunc&& create_func,
-        // const DestroyEntityFunc&& destroy_func,
         const Entity& parent_entity,
         EngineContextWeakPtr ctx) :
-        // create_func(create_func),
-        // destroy_func(destroy_func),
         parent_entity(parent_entity),
         ctx(std::move(ctx)),
         display_name("Create Entity") {
     }
 
-    void CreateEntityCommand::execute()
+    CommandStatus CreateEntityCommand::execute()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
 
+        // First execution: create a fresh entity and capture a redo snapshot.
         if (entity_json.is_null())
         {
             Entity parent_current{};
-            if (parent_entity.valid()
+            if (parent_entity.has_id()
                 && em.entity_valid(parent_entity)
                 && em.scene_graph().contains(parent_entity))
             {
@@ -404,7 +401,7 @@ namespace eeng::editor {
 
             auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
             if (!registry_sp)
-                return;
+                return CommandStatus::Done;
 
             entity_json = meta::serialize_entity_for_undo(
                 static_cast<EntityManager&>(*ctx_sp->entity_manager).get_entity_ref(created_entity),
@@ -412,51 +409,55 @@ namespace eeng::editor {
             if (!created_guid.valid())
                 created_guid = guid_from_json(entity_json);
         }
+        // Redo path: recreate from the serialized snapshot.
         else
         {
             auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
             if (!registry_sp)
-                return;
+                return CommandStatus::Done;
 
             auto er = deserialize_entity(
                 entity_json,
                 *ctx_sp);
-            created_entity = er.entity;
+            created_entity = er.entity; // null
             created_guid = er.guid;
-            ctx_sp->entity_manager->register_entity(created_entity);
+            ctx_sp->entity_manager->register_entity(created_entity); // inserted as root
             reparent_if_possible(created_entity, *ctx_sp);
             bind_refs_for_entity(created_entity, *ctx_sp);
         }
 
         // std::cout << "CreateEntityCommand::execute() " << entt::to_integral(created_entity) << std::endl;
+        return CommandStatus::Done;
     }
 
-    void CreateEntityCommand::undo()
+    CommandStatus CreateEntityCommand::undo()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
-        if (!created_entity.valid())
+        // If we never created a live entity, only proceed if a GUID was recorded.
+        if (!created_entity.has_id())
         {
             if (!created_guid.valid())
-                return;
+                return CommandStatus::Done;
         }
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         if (created_guid.valid())
         {
             auto entity_opt = em.get_entity_from_guid(created_guid);
-            if (entity_opt && entity_opt->valid())
+            if (entity_opt && entity_opt->has_id())
                 ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
-            return;
+            return CommandStatus::Done;
         }
 
-        if (created_entity.valid())
+        if (created_entity.has_id())
             ctx_sp->entity_manager->queue_entity_for_destruction(created_entity);
         // destroy_func(created_entity);
 
         // std::cout << "CreateEntityCommand::undo() " << entt::to_integral(created_entity) << std::endl;
+        return CommandStatus::Done;
     }
 
     std::string CreateEntityCommand::get_name() const
@@ -478,26 +479,26 @@ namespace eeng::editor {
         display_name = std::string("Destroy Entity ") + std::to_string(entity.to_integral());
     }
 
-    void DestroyEntityCommand::execute()
+    CommandStatus DestroyEntityCommand::execute()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         if (!entity_guid.valid())
         {
             if (!try_capture_guid(em, entity, entity_guid))
-                return;
+                return CommandStatus::Done;
         }
 
         const auto entity_current = resolve_entity_from_guid(em, entity_guid);
-        if (!entity_current.valid())
-            return;
+        if (!entity_current.has_id())
+            return CommandStatus::Done;
 
         if (entity_json.is_null())
         {
@@ -508,16 +509,17 @@ namespace eeng::editor {
 
         ctx_sp->entity_manager->queue_entity_for_destruction(entity_current);
         // destroy_func(entity);
+        return CommandStatus::Done;
     }
 
-    void DestroyEntityCommand::undo()
+    CommandStatus DestroyEntityCommand::undo()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         if (entity_json.is_null())
-            return;
+            return CommandStatus::Done;
 
         auto er = deserialize_entity(
             entity_json,
@@ -527,6 +529,7 @@ namespace eeng::editor {
         ctx_sp->entity_manager->register_entity(er.entity);
         reparent_if_possible(er.entity, *ctx_sp);
         bind_refs_for_entity(er.entity, *ctx_sp);
+        return CommandStatus::Done;
     }
 
     std::string DestroyEntityCommand::get_name() const
@@ -546,15 +549,15 @@ namespace eeng::editor {
         display_name = std::string("Destroy Entity Branch ") + std::to_string(entity.to_integral());
     }
 
-    void DestroyEntityBranchCommand::execute()
+    CommandStatus DestroyEntityBranchCommand::execute()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
 
@@ -563,16 +566,16 @@ namespace eeng::editor {
             if (!root_guid.valid())
             {
                 if (!try_capture_guid(em, root_entity, root_guid))
-                    return;
+                    return CommandStatus::Done;
             }
 
             const auto root_current = resolve_entity_from_guid(em, root_guid);
-            if (!root_current.valid())
-                return;
+            if (!root_current.has_id())
+                return CommandStatus::Done;
 
             auto& scenegraph = em.scene_graph();
             if (!scenegraph.contains(root_current))
-                return;
+                return CommandStatus::Done;
             auto branch = scenegraph.get_branch_topdown(root_current);
 
             branch_json = nlohmann::json::array();
@@ -586,7 +589,7 @@ namespace eeng::editor {
         }
 
         if (!branch_json.is_array())
-            return;
+            return CommandStatus::Done;
 
         for (auto it = branch_json.rbegin(); it != branch_json.rend(); ++it)
         {
@@ -595,20 +598,21 @@ namespace eeng::editor {
                 continue;
 
             auto entity_opt = em.get_entity_from_guid(guid);
-            if (!entity_opt || !entity_opt->valid())
+            if (!entity_opt || !entity_opt->has_id())
                 continue;
             ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
         }
+        return CommandStatus::Done;
     }
 
-    void DestroyEntityBranchCommand::undo()
+    CommandStatus DestroyEntityBranchCommand::undo()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         if (branch_json.is_null() || !branch_json.is_array())
-            return;
+            return CommandStatus::Done;
 
         std::vector<ecs::Entity> created_entities;
         created_entities.reserve(branch_json.size());
@@ -625,6 +629,7 @@ namespace eeng::editor {
 
         for (auto entity : created_entities)
             bind_refs_for_entity(entity, *ctx_sp);
+        return CommandStatus::Done;
     }
 
     std::string DestroyEntityBranchCommand::get_name() const
@@ -643,15 +648,15 @@ namespace eeng::editor {
         display_name = std::string("Copy Entity ") + std::to_string(entity.to_integral());
     }
 
-    void CopyEntityCommand::execute()
+    CommandStatus CopyEntityCommand::execute()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
 
@@ -660,26 +665,26 @@ namespace eeng::editor {
             if (!source_guid.valid())
             {
                 if (!try_capture_guid(em, entity_source, source_guid))
-                    return;
+                    return CommandStatus::Done;
             }
 
             const auto source_current = resolve_entity_from_guid(em, source_guid);
-            if (!source_current.valid())
-                return;
+            if (!source_current.has_id())
+                return CommandStatus::Done;
 
             copy_json = meta::serialize_entity_for_undo(em.get_entity_ref(source_current), registry_sp);
             const Guid new_guid = Guid::generate();
             if (!update_entity_guid_in_json(copy_json, new_guid))
             {
                 copy_json = nlohmann::json{};
-                return;
+                return CommandStatus::Done;
             }
 
             const auto parent_ref = em.get_entity_parent(source_current);
             if (!update_parent_guid_in_json(copy_json, parent_ref.guid))
             {
                 copy_json = nlohmann::json{};
-                return;
+                return CommandStatus::Done;
             }
         }
 
@@ -690,35 +695,37 @@ namespace eeng::editor {
         ctx_sp->entity_manager->register_entity(entity_copy);
         reparent_if_possible(entity_copy, *ctx_sp);
         bind_refs_for_entity(entity_copy, *ctx_sp);
+        return CommandStatus::Done;
 
         // assert(entity != entt::null);
         // entity_json = Meta::serialize_entities(&entity, 1, context.registry);
         // destroy_func(entity);
     }
 
-    void CopyEntityCommand::undo()
+    CommandStatus CopyEntityCommand::undo()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         if (copy_json.is_null())
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         auto guid = guid_from_json(copy_json);
         if (!guid.valid())
-            return;
+            return CommandStatus::Done;
 
         auto entity_opt = em.get_entity_from_guid(guid);
-        if (!entity_opt || !entity_opt->valid())
-            return;
+        if (!entity_opt || !entity_opt->has_id())
+            return CommandStatus::Done;
 
         ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
 
         // Meta::deserialize_entities(entity_json, context);
 
         // entity_json = nlohmann::json{};
+        return CommandStatus::Done;
     }
 
     std::string CopyEntityCommand::get_name() const
@@ -737,15 +744,15 @@ namespace eeng::editor {
         display_name = std::string("Copy Entity ") + std::to_string(entity.to_integral());
     }
 
-    void CopyEntityBranchCommand::execute()
+    CommandStatus CopyEntityBranchCommand::execute()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         auto& scenegraph = em.scene_graph();
@@ -755,14 +762,14 @@ namespace eeng::editor {
             if (!root_guid.valid())
             {
                 if (!try_capture_guid(em, root_entity, root_guid))
-                    return;
+                    return CommandStatus::Done;
             }
 
             const auto root_current = resolve_entity_from_guid(em, root_guid);
-            if (!root_current.valid())
-                return;
+            if (!root_current.has_id())
+                return CommandStatus::Done;
             if (!scenegraph.contains(root_current))
-                return;
+                return CommandStatus::Done;
 
             auto source_entities = scenegraph.get_branch_topdown(root_current);
             std::unordered_map<Entity, Guid> guid_map;
@@ -783,7 +790,7 @@ namespace eeng::editor {
                 if (!update_entity_guid_in_json(entity_json, new_guid))
                 {
                     branch_json = nlohmann::json{};
-                    return;
+                    return CommandStatus::Done;
                 }
 
                 Guid parent_guid = Guid::invalid();
@@ -801,7 +808,7 @@ namespace eeng::editor {
                 if (!update_parent_guid_in_json(entity_json, parent_guid))
                 {
                     branch_json = nlohmann::json{};
-                    return;
+                    return CommandStatus::Done;
                 }
 
                 branch_json.push_back(std::move(entity_json));
@@ -809,7 +816,7 @@ namespace eeng::editor {
         }
 
         if (!branch_json.is_array())
-            return;
+            return CommandStatus::Done;
 
         std::vector<Entity> created_entities;
         created_entities.reserve(branch_json.size());
@@ -826,16 +833,17 @@ namespace eeng::editor {
 
         for (auto entity : created_entities)
             bind_refs_for_entity(entity, *ctx_sp);
+        return CommandStatus::Done;
     }
 
-    void CopyEntityBranchCommand::undo()
+    CommandStatus CopyEntityBranchCommand::undo()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         if (branch_json.is_null() || !branch_json.is_array())
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
 
@@ -846,10 +854,11 @@ namespace eeng::editor {
                 continue;
 
             auto entity_opt = em.get_entity_from_guid(guid);
-            if (!entity_opt || !entity_opt->valid())
+            if (!entity_opt || !entity_opt->has_id())
                 continue;
             ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
         }
+        return CommandStatus::Done;
     }
 
     std::string CopyEntityBranchCommand::get_name() const
@@ -873,35 +882,35 @@ namespace eeng::editor {
             + std::to_string(parent_entity.to_integral());
     }
 
-    void ReparentEntityBranchCommand::execute()
+    CommandStatus ReparentEntityBranchCommand::execute()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         auto& scenegraph = em.scene_graph();
 
         if (!entity_guid.valid())
         {
-            if (!entity.valid())
-                return;
+            if (!entity.has_id())
+                return CommandStatus::Done;
             if (!em.entity_valid(entity))
-                return;
+                return CommandStatus::Done;
             if (!scenegraph.contains(entity))
-                return;
+                return CommandStatus::Done;
             entity_guid = em.get_entity_guid(entity);
         }
 
         auto entity_opt = em.get_entity_from_guid(entity_guid);
-        if (!entity_opt || !entity_opt->valid())
-            return;
+        if (!entity_opt || !entity_opt->has_id())
+            return CommandStatus::Done;
         if (!scenegraph.contains(*entity_opt))
-            return;
+            return CommandStatus::Done;
 
         auto entity_current = *entity_opt;
 
-        if (!new_parent_guid.valid() && new_parent_entity.valid())
+        if (!new_parent_guid.valid() && new_parent_entity.has_id())
         {
             if (em.entity_valid(new_parent_entity) && scenegraph.contains(new_parent_entity))
                 new_parent_guid = em.get_entity_guid(new_parent_entity);
@@ -920,46 +929,48 @@ namespace eeng::editor {
         if (new_parent_guid.valid())
         {
             auto parent_opt = em.get_entity_from_guid(new_parent_guid);
-            if (!parent_opt || !parent_opt->valid())
-                return;
+            if (!parent_opt || !parent_opt->has_id())
+                return CommandStatus::Done;
             if (!scenegraph.contains(*parent_opt))
-                return;
+                return CommandStatus::Done;
             parent_current = *parent_opt;
         }
 
         ctx_sp->entity_manager->reparent_entity(entity_current, parent_current);
+        return CommandStatus::Done;
     }
 
-    void ReparentEntityBranchCommand::undo()
+    CommandStatus ReparentEntityBranchCommand::undo()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         auto& scenegraph = em.scene_graph();
 
         if (!entity_guid.valid())
-            return;
+            return CommandStatus::Done;
 
         auto entity_opt = em.get_entity_from_guid(entity_guid);
-        if (!entity_opt || !entity_opt->valid())
-            return;
+        if (!entity_opt || !entity_opt->has_id())
+            return CommandStatus::Done;
         if (!scenegraph.contains(*entity_opt))
-            return;
+            return CommandStatus::Done;
 
         Entity parent_current{};
         if (prev_parent_guid.valid())
         {
             auto parent_opt = em.get_entity_from_guid(prev_parent_guid);
-            if (!parent_opt || !parent_opt->valid())
-                return;
+            if (!parent_opt || !parent_opt->has_id())
+                return CommandStatus::Done;
             if (!scenegraph.contains(*parent_opt))
-                return;
+                return CommandStatus::Done;
             parent_current = *parent_opt;
         }
 
         ctx_sp->entity_manager->reparent_entity(*entity_opt, parent_current);
+        return CommandStatus::Done;
     }
 
     std::string ReparentEntityBranchCommand::get_name() const
@@ -1033,25 +1044,25 @@ namespace eeng::editor {
             + std::to_string(entity.to_integral());
     }
 
-    void AddComponentToEntityCommand::execute()
+    CommandStatus AddComponentToEntityCommand::execute()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         if (!entity_guid.valid())
         {
             if (!try_capture_guid(em, entity, entity_guid))
-                return;
+                return CommandStatus::Done;
         }
         const auto entity_current = resolve_entity_from_guid(em, entity_guid);
-        if (!entity_current.valid())
-            return;
+        if (!entity_current.has_id())
+            return CommandStatus::Done;
 
         // Fetch component storage
         ensure_storage(*registry_sp, comp_id);
@@ -1059,22 +1070,23 @@ namespace eeng::editor {
         assert(!storage->contains(entity_current));
 
         storage->push(entity_current);
+        return CommandStatus::Done;
     }
 
-    void AddComponentToEntityCommand::undo()
+    CommandStatus AddComponentToEntityCommand::undo()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         const auto entity_current = resolve_entity_from_guid(em, entity_guid);
-        if (!entity_current.valid())
-            return;
+        if (!entity_current.has_id())
+            return CommandStatus::Done;
 
         // Fetch component storage
         ensure_storage(*registry_sp, comp_id);
@@ -1082,6 +1094,7 @@ namespace eeng::editor {
         assert(storage->contains(entity_current));
 
         storage->remove(entity_current);
+        return CommandStatus::Done;
     }
 
     std::string AddComponentToEntityCommand::get_name() const
@@ -1105,25 +1118,25 @@ namespace eeng::editor {
             + std::to_string(entity.to_integral());
     }
 
-    void RemoveComponentFromEntityCommand::execute()
+    CommandStatus RemoveComponentFromEntityCommand::execute()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         if (!entity_guid.valid())
         {
             if (!try_capture_guid(em, entity, entity_guid))
-                return;
+                return CommandStatus::Done;
         }
         const auto entity_current = resolve_entity_from_guid(em, entity_guid);
-        if (!entity_current.valid())
-            return;
+        if (!entity_current.has_id())
+            return CommandStatus::Done;
 
         // Fetch component storage
         ensure_storage(*registry_sp, comp_id);
@@ -1140,22 +1153,23 @@ namespace eeng::editor {
             eeng::meta::SerializationPurpose::undo);
         // Remove component from entity
         storage->remove(entity_current);
+        return CommandStatus::Done;
     }
 
-    void RemoveComponentFromEntityCommand::undo()
+    CommandStatus RemoveComponentFromEntityCommand::undo()
     {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
-            return;
+            return CommandStatus::Done;
 
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            return;
+            return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         const auto entity_current = resolve_entity_from_guid(em, entity_guid);
-        if (!entity_current.valid())
-            return;
+        if (!entity_current.has_id())
+            return CommandStatus::Done;
 
         // Fetch component storage
         ensure_storage(*registry_sp, comp_id);
@@ -1175,6 +1189,7 @@ namespace eeng::editor {
             eeng::meta::SerializationPurpose::undo);
         // Add component to entity
         storage->push(entity_current, comp_any.base().data());
+        return CommandStatus::Done;
     }
 
     std::string RemoveComponentFromEntityCommand::get_name() const

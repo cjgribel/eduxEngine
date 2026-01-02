@@ -274,6 +274,13 @@ namespace eeng
         f << j.dump(2);
     }
 
+    void BatchRegistry::save_index()
+    {
+        if (index_path_.empty())
+            return;
+        save_index(index_path_);
+    }
+
     void BatchRegistry::load_or_create_index(const std::filesystem::path& index_path)
     {
         std::ifstream f(index_path);
@@ -320,15 +327,66 @@ namespace eeng
         // const std::filesystem::path& path
     )
     {
+        return create_batch_with_id(Guid::generate(), std::move(name));
+    }
+
+    Guid BatchRegistry::create_batch_with_id(const BatchId& id, std::string name)
+    {
         std::lock_guard lk(mtx_);
-        if (index_path_.empty()) return Guid::invalid();
-        // if (batches_.find(id) != batches_.end()) return false;
+        if (index_path_.empty())
+            return Guid::invalid();
+        if (!id.valid())
+            return Guid::invalid();
+        if (batches_.find(id) != batches_.end())
+            return Guid::invalid();
+
         BatchInfo bi;
-        bi.id = Guid::generate();
-        bi.name = std::move(name);
+        bi.id = id;
+        bi.name = name.empty() ? bi.id.to_string() : std::move(name);
         bi.filename = bi.id.to_string() + ".json";
         batches_.emplace(bi.id, std::move(bi));
         return bi.id;
+    }
+
+    bool BatchRegistry::delete_batch(const BatchId& id, BatchInfo* out_info)
+    {
+        std::lock_guard lk(mtx_);
+        auto it = batches_.find(id);
+        if (it == batches_.end())
+            return false;
+        if (it->second.state != BatchInfo::State::Unloaded)
+            return false;
+
+        if (out_info)
+            *out_info = it->second;
+
+        if (!index_path_.empty())
+        {
+            const auto batch_path = index_path_.parent_path() / it->second.filename;
+            std::error_code ec;
+            std::filesystem::remove(batch_path, ec);
+        }
+
+        batches_.erase(it);
+        return true;
+    }
+
+    bool BatchRegistry::restore_batch(BatchInfo info)
+    {
+        std::lock_guard lk(mtx_);
+        if (!info.id.valid())
+            return false;
+        if (batches_.find(info.id) != batches_.end())
+            return false;
+
+        info.state = BatchInfo::State::Unloaded;
+        info.last_result = TaskResult{};
+        info.live.clear();
+        if (info.filename.empty())
+            info.filename = info.id.to_string() + ".json";
+
+        batches_.emplace(info.id, std::move(info));
+        return true;
     }
 
     std::shared_future<TaskResult>

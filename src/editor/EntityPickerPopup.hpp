@@ -22,7 +22,7 @@ namespace eeng::editor
             if (ref.guid.valid())
             {
                 auto e_opt = em.get_entity_from_guid(ref.guid);
-                if (e_opt && e_opt->valid() && em.entity_valid(*e_opt))
+                if (e_opt && e_opt->has_id() && em.entity_valid(*e_opt))
                 {
                     const auto& h = em.get_entity_header(*e_opt);
                     if (!h.name.empty())
@@ -36,7 +36,7 @@ namespace eeng::editor
             }
 
             // Otherwise: if entity handle is valid, show its name.
-            if (ref.entity.valid() && em.entity_valid(ref.entity))
+            if (ref.entity.has_id() && em.entity_valid(ref.entity))
             {
                 const auto& h = em.get_entity_header(ref.entity);
                 if (!h.name.empty())
@@ -142,7 +142,7 @@ namespace eeng::editor
             }
 
             const bool is_selected =
-                (ref.entity.valid() && em.entity_valid(ref.entity) && ref.entity == it.entity);
+                (ref.entity.has_id() && em.entity_valid(ref.entity) && ref.entity == it.entity);
 
             if (ImGui::Selectable(row.c_str(), is_selected))
             {

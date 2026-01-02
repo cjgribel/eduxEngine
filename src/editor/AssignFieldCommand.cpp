@@ -10,6 +10,7 @@
 #include "ResourceManager.hpp"
 #include "MetaLiterals.h"
 #include "meta/MetaAux.h"
+#include "ecs/EntityManager.hpp"
 #include "MetaSerialize.hpp"
 #include "LogGlobals.hpp"
 #include <iostream>
@@ -27,7 +28,7 @@ namespace
         return any.base().policy() == entt::any_policy::ref;
     }
 
-    void assign_meta_field(
+    bool assign_meta_field(
         const eeng::editor::FieldTarget& target,
         const eeng::editor::MetaFieldPath& meta_path,
         entt::meta_any& value_any)
@@ -39,17 +40,37 @@ namespace
         {
             // Get registry
             auto registry_sp = target.registry.lock();
-            assert(registry_sp && "Registry expired");
+            if (!registry_sp)
+                return false;
+
+            eeng::ecs::Entity entity = target.entity;
+            if (target.entity_guid.valid())
+            {
+                auto ctx_sp = target.ctx.lock();
+                if (ctx_sp && ctx_sp->entity_manager)
+                {
+                    auto& em = static_cast<eeng::EntityManager&>(*ctx_sp->entity_manager);
+                    if (auto entity_opt = em.get_entity_from_guid(target.entity_guid))
+                    {
+                        if (entity_opt->has_id())
+                            entity = *entity_opt;
+                    }
+                }
+            }
+
+            if (!entity.has_id() || !registry_sp->valid(entity))
+                return false;
 
             // Get storage for component type
             auto* storage = registry_sp->storage(target.component_id);
-            assert(storage && storage->contains(target.entity));
+            if (!storage || !storage->contains(entity))
+                return false;
 
             // Get ref meta_any to component
             entt::meta_type meta_type = entt::resolve(target.component_id);
-            entt::meta_any root = meta_type.from_void(storage->value(target.entity));
-            assert(root && "Failed to get component as meta_any");
-            assert(is_ref(root) && "Component meta_any is not a reference");
+            entt::meta_any root = meta_type.from_void(storage->value(entity));
+            if (!root || !is_ref(root))
+                return false;
 
 #ifdef ASSIGN_META_FIELD_USE_RECURSIVE
             const bool ok = eeng::editor::assign_meta_field_recursive(root, meta_path, 0, value_any);
@@ -57,43 +78,40 @@ namespace
 #ifdef ASSIGN_META_FIELD_USE_STACKBASED
             const bool ok = eeng::editor::assign_meta_field_stackbased(root, meta_path, value_any);
 #endif
-            assert(ok && "Failed to set field in component");
+            return ok;
         }
         else if (target.kind == eeng::editor::FieldTarget::Kind::Asset)
         {
             // Get registry
             auto rm_sp = target.resource_manager.lock();
-            assert(rm_sp && "Resource manager expired");
+            if (!rm_sp)
+                return false;
 
             // Get ResourceManager
             auto* rm = dynamic_cast<eeng::ResourceManager*>(rm_sp.get());
-            assert(rm && "assign_meta_field: target.resource_manager is not an ResourceManager");
+            if (!rm)
+                return false;
 
             // Get root meta_any for asset
             if (auto mh_opt = rm->storage().handle_for_guid(target.asset_guid); mh_opt.has_value())
             {
-                bool ok = rm->storage().modify(*mh_opt, [&](entt::meta_any& root)
+                const bool ok = rm->storage().modify(*mh_opt, [&](entt::meta_any& root)
                     {
                         // Note: no re-entry to storage inside visitor lambda!
 
-                        assert(is_ref(root) && "Asset root meta_any is not a reference");
+                        if (!is_ref(root))
+                            return false;
 #ifdef ASSIGN_META_FIELD_USE_STACKBASED
                         return eeng::editor::assign_meta_field_stackbased(root, meta_path, value_any);
 #else
                         return eeng::editor::assign_meta_field_recursive(root, meta_path, 0, value_any);
 #endif
                     });
-                assert(ok && "Failed to set field in asset");
+                return ok;
             }
-            else
-            {
-                assert(false && "Asset not found in storage");
-            }
+            return false;
         }
-        else
-        {
-            assert(false && "Unknown FieldTarget kind");
-        }
+        return false;
 
         // Apply path and set new value
         // assert(!meta_path.entries.empty() && "MetaPath is empty");
@@ -118,18 +136,22 @@ namespace
 
 namespace eeng::editor
 {
-    void AssignFieldCommand::execute()
+    CommandStatus AssignFieldCommand::execute()
     {
-        assign_meta_field(edit.target, edit.meta_path, edit.new_value);
+        if (!assign_meta_field(edit.target, edit.meta_path, edit.new_value))
+            return CommandStatus::Failed;
 
         //assign_meta_field(new_value);
+        return CommandStatus::Done;
     }
 
-    void AssignFieldCommand::undo()
+    CommandStatus AssignFieldCommand::undo()
     {
-        assign_meta_field(edit.target, edit.meta_path, edit.prev_value);
+        if (!assign_meta_field(edit.target, edit.meta_path, edit.prev_value))
+            return CommandStatus::Failed;
 
         // assign_meta_field(prev_value);
+        return CommandStatus::Done;
     }
 
     std::string AssignFieldCommand::get_name() const
@@ -137,11 +159,17 @@ namespace eeng::editor
         return edit.display_name;
     }
 
-    AssignFieldCommandBuilder& AssignFieldCommandBuilder::target_component(std::weak_ptr<entt::registry> registry, const ecs::Entity& entity, entt::id_type component_id)
+    AssignFieldCommandBuilder& AssignFieldCommandBuilder::target_component(EngineContext& ctx, const ecs::Entity& entity, entt::id_type component_id)
     {
         command.edit.target.kind = FieldTarget::Kind::Component;
-        command.edit.target.registry = registry;
+        command.edit.target.ctx = ctx.weak_from_this();
+        command.edit.target.registry = ctx.entity_manager->registry_wptr();
         command.edit.target.entity = entity;
+        if (ctx.entity_manager && ctx.entity_manager->entity_valid(entity))
+        {
+            auto& em = static_cast<eeng::EntityManager&>(*ctx.entity_manager);
+            command.edit.target.entity_guid = em.get_entity_guid(entity);
+        }
         command.edit.target.component_id = component_id;
         return *this;
     }
@@ -258,7 +286,7 @@ namespace eeng::editor
     {
         // Validate target (registry, entity, component id)
         assert(!command.edit.target.registry.expired() && "registry pointer expired");
-        assert(command.edit.target.entity.valid() && "entity invalid");
+        assert(command.edit.target.entity.has_id() && "entity invalid");
         assert(command.edit.target.component_id != 0 && "component id invalid");
 
         // Validate values

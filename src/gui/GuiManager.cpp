@@ -5,6 +5,7 @@
 #include "LogManager.hpp"
 #include "ResourceManager.hpp"
 #include "BatchRegistry.hpp"
+#include "editor/EditorActions.hpp"
 #include "ecs/EntityManager.hpp"
 
 #include "gui/SceneHierarchyWidget.hpp"
@@ -782,6 +783,19 @@ namespace eeng
 
         ImGui::Begin("Batch Registry");
 
+        // --- Create batch ---
+        {
+            static char new_batch_name[128] = "";
+            ImGui::InputText("New Batch Name", new_batch_name, sizeof(new_batch_name));
+            ImGui::SameLine();
+            if (ImGui::Button("New Batch"))
+            {
+                editor::BatchActions::create_batch(ctx, std::string(new_batch_name));
+                new_batch_name[0] = '\0';
+            }
+            ImGui::Separator();
+        }
+
         // Snapshot of batches
         const auto batches = br.list();
         if (batches.empty())
@@ -880,13 +894,14 @@ namespace eeng
                 b->state == BatchInfo::State::Error);
             bool can_unload = (b->state == BatchInfo::State::Loaded);
             bool can_save = (b->state == BatchInfo::State::Loaded);
+            bool can_delete = (b->state == BatchInfo::State::Unloaded);
 
             // -- Load selected batch --
             if (can_load)
             {
                 if (ImGui::Button("Load"))
                 {
-                    br.queue_load(b->id, ctx); // fire-and-forget; strand serializes it
+                    editor::BatchActions::load_batch(ctx, b->id);
                 }
             }
             else
@@ -902,7 +917,7 @@ namespace eeng
             {
                 if (ImGui::Button("Unload"))
                 {
-                    br.queue_unload(b->id, ctx);
+                    editor::BatchActions::unload_batch(ctx, b->id);
                 }
             }
             else
@@ -929,20 +944,34 @@ namespace eeng
                 ImGui::EndDisabled();
             }
 
+            ImGui::SameLine();
+            if (can_delete)
+            {
+                if (ImGui::Button("Delete"))
+                {
+                    editor::BatchActions::delete_batch(ctx, b->id);
+                }
+            }
+            else
+            {
+                ImGui::BeginDisabled();
+                ImGui::Button("Delete");
+                ImGui::EndDisabled();
+            }
+
             ImGui::Separator();
 
             // -- Load all batches --
             if (ImGui::Button("Load All"))
             {
-                // Using your async load-all helper:
-                br.queue_load_all_async(ctx);
+                editor::BatchActions::load_all(ctx);
             }
 
             // -- Unload all batches --
             ImGui::SameLine();
             if (ImGui::Button("Unload All"))
             {
-                br.queue_unload_all_async(ctx);
+                editor::BatchActions::unload_all(ctx);
             }
 
             ImGui::SameLine();
@@ -1116,7 +1145,7 @@ namespace eeng
             if (!registry_sptr) return;
             ctx.entity_selection->remove_invalid([&](const ecs::Entity& entity)
                 {
-                    return entity.valid() && registry_sptr->valid(entity);
+                    return entity.has_id() && registry_sptr->valid(entity);
                 });
         }
 

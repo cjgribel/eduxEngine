@@ -8,6 +8,7 @@
 #ifndef Command_hpp
 #define Command_hpp
 
+#include <cstdint>
 #include <memory>
 #include <entt/fwd.hpp>
 #include "config.h"
@@ -15,6 +16,12 @@
 
 namespace eeng::editor 
 {
+    enum class CommandStatus : std::uint8_t
+    {
+        Done,
+        InFlight,
+        Failed
+    };
 
     struct Selection
     {
@@ -25,9 +32,11 @@ namespace eeng::editor
     class Command
     {
     public:
-        virtual void execute() = 0;
+        virtual CommandStatus execute() = 0;
 
-        virtual void undo() = 0;
+        virtual CommandStatus undo() = 0;
+
+        virtual CommandStatus update() { return CommandStatus::Done; }
 
         virtual std::string get_name() const = 0;
 

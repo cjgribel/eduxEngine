@@ -5,6 +5,7 @@
 #define EditComponentCommand_hpp
 
 #include "Command.hpp"
+#include "EngineContext.hpp"
 #include "engineapi/IResourceManager.hpp"
 #include "editor/MetaFieldPath.hpp"
 #include "ecs/Entity.hpp"
@@ -27,6 +28,8 @@ namespace eeng::editor
         // Component target
         std::weak_ptr<entt::registry> registry;
         eeng::ecs::Entity entity{};
+        Guid entity_guid{};
+        EngineContextWeakPtr ctx;
         entt::id_type component_id{ 0 };
 
         // Asset target
@@ -65,9 +68,9 @@ namespace eeng::editor
         // void assign_meta_field(entt::meta_any& value_any);
 
     public:
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };
@@ -85,7 +88,7 @@ namespace eeng::editor
         AssignFieldCommand build_asset_command();
 
     public:
-        AssignFieldCommandBuilder& target_component(std::weak_ptr<entt::registry> registry, const ecs::Entity& entity, entt::id_type component_id);
+        AssignFieldCommandBuilder& target_component(EngineContext& ctx, const ecs::Entity& entity, entt::id_type component_id);
 
         AssignFieldCommandBuilder& target_asset(std::weak_ptr<IResourceManager> resource_manager, Guid asset_guid, const std::string& asset_type_id_str);
 

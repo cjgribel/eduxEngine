@@ -8,6 +8,7 @@
 #ifndef CommandQueue_hpp
 #define CommandQueue_hpp
 
+#include <optional>
 #include <vector>
 #include "Command.hpp"
 
@@ -28,11 +29,14 @@ namespace eeng::editor
         int current_index = 0; // Index awaiting execution
         int latest_index = 0; //
         // bool has_new_ = false; // ???
+        enum class InFlightAction : std::uint8_t { Execute, Undo };
+        std::optional<size_t> in_flight_index;
+        InFlightAction in_flight_action{};
 
     public:
         void add(CommandPtr&& command)
         {
-            //remove_pending(); // Might not work if multiple commands are added between executions
+            //discard_unexecuted(); // Might not work if multiple commands are added between executions
 
             // Remove current_index -> latest_index
             if (current_index < latest_index)
@@ -55,6 +59,11 @@ namespace eeng::editor
             return current_index;
         }
 
+        bool has_in_flight() const
+        {
+            return in_flight_index.has_value();
+        }
+
         bool is_executed(size_t index)
         {
             return index < current_index;
@@ -66,52 +75,113 @@ namespace eeng::editor
             return queue[index]->get_name();
         }
 
-        int new_commands_pending()
+        int enqueued_count()
         {
             if (latest_index >= 0)
                 return queue.size() - latest_index;
             return 0;
         }
 
-        bool has_new_commands_pending()
+        bool has_ready_commands()
         {
+            if (has_in_flight())
+                return false;
             return latest_index >= 0 && latest_index < queue.size();
         }
 
-        bool commands_pending()
+        bool has_next_command()
         {
+            if (has_in_flight())
+                return false;
             return current_index >= 0 && current_index < queue.size();
         }
 
-        void remove_pending()
+        void discard_unexecuted()
         {
-            if (!commands_pending()) return;
+            if (!has_next_command()) return;
             queue.erase(queue.begin() + current_index, queue.end());
             latest_index = current_index;
         }
 
         void execute_next()
         {
-            if (!commands_pending()) return;
-            queue[current_index++]->execute();
+            if (has_in_flight())
+                return;
+            if (!has_next_command())
+                return;
+
+            const auto result = queue[current_index]->execute();
+            if (result == CommandStatus::InFlight)
+            {
+                in_flight_index = current_index;
+                in_flight_action = InFlightAction::Execute;
+                return;
+            }
+
+            current_index++;
             latest_index = std::max(current_index, latest_index);
         }
 
-        void execute_pending()
+        void process()
         {
-            while (commands_pending()) execute_next();
+            while (true)
+            {
+                if (has_in_flight())
+                {
+                    const auto result = queue[*in_flight_index]->update();
+                    if (result == CommandStatus::InFlight)
+                        return;
+
+                    if (in_flight_action == InFlightAction::Execute)
+                    {
+                        current_index++;
+                        latest_index = std::max(current_index, latest_index);
+                    }
+                    else
+                    {
+                        if (current_index > 0)
+                            current_index--;
+                    }
+
+                    in_flight_index.reset();
+                    return;
+                }
+
+                if (!has_next_command())
+                    return;
+
+                execute_next();
+                if (has_in_flight())
+                    return;
+            }
         }
 
         bool can_undo()
         {
             assert(current_index <= queue.size());
+            if (has_in_flight())
+                return false;
             return current_index > 0;
         }
 
         void undo_last()
         {
-            if (!can_undo()) return;
-            queue[--current_index]->undo();
+            if (has_in_flight())
+                return;
+            if (!can_undo())
+                return;
+
+            const size_t index = current_index - 1;
+            const auto result = queue[index]->undo();
+            if (result == CommandStatus::InFlight)
+            {
+                in_flight_index = index;
+                in_flight_action = InFlightAction::Undo;
+                return;
+            }
+            if (result == CommandStatus::Failed)
+                return;
+            current_index--;
         }
 
         void clear()
@@ -119,6 +189,7 @@ namespace eeng::editor
             queue.clear();
             current_index = 0;
             latest_index = 0;
+            in_flight_index.reset();
         }
     };
 

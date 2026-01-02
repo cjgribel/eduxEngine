@@ -76,7 +76,7 @@ namespace eeng::ecs
          */
         entity_type to_integral() const;
 
-        bool valid() const;
+        bool has_id() const;
 
         /**
          * @brief Checks if the entity is null.
@@ -89,7 +89,7 @@ namespace eeng::ecs
          */
         void set_null();
 
-        operator bool () const { return valid(); }
+        operator bool () const { return has_id(); }
 
         // Comparison operators
         bool operator==(const Entity& other) const;

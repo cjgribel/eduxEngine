@@ -34,7 +34,7 @@ namespace eeng
         auto& guid = header_comp.guid;
 
         // Add entity to scene graph
-        if (!parent_entity.valid())
+        if (!parent_entity.has_id())
         {
             scene_graph_->insert_node(entity);
         }
@@ -90,7 +90,7 @@ namespace eeng
 
             auto parent_entity_opt = get_entity_from_guid(parent_guid);
             assert(parent_entity_opt.has_value());  // Require that parent exists
-            assert(parent_entity_opt->valid());     // Require that parent is valid
+            assert(parent_entity_opt->has_id());     // Require that parent is valid
 
             // Bind runtime handle into EntityRef
             parent_ref.bind(*parent_entity_opt);
@@ -104,7 +104,7 @@ namespace eeng
     // desc -> create_empty_entity -> register_entities
     Entity EntityManager::create_empty_entity(const Entity& entity_hint)
     {
-        if (!entity_hint.valid())
+        if (!entity_hint.has_id())
             return Entity{ registry_->create() };
 
         Entity entity = Entity{ registry_->create(entity_hint) };
@@ -121,7 +121,7 @@ namespace eeng
         const Entity& entity_hint)
     {
         // Invariants: parent is null or already known to EM
-        if (entity_parent.valid())
+        if (entity_parent.has_id())
         {
             assert(registry_->valid(entity_parent));
             // optionally:
@@ -136,7 +136,7 @@ namespace eeng
         auto guid = Guid::generate();
 
         ecs::EntityRef parent_ref{};
-        if (entity_parent.valid())
+        if (entity_parent.has_id())
         {
             parent_ref = get_entity_ref(entity_parent);   // uses EM's maps
         }
@@ -156,7 +156,7 @@ namespace eeng
         // auto& header = registry_->get<HeaderComponent>(entity);
         // auto entity_parent = header.parent_entity.get_entity();
 
-        if (!entity_parent.valid()) return true;
+        if (!entity_parent.has_id()) return true;
         return scene_graph_->contains(entity_parent);
     }
 
@@ -231,7 +231,7 @@ namespace eeng
 
     ecs::EntityRef EntityManager::get_entity_ref(const ecs::Entity& entity) const
     {
-        if (!entity.valid())
+        if (!entity.has_id())
         {
             return {}; // default/null EntityRef (guid + entity both “empty”)
         }
@@ -266,7 +266,7 @@ namespace eeng
 
     const Guid EntityManager::get_entity_guid(const ecs::Entity& entity) const
     {
-        assert(entity.valid());
+        assert(entity.has_id());
         auto it = entity_to_guid_map_.find(entity);
         assert(it != entity_to_guid_map_.end());
         return it->second;

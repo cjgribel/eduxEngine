@@ -29,12 +29,12 @@ namespace eeng::editor
             if (ptr->guid.valid())
             {
                 auto e_opt = em->get_entity_from_guid(ptr->guid);
-                if (e_opt && e_opt->valid() && em->entity_valid(*e_opt))
+                if (e_opt && e_opt->has_id() && em->entity_valid(*e_opt))
                 {
                     resolved = true;
                 }
             }
-            else if (ptr->entity.valid() && em->entity_valid(ptr->entity))
+            else if (ptr->entity.has_id() && em->entity_valid(ptr->entity))
             {
                 resolved = true;
             }
@@ -59,7 +59,7 @@ namespace eeng::editor
         inspector.begin_leaf("Live ID");
         {
             const auto e = ptr->entity;
-            ImGui::TextUnformatted((e.valid() && em->entity_valid(e)) ? std::to_string(e.to_integral()).c_str() : "n/a");
+            ImGui::TextUnformatted((e.has_id() && em->entity_valid(e)) ? std::to_string(e.to_integral()).c_str() : "n/a");
         }
         inspector.end_leaf();
 

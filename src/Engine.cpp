@@ -185,8 +185,11 @@ namespace eeng
 
             // --- Event dispatch / Command execution / Entity destruction ---
 #if 1
-            if (ctx->command_queue->has_new_commands_pending())
-                ctx->command_queue->execute_pending();
+            if (ctx->command_queue->has_in_flight()
+                || ctx->command_queue->has_ready_commands())
+            {
+                ctx->command_queue->process();
+            }
 #else
             //void Scene::event_loop()
             {
@@ -194,7 +197,7 @@ namespace eeng
                 const int max_cycles = 5;
 
                 while ((dispatcher->has_pending_events() ||
-                    cmd_queue->has_new_commands_pending() ||
+                    cmd_queue->has_enqueued_commands() ||
                     dispatcher->has_pending_events())
                     && cycles++ <= max_cycles)
                 {
@@ -203,8 +206,8 @@ namespace eeng
 
                     // Execute commands. May lead to entities being queued for destruction
                     // and new events being issued.
-                    if (cmd_queue->has_new_commands_pending())
-                        cmd_queue->execute_pending();
+                    if (cmd_queue->has_enqueued_commands())
+                        cmd_queue->process();
 
                     // Destroy entities flagged for destruction.
                     // May lead to additional entities being flagged for destruction.

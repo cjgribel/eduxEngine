@@ -8,6 +8,7 @@
 #include "SerialExecutor.hpp"
 #include "MetaSerialize.hpp"
 #include "EngineContext.hpp"
+#include <filesystem>
 #include <unordered_map>
 #include <mutex>
 #include <future>
@@ -94,12 +95,16 @@ namespace eeng {
 
         void save_index(const std::filesystem::path& index_path);
         void load_or_create_index(const std::filesystem::path& index_path);
+        void save_index();
 
         Guid create_batch(
             // const BatchId& id,
             std::string name
             // const std::filesystem::path& path
         );
+        Guid create_batch_with_id(const BatchId& id, std::string name);
+        bool delete_batch(const BatchId& id, BatchInfo* out_info = nullptr);
+        bool restore_batch(BatchInfo info);
 
 
         std::shared_future<TaskResult> queue_save_batch(const BatchId& id, EngineContext& ctx);

@@ -50,7 +50,7 @@ namespace eeng::gui
             }
 
             const bool selected_entity_valid =
-                selected_entity.valid()&
+                selected_entity.has_id()&
                 registry_sp->valid(selected_entity);
 
             // --- Add / Remove Component ------------------------------------

@@ -34,9 +34,9 @@ namespace eeng::editor {
             const ecs::Entity& parent_entity,
             EngineContextWeakPtr ctx);
 
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };
@@ -57,9 +57,9 @@ namespace eeng::editor {
             EngineContextWeakPtr ctx
         );
 
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };
@@ -80,9 +80,9 @@ namespace eeng::editor {
             EngineContextWeakPtr ctx
         );
 
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };
@@ -102,9 +102,9 @@ namespace eeng::editor {
             const ecs::Entity& entity,
             EngineContextWeakPtr ctx);
 
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };
@@ -124,9 +124,9 @@ namespace eeng::editor {
             const ecs::Entity& entity,
             EngineContextWeakPtr ctx);
 
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };
@@ -149,9 +149,9 @@ namespace eeng::editor {
             const ecs::Entity& parent_entity,
             EngineContextWeakPtr ctx);
 
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };
@@ -195,9 +195,9 @@ namespace eeng::editor {
             entt::id_type comp_id,
             EngineContextWeakPtr ctx);
 
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };
@@ -219,9 +219,9 @@ namespace eeng::editor {
             entt::id_type comp_id,
             EngineContextWeakPtr ctx);
 
-        void execute() override;
+        CommandStatus execute() override;
 
-        void undo() override;
+        CommandStatus undo() override;
 
         std::string get_name() const override;
     };

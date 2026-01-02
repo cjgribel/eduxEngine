@@ -389,7 +389,7 @@ namespace eeng::meta {
         // TODO: Take ctx directly as an argument
         // auto context_sp = inspector.ctx.lock();
         auto& registry = ctx.entity_manager->registry();
-        assert(entity.valid());
+        assert(entity.has_id());
         assert(registry.valid(entity));
 
         for (auto&& [id, type] : registry.storage())
@@ -406,7 +406,7 @@ namespace eeng::meta {
 #ifdef USE_COMMANDS
                     // Reset meta command for component type
                     auto cmdb = editor::AssignFieldCommandBuilder{}.target_component(
-                        ctx.entity_manager->registry_wptr(),
+                        ctx,
                         entity,
                         id
                     );

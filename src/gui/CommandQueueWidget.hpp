@@ -35,15 +35,20 @@ namespace eeng::gui
                 current_index = total;
 
             const size_t executed = current_index;
-            const size_t pending = total - executed;
+            const size_t queued = total - executed;
 
             ImGui::Text("Executed: %zu", executed);
             ImGui::SameLine();
-            ImGui::Text("Pending: %zu", pending);
+            ImGui::Text("Queued: %zu", queued);
+            if (queue->has_in_flight())
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled("Busy");
+            }
 
             const bool can_undo = queue->can_undo();
-            const bool can_redo = queue->commands_pending();
-            const bool can_clear = total > 0;
+            const bool can_redo = queue->has_next_command();
+            const bool can_clear = total > 0 && !queue->has_in_flight();
 
             bool queue_changed = false;
 
@@ -94,7 +99,7 @@ namespace eeng::gui
                 else
                 {
                     const ImVec4 executed_color(0.5f, 0.85f, 0.5f, 1.0f);
-                    const ImVec4 pending_color(0.9f, 0.65f, 0.2f, 1.0f);
+                    const ImVec4 queued_color(0.9f, 0.65f, 0.2f, 1.0f);
 
                     for (size_t i = 0; i < total; ++i)
                     {
@@ -102,7 +107,7 @@ namespace eeng::gui
                             break;
                         const bool is_executed = queue->is_executed(i);
                         const bool is_next = (i == current_index);
-                        const ImVec4& color = is_executed ? executed_color : pending_color;
+                        const ImVec4& color = is_executed ? executed_color : queued_color;
                         const char* marker = is_next ? ">" : " ";
                         const auto name = queue->get_name(i);
                         ImGui::TextColored(color, "%s %zu: %s", marker, i, name.c_str());

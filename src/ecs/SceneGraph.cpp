@@ -29,7 +29,7 @@ namespace eeng::ecs
         const Entity& parent_entity
     )
     {
-        if (!parent_entity.valid())
+        if (!parent_entity.has_id())
         {
             tree->insert_as_root(entity);
             return true;
@@ -88,7 +88,7 @@ namespace eeng::ecs
 
         assert(tree->contains(entity));
 
-        if (!parent_entity.valid())
+        if (!parent_entity.has_id())
         {
             unparent(entity);
             return;
