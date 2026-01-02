@@ -641,7 +641,7 @@ namespace eeng
                         std::string batch_tag = id.to_string();
 
                         auto& em = ctx.entity_manager;
-                        auto [guid, entity] = em->create_entity(
+                        auto [guid, entity] = em->create_entity_live_parent(
                             batch_tag,          // REMOVE ?
                             name,
                             parent.entity,
@@ -870,7 +870,7 @@ namespace eeng
                             desc,
                             ctx,
                             eeng::meta::SerializationPurpose::file);
-                        ctx.entity_manager->register_entity(er.entity);
+                        ctx.entity_manager->register_entity_live_parent(er.entity);
                         return er;
                     });
 
@@ -1366,11 +1366,11 @@ namespace eeng
                         desc,
                         ctx,
                         eeng::meta::SerializationPurpose::file);
-                    // ctx.entity_manager->register_entity(er.get_entity());
+                    // ctx.entity_manager->register_entity_live_parent(er.get_entity());
                     B.live.push_back(er);
                     new_entities.push_back(er.entity);
                 }
-                ctx.entity_manager->register_entities(new_entities);
+                ctx.entity_manager->register_entities_from_deserialization(new_entities);
             });
 
         // ABORT IF ASSET LOAD FAILED ???

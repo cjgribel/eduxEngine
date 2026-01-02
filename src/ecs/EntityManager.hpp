@@ -23,18 +23,26 @@ namespace eeng
         bool entity_valid(
             const ecs::Entity& entity) const override;
 
-        // Intended use: during deserialization
-        // desc -> create_empty_entity -> register_entities
-        ecs::Entity create_empty_entity(
+        /// Create an unregistered entity handle for deserialization paths.
+        /// Intended use: create_entity_unregistered -> add components -> register_entities_from_deserialization.
+        ecs::Entity create_entity_unregistered(
             const ecs::Entity& entity_hint) override;
 
-        // Intended use: runtime creation (parent exists & is registered etc)
-        // create_entity (-> register_entitity)
-        std::pair<Guid, ecs::Entity> create_entity(
+        /// Create and register an entity with a live parent handle.
+        /// Intended use: runtime creation when parent is already registered in the scene graph.
+        std::pair<Guid, ecs::Entity> create_entity_live_parent(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent,
             const ecs::Entity& entity_hint) override;
+
+        /// Register a single entity whose header contains a live parent handle (if any).
+        /// Intended use: runtime creation, not deserialization (parent must already be live).
+        void register_entity_live_parent(const ecs::Entity& entity) override;
+
+        /// Register a batch of deserialized entities using parent GUIDs in headers.
+        /// Intended use: after deserialization when GUID maps are complete; throws if a parent is missing.
+        void register_entities_from_deserialization(const std::vector<ecs::Entity>& entities) override;
 
         bool entity_parent_registered(
             const ecs::Entity& entity) const override;
@@ -72,7 +80,7 @@ namespace eeng
         // Guid& get_entity_guid(const ecs::Entity& entity);
         const Guid get_entity_guid(const ecs::Entity& entity) const;
 
-        std::optional<ecs::Entity> get_entity_from_guid(const Guid& guid) const;
+        std::optional<ecs::Entity> get_entity_from_guid(const Guid& guid) const override;
 
         // destroy_pending_entities
 
@@ -91,18 +99,6 @@ namespace eeng
         }
 
     private:
-
-        // Why private?
-        // Intended use: runtime creation (parent exists & is registered etc)
-        // create_entity (-> register_entitity)
-        void register_entity(const ecs::Entity& entity) override;
-
-        // Why private?
-        // Intended use: during deserialization
-        // desc -> create_empty_entity -> register_entities
-        void register_entities(const std::vector<ecs::Entity>& entities) override;
-
-
         std::shared_ptr<entt::registry>     registry_;
         std::unordered_map<Guid, ecs::Entity>    guid_to_entity_map_;
         std::unordered_map<ecs::Entity, Guid>    entity_to_guid_map_;

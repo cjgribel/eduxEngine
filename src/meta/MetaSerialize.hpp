@@ -5,6 +5,7 @@
 #define MetaSerialize_hpp
 
 #include <entt/entt.hpp>
+#include <cstdint>
 
 // Note: We're including the full nlohmann header and not just 
 // <nlohmann/json_fwd.hpp>. The expected usage of this header is on engine cpp:s
@@ -17,6 +18,13 @@
 
 namespace eeng::meta
 {
+    // Parent validation when registering deserialized entities.
+    enum class ParentPolicy : std::uint8_t
+    {
+        // Require parent GUID (if present) to resolve to a live, registered entity.
+        RequireLiveParent
+    };
+
     struct ComponentSpawnDesc
     {
         // entt::id_type type_id;
@@ -77,6 +85,24 @@ namespace eeng::meta
         EngineContext& ctx,
         SerializationPurpose purpose = SerializationPurpose::generic
     );
+
+    // Deserialize/spawn and register into scene graph with strict parent checks.
+    // NOTE: Does not bind AssetRef/EntityRef; callers decide when to bind (often after
+    // all entities in a branch/batch are registered and GUID maps are complete).
+    ecs::EntityRef deserialize_entity_and_register(
+        const nlohmann::json& json,
+        EngineContext& ctx,
+        SerializationPurpose purpose = SerializationPurpose::generic,
+        ParentPolicy parent_policy = ParentPolicy::RequireLiveParent);
+
+    // Spawn from pre-parsed descriptor, then register. Intended for batch loading where JSON
+    // is already converted to ComponentSpawnDesc/EntitySpawnDesc.
+    // NOTE: Does not bind AssetRef/EntityRef; callers decide when to bind.
+    ecs::EntityRef spawn_entity_from_desc_and_register(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx,
+        SerializationPurpose purpose = SerializationPurpose::generic,
+        ParentPolicy parent_policy = ParentPolicy::RequireLiveParent);
 
     // Purpose wrappers (keep call sites intention-revealing).
     inline nlohmann::json serialize_any_for_file(const entt::meta_any& meta_any)
@@ -182,6 +208,48 @@ namespace eeng::meta
         EngineContext& ctx)
     {
         return spawn_entity_from_desc(desc, ctx, SerializationPurpose::display);
+    }
+
+    inline ecs::EntityRef deserialize_entity_and_register_for_file(
+        const nlohmann::json& json,
+        EngineContext& ctx)
+    {
+        return deserialize_entity_and_register(json, ctx, SerializationPurpose::file);
+    }
+
+    inline ecs::EntityRef deserialize_entity_and_register_for_undo(
+        const nlohmann::json& json,
+        EngineContext& ctx)
+    {
+        return deserialize_entity_and_register(json, ctx, SerializationPurpose::undo);
+    }
+
+    inline ecs::EntityRef deserialize_entity_and_register_for_display(
+        const nlohmann::json& json,
+        EngineContext& ctx)
+    {
+        return deserialize_entity_and_register(json, ctx, SerializationPurpose::display);
+    }
+
+    inline ecs::EntityRef spawn_entity_from_desc_and_register_for_file(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx)
+    {
+        return spawn_entity_from_desc_and_register(desc, ctx, SerializationPurpose::file);
+    }
+
+    inline ecs::EntityRef spawn_entity_from_desc_and_register_for_undo(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx)
+    {
+        return spawn_entity_from_desc_and_register(desc, ctx, SerializationPurpose::undo);
+    }
+
+    inline ecs::EntityRef spawn_entity_from_desc_and_register_for_display(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx)
+    {
+        return spawn_entity_from_desc_and_register(desc, ctx, SerializationPurpose::display);
     }
 
 #if 0

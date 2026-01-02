@@ -52,13 +52,13 @@ namespace
             // return false; 
         }
 
-        ecs::Entity create_empty_entity(const ecs::Entity& /*hint*/) override
+        ecs::Entity create_entity_unregistered(const ecs::Entity& /*hint*/) override
         {
             auto e = registry_->create();
             return ecs::Entity{ e };
         }
 
-        std::pair<Guid, ecs::Entity> create_entity(
+        std::pair<Guid, ecs::Entity> create_entity_live_parent(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent,
@@ -74,6 +74,11 @@ namespace
 
         void reparent_entity(
             const ecs::Entity& entity, const ecs::Entity& parent_entity) override {
+        }
+
+        std::optional<ecs::Entity> get_entity_from_guid(const Guid& guid) const override
+        {
+            return std::nullopt;
         }
 
         // void set_entity_parent(
@@ -93,9 +98,9 @@ namespace
         std::weak_ptr<const entt::registry> registry_wptr() const noexcept override { return registry_; }
 
     private:
-        void register_entity(const ecs::Entity& entity) override {}
+        void register_entity_live_parent(const ecs::Entity& entity) override {}
 
-        void register_entities(const std::vector<ecs::Entity>& entities) override {};
+        void register_entities_from_deserialization(const std::vector<ecs::Entity>& entities) override {};
 
         std::shared_ptr<entt::registry> registry_;
     };
@@ -778,7 +783,7 @@ TEST_F(MetaSerializationTest, SerializeDeserialize_EntityRoundTrip)
 
     // create an entity in the source registry
     Guid src_guid{ 0x12345678ULL };
-    ecs::Entity src_entity = src_em->create_empty_entity(ecs::Entity::EntityNull);
+    ecs::Entity src_entity = src_em->create_entity_unregistered(ecs::Entity::EntityNull);
 
     // attach components that were registered in SetUpTestSuite()
     {

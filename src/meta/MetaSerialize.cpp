@@ -6,13 +6,35 @@
 #include "MetaLiterals.h"
 #include "MetaAux.h"
 #include "EngineContext.hpp"
+#include "ecs/HeaderComponent.hpp"
 #include <iostream>
 #include <sstream>
 #include <cassert>
+#include <stdexcept>
 #include <nlohmann/json.hpp>
 
 namespace eeng::meta
 {
+    namespace
+    {
+        void require_live_parent(IEntityManager& em, const ecs::Entity& entity)
+        {
+            auto& registry = em.registry();
+            if (!registry.all_of<ecs::HeaderComponent>(entity))
+                throw std::runtime_error("Missing HeaderComponent while registering entity");
+
+            const auto& header = registry.get<ecs::HeaderComponent>(entity);
+            const auto& parent_ref = header.parent_entity;
+            if (!parent_ref.guid.valid())
+                return;
+
+            // Parent is referenced by GUID only; must be resolvable at registration time.
+            auto parent_opt = em.get_entity_from_guid(parent_ref.guid);
+            if (!parent_opt || !parent_opt->has_id() || !em.entity_valid(*parent_opt))
+                throw std::runtime_error("Parent GUID not found while registering entity");
+        }
+    }
+
 
     /// @brief  Makes sure entt has storage for a given component via meta function.
     /// @param registry 
@@ -550,7 +572,7 @@ namespace eeng::meta
         // Fetch entity GUID and create EntityRef
         assert(json.contains("entity_guid"));
         auto guid = Guid{ json["entity_guid"].get<Guid::underlying_type>() };
-        auto entity = ctx.entity_manager->create_empty_entity(ecs::Entity::EntityNull);
+        auto entity = ctx.entity_manager->create_entity_unregistered(ecs::Entity::EntityNull);
         ecs::EntityRef entity_ref{ guid, entity };
 
         // std::cout << "Deserializing entity " << entity.to_integral() << std::endl;
@@ -623,7 +645,7 @@ namespace eeng::meta
         auto& reg = em.registry();
 
         // Create + register
-        auto e = em.create_empty_entity(ecs::Entity::EntityNull);
+        auto e = em.create_entity_unregistered(ecs::Entity::EntityNull);
         // em.register_guid(desc.guid, e);
 
         // Add components via meta pipeline
@@ -645,6 +667,42 @@ namespace eeng::meta
         // ecs::EntityRef er{ desc.guid, e };
         // B.live.push_back(er);
         // return er;
+    }
+
+    ecs::EntityRef deserialize_entity_and_register(
+        const nlohmann::json& json,
+        EngineContext& ctx,
+        SerializationPurpose purpose,
+        ParentPolicy parent_policy)
+    {
+        auto er = deserialize_entity(json, ctx, purpose);
+        auto& em = *ctx.entity_manager;
+
+        // Enforce parent availability before registration to avoid implicit root inserts.
+        if (parent_policy == ParentPolicy::RequireLiveParent)
+            require_live_parent(em, er.entity);
+
+        // Use register_entities so parent GUIDs can be resolved via GUID maps.
+        em.register_entities_from_deserialization({ er.entity });
+        return er;
+    }
+
+    ecs::EntityRef spawn_entity_from_desc_and_register(
+        const EntitySpawnDesc& desc,
+        EngineContext& ctx,
+        SerializationPurpose purpose,
+        ParentPolicy parent_policy)
+    {
+        auto er = spawn_entity_from_desc(desc, ctx, purpose);
+        auto& em = *ctx.entity_manager;
+
+        // Enforce parent availability before registration to avoid implicit root inserts.
+        if (parent_policy == ParentPolicy::RequireLiveParent)
+            require_live_parent(em, er.entity);
+
+        // Use register_entities so parent GUIDs can be resolved via GUID maps.
+        em.register_entities_from_deserialization({ er.entity });
+        return er;
     }
 
 
@@ -693,7 +751,7 @@ namespace eeng::meta
                 auto& entity = entity_buffer.at(i);
                 if (!context.can_register_entity(entity)) continue;
 
-                context.register_entity(entity);
+                context.register_entity_live_parent(entity);
                 std::swap(entity, entity_buffer[pivot++]);
                 swap_made = true;
             }

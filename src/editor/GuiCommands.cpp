@@ -132,26 +132,6 @@ namespace
         return *entity_opt;
     }
 
-    void reparent_if_possible(Entity entity, EngineContext& ctx)
-    {
-        if (!entity.has_id())
-            return;
-
-        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
-        auto& scenegraph = em.scene_graph();
-        auto parent_guid = em.get_entity_parent(entity).guid;
-        if (!parent_guid.valid())
-            return;
-
-        auto parent_entity = resolve_entity_from_guid(em, parent_guid);
-        if (!parent_entity.has_id())
-            return;
-        if (!scenegraph.contains(parent_entity))
-            return;
-
-        em.reparent_entity(entity, parent_entity);
-    }
-
     bool update_entity_guid_in_json(nlohmann::json& entity_json, const Guid& guid)
     {
         const auto& keys = header_keys();
@@ -317,42 +297,6 @@ namespace
         return Guid{ entity_json["entity_guid"].get<Guid::underlying_type>() };
     }
 
-    eeng::ecs::EntityRef deserialize_entity(
-        const nlohmann::json& json,
-        EngineContext& ctx,
-        eeng::meta::SerializationPurpose purpose = eeng::meta::SerializationPurpose::undo)
-    {
-        assert(json.contains("entity_guid"));
-        auto guid = Guid{ json["entity_guid"].get<Guid::underlying_type>() };
-        auto entity = ctx.entity_manager->create_empty_entity(Entity{});
-        eeng::ecs::EntityRef entity_ref{ guid, entity };
-
-        assert(json.contains("components"));
-        assert(json["components"].is_object());
-
-        auto& registry = ctx.entity_manager->registry();
-
-        for (const auto& component_json : json["components"].items())
-        {
-            const std::string key_str = component_json.key();
-            auto meta_type = eeng::meta::resolve_by_type_id_string(key_str);
-            if (!meta_type)
-                continue;
-
-            if (!eeng::meta::traits::is_serializable(meta_type, purpose))
-                continue;
-
-            entt::meta_any any = meta_type.construct();
-            eeng::meta::deserialize_any(component_json.value(), any, entity, ctx, purpose);
-
-            auto comp_id = meta_type.id();
-            ensure_storage(registry, comp_id);
-            registry.storage(comp_id)->push(entity, any.base().data());
-        }
-
-        return entity_ref;
-    }
-
     void bind_refs_for_entity(Entity entity, EngineContext& ctx)
     {
         if (ctx.resource_manager)
@@ -391,7 +335,7 @@ namespace eeng::editor {
                 parent_current = parent_entity;
             }
 
-            auto [guid, entity] = ctx_sp->entity_manager->create_entity(
+            auto [guid, entity] = ctx_sp->entity_manager->create_entity_live_parent(
                 "",
                 "",
                 parent_current,
@@ -412,17 +356,11 @@ namespace eeng::editor {
         // Redo path: recreate from the serialized snapshot.
         else
         {
-            auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
-            if (!registry_sp)
-                return CommandStatus::Done;
-
-            auto er = deserialize_entity(
+            auto er = meta::deserialize_entity_and_register_for_undo(
                 entity_json,
                 *ctx_sp);
-            created_entity = er.entity; // null
+            created_entity = er.entity;
             created_guid = er.guid;
-            ctx_sp->entity_manager->register_entity(created_entity); // inserted as root
-            reparent_if_possible(created_entity, *ctx_sp);
             bind_refs_for_entity(created_entity, *ctx_sp);
         }
 
@@ -521,13 +459,11 @@ namespace eeng::editor {
         if (entity_json.is_null())
             return CommandStatus::Done;
 
-        auto er = deserialize_entity(
+        auto er = meta::deserialize_entity_and_register_for_undo(
             entity_json,
             *ctx_sp);
         entity = er.entity;
         entity_guid = er.guid;
-        ctx_sp->entity_manager->register_entity(er.entity);
-        reparent_if_possible(er.entity, *ctx_sp);
         bind_refs_for_entity(er.entity, *ctx_sp);
         return CommandStatus::Done;
     }
@@ -619,13 +555,13 @@ namespace eeng::editor {
 
         for (const auto& entity_json : branch_json)
         {
-            auto er = deserialize_entity(
+            auto er = meta::deserialize_entity_for_undo(
                 entity_json,
                 *ctx_sp);
             created_entities.push_back(er.entity);
         }
 
-        ctx_sp->entity_manager->register_entities(created_entities);
+        ctx_sp->entity_manager->register_entities_from_deserialization(created_entities);
 
         for (auto entity : created_entities)
             bind_refs_for_entity(entity, *ctx_sp);
@@ -688,12 +624,10 @@ namespace eeng::editor {
             }
         }
 
-        auto er = deserialize_entity(
+        auto er = meta::deserialize_entity_and_register_for_undo(
             copy_json,
             *ctx_sp);
         const auto entity_copy = er.entity;
-        ctx_sp->entity_manager->register_entity(entity_copy);
-        reparent_if_possible(entity_copy, *ctx_sp);
         bind_refs_for_entity(entity_copy, *ctx_sp);
         return CommandStatus::Done;
 
@@ -823,13 +757,13 @@ namespace eeng::editor {
 
         for (const auto& entity_json : branch_json)
         {
-            auto er = deserialize_entity(
+            auto er = meta::deserialize_entity_for_undo(
                 entity_json,
                 *ctx_sp);
             created_entities.push_back(er.entity);
         }
 
-        ctx_sp->entity_manager->register_entities(created_entities);
+        ctx_sp->entity_manager->register_entities_from_deserialization(created_entities);
 
         for (auto entity : created_entities)
             bind_refs_for_entity(entity, *ctx_sp);

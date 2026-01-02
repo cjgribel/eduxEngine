@@ -5,6 +5,7 @@
 #include "HeaderComponent.hpp"
 #include <entt/entt.hpp>
 #include <cassert>
+#include <stdexcept>
 
 namespace eeng
 {
@@ -25,8 +26,8 @@ namespace eeng
     }
 
     // Intended use: runtime creation (parent exists & is registered etc)
-    // create_entity (-> register_entitity)
-    void EntityManager::register_entity(const Entity& entity)
+    // create_entity_live_parent (-> register_entity_live_parent)
+    void EntityManager::register_entity_live_parent(const Entity& entity)
     {
         assert(registry_->all_of<HeaderComponent>(entity));
         auto& header_comp = registry_->get<HeaderComponent>(entity);
@@ -54,8 +55,8 @@ namespace eeng
     }
 
     // Intended use: during deserialization
-    // desc -> create_empty_entity -> register_entities
-    void EntityManager::register_entities(const std::vector<Entity>& entities)
+    // desc -> create_entity_unregistered -> register_entities_from_deserialization
+    void EntityManager::register_entities_from_deserialization(const std::vector<Entity>& entities)
     {
         // 1) Build GUID <-> Entity maps
         for (auto entity : entities)
@@ -67,14 +68,15 @@ namespace eeng
             guid_to_entity_map_[guid] = entity;
             entity_to_guid_map_[entity] = guid;
 
-            // Ensure node exists in scene graph as a root
+            // Ensure node exists in scene graph as a root; parent resolution happens later.
             if (!scene_graph_->contains(entity))
             {
                 scene_graph_->insert_node(entity);
             }
         }
 
-        // 2) Resolve parent GUIDs to Entities and reparent
+        // 2) Resolve parent GUIDs to Entities and reparent.
+        // This assumes parents are already registered in the GUID map (same batch/branch or live scene).
         for (auto entity : entities)
         {
             auto& header = get_entity_header(entity);
@@ -89,8 +91,10 @@ namespace eeng
             }
 
             auto parent_entity_opt = get_entity_from_guid(parent_guid);
-            assert(parent_entity_opt.has_value());  // Require that parent exists
-            assert(parent_entity_opt->has_id());     // Require that parent is valid
+            if (!parent_entity_opt || !parent_entity_opt->has_id())
+                throw std::runtime_error("Parent GUID not found while registering entities");
+            if (!scene_graph_->contains(*parent_entity_opt))
+                throw std::runtime_error("Parent entity not registered in scene graph");
 
             // Bind runtime handle into EntityRef
             parent_ref.bind(*parent_entity_opt);
@@ -101,8 +105,8 @@ namespace eeng
     }
 
     // Intended use: during deserialization
-    // desc -> create_empty_entity -> register_entities
-    Entity EntityManager::create_empty_entity(const Entity& entity_hint)
+    // desc -> create_entity_unregistered -> register_entities_from_deserialization
+    Entity EntityManager::create_entity_unregistered(const Entity& entity_hint)
     {
         if (!entity_hint.has_id())
             return Entity{ registry_->create() };
@@ -113,8 +117,8 @@ namespace eeng
     }
 
     // Intended use: runtime creation (parent exists & is registered etc)
-    // create_entity (-> register_entitity)
-    std::pair<Guid, ecs::Entity> EntityManager::create_entity(
+    // create_entity_live_parent (-> register_entity_live_parent)
+    std::pair<Guid, ecs::Entity> EntityManager::create_entity_live_parent(
         const std::string& chunk_tag,
         const std::string& name,
         const Entity& entity_parent, // Entity ????
@@ -129,7 +133,7 @@ namespace eeng
             assert(scene_graph_->contains(entity_parent));
         }
 
-        Entity entity = create_empty_entity(entity_hint);
+        Entity entity = create_entity_unregistered(entity_hint);
 
         std::string used_name = name.size() ? name : std::to_string(entity.to_integral());
         std::string used_chunk_tag = chunk_tag.size() ? chunk_tag : "default_chunk";
@@ -143,9 +147,9 @@ namespace eeng
 
         registry_->emplace<HeaderComponent>(entity, used_name, used_chunk_tag, guid, parent_ref);
 
-        register_entity(entity);
+        register_entity_live_parent(entity);
 
-        //std::cout << "Scene::create_entity " << entity.to_integral() << std::endl;
+        //std::cout << "Scene::create_entity_live_parent " << entity.to_integral() << std::endl;
         return { guid, entity };
     }
 
@@ -182,7 +186,7 @@ namespace eeng
     //     // assert(registry_->all_of<HeaderComponent>(entity));
     //     // registry_->get<HeaderComponent>(entity).parent_entity = entity_parent;
 
-    //     // register_entity(entity);
+    //     // register_entity_live_parent(entity);
     // }
 
     void EntityManager::queue_entity_for_destruction(const ecs::Entity& entity)

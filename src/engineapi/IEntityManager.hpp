@@ -5,6 +5,7 @@
 #include "ecs/Entity.hpp"
 #include <entt/fwd.hpp>
 #include <string>
+#include <optional>
 #include <cstddef>
 
 namespace eeng
@@ -17,16 +18,23 @@ namespace eeng
         virtual bool entity_valid(
             const ecs::Entity& entity) const = 0;
 
-        // 
-        virtual void register_entity(
+        /// Register a single entity whose header contains a live parent handle (if any).
+        /// Intended use: runtime creation, not deserialization (parent must already be live).
+        virtual void register_entity_live_parent(
             const ecs::Entity& entity) = 0;
 
-        virtual void register_entities(const std::vector<ecs::Entity>& entities) = 0;
+        /// Register a batch of deserialized entities using parent GUIDs in headers.
+        /// Intended use: after deserialization when GUID maps are complete; throws if a parent is missing.
+        virtual void register_entities_from_deserialization(const std::vector<ecs::Entity>& entities) = 0;
 
-        virtual ecs::Entity create_empty_entity(
+        /// Create an unregistered entity handle for deserialization paths.
+        /// Intended use: create_entity_unregistered -> add components -> register_entities_from_deserialization.
+        virtual ecs::Entity create_entity_unregistered(
             const ecs::Entity& entity_hint) = 0;
 
-        virtual std::pair<Guid, ecs::Entity> create_entity(
+        /// Create and register an entity with a live parent handle.
+        /// Intended use: runtime creation when parent is already registered in the scene graph.
+        virtual std::pair<Guid, ecs::Entity> create_entity_live_parent(
             const std::string& chunk_tag,
             const std::string& name,
             const ecs::Entity& entity_parent    = ecs::Entity::EntityNull,
@@ -39,6 +47,9 @@ namespace eeng
             const ecs::Entity& entity,
             const ecs::Entity& parent_entity) = 0;
 
+        /// Resolve a GUID to a live entity handle if available.
+        virtual std::optional<ecs::Entity> get_entity_from_guid(const Guid& guid) const = 0;
+
         // virtual void set_entity_parent(
         //     const ecs::Entity& entity,
         //     const ecs::Entity& entity_parent) = 0;
@@ -47,13 +58,13 @@ namespace eeng
         //     entt::entity hint_entity,
         //     entt::entity parent_entity)
         // {
-        //     return create_entity("", "", parent_entity, hint_entity);
+        //     return create_entity_live_parent("", "", parent_entity, hint_entity);
         // }
 
-        // entt::entity Scene::create_entity(
+        // entt::entity Scene::create_entity_live_parent(
         //     entt::entity parent_entity)
         // {
-        //     return create_entity("", "", parent_entity, entt::null);
+        //     return create_entity_live_parent("", "", parent_entity, entt::null);
         // }
 
         virtual void queue_entity_for_destruction(
