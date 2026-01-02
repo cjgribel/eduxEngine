@@ -7,6 +7,7 @@
 #include "EventQueue.h"
 #include "ThreadPool.hpp"
 #include <fstream>
+#include <algorithm>
 
 namespace eeng::detail
 {
@@ -657,6 +658,8 @@ namespace eeng
                     B->live.push_back(created);
                 }
 
+                mark_closure_dirty(id);
+
                 // No components yet → no asset refs yet → no closure update now
 
                 return emit_and_return(created, B);
@@ -713,6 +716,7 @@ namespace eeng
 
                 // NOTE: we do NOT shrink asset_closure_hdr here.
                 // Over-approx closure is fine; RM will ref-count correctly.
+                mark_closure_dirty(id);
                 return emit_and_return(true, B);
             });
     }
@@ -791,6 +795,7 @@ namespace eeng
                 // 4) MT: bind AssetRef<> and EntityRef<> inside this entity’s components
                 bind_refs_for_entities_on_main({ entity_ref }, ctx);
 
+                mark_closure_dirty(id);
                 return emit_and_return(true, B);
             });
     }
@@ -816,20 +821,29 @@ namespace eeng
                         return ok;
                     };
 
-                std::lock_guard lk(mtx_);
-                auto it = batches_.find(id);
-                if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
-                    return emit_and_return(false, (it != batches_.end()) ? &it->second : nullptr);
+                BatchInfo* B = nullptr;
+                bool removed = false;
+                {
+                    std::lock_guard lk(mtx_);
+                    auto it = batches_.find(id);
+                    if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
+                        return emit_and_return(false, (it != batches_.end()) ? &it->second : nullptr);
 
-                auto& live = it->second.live;
-                auto old_size = live.size();
-                live.erase(std::remove_if(live.begin(), live.end(),
-                    [&](const ecs::EntityRef& er)
-                    {
-                        return er.guid == entity_ref.guid;
-                    }),
-                    live.end());
-                return emit_and_return(live.size() != old_size, &it->second);
+                    B = &it->second;
+                    auto& live = B->live;
+                    auto old_size = live.size();
+                    live.erase(std::remove_if(live.begin(), live.end(),
+                        [&](const ecs::EntityRef& er)
+                        {
+                            return er.guid == entity_ref.guid;
+                        }),
+                        live.end());
+                    removed = (live.size() != old_size);
+                }
+
+                if (removed)
+                    mark_closure_dirty(id);
+                return emit_and_return(removed, B);
             });
     }
 
@@ -921,6 +935,7 @@ namespace eeng
                 // 3) MT: bind refs in the spawned entity’s components
                 bind_refs_for_entities_on_main({ created }, ctx);
 
+                mark_closure_dirty(id);
                 return emit_and_return(created, B);
             });
     }
@@ -1105,6 +1120,70 @@ namespace eeng
             out.push_back(&b);
         }
         return out;
+    }
+
+    void BatchRegistry::mark_closure_dirty(const BatchId& id)
+    {
+        std::lock_guard lk(mtx_);
+        auto it = batches_.find(id);
+        if (it == batches_.end())
+            return;
+        if (it->second.state != BatchInfo::State::Loaded)
+            return;
+        dirty_batches_.insert(id);
+    }
+
+    void BatchRegistry::mark_closure_dirty_for_entity(const ecs::Entity& entity, EngineContext& ctx)
+    {
+        if (!entity.has_id() || !ctx.entity_manager || !ctx.entity_manager->entity_valid(entity))
+            return;
+
+        std::lock_guard lk(mtx_);
+        for (const auto& [id, info] : batches_)
+        {
+            if (info.state != BatchInfo::State::Loaded)
+                continue;
+
+            const auto& live = info.live;
+            const auto it = std::find_if(live.begin(), live.end(), [&](const ecs::EntityRef& er)
+                {
+                    return er.entity == entity;
+                });
+            if (it != live.end())
+            {
+                dirty_batches_.insert(id);
+            }
+        }
+    }
+
+    void BatchRegistry::process_dirty_batches(EngineContext& ctx)
+    {
+        std::vector<BatchId> to_rebuild;
+        {
+            std::lock_guard lk(mtx_);
+            for (auto it = dirty_batches_.begin(); it != dirty_batches_.end();)
+            {
+                auto batch_it = batches_.find(*it);
+                if (batch_it == batches_.end())
+                {
+                    it = dirty_batches_.erase(it);
+                    continue;
+                }
+                if (batch_it->second.state != BatchInfo::State::Loaded)
+                {
+                    ++it;
+                    continue;
+                }
+
+                to_rebuild.push_back(*it);
+                it = dirty_batches_.erase(it);
+            }
+        }
+
+        for (const auto& id : to_rebuild)
+        {
+            queue_rebuild_closure(id, ctx);
+        }
     }
 
     std::shared_future<TaskResult>

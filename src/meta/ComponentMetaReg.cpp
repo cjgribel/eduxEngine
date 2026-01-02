@@ -339,7 +339,8 @@ namespace eeng
                 // Model asset ref
                 .data<&eeng::ecs::ModelComponent::model_ref>("model_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "model_ref", "Model reference", "Model Reference." })
-                .traits(MetaFlags::readonly_inspection)
+                // .traits(MetaFlags::readonly_inspection)
+                .traits(MetaFlags::none)
 
                 // Anim clip index
                 .data<&eeng::ecs::ModelComponent::clip_index>("clip_index"_hs)

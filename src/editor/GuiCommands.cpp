@@ -11,6 +11,7 @@
 #include <utility>
 #include "MetaSerialize.hpp"
 #include "GuiCommands.hpp"
+#include "BatchRegistry.hpp"
 #include "ecs/EntityManager.hpp"
 #include "meta/EntityMetaHelpers.hpp"
 #include "meta/MetaAux.h"
@@ -303,6 +304,14 @@ namespace
             eeng::meta::bind_asset_refs_for_entity(entity, ctx);
         eeng::meta::bind_entity_refs_for_entity(entity, ctx);
     }
+
+    void mark_batch_dirty_for_entity(Entity entity, EngineContext& ctx)
+    {
+        if (!ctx.batch_registry)
+            return;
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+        br.mark_closure_dirty_for_entity(entity, ctx);
+    }
 }
 
 namespace eeng::editor {
@@ -364,6 +373,9 @@ namespace eeng::editor {
             bind_refs_for_entity(created_entity, *ctx_sp);
         }
 
+        if (created_entity.has_id())
+            mark_batch_dirty_for_entity(created_entity, *ctx_sp);
+
         // std::cout << "CreateEntityCommand::execute() " << entt::to_integral(created_entity) << std::endl;
         return CommandStatus::Done;
     }
@@ -386,12 +398,18 @@ namespace eeng::editor {
         {
             auto entity_opt = em.get_entity_from_guid(created_guid);
             if (entity_opt && entity_opt->has_id())
+            {
+                mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
                 ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
+            }
             return CommandStatus::Done;
         }
 
         if (created_entity.has_id())
+        {
+            mark_batch_dirty_for_entity(created_entity, *ctx_sp);
             ctx_sp->entity_manager->queue_entity_for_destruction(created_entity);
+        }
         // destroy_func(created_entity);
 
         // std::cout << "CreateEntityCommand::undo() " << entt::to_integral(created_entity) << std::endl;
@@ -445,6 +463,7 @@ namespace eeng::editor {
                 registry_sp);
         }
 
+        mark_batch_dirty_for_entity(entity_current, *ctx_sp);
         ctx_sp->entity_manager->queue_entity_for_destruction(entity_current);
         // destroy_func(entity);
         return CommandStatus::Done;
@@ -465,6 +484,8 @@ namespace eeng::editor {
         entity = er.entity;
         entity_guid = er.guid;
         bind_refs_for_entity(er.entity, *ctx_sp);
+        if (er.entity.has_id())
+            mark_batch_dirty_for_entity(er.entity, *ctx_sp);
         return CommandStatus::Done;
     }
 
@@ -536,6 +557,7 @@ namespace eeng::editor {
             auto entity_opt = em.get_entity_from_guid(guid);
             if (!entity_opt || !entity_opt->has_id())
                 continue;
+            mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
             ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
         }
         return CommandStatus::Done;
@@ -564,7 +586,10 @@ namespace eeng::editor {
         ctx_sp->entity_manager->register_entities_from_deserialization(created_entities);
 
         for (auto entity : created_entities)
+        {
             bind_refs_for_entity(entity, *ctx_sp);
+            mark_batch_dirty_for_entity(entity, *ctx_sp);
+        }
         return CommandStatus::Done;
     }
 
@@ -629,6 +654,8 @@ namespace eeng::editor {
             *ctx_sp);
         const auto entity_copy = er.entity;
         bind_refs_for_entity(entity_copy, *ctx_sp);
+        if (entity_copy.has_id())
+            mark_batch_dirty_for_entity(entity_copy, *ctx_sp);
         return CommandStatus::Done;
 
         // assert(entity != entt::null);
@@ -654,6 +681,7 @@ namespace eeng::editor {
         if (!entity_opt || !entity_opt->has_id())
             return CommandStatus::Done;
 
+        mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
         ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
 
         // Meta::deserialize_entities(entity_json, context);
@@ -766,7 +794,10 @@ namespace eeng::editor {
         ctx_sp->entity_manager->register_entities_from_deserialization(created_entities);
 
         for (auto entity : created_entities)
+        {
             bind_refs_for_entity(entity, *ctx_sp);
+            mark_batch_dirty_for_entity(entity, *ctx_sp);
+        }
         return CommandStatus::Done;
     }
 
@@ -790,6 +821,7 @@ namespace eeng::editor {
             auto entity_opt = em.get_entity_from_guid(guid);
             if (!entity_opt || !entity_opt->has_id())
                 continue;
+            mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
             ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
         }
         return CommandStatus::Done;

@@ -10,6 +10,7 @@
 #include "EngineContext.hpp"
 #include <filesystem>
 #include <unordered_map>
+#include <unordered_set>
 #include <mutex>
 #include <future>
 #include <string>
@@ -191,6 +192,15 @@ namespace eeng {
         std::shared_future<TaskResult>
             queue_rebuild_closure(const BatchId& id, EngineContext& ctx);
 
+        /// Mark a loaded batch as needing asset-closure rebuild (coalesced).
+        void mark_closure_dirty(const BatchId& id);
+
+        /// Mark the owning batch (if any) for this entity as needing a rebuild.
+        void mark_closure_dirty_for_entity(const ecs::Entity& entity, EngineContext& ctx);
+
+        /// Queue rebuilds for dirty loaded batches (call from main loop).
+        void process_dirty_batches(EngineContext& ctx);
+
         std::vector<const BatchInfo*> list() const;
 
     private:
@@ -217,6 +227,7 @@ namespace eeng {
         // registry storage
         mutable std::mutex                           mtx_;
         std::unordered_map<eeng::BatchId, BatchInfo> batches_;
+        std::unordered_set<eeng::BatchId>           dirty_batches_;
         std::filesystem::path                        index_path_;
     };
 } // namespace eeng

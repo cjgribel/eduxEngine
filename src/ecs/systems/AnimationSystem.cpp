@@ -13,10 +13,26 @@
 #include "ResourceManager.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "assets/types/ModelAssets.hpp"
+#include "LogMacros.h"
+#include <unordered_set>
 
 namespace
 {
     using namespace eeng::assets;
+
+    std::unordered_set<eeng::Guid> missing_gpu_models;
+    std::unordered_set<eeng::Guid> missing_model_data;
+
+    void log_missing_once(eeng::EngineContext& ctx,
+        std::unordered_set<eeng::Guid>& seen,
+        const eeng::Guid& guid,
+        const char* label)
+    {
+        if (!guid.valid())
+            return;
+        if (seen.insert(guid).second)
+            EENG_LOG_WARN(&ctx, "%s %s", label, guid.to_string().c_str());
+    }
 
     /// @brief Resolve an animation clip pointer by index (or nullptr if invalid).
     const AnimClip* resolve_clip(const ModelDataAsset& model, int clip_index)
@@ -142,14 +158,39 @@ namespace eeng::ecs::systems
             if (!model_component.model_ref.is_bound())
                 continue;
 
+            if (!rm->storage().validate(model_component.model_ref.handle))
+            {
+                log_missing_once(ctx, missing_gpu_models, model_component.model_ref.guid,
+                    "Missing GpuModelAsset for ModelComponent:");
+                // TODO: consider binding a placeholder model for animation.
+                continue;
+            }
+
             Handle<assets::ModelDataAsset> model_handle{};
-            rm->storage().read(model_component.model_ref.handle, [&](const assets::GpuModelAsset& gpu)
-                {
-                    model_handle = gpu.model_ref.handle;
-                });
+            eeng::Guid model_guid = eeng::Guid::invalid();
+            try
+            {
+                rm->storage().read(model_component.model_ref.handle, [&](const assets::GpuModelAsset& gpu)
+                    {
+                        model_handle = gpu.model_ref.handle;
+                        model_guid = gpu.model_ref.guid;
+                    });
+            }
+            catch (const eeng::ValidationError&)
+            {
+                log_missing_once(ctx, missing_gpu_models, model_component.model_ref.guid,
+                    "Missing GpuModelAsset for ModelComponent:");
+                // TODO: consider binding a placeholder model for animation.
+                continue;
+            }
 
             if (!rm->storage().validate(model_handle))
+            {
+                log_missing_once(ctx, missing_model_data, model_guid,
+                    "Missing ModelDataAsset for ModelComponent:");
+                // TODO: consider binding a placeholder model for animation.
                 continue;
+            }
 
             model_component.clip_time += delta_time * model_component.clip_speed;
 

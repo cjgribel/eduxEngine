@@ -7,7 +7,9 @@
 
 #include "editor/AssignFieldCommand.hpp"
 #include "editor/MetaFieldAssign.hpp"
+#include "meta/EntityMetaHelpers.hpp"
 #include "ResourceManager.hpp"
+#include "BatchRegistry.hpp"
 #include "MetaLiterals.h"
 #include "meta/MetaAux.h"
 #include "ecs/EntityManager.hpp"
@@ -16,6 +18,8 @@
 #include <iostream>
 #include <cassert>
 #include <stack>
+#include <algorithm>
+#include <optional>
 
 // Pick one
 //#define ASSIGN_META_FIELD_USE_STACKBASED
@@ -23,6 +27,45 @@
 
 namespace
 {
+    std::optional<eeng::ecs::Entity> resolve_target_entity(const eeng::editor::FieldTarget& target)
+    {
+        if (target.kind != eeng::editor::FieldTarget::Kind::Component)
+            return std::nullopt;
+
+        eeng::ecs::Entity entity = target.entity;
+        if (target.entity_guid.valid())
+        {
+            auto ctx_sp = target.ctx.lock();
+            if (ctx_sp && ctx_sp->entity_manager)
+            {
+                if (auto entity_opt = ctx_sp->entity_manager->get_entity_from_guid(target.entity_guid))
+                    entity = *entity_opt;
+                if (!ctx_sp->entity_manager->entity_valid(entity))
+                    return std::nullopt;
+            }
+        }
+
+        if (!entity.has_id())
+            return std::nullopt;
+        return entity;
+    }
+
+    std::vector<eeng::Guid> collect_asset_guids_sorted(const eeng::ecs::Entity& entity, entt::registry& registry)
+    {
+        auto guids = eeng::meta::collect_asset_guids_for_entity(entity, registry);
+        std::sort(guids.begin(), guids.end());
+        guids.erase(std::unique(guids.begin(), guids.end()), guids.end());
+        return guids;
+    }
+
+    void mark_batch_dirty_for_entity(eeng::EngineContext& ctx, const eeng::ecs::Entity& entity)
+    {
+        if (!ctx.batch_registry)
+            return;
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+        br.mark_closure_dirty_for_entity(entity, ctx);
+    }
+
     bool is_ref(const entt::meta_any& any)
     {
         return any.base().policy() == entt::any_policy::ref;
@@ -43,23 +86,10 @@ namespace
             if (!registry_sp)
                 return false;
 
-            eeng::ecs::Entity entity = target.entity;
-            if (target.entity_guid.valid())
-            {
-                auto ctx_sp = target.ctx.lock();
-                if (ctx_sp && ctx_sp->entity_manager)
-                {
-                    auto& em = static_cast<eeng::EntityManager&>(*ctx_sp->entity_manager);
-                    if (auto entity_opt = em.get_entity_from_guid(target.entity_guid))
-                    {
-                        if (entity_opt->has_id())
-                            entity = *entity_opt;
-                    }
-                }
-            }
-
-            if (!entity.has_id() || !registry_sp->valid(entity))
+            const auto entity_opt = resolve_target_entity(target);
+            if (!entity_opt || !registry_sp->valid(*entity_opt))
                 return false;
+            const auto entity = *entity_opt;
 
             // Get storage for component type
             auto* storage = registry_sp->storage(target.component_id);
@@ -138,8 +168,28 @@ namespace eeng::editor
 {
     CommandStatus AssignFieldCommand::execute()
     {
+        std::vector<Guid> before;
+        std::optional<ecs::Entity> target_entity;
+        auto registry_sp = edit.target.registry.lock();
+        if (registry_sp)
+        {
+            target_entity = resolve_target_entity(edit.target);
+            if (target_entity)
+                before = collect_asset_guids_sorted(*target_entity, *registry_sp);
+        }
+
         if (!assign_meta_field(edit.target, edit.meta_path, edit.new_value))
             return CommandStatus::Failed;
+
+        if (registry_sp && target_entity)
+        {
+            auto after = collect_asset_guids_sorted(*target_entity, *registry_sp);
+            if (before != after)
+            {
+                if (auto ctx_sp = edit.target.ctx.lock())
+                    mark_batch_dirty_for_entity(*ctx_sp, *target_entity);
+            }
+        }
 
         //assign_meta_field(new_value);
         return CommandStatus::Done;
@@ -147,8 +197,28 @@ namespace eeng::editor
 
     CommandStatus AssignFieldCommand::undo()
     {
+        std::vector<Guid> before;
+        std::optional<ecs::Entity> target_entity;
+        auto registry_sp = edit.target.registry.lock();
+        if (registry_sp)
+        {
+            target_entity = resolve_target_entity(edit.target);
+            if (target_entity)
+                before = collect_asset_guids_sorted(*target_entity, *registry_sp);
+        }
+
         if (!assign_meta_field(edit.target, edit.meta_path, edit.prev_value))
             return CommandStatus::Failed;
+
+        if (registry_sp && target_entity)
+        {
+            auto after = collect_asset_guids_sorted(*target_entity, *registry_sp);
+            if (before != after)
+            {
+                if (auto ctx_sp = edit.target.ctx.lock())
+                    mark_batch_dirty_for_entity(*ctx_sp, *target_entity);
+            }
+        }
 
         // assign_meta_field(prev_value);
         return CommandStatus::Done;

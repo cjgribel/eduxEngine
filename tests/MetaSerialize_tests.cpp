@@ -7,6 +7,7 @@
 #include <array>
 #include <thread>
 #include <atomic>
+#include <optional>
 #include "entt/entt.hpp"
 #include "hash_combine.h"
 #include "MetaInfo.h"
