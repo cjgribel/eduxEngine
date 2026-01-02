@@ -6,34 +6,15 @@
 #include <cstdint>
 #include <fstream>
 #include <sstream>
-#include <unordered_set>
-
 #include <glm/gtc/type_ptr.hpp>
 
 #include "ShaderLoader.h"
-#include "LogMacros.h"
-#include "ResourceManager.hpp"
+#include "EngineContextHelpers.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "assets/types/ModelAssets.hpp"
 
 namespace
 {
-    std::unordered_set<eeng::Guid> missing_gpu_models;
-    std::unordered_set<eeng::Guid> missing_model_data;
-    std::unordered_set<eeng::Guid> missing_materials;
-    std::unordered_set<eeng::Guid> missing_textures;
-
-    void log_missing_once(eeng::EngineContext& ctx,
-        std::unordered_set<eeng::Guid>& seen,
-        const eeng::Guid& guid,
-        const char* label)
-    {
-        if (!guid.valid())
-            return;
-        if (seen.insert(guid).second)
-            EENG_LOG_WARN(&ctx, "%s %s", label, guid.to_string().c_str());
-    }
-
     struct TextureDesc
     {
         eeng::assets::MaterialTextureSlot slot;
@@ -105,8 +86,9 @@ namespace eeng::ecs::systems
         if (shader_program_ == 0)
             return;
 
-        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
-        assert(rm);
+        auto rm = eeng::try_get_resource_manager(ctx, "RenderSystem");
+        if (!rm)
+            return;
 
         glUseProgram(shader_program_);
         if (bind_frame_uniforms)
@@ -119,14 +101,6 @@ namespace eeng::ecs::systems
             if (!model.model_ref.is_bound())
                 continue;
 
-            if (!rm->storage().validate(model.model_ref.handle))
-            {
-                log_missing_once(ctx, missing_gpu_models, model.model_ref.guid,
-                    "Missing GpuModelAsset for ModelComponent:");
-                // TODO: consider binding a placeholder model for rendering.
-                continue;
-            }
-
             GLuint vao = 0;
             GLuint ibo = 0;
             std::vector<assets::GpuSubMesh> submeshes;
@@ -134,55 +108,48 @@ namespace eeng::ecs::systems
             Guid model_guid = Guid::invalid();
             std::vector<assets::SubMesh> cpu_submeshes;
             size_t bone_count = 0;
+            bool gpu_ready = false;
 
-            try
-            {
-                rm->storage().read(model.model_ref.handle, [&](const assets::GpuModelAsset& gpu)
-                    {
-                        if (gpu.state != assets::GpuLoadState::Ready || gpu.vao == 0)
-                            return;
-
-                        vao = gpu.vao;
-                        ibo = gpu.ibo;
-                        submeshes = gpu.submeshes;
-                        model_handle = gpu.model_ref.handle;
-                        model_guid = gpu.model_ref.guid;
-                    });
-            }
-            catch (const ValidationError&)
-            {
-                log_missing_once(ctx, missing_gpu_models, model.model_ref.guid,
-                    "Missing GpuModelAsset for ModelComponent:");
-                // TODO: consider binding a placeholder model for rendering.
-                continue;
-            }
-
-            if (vao == 0 || ibo == 0 || submeshes.empty())
-                continue;
-
-            if (rm->storage().validate(model_handle))
-            {
-                try
+            const bool gpu_read = eeng::try_read_asset_ref(
+                *rm,
+                model.model_ref,
+                ctx,
+                "RenderSystem",
+                "Missing GpuModelAsset for ModelComponent:",
+                [&](const assets::GpuModelAsset& gpu)
                 {
-                    rm->storage().read(model_handle, [&](const assets::ModelDataAsset& cpu_model)
-                        {
-                            cpu_submeshes = cpu_model.submeshes;
-                            bone_count = cpu_model.bones.size();
-                        });
-                }
-                catch (const ValidationError&)
+                    if (gpu.state != assets::GpuLoadState::Ready || gpu.vao == 0)
+                        return;
+
+                    vao = gpu.vao;
+                    ibo = gpu.ibo;
+                    submeshes = gpu.submeshes;
+                    model_handle = gpu.model_ref.handle;
+                    model_guid = gpu.model_ref.guid;
+                    gpu_ready = true;
+                });
+
+            if (!gpu_read || !gpu_ready || vao == 0 || ibo == 0 || submeshes.empty())
+            {
+                if (!gpu_read)
                 {
-                    log_missing_once(ctx, missing_model_data, model_guid,
-                        "Missing ModelDataAsset for ModelComponent:");
                     // TODO: consider binding a placeholder model for rendering.
                 }
+                continue;
             }
-            else
-            {
-                log_missing_once(ctx, missing_model_data, model_guid,
-                    "Missing ModelDataAsset for ModelComponent:");
-                // TODO: consider binding a placeholder model for rendering.
-            }
+
+            eeng::try_read_asset(
+                *rm,
+                model_handle,
+                model_guid,
+                ctx,
+                "RenderSystem",
+                "Missing ModelDataAsset for ModelComponent:",
+                [&](const assets::ModelDataAsset& cpu_model)
+                {
+                    cpu_submeshes = cpu_model.submeshes;
+                    bone_count = cpu_model.bones.size();
+                });
 
             if (bind_entity_uniforms)
                 bind_entity_uniforms(shader_program_, entity, model);
@@ -211,27 +178,16 @@ namespace eeng::ecs::systems
                 bool has_material = false;
                 if (sm.material.is_bound())
                 {
-                    if (!rm->storage().validate(sm.material.handle))
-                    {
-                        log_missing_once(ctx, missing_materials, sm.material.guid,
-                            "Missing GpuMaterialAsset for ModelComponent:");
-                    }
-                    else
-                    {
-                        try
+                    has_material = eeng::try_read_asset_ref(
+                        *rm,
+                        sm.material,
+                        ctx,
+                        "RenderSystem",
+                        "Missing GpuMaterialAsset for ModelComponent:",
+                        [&](const assets::GpuMaterialAsset& mtl)
                         {
-                            rm->storage().read(sm.material.handle, [&](const assets::GpuMaterialAsset& mtl)
-                                {
-                                    material = mtl;
-                                    has_material = true;
-                                });
-                        }
-                        catch (const ValidationError&)
-                        {
-                            log_missing_once(ctx, missing_materials, sm.material.guid,
-                                "Missing GpuMaterialAsset for ModelComponent:");
-                        }
-                    }
+                            material = mtl;
+                        });
                 }
 
                 glUniform3fv(glGetUniformLocation(shader_program_, "Ka"), 1, glm::value_ptr(material.Ka));
@@ -249,27 +205,19 @@ namespace eeng::ecs::systems
                         const auto& tex_ref = material.textures[static_cast<size_t>(texture_desc.slot)];
                         if (tex_ref.is_bound())
                         {
-                            if (!rm->storage().validate(tex_ref.handle))
-                            {
-                                log_missing_once(ctx, missing_textures, tex_ref.guid,
-                                    "Missing GpuTextureAsset for ModelComponent:");
-                            }
-                            else
-                            {
-                                try
+                            bool texture_ready = false;
+                            const bool texture_read = eeng::try_read_asset_ref(
+                                *rm,
+                                tex_ref,
+                                ctx,
+                                "RenderSystem",
+                                "Missing GpuTextureAsset for ModelComponent:",
+                                [&](const assets::GpuTextureAsset& tex)
                                 {
-                                    rm->storage().read(tex_ref.handle, [&](const assets::GpuTextureAsset& tex)
-                                        {
-                                            tex_id = tex.gl_id;
-                                            has_texture = (tex_id != 0 && tex.state == assets::GpuLoadState::Ready);
-                                        });
-                                }
-                                catch (const ValidationError&)
-                                {
-                                    log_missing_once(ctx, missing_textures, tex_ref.guid,
-                                        "Missing GpuTextureAsset for ModelComponent:");
-                                }
-                            }
+                                    tex_id = tex.gl_id;
+                                    texture_ready = (tex_id != 0 && tex.state == assets::GpuLoadState::Ready);
+                                });
+                            has_texture = texture_read && texture_ready;
                         }
                     }
 

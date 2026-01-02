@@ -598,7 +598,7 @@ namespace eeng
                             {
                                 // #ifdef USE_COMMANDS
                                                             // Reset meta command for component type
-                                cmd_builder.target_asset(ctx.resource_manager, entry.meta.guid, entry.meta.type_id);
+                                cmd_builder.target_asset(ctx, ctx.resource_manager, entry.meta.guid, entry.meta.type_id);
                                 //.registry(ctx.entity_manager->registry_wptr())
                                 //.entity(ecs::Entity::EntityNull) // no entity for assets
                                 //.component(any.type().id()) // asset type - no comp type id!

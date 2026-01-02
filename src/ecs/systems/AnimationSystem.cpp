@@ -10,29 +10,13 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include "EngineContext.hpp"
-#include "ResourceManager.hpp"
+#include "EngineContextHelpers.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "assets/types/ModelAssets.hpp"
-#include "LogMacros.h"
-#include <unordered_set>
 
 namespace
 {
     using namespace eeng::assets;
-
-    std::unordered_set<eeng::Guid> missing_gpu_models;
-    std::unordered_set<eeng::Guid> missing_model_data;
-
-    void log_missing_once(eeng::EngineContext& ctx,
-        std::unordered_set<eeng::Guid>& seen,
-        const eeng::Guid& guid,
-        const char* label)
-    {
-        if (!guid.valid())
-            return;
-        if (seen.insert(guid).second)
-            EENG_LOG_WARN(&ctx, "%s %s", label, guid.to_string().c_str());
-    }
 
     /// @brief Resolve an animation clip pointer by index (or nullptr if invalid).
     const AnimClip* resolve_clip(const ModelDataAsset& model, int clip_index)
@@ -148,7 +132,7 @@ namespace eeng::ecs::systems
     /// @brief Evaluate animation for all ModelComponent instances and update bone matrices.
     void AnimationSystem::update(entt::registry& registry, EngineContext& ctx, float delta_time)
     {
-        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+        auto rm = eeng::try_get_resource_manager(ctx, "AnimationSystem");
         if (!rm)
             return;
 
@@ -158,44 +142,37 @@ namespace eeng::ecs::systems
             if (!model_component.model_ref.is_bound())
                 continue;
 
-            if (!rm->storage().validate(model_component.model_ref.handle))
-            {
-                log_missing_once(ctx, missing_gpu_models, model_component.model_ref.guid,
-                    "Missing GpuModelAsset for ModelComponent:");
-                // TODO: consider binding a placeholder model for animation.
-                continue;
-            }
-
             Handle<assets::ModelDataAsset> model_handle{};
             eeng::Guid model_guid = eeng::Guid::invalid();
-            try
-            {
-                rm->storage().read(model_component.model_ref.handle, [&](const assets::GpuModelAsset& gpu)
-                    {
-                        model_handle = gpu.model_ref.handle;
-                        model_guid = gpu.model_ref.guid;
-                    });
-            }
-            catch (const eeng::ValidationError&)
-            {
-                log_missing_once(ctx, missing_gpu_models, model_component.model_ref.guid,
-                    "Missing GpuModelAsset for ModelComponent:");
-                // TODO: consider binding a placeholder model for animation.
-                continue;
-            }
-
-            if (!rm->storage().validate(model_handle))
-            {
-                log_missing_once(ctx, missing_model_data, model_guid,
-                    "Missing ModelDataAsset for ModelComponent:");
-                // TODO: consider binding a placeholder model for animation.
-                continue;
-            }
-
-            model_component.clip_time += delta_time * model_component.clip_speed;
-
-            rm->storage().read(model_handle, [&](const assets::ModelDataAsset& model)
+            const bool gpu_read = eeng::try_read_asset_ref(
+                *rm,
+                model_component.model_ref,
+                ctx,
+                "AnimationSystem",
+                "Missing GpuModelAsset for ModelComponent:",
+                [&](const assets::GpuModelAsset& gpu)
                 {
+                    model_handle = gpu.model_ref.handle;
+                    model_guid = gpu.model_ref.guid;
+                });
+
+            if (!gpu_read)
+            {
+                // TODO: consider binding a placeholder model for animation.
+                continue;
+            }
+
+            if (!eeng::try_read_asset(
+                *rm,
+                model_handle,
+                model_guid,
+                ctx,
+                "AnimationSystem",
+                "Missing ModelDataAsset for ModelComponent:",
+                [&](const assets::ModelDataAsset& model)
+                {
+                    model_component.clip_time += delta_time * model_component.clip_speed;
+
                     const auto* clip = resolve_clip(model, model_component.clip_index);
                     const float ntime = normalized_time(clip, model_component.clip_time, model_component.loop);
 
@@ -233,7 +210,11 @@ namespace eeng::ecs::systems
                         // Skinning matrix: pose in model space * inverse bind (bind -> bone local).
                         model_component.bone_matrices[i] = node_tfm * bone.inverse_bind_tfm;
                     }
-                });
+                }))
+            {
+                // TODO: consider binding a placeholder model for animation.
+                continue;
+            }
         }
     }
 }

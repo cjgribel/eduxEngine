@@ -90,7 +90,7 @@ namespace eeng::editor
     public:
         AssignFieldCommandBuilder& target_component(EngineContext& ctx, const ecs::Entity& entity, entt::id_type component_id);
 
-        AssignFieldCommandBuilder& target_asset(std::weak_ptr<IResourceManager> resource_manager, Guid asset_guid, const std::string& asset_type_id_str);
+        AssignFieldCommandBuilder& target_asset(EngineContext& ctx, std::weak_ptr<IResourceManager> resource_manager, Guid asset_guid, const std::string& asset_type_id_str);
 
         AssignFieldCommandBuilder& prev_value(const entt::meta_any& value);
 

@@ -8,6 +8,7 @@
 #include "editor/AssignFieldCommand.hpp"
 #include "editor/MetaFieldAssign.hpp"
 #include "meta/EntityMetaHelpers.hpp"
+#include "EngineContextHelpers.hpp"
 #include "ResourceManager.hpp"
 #include "BatchRegistry.hpp"
 #include "MetaLiterals.h"
@@ -81,8 +82,11 @@ namespace
 
         if (target.kind == eeng::editor::FieldTarget::Kind::Component)
         {
-            // Get registry
-            auto registry_sp = target.registry.lock();
+            auto ctx_sp = target.ctx.lock();
+            if (!ctx_sp)
+                return false;
+
+            auto registry_sp = eeng::try_get_registry(*ctx_sp, "AssignFieldCommand");
             if (!registry_sp)
                 return false;
 
@@ -112,13 +116,11 @@ namespace
         }
         else if (target.kind == eeng::editor::FieldTarget::Kind::Asset)
         {
-            // Get registry
-            auto rm_sp = target.resource_manager.lock();
-            if (!rm_sp)
+            auto ctx_sp = target.ctx.lock();
+            if (!ctx_sp)
                 return false;
 
-            // Get ResourceManager
-            auto* rm = dynamic_cast<eeng::ResourceManager*>(rm_sp.get());
+            auto rm = eeng::try_get_resource_manager(*ctx_sp, "AssignFieldCommand");
             if (!rm)
                 return false;
 
@@ -244,9 +246,10 @@ namespace eeng::editor
         return *this;
     }
 
-    AssignFieldCommandBuilder& AssignFieldCommandBuilder::target_asset(std::weak_ptr<IResourceManager> resource_manager, Guid asset_guid, const std::string& asset_type_id_str)
+    AssignFieldCommandBuilder& AssignFieldCommandBuilder::target_asset(EngineContext& ctx, std::weak_ptr<IResourceManager> resource_manager, Guid asset_guid, const std::string& asset_type_id_str)
     {
         command.edit.target.kind = FieldTarget::Kind::Asset;
+        command.edit.target.ctx = ctx.weak_from_this();
         command.edit.target.resource_manager = resource_manager;
         command.edit.target.asset_guid = asset_guid;
         command.edit.target.asset_type_id_str = asset_type_id_str;
