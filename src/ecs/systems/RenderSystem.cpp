@@ -87,8 +87,7 @@ namespace eeng::ecs::systems
             return;
 
         auto rm = eeng::try_get_resource_manager(ctx, "RenderSystem");
-        if (!rm)
-            return;
+        if (!rm) return;
 
         glUseProgram(shader_program_);
         if (bind_frame_uniforms)

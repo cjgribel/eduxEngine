@@ -133,8 +133,7 @@ namespace eeng::ecs::systems
     void AnimationSystem::update(entt::registry& registry, EngineContext& ctx, float delta_time)
     {
         auto rm = eeng::try_get_resource_manager(ctx, "AnimationSystem");
-        if (!rm)
-            return;
+        if (!rm) return;
 
         auto view = registry.view<ecs::ModelComponent>();
         for (auto&& [entity, model_component] : view.each())

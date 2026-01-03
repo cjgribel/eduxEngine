@@ -121,8 +121,7 @@ namespace
                 return false;
 
             auto rm = eeng::try_get_resource_manager(*ctx_sp, "AssignFieldCommand");
-            if (!rm)
-                return false;
+            if (!rm) return false;
 
             // Get root meta_any for asset
             if (auto mh_opt = rm->storage().handle_for_guid(target.asset_guid); mh_opt.has_value())

@@ -6,6 +6,7 @@
 #include "MetaLiterals.h"
 #include "Guid.h"
 #include "EngineContext.hpp"
+#include "EngineContextHelpers.hpp"
 #include "ResourceManager.hpp"
 #include "ecs/EntityManager.hpp"
 #include <vector>
@@ -42,7 +43,8 @@ namespace eeng::meta
     // void bind_asset_refs(T& self, /*, IResourceManager& rm*/ EngineContext& ctx)
     void bind_asset_refs(entt::meta_any& any, EngineContext& ctx)
     {
-        auto& rm = static_cast<eeng::ResourceManager&>(*ctx.resource_manager);
+        auto rm = eeng::try_get_resource_manager(ctx, "EntityMetaHelpers");
+        if (!rm) return;
 
         auto self_ptr = any.try_cast<T>();
         assert(self_ptr && "[bind_asset_refs]: Could not cast meta_any to Guid");
@@ -58,7 +60,7 @@ namespace eeng::meta
                     return;
                 }
 
-                auto handle_opt = rm.handle_for_guid<AssetType>(guid);
+                auto handle_opt = rm->handle_for_guid<AssetType>(guid);
                 if (!handle_opt)
                 {
                     // Asset handle not found for guid
@@ -176,8 +178,8 @@ namespace eeng::meta
             const Guid& guid,
             EngineContext& ctx)
     {
-        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
-        assert(rm);
+        auto rm = eeng::try_get_resource_manager(ctx, "EntityMetaHelpers");
+        if (!rm) return {};
 
         std::vector<Guid> out;
 

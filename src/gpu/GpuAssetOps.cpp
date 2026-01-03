@@ -4,6 +4,7 @@
 #include "GpuAssetOps.hpp"
 #include <algorithm>
 #include <filesystem>
+#include "EngineContextHelpers.hpp"
 #include "ResourceManager.hpp"
 #include "Storage.hpp"
 #include "assets/types/ModelAssets.hpp" // GpuModelAsset, ModelDataAsset, TextureAsset, MaterialAsset
@@ -127,9 +128,14 @@ namespace eeng::gl
         EngineContext& ctx)
     {
         GpuModelInitResult result{};
-        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+        auto rm = eeng::try_get_resource_manager(ctx, "GpuAssetOps");
+        if (!rm)
+        {
+            result.ok = false;
+            result.error = "GpuModel init failed: ResourceManager unavailable";
+            return result;
+        }
         auto& storage = rm->storage();
-        assert(rm);
 
         try
         {
@@ -322,8 +328,8 @@ namespace eeng::gl
         // + skin weights & indices
         // + bone matrices
 
-        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
-        assert(rm);
+        auto rm = eeng::try_get_resource_manager(ctx, "GpuAssetOps");
+        if (!rm) return;
 
         // Get handles under lock
         u32 vao = 0;
@@ -385,8 +391,13 @@ namespace eeng::gl
     {
         GpuTextureInitResult result{};
 
-        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
-        assert(rm);
+        auto rm = eeng::try_get_resource_manager(ctx, "GpuAssetOps");
+        if (!rm)
+        {
+            result.ok = false;
+            result.error = "GpuTexture init failed: ResourceManager unavailable";
+            return result;
+        }
 
         bool already_ready = false;
         rm->storage().modify(gpu_handle, [&](GpuTextureAsset& gpu)
@@ -481,8 +492,8 @@ namespace eeng::gl
         const Handle<GpuTextureAsset>& gpu_handle,
         EngineContext& ctx)
     {
-        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
-        assert(rm);
+        auto rm = eeng::try_get_resource_manager(ctx, "GpuAssetOps");
+        if (!rm) return;
 
         u32 gl_id = 0;
         rm->storage().read(gpu_handle, [&](const GpuTextureAsset& gpu)
