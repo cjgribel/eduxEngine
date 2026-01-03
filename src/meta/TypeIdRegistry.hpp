@@ -44,7 +44,8 @@ namespace eeng::meta
         template<class T>
         static entt::id_type register_type_from_meta()
         {
-            entt::meta_type mt = entt::resolve<T>();
+            // Use resolve(type_id) so we only accept explicitly registered types.
+            entt::meta_type mt = entt::resolve(entt::type_id<T>());
             assert(mt && "TypeIdRegistry::register_type_from_meta<T>: T not registered with entt::meta");
 
             TypeMetaInfo *info = mt.custom();

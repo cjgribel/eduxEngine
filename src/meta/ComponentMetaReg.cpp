@@ -140,6 +140,7 @@ namespace eeng
         template<typename T>
         void register_helper_type()
         {
+            meta::register_type<T>();
             warm_start_meta_type<AssetRef<T>>();
         }
     } // namespace
