@@ -902,6 +902,7 @@ namespace eeng::editor {
             parent_current = *parent_opt;
         }
 
+        // Transform dirtying on reparent is handled by EntityManager.
         ctx_sp->entity_manager->reparent_entity(entity_current, parent_current);
         return CommandStatus::Done;
     }
@@ -935,6 +936,7 @@ namespace eeng::editor {
             parent_current = *parent_opt;
         }
 
+        // Transform dirtying on reparent is handled by EntityManager.
         ctx_sp->entity_manager->reparent_entity(*entity_opt, parent_current);
         return CommandStatus::Done;
     }

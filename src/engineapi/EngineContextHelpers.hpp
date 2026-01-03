@@ -9,6 +9,7 @@
 #include "Storage.hpp"
 #include "LogMacros.h"
 #include "ecs/EntityManager.hpp"
+#include "EventQueue.h"
 
 #include <memory>
 #include <stdexcept>
@@ -81,6 +82,22 @@ namespace eeng
         return rm;
     }
 
+    inline ResourceManager* try_get_resource_manager_ptr(EngineContext& ctx, const char* log_tag)
+    {
+        auto rm = try_get_resource_manager(ctx, log_tag);
+        return rm ? rm.get() : nullptr;
+    }
+
+    inline EventQueue* try_get_event_queue(EngineContext& ctx, const char* log_tag)
+    {
+        if (!ctx.event_queue)
+        {
+            detail::handle_failure(ctx, log_tag, "EventQueue unavailable");
+            return nullptr;
+        }
+        return ctx.event_queue.get();
+    }
+
     inline EntityManager* try_get_entity_manager(EngineContext& ctx, const char* log_tag)
     {
         if (!ctx.entity_manager)
@@ -107,6 +124,12 @@ namespace eeng
         if (!registry_sp)
             detail::handle_failure(ctx, log_tag, "Registry expired");
         return registry_sp;
+    }
+
+    inline entt::registry* try_get_registry_ptr(EngineContext& ctx, const char* log_tag)
+    {
+        auto registry_sp = try_get_registry(ctx, log_tag);
+        return registry_sp ? registry_sp.get() : nullptr;
     }
 
     template<typename T, typename Fn>

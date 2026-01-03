@@ -52,6 +52,13 @@ namespace eeng::editor
         std::string display_name;
     };
 
+    struct FieldChangedEvent
+    {
+        FieldTarget target;
+        MetaFieldPath meta_path;
+        bool is_undo{ false };
+    };
+
     class AssignFieldCommand : public Command
     {
         // std::weak_ptr<entt::registry>   registry;

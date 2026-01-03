@@ -13,6 +13,7 @@
 #include "ecs/ModelComponent.hpp"
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
+#include "ecs/systems/TransformSystem.hpp"
 #include "mock/MockTypes.hpp"
 #include "mock/CopySignaller.hpp"
 
@@ -307,6 +308,9 @@ namespace eeng
             .data<&eeng::ecs::TransformComponent::world_rotation_matrix>("world_rotation_matrix"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "world_rotation_matrix", "World Rotation Matrix", "Derived world rotation matrix." })
             .traits(MetaFlags::readonly_inspection)
+
+            .func<&eeng::ecs::systems::TransformSystem::on_component_post_assign>(eeng::literals::post_assign_hs)
+            .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_assign", "Post-assign hook for component edits." })
             ;
         register_component<ecs::TransformComponent>();
 

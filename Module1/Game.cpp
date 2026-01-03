@@ -24,7 +24,6 @@
 
 #include "ResourceManager.hpp" // Since we use the concrete type
 #include "BatchRegistry.hpp" // Since we use the concrete type
-#include "EngineContextHelpers.hpp"
 #include "MetaSerialize.hpp"
 #include <filesystem>
 // <-
@@ -289,6 +288,8 @@ bool Game::init()
     renderSystem = std::make_unique<eeng::ecs::systems::RenderSystem>();
     renderSystem->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
     animationSystem = std::make_unique<eeng::ecs::systems::AnimationSystem>();
+    transformSystem = std::make_unique<eeng::ecs::systems::TransformSystem>();
+    transformSystem->init(*ctx);
 
     // LEVEL CYCLE API TESTS
     {
@@ -957,14 +958,9 @@ void Game::update(
         animationSystem->update(registry, *ctx, deltaTime);
     }
 
-    // TODO: consider moving transform cache updates into an Engine-level system.
-    if (auto registry_sptr = eeng::try_get_registry(*ctx, "Game::update"))
-    {
-        if (auto* entity_manager = eeng::try_get_entity_manager(*ctx, "Game::update"))
-        {
-            entity_manager->scene_graph().traverse(registry_sptr);
-        }
-    }
+    // TODO: consider scheduling transform cache updates as an Engine-level system phase.
+    if (transformSystem)
+        transformSystem->update(*ctx, deltaTime);
 
     // Intersect player view ray with AABBs of other objects 
     glm_aux::intersect_ray_AABB(player.viewRay, character_aabb2.min, character_aabb2.max);

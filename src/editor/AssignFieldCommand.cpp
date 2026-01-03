@@ -14,10 +14,8 @@
 #include "MetaLiterals.h"
 #include "meta/MetaAux.h"
 #include "ecs/EntityManager.hpp"
-#include "ecs/TransformComponent.hpp"
 #include "MetaSerialize.hpp"
 #include "LogGlobals.hpp"
-#include <entt/entt.hpp>
 #include <iostream>
 #include <cassert>
 #include <stack>
@@ -69,23 +67,85 @@ namespace
         br.mark_closure_dirty_for_entity(entity, ctx);
     }
 
-    void mark_transform_dirty_if_needed(
-        const eeng::editor::FieldTarget& target,
-        entt::registry& registry,
-        const eeng::ecs::Entity& entity)
-    {
-        if (target.kind != eeng::editor::FieldTarget::Kind::Component)
-            return;
-        if (target.component_id != entt::type_hash<eeng::ecs::TransformComponent>::value())
-            return;
-
-        if (auto* tfm = registry.try_get<eeng::ecs::TransformComponent>(entity))
-            tfm->mark_local_dirty();
-    }
-
     bool is_ref(const entt::meta_any& any)
     {
         return any.base().policy() == entt::any_policy::ref;
+    }
+
+    struct ComponentTargetContext
+    {
+        std::shared_ptr<entt::registry> registry;
+        eeng::ecs::Entity entity;
+    };
+
+    std::optional<ComponentTargetContext> resolve_component_target(const eeng::editor::FieldTarget& target)
+    {
+        if (target.kind != eeng::editor::FieldTarget::Kind::Component)
+            return std::nullopt;
+
+        auto registry_sp = target.registry.lock();
+        if (!registry_sp)
+            return std::nullopt;
+
+        const auto entity_opt = resolve_target_entity(target);
+        if (!entity_opt || !registry_sp->valid(*entity_opt))
+            return std::nullopt;
+
+        return ComponentTargetContext{ registry_sp, *entity_opt };
+    }
+
+    std::vector<eeng::Guid> collect_asset_guids_if_component_target(
+        const std::optional<ComponentTargetContext>& component_ctx)
+    {
+        if (!component_ctx)
+            return {};
+
+        return collect_asset_guids_sorted(component_ctx->entity, *component_ctx->registry);
+    }
+
+    void emit_field_changed_event(
+        const eeng::editor::FieldTarget& target,
+        const eeng::editor::MetaFieldPath& meta_path,
+        bool is_undo)
+    {
+        auto ctx_sp = target.ctx.lock();
+        if (!ctx_sp)
+            return;
+
+        auto* event_queue = eeng::try_get_event_queue(*ctx_sp, "AssignFieldCommand");
+        if (!event_queue)
+            return;
+
+        event_queue->enqueue_event(eeng::editor::FieldChangedEvent{
+            target,
+            meta_path,
+            is_undo
+            });
+    }
+
+    void invoke_component_post_assign_hook(
+        eeng::EngineContext& ctx,
+        const eeng::editor::FieldTarget& target,
+        const eeng::ecs::Entity& entity,
+        const eeng::editor::MetaFieldPath& meta_path,
+        bool is_undo)
+    {
+        if (target.kind != eeng::editor::FieldTarget::Kind::Component)
+            return;
+
+        entt::meta_type meta_type = entt::resolve(target.component_id);
+        if (!meta_type)
+            return;
+
+        if (entt::meta_func meta_func = meta_type.func(eeng::literals::post_assign_hs); meta_func)
+        {
+            meta_func.invoke(
+                {},
+                entt::forward_as_meta(ctx),
+                entt::forward_as_meta(entity),
+                entt::forward_as_meta(meta_path),
+                entt::forward_as_meta(is_undo));
+        }
     }
 
     bool assign_meta_field(
@@ -164,20 +224,7 @@ namespace
         // assert(!meta_path.entries.empty() && "MetaPath is empty");
 
 
-        // TODO ->
-        // Component is now modified - run per-field callbacks or emit events.
-        /*
-        Post-assign hooks:
-            run per-field/per-type callbacks (immediate, invariant maintenance)
-            emit FieldChangedEvent{ edit_copy } (systems can react)
-        */
-
-        /*
-            struct FieldChangedEvent
-            {
-                FieldEdit edit; // copy
-            };
-        */
+        // Post-assign hooks and field-changed events are emitted by AssignFieldCommand.
     }
 }
 
@@ -185,27 +232,28 @@ namespace eeng::editor
 {
     CommandStatus AssignFieldCommand::execute()
     {
-        std::vector<Guid> before;
-        std::optional<ecs::Entity> target_entity;
-        auto registry_sp = edit.target.registry.lock();
-        if (registry_sp)
-        {
-            target_entity = resolve_target_entity(edit.target);
-            if (target_entity)
-                before = collect_asset_guids_sorted(*target_entity, *registry_sp);
-        }
+        const auto component_ctx = resolve_component_target(edit.target);
+        const auto asset_guids_before = collect_asset_guids_if_component_target(component_ctx);
 
         if (!assign_meta_field(edit.target, edit.meta_path, edit.new_value))
             return CommandStatus::Failed;
 
-        if (registry_sp && target_entity)
+        if (component_ctx)
         {
-            mark_transform_dirty_if_needed(edit.target, *registry_sp, *target_entity);
-            auto after = collect_asset_guids_sorted(*target_entity, *registry_sp);
-            if (before != after)
+            if (auto ctx_sp = edit.target.ctx.lock())
+                invoke_component_post_assign_hook(*ctx_sp, edit.target, component_ctx->entity, edit.meta_path, false);
+        }
+
+        emit_field_changed_event(edit.target, edit.meta_path, false);
+
+        if (component_ctx)
+        {
+            // Component edits may change the asset closure for an entity.
+            const auto asset_guids_after = collect_asset_guids_if_component_target(component_ctx);
+            if (asset_guids_before != asset_guids_after)
             {
                 if (auto ctx_sp = edit.target.ctx.lock())
-                    mark_batch_dirty_for_entity(*ctx_sp, *target_entity);
+                    mark_batch_dirty_for_entity(*ctx_sp, component_ctx->entity);
             }
         }
 
@@ -215,27 +263,28 @@ namespace eeng::editor
 
     CommandStatus AssignFieldCommand::undo()
     {
-        std::vector<Guid> before;
-        std::optional<ecs::Entity> target_entity;
-        auto registry_sp = edit.target.registry.lock();
-        if (registry_sp)
-        {
-            target_entity = resolve_target_entity(edit.target);
-            if (target_entity)
-                before = collect_asset_guids_sorted(*target_entity, *registry_sp);
-        }
+        const auto component_ctx = resolve_component_target(edit.target);
+        const auto asset_guids_before = collect_asset_guids_if_component_target(component_ctx);
 
         if (!assign_meta_field(edit.target, edit.meta_path, edit.prev_value))
             return CommandStatus::Failed;
 
-        if (registry_sp && target_entity)
+        if (component_ctx)
         {
-            mark_transform_dirty_if_needed(edit.target, *registry_sp, *target_entity);
-            auto after = collect_asset_guids_sorted(*target_entity, *registry_sp);
-            if (before != after)
+            if (auto ctx_sp = edit.target.ctx.lock())
+                invoke_component_post_assign_hook(*ctx_sp, edit.target, component_ctx->entity, edit.meta_path, true);
+        }
+
+        emit_field_changed_event(edit.target, edit.meta_path, true);
+
+        if (component_ctx)
+        {
+            // Component edits may change the asset closure for an entity.
+            const auto asset_guids_after = collect_asset_guids_if_component_target(component_ctx);
+            if (asset_guids_before != asset_guids_after)
             {
                 if (auto ctx_sp = edit.target.ctx.lock())
-                    mark_batch_dirty_for_entity(*ctx_sp, *target_entity);
+                    mark_batch_dirty_for_entity(*ctx_sp, component_ctx->entity);
             }
         }
 

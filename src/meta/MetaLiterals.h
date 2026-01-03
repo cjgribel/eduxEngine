@@ -14,6 +14,7 @@ namespace eeng::literals
     constexpr entt::hashed_string serialize_hs = "serialize"_hs;
     constexpr entt::hashed_string deserialize_hs = "deserialize"_hs;
     constexpr entt::hashed_string inspect_hs = "inspect"_hs;
+    constexpr entt::hashed_string post_assign_hs = "post_assign"_hs;
     constexpr entt::hashed_string assure_storage_hs = "assure_storage"_hs;
 
     constexpr entt::hashed_string load_asset_hs = "load_asset"_hs;

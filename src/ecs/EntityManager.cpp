@@ -3,6 +3,7 @@
 
 #include "EntityManager.hpp"
 #include "HeaderComponent.hpp"
+#include "TransformComponent.hpp"
 #include <entt/entt.hpp>
 #include <cassert>
 #include <stdexcept>
@@ -177,6 +178,12 @@ namespace eeng
         // registry_->get<HeaderComponent>(entity).parent_entity = EntityRef { parent_guid, parent_entity };
 
         scene_graph_->reparent(entity, parent_entity);
+
+        if (registry_->all_of<TransformComponent>(entity))
+        {
+            auto& tfm = registry_->get<TransformComponent>(entity);
+            tfm.mark_local_dirty();
+        }
     }
 
     // void EntityManager::set_entity_parent(const Entity& entity, const Entity& entity_parent)
