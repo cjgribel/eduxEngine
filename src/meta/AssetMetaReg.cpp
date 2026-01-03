@@ -6,6 +6,7 @@
 #include "AssetMetaReg.hpp"
 
 #include "EngineContext.hpp"
+#include "EngineContextHelpers.hpp"
 #include "MetaInfo.h"
 #include "MetaLiterals.h"
 #include "meta/EntityMetaHelpers.hpp"
@@ -111,7 +112,7 @@ namespace eeng {
 
         void on_create_gpu_model(const Guid& guid, EngineContext& ctx)
         {
-            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            auto rm = eeng::try_get_resource_manager(ctx, "AssetMetaReg");
             if (!rm) return;
 
             auto handle_opt = rm->handle_for_guid<assets::GpuModelAsset>(guid);
@@ -133,7 +134,7 @@ namespace eeng {
 
         void on_destroy_gpu_model(const Guid& guid, EngineContext& ctx)
         {
-            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            auto rm = eeng::try_get_resource_manager(ctx, "AssetMetaReg");
             if (!rm) return;
 
             auto handle_opt = rm->handle_for_guid<assets::GpuModelAsset>(guid);
@@ -152,7 +153,7 @@ namespace eeng {
 
         void on_create_gpu_texture(const Guid& guid, EngineContext& ctx)
         {
-            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            auto rm = eeng::try_get_resource_manager(ctx, "AssetMetaReg");
             if (!rm) return;
 
             auto handle_opt = rm->handle_for_guid<assets::GpuTextureAsset>(guid);
@@ -174,7 +175,7 @@ namespace eeng {
 
         void on_destroy_gpu_texture(const Guid& guid, EngineContext& ctx)
         {
-            auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
+            auto rm = eeng::try_get_resource_manager(ctx, "AssetMetaReg");
             if (!rm) return;
 
             auto handle_opt = rm->handle_for_guid<assets::GpuTextureAsset>(guid);
@@ -445,7 +446,8 @@ namespace eeng {
 
                 .data<&assets::GpuMaterialAsset::Ka>("Ka"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "Ka", "Ambient Color", "Ambient Color." })
-                .traits(MetaFlags::readonly_inspection)
+                .traits(MetaFlags::none)
+                // .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::GpuMaterialAsset::Kd>("Kd"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "Kd", "Diffuse Color", "Diffuse Color." })
