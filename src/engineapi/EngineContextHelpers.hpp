@@ -10,9 +10,14 @@
 #include "LogMacros.h"
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <utility>
+
+#ifndef EENG_CTX_HELPERS_STRICT
+#define EENG_CTX_HELPERS_STRICT 0
+#endif
 
 namespace eeng
 {
@@ -43,13 +48,35 @@ namespace eeng
             if (warned.insert(key).second)
                 EENG_LOG_WARN(&ctx, "[%s] %s %s", tag, message, guid_str.c_str());
         }
+
+        inline void handle_failure(EngineContext& ctx, const char* log_tag, const char* message)
+        {
+#if EENG_CTX_HELPERS_STRICT
+            const char* tag = normalize_log_tag(log_tag);
+            throw std::runtime_error(std::string("[") + tag + "] " + message);
+#else
+            log_warn_once(ctx, log_tag, message);
+#endif
+        }
+
+        inline void handle_failure(EngineContext& ctx, const char* log_tag, const Guid& guid, const char* message)
+        {
+#if EENG_CTX_HELPERS_STRICT
+            const char* tag = normalize_log_tag(log_tag);
+            if (guid.valid())
+                throw std::runtime_error(std::string("[") + tag + "] " + message + " " + guid.to_string());
+            throw std::runtime_error(std::string("[") + tag + "] " + message);
+#else
+            log_warn_once(ctx, log_tag, guid, message);
+#endif
+        }
     } // namespace detail
 
     inline std::shared_ptr<ResourceManager> try_get_resource_manager(EngineContext& ctx, const char* log_tag)
     {
         auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
         if (!rm)
-            detail::log_warn_once(ctx, log_tag, "ResourceManager unavailable");
+            detail::handle_failure(ctx, log_tag, "ResourceManager unavailable");
         return rm;
     }
 
@@ -57,13 +84,13 @@ namespace eeng
     {
         if (!ctx.entity_manager)
         {
-            detail::log_warn_once(ctx, log_tag, "EntityManager unavailable");
+            detail::handle_failure(ctx, log_tag, "EntityManager unavailable");
             return {};
         }
 
         auto registry_sp = ctx.entity_manager->registry_wptr().lock();
         if (!registry_sp)
-            detail::log_warn_once(ctx, log_tag, "Registry expired");
+            detail::handle_failure(ctx, log_tag, "Registry expired");
         return registry_sp;
     }
 
