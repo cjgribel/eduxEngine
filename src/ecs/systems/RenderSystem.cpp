@@ -11,6 +11,7 @@
 #include "ShaderLoader.h"
 #include "EngineContextHelpers.hpp"
 #include "ecs/ModelComponent.hpp"
+#include "ecs/TransformComponent.hpp"
 #include "assets/types/ModelAssets.hpp"
 
 namespace
@@ -149,6 +150,14 @@ namespace eeng::ecs::systems
                     cpu_submeshes = cpu_model.submeshes;
                     bone_count = cpu_model.bones.size();
                 });
+
+            const auto* tfm = registry.try_get<ecs::TransformComponent>(entity);
+            const glm::mat4 world = tfm ? tfm->world_matrix : glm::mat4(1.0f);
+            glUniformMatrix4fv(
+                glGetUniformLocation(shader_program_, "WorldMatrix"),
+                1,
+                0,
+                glm::value_ptr(world));
 
             if (bind_entity_uniforms)
                 bind_entity_uniforms(shader_program_, entity, model);

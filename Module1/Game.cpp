@@ -15,6 +15,7 @@
 #include "MockImporter.hpp" // --> ENGINE API
 
 #include "ecs/ModelComponent.hpp"
+#include "ecs/TransformComponent.hpp"
 
 #include "ecs/MockComponents.hpp"
 #include "mock/MockTypes.hpp"
@@ -23,6 +24,7 @@
 
 #include "ResourceManager.hpp" // Since we use the concrete type
 #include "BatchRegistry.hpp" // Since we use the concrete type
+#include "EngineContextHelpers.hpp"
 #include "MetaSerialize.hpp"
 #include <filesystem>
 // <-
@@ -108,9 +110,10 @@ namespace eeng::dev
                     eeng::assets::AssimpImporter importer;
                     eeng::assets::AssimpImportOptions opts{};
                     opts.assets_root = imported_assets_root;
-                    // opts.source_file = "/Users/ag1498/GitHub/eduxEngine/assets/Amy/Ch46_nonPBR.fbx";
                     opts.source_file = source_assets_root / "Amy/Ch46_nonPBR.fbx";
                     opts.model_name = "Amy";
+                    // opts.source_file = source_assets_root / "crytek-sponza_hansen/sponza.obj";
+                    // opts.model_name = "Sponza";
                     opts.flags = static_cast<eeng::assets::ImportFlags>(
                         static_cast<unsigned>(eeng::assets::ImportFlags::GenerateTangents) |
                         static_cast<unsigned>(eeng::assets::ImportFlags::GenerateNormals) |
@@ -202,6 +205,15 @@ namespace eeng::dev
                                     return;
 
                                 auto& reg = *registry_sptr;
+
+                                auto& root_tfm = reg.emplace<ecs::TransformComponent>(er_root.entity);
+                                (void)root_tfm;
+                                auto& player_tfm = reg.emplace<ecs::TransformComponent>(er_player.entity);
+                                player_tfm.scale = glm::vec3(0.05f);
+                                player_tfm.mark_local_dirty();
+                                auto& camera_tfm = reg.emplace<ecs::TransformComponent>(er_camera.entity);
+                                camera_tfm.scale = glm::vec3(0.05f);
+                                camera_tfm.mark_local_dirty();
 
                                 auto player_model_ref = refs[0]; // 
                                 auto camera_model_ref = refs[1];
@@ -938,10 +950,20 @@ void Game::update(
         time * glm::radians(50.0f) * 0, { 0, 1, 0 },
         { 0.03f, 0.03f, 0.03f });
 
+    // TODO: consider scheduling animation updates as a dedicated system phase.
     if (animationSystem)
     {
         auto& registry = ctx->entity_manager->registry();
         animationSystem->update(registry, *ctx, deltaTime);
+    }
+
+    // TODO: consider moving transform cache updates into an Engine-level system.
+    if (auto registry_sptr = eeng::try_get_registry(*ctx, "Game::update"))
+    {
+        if (auto* entity_manager = eeng::try_get_entity_manager(*ctx, "Game::update"))
+        {
+            entity_manager->scene_graph().traverse(registry_sptr);
+        }
     }
 
     // Intersect player view ray with AABBs of other objects 
@@ -1059,15 +1081,6 @@ void Game::render(
                 glUniform3fv(glGetUniformLocation(program, "lightpos"), 1, glm::value_ptr(pointlight.pos));
                 glUniform3fv(glGetUniformLocation(program, "lightColor"), 1, glm::value_ptr(pointlight.color));
                 glUniform3fv(glGetUniformLocation(program, "eyepos"), 1, glm::value_ptr(camera.pos));
-            },
-            [&](GLuint program, entt::entity, const eeng::ecs::ModelComponent&)
-            {
-                const glm::mat4 world = glm_aux::S({ 0.05f, 0.05f, 0.05f }); // glm::mat4(1.0f);
-                glUniformMatrix4fv(
-                    glGetUniformLocation(program, "WorldMatrix"),
-                    1,
-                    0,
-                    glm::value_ptr(world));
             });
     }
 

@@ -9,6 +9,10 @@ namespace eeng::ecs
     // std::string eeng::ecs::Transform::to_string() const
     std::string to_string(const TransformComponent& t)
     {
-        return std::format("Transform(x = {} ...)", t.x);
+        return std::format(
+            "Transform(pos = [{}, {}, {}])",
+            t.position.x,
+            t.position.y,
+            t.position.z);
     }
 }

@@ -14,8 +14,10 @@
 #include "MetaLiterals.h"
 #include "meta/MetaAux.h"
 #include "ecs/EntityManager.hpp"
+#include "ecs/TransformComponent.hpp"
 #include "MetaSerialize.hpp"
 #include "LogGlobals.hpp"
+#include <entt/entt.hpp>
 #include <iostream>
 #include <cassert>
 #include <stack>
@@ -65,6 +67,20 @@ namespace
             return;
         auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
         br.mark_closure_dirty_for_entity(entity, ctx);
+    }
+
+    void mark_transform_dirty_if_needed(
+        const eeng::editor::FieldTarget& target,
+        entt::registry& registry,
+        const eeng::ecs::Entity& entity)
+    {
+        if (target.kind != eeng::editor::FieldTarget::Kind::Component)
+            return;
+        if (target.component_id != entt::type_hash<eeng::ecs::TransformComponent>::value())
+            return;
+
+        if (auto* tfm = registry.try_get<eeng::ecs::TransformComponent>(entity))
+            tfm->mark_local_dirty();
     }
 
     bool is_ref(const entt::meta_any& any)
@@ -184,6 +200,7 @@ namespace eeng::editor
 
         if (registry_sp && target_entity)
         {
+            mark_transform_dirty_if_needed(edit.target, *registry_sp, *target_entity);
             auto after = collect_asset_guids_sorted(*target_entity, *registry_sp);
             if (before != after)
             {
@@ -213,6 +230,7 @@ namespace eeng::editor
 
         if (registry_sp && target_entity)
         {
+            mark_transform_dirty_if_needed(edit.target, *registry_sp, *target_entity);
             auto after = collect_asset_guids_sorted(*target_entity, *registry_sp);
             if (before != after)
             {

@@ -8,6 +8,7 @@
 #include "AssetRef.hpp"
 #include "Storage.hpp"
 #include "LogMacros.h"
+#include "ecs/EntityManager.hpp"
 
 #include <memory>
 #include <stdexcept>
@@ -78,6 +79,20 @@ namespace eeng
         if (!rm)
             detail::handle_failure(ctx, log_tag, "ResourceManager unavailable");
         return rm;
+    }
+
+    inline EntityManager* try_get_entity_manager(EngineContext& ctx, const char* log_tag)
+    {
+        if (!ctx.entity_manager)
+        {
+            detail::handle_failure(ctx, log_tag, "EntityManager unavailable");
+            return nullptr;
+        }
+
+        auto* em = dynamic_cast<EntityManager*>(ctx.entity_manager.get());
+        if (!em)
+            detail::handle_failure(ctx, log_tag, "Concrete EntityManager unavailable");
+        return em;
     }
 
     inline std::shared_ptr<entt::registry> try_get_registry(EngineContext& ctx, const char* log_tag)

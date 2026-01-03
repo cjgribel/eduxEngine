@@ -275,20 +275,41 @@ namespace eeng
         // meta::type_id_map()["eeng.ecs.mock.MockCameraComponent"] = entt::resolve<eeng::ecs::mock::MockCameraComponent>().id();
 
         // --- TransformComponent ----------------------------------------------
-#if 0
-        entt::meta<ecs::Transform>()
-            //.type("Transform"_hs)                 // <- this hashed string is used implicitly
-            //.prop(display_name_hs, "Transform")  // <- Can be used without .type()
 
-            .data<&Transform::x>("x"_hs).prop(display_name_hs, "x")
-            .data<&Transform::y>("y"_hs).prop(display_name_hs, "y")
-            .data<&Transform::angle>("angle"_hs).prop(display_name_hs, "angle")
-            .data<&Transform::x_global>("x_global"_hs).prop(display_name_hs, "x_global").prop(readonly_hs, true)
-            .data<&Transform::y_global>("y_global"_hs).prop(display_name_hs, "y_global").prop(readonly_hs, true)
-            .data<&Transform::angle_global>("angle_global"_hs).prop(display_name_hs, "angle_global").prop(readonly_hs, true)
+        entt::meta_factory<eeng::ecs::TransformComponent>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.TransformComponent", .name = "TransformComponent", .tooltip = "Entity transform data." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::TransformComponent::position>("position"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Local position." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::TransformComponent::rotation>("rotation"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "rotation", "Rotation", "Local rotation." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::TransformComponent::scale>("scale"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "scale", "Scale", "Local scale." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::TransformComponent::local_matrix>("local_matrix"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "local_matrix", "Local Matrix", "Derived local transform matrix." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::ecs::TransformComponent::world_matrix>("world_matrix"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "world_matrix", "World Matrix", "Derived world transform matrix." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::ecs::TransformComponent::world_rotation>("world_rotation"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "world_rotation", "World Rotation", "Derived world rotation." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::ecs::TransformComponent::world_rotation_matrix>("world_rotation_matrix"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "world_rotation_matrix", "World Rotation Matrix", "Derived world rotation matrix." })
+            .traits(MetaFlags::readonly_inspection)
             ;
         register_component<ecs::TransformComponent>();
-#endif
+
 
         // --- HeaderComponent -------------------------------------------------
 #if 0

@@ -6,7 +6,10 @@
 #include "MetaInspect.hpp"
 #include "ecs/TransformComponent.hpp"
 
+#include <cstdint>
 #include <entt/entt.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <stdio.h>
 
 using Transform = eeng::ecs::TransformComponent;
@@ -128,28 +131,45 @@ namespace eeng::ecs
             assert(registry->valid(*entity_ptr));
             auto& tfm_node = registry->template get<Transform>(*entity_ptr);
 
+            Transform* parent_tfm = nullptr;
+            std::uint32_t parent_version = 0;
             if (entity_parent_ptr && registry->template all_of<Transform>(*entity_parent_ptr))
             {
                 assert(registry->valid(*entity_parent_ptr)); // fix
-                auto& tfm_parent = registry->template get<Transform>(*entity_parent_ptr);
-                tfm_node.x_parent = tfm_parent.x_global;
-                tfm_node.y_parent = tfm_parent.y_global;
-                tfm_node.angle_parent = tfm_parent.angle_global;
-            }
-            else
-            {
-                tfm_node.x_parent = 0.0f;
-                tfm_node.y_parent = 0.0f;
-                tfm_node.angle_parent = 0.0f;
+                parent_tfm = &registry->template get<Transform>(*entity_parent_ptr);
+                parent_version = parent_tfm->world_version;
             }
 
-            // // opt sin/cos
-            // tfm_node.x_global = tfm_node.x;
-            // tfm_node.y_global = tfm_node.y;
-            // tfm_node.angle_global = tfm_node.angle;
-            tfm_node.x_global = tfm_node.x * cos(tfm_node.angle_parent) - tfm_node.y * sin(tfm_node.angle_parent) + tfm_node.x_parent;
-            tfm_node.y_global = tfm_node.x * sin(tfm_node.angle_parent) + tfm_node.y * cos(tfm_node.angle_parent) + tfm_node.y_parent;
-            tfm_node.angle_global = tfm_node.angle + tfm_node.angle_parent;
+            const bool local_changed = (tfm_node.local_matrix_version != tfm_node.local_version);
+            if (local_changed)
+            {
+                tfm_node.rotation = glm::normalize(tfm_node.rotation);
+                tfm_node.local_matrix =
+                    glm::translate(glm::mat4(1.0f), tfm_node.position) *
+                    glm::mat4_cast(tfm_node.rotation) *
+                    glm::scale(glm::mat4(1.0f), tfm_node.scale);
+                tfm_node.local_matrix_version = tfm_node.local_version;
+            }
+
+            if (local_changed || tfm_node.parent_world_version != parent_version)
+            {
+                if (parent_tfm)
+                {
+                    tfm_node.world_matrix = parent_tfm->world_matrix * tfm_node.local_matrix;
+                    tfm_node.world_rotation = glm::normalize(parent_tfm->world_rotation * tfm_node.rotation);
+                }
+                else
+                {
+                    tfm_node.world_matrix = tfm_node.local_matrix;
+                    tfm_node.world_rotation = glm::normalize(tfm_node.rotation);
+                }
+
+                tfm_node.world_rotation_matrix = glm::mat3_cast(tfm_node.world_rotation);
+                tfm_node.parent_world_version = parent_version;
+                ++tfm_node.world_version;
+                if (tfm_node.world_version == 0)
+                    ++tfm_node.world_version;
+            }
             });
     }
 
