@@ -98,14 +98,24 @@ namespace eeng::meta
 {
     inline bool type_is_registered(entt::meta_type mt)
     {
-        return static_cast<bool>(mt);
+        if (!mt)
+            return false;
+
+        // EnTT can synthesize a meta_type for any T, even if no explicit meta
+        // registration exists. We treat a type as "registered" only when it
+        // carries our TypeMetaInfo with a non-empty id (used by importers).
+        if (TypeMetaInfo* info = mt.custom(); info && !info->id.empty())
+            return true;
+
+        return false;
     }
 
     template<typename T>
     inline bool type_is_registered()
     {
-        // TODO -> this is always true for static type. Check for MetaTypeInfo instead.
-        return type_is_registered(entt::resolve<T>());
+        // entt::resolve<T>() always yields a truthy meta_type; resolve by type_id
+        // to query actual registration, then require TypeMetaInfo.
+        return type_is_registered(entt::resolve(entt::type_id<T>()));
     }
 
     inline std::string get_meta_type_display_name(entt::meta_type mt)

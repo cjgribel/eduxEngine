@@ -33,7 +33,7 @@ add_executable(tests
     MetaFieldAssign_tests.cpp ../src/editor/MetaFieldAssign.cpp
     )
 
-target_link_libraries(tests PRIVATE gtest_main nlohmann_json::nlohmann_json)
+target_link_libraries(tests PRIVATE gtest_main nlohmann_json::nlohmann_json glm::glm)
 
 include(GoogleTest)
 gtest_discover_tests(tests)

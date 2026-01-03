@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "serializers/ModelDataAssetSerialization.hpp"
+#include "serializers/GLMSerialize.hpp"
 
 #include <cassert>
 #include <stdexcept>
@@ -18,80 +19,6 @@ namespace eeng::serializers
 {
     namespace
     {
-        nlohmann::json serialize_vec2(const glm::vec2& v)
-        {
-            return nlohmann::json::array({ v.x, v.y });
-        }
-
-        nlohmann::json serialize_vec3(const glm::vec3& v)
-        {
-            return nlohmann::json::array({ v.x, v.y, v.z });
-        }
-
-        nlohmann::json serialize_quat(const glm::quat& q)
-        {
-            return nlohmann::json::array({ q.x, q.y, q.z, q.w });
-        }
-
-        nlohmann::json serialize_mat4(const glm::mat4& m)
-        {
-            nlohmann::json j = nlohmann::json::array();
-            auto& arr = j.get_ref<nlohmann::json::array_t&>();
-            arr.reserve(16);
-            for (int c = 0; c < 4; c++)
-            {
-                for (int r = 0; r < 4; r++)
-                {
-                    arr.emplace_back(m[c][r]);
-                }
-            }
-            return j;
-        }
-
-        glm::vec2 deserialize_vec2(const nlohmann::json& j)
-        {
-            if (j.is_array() && j.size() >= 2)
-                return { j[0].get<float>(), j[1].get<float>() };
-            if (j.is_object())
-                return { j.value("x", 0.0f), j.value("y", 0.0f) };
-            return {};
-        }
-
-        glm::vec3 deserialize_vec3(const nlohmann::json& j)
-        {
-            if (j.is_array() && j.size() >= 3)
-                return { j[0].get<float>(), j[1].get<float>(), j[2].get<float>() };
-            if (j.is_object())
-                return { j.value("x", 0.0f), j.value("y", 0.0f), j.value("z", 0.0f) };
-            return {};
-        }
-
-        glm::quat deserialize_quat(const nlohmann::json& j)
-        {
-            if (j.is_array() && j.size() >= 4)
-                return glm::quat(j[3].get<float>(), j[0].get<float>(), j[1].get<float>(), j[2].get<float>());
-            if (j.is_object())
-                return glm::quat(j.value("w", 1.0f), j.value("x", 0.0f), j.value("y", 0.0f), j.value("z", 0.0f));
-            return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-        }
-
-        glm::mat4 deserialize_mat4(const nlohmann::json& j)
-        {
-            glm::mat4 m{ 1.0f };
-            if (j.is_array() && j.size() >= 16)
-            {
-                size_t idx = 0;
-                for (int c = 0; c < 4; c++)
-                {
-                    for (int r = 0; r < 4; r++)
-                    {
-                        m[c][r] = j[idx++].get<float>();
-                    }
-                }
-            }
-            return m;
-        }
-
         template<typename T>
         nlohmann::json serialize_asset_ref(const AssetRef<T>& ref)
         {
@@ -110,72 +37,6 @@ namespace eeng::serializers
                 return AssetRef<T>{ Guid{ j.get<Guid::underlying_type>() } };
             }
             return AssetRef<T>{};
-        }
-
-        nlohmann::json serialize_vec2_array(const std::vector<glm::vec2>& values)
-        {
-            nlohmann::json j = nlohmann::json::array();
-            auto& arr = j.get_ref<nlohmann::json::array_t&>();
-            arr.reserve(values.size());
-            for (const auto& v : values)
-                arr.emplace_back(serialize_vec2(v));
-            return j;
-        }
-
-        nlohmann::json serialize_vec3_array(const std::vector<glm::vec3>& values)
-        {
-            nlohmann::json j = nlohmann::json::array();
-            auto& arr = j.get_ref<nlohmann::json::array_t&>();
-            arr.reserve(values.size());
-            for (const auto& v : values)
-                arr.emplace_back(serialize_vec3(v));
-            return j;
-        }
-
-        nlohmann::json serialize_quat_array(const std::vector<glm::quat>& values)
-        {
-            nlohmann::json j = nlohmann::json::array();
-            auto& arr = j.get_ref<nlohmann::json::array_t&>();
-            arr.reserve(values.size());
-            for (const auto& v : values)
-                arr.emplace_back(serialize_quat(v));
-            return j;
-        }
-
-        void deserialize_vec2_array(const nlohmann::json& j, std::vector<glm::vec2>& values)
-        {
-            values.clear();
-            if (!j.is_array())
-                return;
-            values.resize(j.size());
-            for (size_t i = 0; i < j.size(); i++)
-            {
-                values[i] = deserialize_vec2(j[i]);
-            }
-        }
-
-        void deserialize_vec3_array(const nlohmann::json& j, std::vector<glm::vec3>& values)
-        {
-            values.clear();
-            if (!j.is_array())
-                return;
-            values.resize(j.size());
-            for (size_t i = 0; i < j.size(); i++)
-            {
-                values[i] = deserialize_vec3(j[i]);
-            }
-        }
-
-        void deserialize_quat_array(const nlohmann::json& j, std::vector<glm::quat>& values)
-        {
-            values.clear();
-            if (!j.is_array())
-                return;
-            values.resize(j.size());
-            for (size_t i = 0; i < j.size(); i++)
-            {
-                values[i] = deserialize_quat(j[i]);
-            }
         }
 
         nlohmann::json serialize_skin_array(const std::vector<assets::SkinData>& values)

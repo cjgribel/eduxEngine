@@ -10,9 +10,9 @@
 #include "MetaInfo.h"
 #include "MetaLiterals.h"
 #include "meta/EntityMetaHelpers.hpp"
+#include "meta/GLMMetaReg.hpp"
 
 #include "editor/AssetRefInspect.hpp"
-#include "editor/GLMInspect.hpp"
 #include "assets/types/ModelAssets.hpp"
 #include "gpu/GpuAssetOps.hpp"
 #include "mock/MockAssetTypes.hpp"
@@ -481,42 +481,8 @@ namespace eeng {
             register_asset<assets::TextureAsset>();
         }
 
-        // glm::vec2 (helper)
-        {
-            entt::meta_factory<glm::vec2>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "glm.vec2", .name = "Vec2", .tooltip = "Vec2." })
-                .traits(MetaFlags::none)
-
-                .data<&glm::vec2::x>("x"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "X." }).traits(MetaFlags::none)
-
-                .data<&glm::vec2::y>("y"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "Y." }).traits(MetaFlags::none)
-
-                .template func<&eeng::editor::inspect_glmvec2>(eeng::literals::inspect_hs)
-                ;
-            register_asset<assets::TextureAsset>();
-        }
-
-        // glm::vec3 (helper)
-        {
-            entt::meta_factory<glm::vec3>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "glm.vec3", .name = "Vec3", .tooltip = "Vec3." })
-                .traits(MetaFlags::none)
-
-                .data<&glm::vec3::x>("x"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "x", "X", "X." }).traits(MetaFlags::none)
-
-                .data<&glm::vec3::y>("y"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "y", "Y", "Y." }).traits(MetaFlags::none)
-
-                .data<&glm::vec3::z>("z"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "z", "Z", "Z." }).traits(MetaFlags::none)
-
-                .template func<&eeng::editor::inspect_glmvec3>(eeng::literals::inspect_hs)
-                ;
-            register_asset<assets::TextureAsset>();
-        }
+        // GLM helper types (vectors, matrices, quaternions)
+        meta::register_glm_meta_types();
 
         // MaterialAsset
         {

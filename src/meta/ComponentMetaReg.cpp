@@ -20,6 +20,7 @@
 #include "editor/GuidInspect.hpp"
 
 #include "MetaLiterals.h"
+#include "meta/GLMMetaReg.hpp"
 //#include "Storage.hpp"
 #include "MetaInfo.h"
 // #include "IResourceManager.hpp" 
@@ -166,6 +167,7 @@ namespace eeng
     void register_component_meta_types(EngineContext& ctx)
     {
         EENG_LOG_INFO(&ctx, "Registering component meta types...");
+        meta::register_glm_meta_types();
 
         // --- Guid ------------------------------------------------------------
         entt::meta_factory<Guid>{}
@@ -452,44 +454,44 @@ namespace eeng
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.mock.MockMixComponent", .name = "MockMixComponent", .tooltip = "A mock component with mixed data types for testing." })
             .traits(MetaFlags::none)
 
-            .data<&MockMixComponent::flag/*, entt::as_ref_t*/>("flag"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "flag", "Flag", "A boolean flag." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::bool_flag/*, entt::as_ref_t*/>("bool_flag"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "bool_flag", "Bool Flag", "A boolean flag." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::a>("a"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "a", "A", "A float value." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::float_scalar>("float_scalar"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "float_scalar", "Float Scalar", "A float value." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::b/*, entt::as_ref_t*/>("b"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "b", "B", "An integer value." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::int_scalar/*, entt::as_ref_t*/>("int_scalar"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "int_scalar", "Int Scalar", "An integer value." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::c>("c"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "c", "C", "An integer value." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::int_scalar_2>("int_scalar_2"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "int_scalar_2", "Int Scalar 2", "An integer value." }).traits(MetaFlags::none)
 
             .data<&MockMixComponent::position>("position"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "A 3D position vector." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::somestring>("somestring"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "somestring", "Some String", "A sample string." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::string_value>("string_value"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "string_value", "String Value", "A sample string." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::vector1>("vector1"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "vector1", "Vector1", "An array of integers." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::int_array3>("int_array3"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "int_array3", "Int Array3", "An array of integers." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::vector2>("vector2"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "vector2", "Vector2", "An array of integers." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::element_vector>("element_vector"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "element_vector", "Element Vector", "A vector of ElementType values." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::map1>("map1"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "map1", "Map1", "A map of strings to integers." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::int_float_map>("int_float_map"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "int_float_map", "Int Float Map", "A map of integers to floats." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::map2>("map2"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "map2", "Map2", "A map of strings to floats." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::int_element_map>("int_element_map"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "int_element_map", "Int Element Map", "A map of integers to ElementType values." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::map3>("map3"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "map3", "Map3", "A map of strings to strings." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::element_int_map>("element_int_map"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "element_int_map", "Element Int Map", "A map of ElementType values to integers." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::set1>("set1"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "set1", "Set1", "A set of strings." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::int_set>("int_set"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "int_set", "Int Set", "A set of integers." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::anEnum>("anEnum"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "anEnum", "An Enum", "An example enum value." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::enum_value>("enum_value"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "enum_value", "Enum Value", "An example enum value." }).traits(MetaFlags::none)
 
             .data<&MockMixComponent::nested_int_vectors>("nested_int_vectors"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "nested_int_vectors", "Nested Int Vectors", "A vector of vectors of integers." }).traits(MetaFlags::none)
@@ -497,8 +499,41 @@ namespace eeng
             .data<&MockMixComponent::enum_vector>("enum_vector"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "enum_vector", "Enum Vector", "A vector of enum values." }).traits(MetaFlags::none)
 
-            .data<&MockMixComponent::enum_map>("enum_map"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "enum_map", "Enum Map", "A map of enum values to integers." }).traits(MetaFlags::none)
+            .data<&MockMixComponent::enum_int_map>("enum_int_map"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "enum_int_map", "Enum Int Map", "A map of enum values to integers." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_vec2>("glm_vec2"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_vec2", "GLM Vec2", "A glm::vec2 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_vec3>("glm_vec3"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_vec3", "GLM Vec3", "A glm::vec3 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_vec4>("glm_vec4"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_vec4", "GLM Vec4", "A glm::vec4 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_ivec2>("glm_ivec2"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_ivec2", "GLM IVec2", "A glm::ivec2 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_ivec3>("glm_ivec3"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_ivec3", "GLM IVec3", "A glm::ivec3 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_ivec4>("glm_ivec4"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_ivec4", "GLM IVec4", "A glm::ivec4 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_quat>("glm_quat"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_quat", "GLM Quat", "A glm::quat value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_mat2>("glm_mat2"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_mat2", "GLM Mat2", "A glm::mat2 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_mat3>("glm_mat3"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_mat3", "GLM Mat3", "A glm::mat3 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_mat4>("glm_mat4"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_mat4", "GLM Mat4", "A glm::mat4 value." }).traits(MetaFlags::none)
+
+            .data<&MockMixComponent::glm_vec3_vector>("glm_vec3_vector"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "glm_vec3_vector", "GLM Vec3 Vector", "A vector of glm::vec3 values." }).traits(MetaFlags::none)
 
             // to_string, member version
                 //.func<&DebugClass::to_string>(to_string_hs)

@@ -103,22 +103,33 @@ protected:
 
         entt::meta_factory<MockMixComponent>()
             .type("MockMixComponent"_hs)
-            .data<&MockMixComponent::a>("a"_hs)
-            .data<&MockMixComponent::b>("b"_hs)
-            .data<&MockMixComponent::c>("c"_hs)
-            .data<&MockMixComponent::flag>("flag"_hs)
+            .data<&MockMixComponent::float_scalar>("float_scalar"_hs)
+            .data<&MockMixComponent::int_scalar>("int_scalar"_hs)
+            .data<&MockMixComponent::int_scalar_2>("int_scalar_2"_hs)
+            .data<&MockMixComponent::bool_flag>("bool_flag"_hs)
             .data<&MockMixComponent::position>("position"_hs)
-            .data<&MockMixComponent::somestring>("somestring"_hs)
-            .data<&MockMixComponent::vector1>("vector1"_hs)
-            .data<&MockMixComponent::vector2>("vector2"_hs)
-            .data<&MockMixComponent::map1>("map1"_hs)
-            .data<&MockMixComponent::map2>("map2"_hs)
-            .data<&MockMixComponent::map3>("map3"_hs)
-            .data<&MockMixComponent::set1>("set1"_hs)
-            .data<&MockMixComponent::anEnum>("anEnum"_hs)
+            .data<&MockMixComponent::string_value>("string_value"_hs)
+            .data<&MockMixComponent::int_array3>("int_array3"_hs)
+            .data<&MockMixComponent::element_vector>("element_vector"_hs)
+            .data<&MockMixComponent::int_float_map>("int_float_map"_hs)
+            .data<&MockMixComponent::int_element_map>("int_element_map"_hs)
+            .data<&MockMixComponent::element_int_map>("element_int_map"_hs)
+            .data<&MockMixComponent::int_set>("int_set"_hs)
+            .data<&MockMixComponent::enum_value>("enum_value"_hs)
             .data<&MockMixComponent::nested_int_vectors>("nested_int_vectors"_hs)
             .data<&MockMixComponent::enum_vector>("enum_vector"_hs)
-            .data<&MockMixComponent::enum_map>("enum_map"_hs)
+            .data<&MockMixComponent::enum_int_map>("enum_int_map"_hs)
+            .data<&MockMixComponent::glm_vec2>("glm_vec2"_hs)
+            .data<&MockMixComponent::glm_vec3>("glm_vec3"_hs)
+            .data<&MockMixComponent::glm_vec4>("glm_vec4"_hs)
+            .data<&MockMixComponent::glm_ivec2>("glm_ivec2"_hs)
+            .data<&MockMixComponent::glm_ivec3>("glm_ivec3"_hs)
+            .data<&MockMixComponent::glm_ivec4>("glm_ivec4"_hs)
+            .data<&MockMixComponent::glm_quat>("glm_quat"_hs)
+            .data<&MockMixComponent::glm_mat2>("glm_mat2"_hs)
+            .data<&MockMixComponent::glm_mat3>("glm_mat3"_hs)
+            .data<&MockMixComponent::glm_mat4>("glm_mat4"_hs)
+            .data<&MockMixComponent::glm_vec3_vector>("glm_vec3_vector"_hs)
             ;
     }
 };
@@ -132,14 +143,14 @@ TEST_F(MetaFieldAssignTest, Assign_SimpleField_A)
     using eeng::editor::MetaFieldPathBuilder;
 
     MockMixComponent obj{};
-    obj.a = 1.0f;
+    obj.float_scalar = 1.0f;
 
     // Make root an alias to obj (mirrors registry usage)
     entt::meta_any root = entt::forward_as_meta(obj); // ref policy
 
     auto path =
         MetaFieldPathBuilder{}
-        .data("a")
+        .data("float_scalar")
         .build();
 
     entt::meta_any new_val = 42.0f;
@@ -147,7 +158,7 @@ TEST_F(MetaFieldAssignTest, Assign_SimpleField_A)
     bool ok = assign_field(root, path, new_val);
     ASSERT_TRUE(ok);
 
-    EXPECT_FLOAT_EQ(obj.a, 42.0f);
+    EXPECT_FLOAT_EQ(obj.float_scalar, 42.0f);
 }
 
 TEST_F(MetaFieldAssignTest, Assign_Nested_PositionUVcoordsU)
@@ -174,17 +185,17 @@ TEST_F(MetaFieldAssignTest, Assign_Nested_PositionUVcoordsU)
     EXPECT_FLOAT_EQ(obj.position.uv_coords.u, 123.0f);
 }
 
-TEST_F(MetaFieldAssignTest, Assign_ArrayElement_Vector1_Index)
+TEST_F(MetaFieldAssignTest, Assign_ArrayElement_IntArray3_Index)
 {
     using eeng::editor::MetaFieldPathBuilder;
 
     MockMixComponent obj{};
-    // vector1 = {1, 2, 3}
+    // int_array3 = {1, 2, 3}
     entt::meta_any root = entt::forward_as_meta(obj);
 
     auto path =
         MetaFieldPathBuilder{}
-        .data("vector1")
+        .data("int_array3")
         .index(2)   // third element
         .build();
 
@@ -193,10 +204,10 @@ TEST_F(MetaFieldAssignTest, Assign_ArrayElement_Vector1_Index)
     bool ok = assign_field(root, path, new_val);
     ASSERT_TRUE(ok);
 
-    ASSERT_EQ(obj.vector1.size(), 3u);
-    EXPECT_EQ(obj.vector1[0], 1);
-    EXPECT_EQ(obj.vector1[1], 2);
-    EXPECT_EQ(obj.vector1[2], 999);
+    ASSERT_EQ(obj.int_array3.size(), 3u);
+    EXPECT_EQ(obj.int_array3[0], 1);
+    EXPECT_EQ(obj.int_array3[1], 2);
+    EXPECT_EQ(obj.int_array3[2], 999);
 }
 
 TEST_F(MetaFieldAssignTest, Assign_VectorElement_Field_M)
@@ -204,13 +215,13 @@ TEST_F(MetaFieldAssignTest, Assign_VectorElement_Field_M)
     using eeng::editor::MetaFieldPathBuilder;
 
     MockMixComponent obj{};
-    obj.vector2 = { {4.0f}, {5.0f}, {6.0f} };
+    obj.element_vector = { {4.0f}, {5.0f}, {6.0f} };
 
     entt::meta_any root = entt::forward_as_meta(obj);
 
     auto path =
         MetaFieldPathBuilder{}
-        .data("vector2")
+        .data("element_vector")
         .index(1)      // second ElementType
         .data("m")     // its 'm' field
         .build();
@@ -220,10 +231,10 @@ TEST_F(MetaFieldAssignTest, Assign_VectorElement_Field_M)
     bool ok = assign_field(root, path, new_val);
     ASSERT_TRUE(ok);
 
-    ASSERT_EQ(obj.vector2.size(), 3u);
-    EXPECT_FLOAT_EQ(obj.vector2[0].m, 4.0f);
-    EXPECT_FLOAT_EQ(obj.vector2[1].m, 99.0f);
-    EXPECT_FLOAT_EQ(obj.vector2[2].m, 6.0f);
+    ASSERT_EQ(obj.element_vector.size(), 3u);
+    EXPECT_FLOAT_EQ(obj.element_vector[0].m, 4.0f);
+    EXPECT_FLOAT_EQ(obj.element_vector[1].m, 99.0f);
+    EXPECT_FLOAT_EQ(obj.element_vector[2].m, 6.0f);
 }
 
 TEST_F(MetaFieldAssignTest, Assign_Map1_ValueByKey)
@@ -231,13 +242,13 @@ TEST_F(MetaFieldAssignTest, Assign_Map1_ValueByKey)
     using eeng::editor::MetaFieldPathBuilder;
 
     MockMixComponent obj{};
-    // map1: std::map<int, float> = { {7, 7.5f}, {8, 8.5f} }
+    // int_float_map: std::map<int, float> = { {7, 7.5f}, {8, 8.5f} }
 
     entt::meta_any root = entt::forward_as_meta(obj);
 
     auto path =
         MetaFieldPathBuilder{}
-        .data("map1")
+        .data("int_float_map")
         .key(7, "7")
         .build();   // leaf is the mapped float itself
 
@@ -246,10 +257,10 @@ TEST_F(MetaFieldAssignTest, Assign_Map1_ValueByKey)
     bool ok = assign_field(root, path, new_val);
     ASSERT_TRUE(ok);
 
-    auto it7 = obj.map1.find(7);
-    auto it8 = obj.map1.find(8);
-    ASSERT_NE(it7, obj.map1.end());
-    ASSERT_NE(it8, obj.map1.end());
+    auto it7 = obj.int_float_map.find(7);
+    auto it8 = obj.int_float_map.find(8);
+    ASSERT_NE(it7, obj.int_float_map.end());
+    ASSERT_NE(it8, obj.int_float_map.end());
 
     EXPECT_FLOAT_EQ(it7->second, 123.25f);
     EXPECT_FLOAT_EQ(it8->second, 8.5f);
@@ -260,13 +271,13 @@ TEST_F(MetaFieldAssignTest, Assign_Map2_ElementField_M)
     using eeng::editor::MetaFieldPathBuilder;
 
     MockMixComponent obj{};
-    // map2: std::map<int, ElementType> = { {9, {9.5f}}, {10, {10.5f}} }
+    // int_element_map: std::map<int, ElementType> = { {9, {9.5f}}, {10, {10.5f}} }
 
     entt::meta_any root = entt::forward_as_meta(obj);
 
     auto path =
         MetaFieldPathBuilder{}
-        .data("map2")
+        .data("int_element_map")
         .key(9, "9")
         .data("m")
         .build();
@@ -276,10 +287,10 @@ TEST_F(MetaFieldAssignTest, Assign_Map2_ElementField_M)
     bool ok = assign_field(root, path, new_val);
     ASSERT_TRUE(ok);
 
-    auto it9 = obj.map2.find(9);
-    auto it10 = obj.map2.find(10);
-    ASSERT_NE(it9, obj.map2.end());
-    ASSERT_NE(it10, obj.map2.end());
+    auto it9 = obj.int_element_map.find(9);
+    auto it10 = obj.int_element_map.find(10);
+    ASSERT_NE(it9, obj.int_element_map.end());
+    ASSERT_NE(it10, obj.int_element_map.end());
 
     EXPECT_FLOAT_EQ(it9->second.m, 777.0f);
     EXPECT_FLOAT_EQ(it10->second.m, 10.5f);
@@ -347,13 +358,13 @@ TEST_F(MetaFieldAssignTest, Assign_EnumKeyedMap_Value)
     using eeng::editor::MetaFieldPathBuilder;
 
     MockMixComponent obj{};
-    // enum_map = { {Hello,10}, {Bye,20} };
+    // enum_int_map = { {Hello,10}, {Bye,20} };
 
     entt::meta_any root = entt::forward_as_meta(obj);
 
     auto path =
         MetaFieldPathBuilder{}
-        .data("enum_map")
+        .data("enum_int_map")
         .key(AnEnum::Bye, "Bye")
         .build();  // leaf is the mapped int
 
@@ -362,10 +373,10 @@ TEST_F(MetaFieldAssignTest, Assign_EnumKeyedMap_Value)
     bool ok = assign_field(root, path, new_val);
     ASSERT_TRUE(ok);
 
-    auto it_hello = obj.enum_map.find(AnEnum::Hello);
-    auto it_bye = obj.enum_map.find(AnEnum::Bye);
-    ASSERT_NE(it_hello, obj.enum_map.end());
-    ASSERT_NE(it_bye, obj.enum_map.end());
+    auto it_hello = obj.enum_int_map.find(AnEnum::Hello);
+    auto it_bye = obj.enum_int_map.find(AnEnum::Bye);
+    ASSERT_NE(it_hello, obj.enum_int_map.end());
+    ASSERT_NE(it_bye, obj.enum_int_map.end());
 
     EXPECT_EQ(it_hello->second, 10);
     EXPECT_EQ(it_bye->second, 123);
