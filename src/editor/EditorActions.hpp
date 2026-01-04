@@ -29,5 +29,9 @@ namespace eeng::editor
         static void unload_all(EngineContext& ctx);
         static void create_batch(EngineContext& ctx, std::string name);
         static void delete_batch(EngineContext& ctx, const BatchId& id);
+        static void assign_entities_to_batch(
+            EngineContext& ctx,
+            const BatchId& id,
+            const std::deque<ecs::Entity>& selection);
     };
 }

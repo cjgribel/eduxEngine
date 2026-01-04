@@ -11,6 +11,8 @@
 #include "meta/MetaInspect.hpp"      // for eeng::meta::inspect_entity
 #include "MetaLiterals.h"
 #include "MetaAux.h"
+#include "BatchRegistry.hpp"
+#include "ecs/EntityManager.hpp"
 //#include "FileManager.hpp"
 // #include "ecs/HeaderComponent.hpp"
 
@@ -55,6 +57,103 @@ namespace eeng::gui
             const bool selected_entity_valid =
                 selected_entity.has_id()&
                 registry_sp->valid(selected_entity);
+
+            // Batch info (lookup from loaded batches; unloaded membership is unknown here).
+            ImGui::TextUnformatted("Batch");
+            ImGui::SameLine();
+            {
+                std::string label = "(no selection)";
+
+                if (!entity_selection.empty())
+                {
+                    if (!ctx.batch_registry || !ctx.entity_manager)
+                    {
+                        label = "(no batch registry)";
+                    }
+                    else
+                    {
+                        auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
+                        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+                        const auto batches = br.list();
+
+                        std::vector<BatchId> seen_batches;
+                        int unresolved = 0;
+
+                        for (const auto& entity : entity_selection.get_all())
+                        {
+                            if (!entity.has_id() || !registry_sp->valid(entity))
+                            {
+                                ++unresolved;
+                                continue;
+                            }
+
+                            const auto entity_ref = em.get_entity_ref(entity);
+                            if (!entity_ref.guid.valid())
+                            {
+                                ++unresolved;
+                                continue;
+                            }
+
+                            bool found = false;
+                            for (const auto* batch : batches)
+                            {
+                                if (!batch || batch->state != BatchInfo::State::Loaded)
+                                    continue;
+
+                                const auto& live = batch->live;
+                                const auto it = std::find_if(live.begin(), live.end(),
+                                    [&](const ecs::EntityRef& er)
+                                    {
+                                        return er.guid == entity_ref.guid;
+                                    });
+
+                                if (it != live.end())
+                                {
+                                    found = true;
+                                    if (std::find(seen_batches.begin(), seen_batches.end(), batch->id) == seen_batches.end())
+                                        seen_batches.push_back(batch->id);
+                                }
+                            }
+
+                            if (!found)
+                                ++unresolved;
+                        }
+
+                        if (seen_batches.size() == 1 && unresolved == 0)
+                        {
+                            const auto batch_id = seen_batches.front();
+                            const BatchInfo* info = nullptr;
+                            for (const auto* batch : batches)
+                            {
+                                if (batch && batch->id == batch_id)
+                                {
+                                    info = batch;
+                                    break;
+                                }
+                            }
+                            if (info && !info->name.empty())
+                                label = info->name;
+                            else
+                                label = batch_id.to_string();
+                        }
+                        else if (seen_batches.empty())
+                        {
+                            label = "(unknown/unloaded)";
+                        }
+                        else
+                        {
+                            label = "Mixed";
+                        }
+                    }
+                }
+
+                ImGui::TextDisabled("%s", label.c_str());
+            }
+            ImGui::SameLine();
+            ImGui::BeginDisabled();
+            ImGui::Button("Go to batch");
+            ImGui::EndDisabled();
+            ImGui::Separator();
 
             // --- Add / Remove Component ------------------------------------
 

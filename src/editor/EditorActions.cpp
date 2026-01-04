@@ -6,6 +6,8 @@
 #include "editor/GuiCommands.hpp"
 #include "editor/BatchCommands.hpp"
 #include "ecs/EntityManager.hpp"
+#include "LogMacros.h"
+#include <unordered_set>
 
 namespace eeng::editor
 {
@@ -301,6 +303,55 @@ namespace eeng::editor
         ctx.command_queue->add(
             CommandFactory::Create<DeleteBatchCommand>(
                 id,
+                ctx_wptr));
+    }
+
+    void BatchActions::assign_entities_to_batch(
+        EngineContext& ctx,
+        const BatchId& id,
+        const std::deque<ecs::Entity>& selection)
+    {
+        if (!can_queue(ctx) || !id.valid() || selection.empty())
+            return;
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+            return;
+
+        // Policy: keep batch membership consistent across an entity branch.
+        // If a parent moves, all descendants should follow.
+        if (!ctx.entity_manager)
+        {
+            EENG_LOG(&ctx, "AssignEntitiesToBatch aborted: missing entity manager.");
+            return;
+        }
+
+        std::vector<ecs::Entity> selection_snapshot;
+        selection_snapshot.reserve(selection.size());
+
+        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+        auto& scenegraph = em.scene_graph();
+        std::unordered_set<ecs::Entity> seen;
+
+        for (const auto& entity : selection)
+        {
+            if (!entity.has_id() || !em.entity_valid(entity)) continue;
+            if (!scenegraph.contains(entity)) continue;
+
+            const auto branch = scenegraph.get_branch_topdown(entity);
+            for (const auto& branch_entity : branch)
+            {
+                if (!branch_entity.has_id() || !em.entity_valid(branch_entity)) continue;
+                
+                if (seen.insert(branch_entity).second)
+                    selection_snapshot.push_back(branch_entity);
+            }
+        }
+
+        ctx.command_queue->add(
+            CommandFactory::Create<AssignEntitiesToBatchCommand>(
+                id,
+                std::move(selection_snapshot),
                 ctx_wptr));
     }
 }

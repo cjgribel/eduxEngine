@@ -84,6 +84,7 @@ namespace eeng
         , command_queue(std::make_unique<editor::CommandQueue>())
         , asset_selection(std::make_unique<editor::SelectionManager<Guid>>())
         , entity_selection(std::make_unique<editor::SelectionManager<ecs::Entity>>())
+        , batch_selection(std::make_unique<editor::SelectionManager<BatchId>>())
         , engine_config(std::make_unique<EngineConfig>(*event_queue))
     {
     }

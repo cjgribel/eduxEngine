@@ -33,6 +33,8 @@ namespace
         if (target.kind != eeng::editor::FieldTarget::Kind::Component)
             return std::nullopt;
 
+        // try_get
+
         eeng::ecs::Entity entity = target.entity;
         if (target.entity_guid.valid())
         {
@@ -102,7 +104,8 @@ namespace
 
         return collect_asset_guids_sorted(component_ctx->entity, *component_ctx->registry);
     }
-
+ 
+    // Emit a FieldChangedEvent to notify listeners of a field change.
     void emit_field_changed_event(
         const eeng::editor::FieldTarget& target,
         const eeng::editor::MetaFieldPath& meta_path,
@@ -123,6 +126,7 @@ namespace
             });
     }
 
+    // Invoke the post-assign hook on a component after a field assignment.
     void invoke_component_post_assign_hook(
         eeng::EngineContext& ctx,
         const eeng::editor::FieldTarget& target,
@@ -190,6 +194,7 @@ namespace
 #endif
             return ok;
         }
+
         else if (target.kind == eeng::editor::FieldTarget::Kind::Asset)
         {
             auto ctx_sp = target.ctx.lock();
@@ -218,6 +223,7 @@ namespace
             }
             return false;
         }
+        
         return false;
 
         // Apply path and set new value

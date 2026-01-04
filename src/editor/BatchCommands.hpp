@@ -6,6 +6,7 @@
 #include <future>
 #include <optional>
 #include <string>
+#include <vector>
 #include "Command.hpp"
 #include "EngineContext.hpp"
 #include "BatchRegistry.hpp"
@@ -121,6 +122,38 @@ namespace eeng::editor
         CommandStatus execute() override;
 
         CommandStatus undo() override;
+
+        std::string get_name() const override;
+    };
+
+    class AssignEntitiesToBatchCommand : public Command
+    {
+        struct Assignment
+        {
+            ecs::EntityRef entity_ref;
+            std::vector<BatchId> prev_batches;
+        };
+
+        BatchId target_batch{};
+        EngineContextWeakPtr ctx;
+        std::vector<ecs::Entity> selection;
+        std::vector<Assignment> assignments;
+        std::vector<std::shared_future<bool>> futures;
+        bool in_flight{ false };
+        bool prepared{ false };
+        std::string display_name;
+
+    public:
+        AssignEntitiesToBatchCommand(
+            const BatchId& target,
+            std::vector<ecs::Entity> selection,
+            EngineContextWeakPtr ctx);
+
+        CommandStatus execute() override;
+
+        CommandStatus undo() override;
+
+        CommandStatus update() override;
 
         std::string get_name() const override;
     };

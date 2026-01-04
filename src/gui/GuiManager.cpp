@@ -37,7 +37,7 @@ namespace eeng
 
     namespace
     {
-        // top-up, breadth-first
+        // top-down, breadth-first
         AssetBatch get_branch_topdown(const Guid& guid, const EngineContext& ctx)
         {
             AssetBatch stack;
@@ -805,10 +805,32 @@ namespace eeng
             return;
         }
 
-        // Selection state (local to this window)
-        static int selected_index = 0;
-        if (selected_index >= static_cast<int>(batches.size()))
-            selected_index = static_cast<int>(batches.size()) - 1;
+        // Selection state (shared across GUI)
+        auto& batch_selection = *ctx.batch_selection;
+        if (batch_selection.empty() && !batches.empty())
+            batch_selection.add(batches.front()->id);
+
+        BatchId selected_id{};
+        if (!batch_selection.empty())
+            selected_id = batch_selection.last();
+
+        int selected_index = -1;
+        for (int i = 0; i < static_cast<int>(batches.size()); ++i)
+        {
+            if (batches[i]->id == selected_id)
+            {
+                selected_index = i;
+                break;
+            }
+        }
+
+        if (selected_index < 0 && !batches.empty())
+        {
+            batch_selection.clear();
+            batch_selection.add(batches.front()->id);
+            selected_id = batches.front()->id;
+            selected_index = 0;
+        }
 
         // Layout: left = list, right = details
         ImGui::Columns(2, nullptr, true);
@@ -851,7 +873,12 @@ namespace eeng
             ImGui::PushStyleColor(ImGuiCol_Text, state_color);
             bool selected = ImGui::Selectable(label.c_str(), selected_index == i);
             ImGui::PopStyleColor();
-            if (selected) selected_index = i;
+            if (selected)
+            {
+                batch_selection.clear();
+                batch_selection.add(b->id);
+                selected_index = i;
+            }
         }
 
         ImGui::NextColumn();
@@ -887,6 +914,30 @@ namespace eeng
             ImGui::Text("Live entities (loaded only): %zu",
                 static_cast<size_t>(b->live.size()));
 
+            ImGui::Separator();
+
+            // Selection -> assign to batch
+            const auto& entity_selection = *ctx.entity_selection;
+            const int selection_count = static_cast<int>(entity_selection.size());
+            const bool can_queue = (ctx.command_queue != nullptr);
+            const bool can_assign = can_queue
+                && ctx.entity_manager
+                && selection_count > 0
+                && b->state == BatchInfo::State::Loaded;
+
+            ImGui::TextUnformatted("Selection");
+            ImGui::Text("Selected entities: %d", selection_count);
+
+            // Policy: only allow assignment to loaded batches to avoid orphaning entities.
+            ImGui::BeginDisabled(!can_assign);
+            if (ImGui::Button("Assign selection to this batch"))
+            {
+                editor::BatchActions::assign_entities_to_batch(
+                    ctx,
+                    b->id,
+                    entity_selection.get_all());
+            }
+            ImGui::EndDisabled();
             ImGui::Separator();
 
             // Actions

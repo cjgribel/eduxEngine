@@ -41,6 +41,7 @@ namespace eeng
 
     using GuidSelection = eeng::editor::SelectionManager<Guid>;
     using EntitySelection = eeng::editor::SelectionManager<ecs::Entity>;
+    using BatchSelection = eeng::editor::SelectionManager<BatchId>;
 
     struct SetVsyncEvent { bool enabled; };
     struct SetWireFrameRenderingEvent { bool enabled; };
@@ -143,6 +144,7 @@ namespace eeng
         std::unique_ptr<editor::CommandQueue>   command_queue;
         std::unique_ptr<GuidSelection>          asset_selection;
         std::unique_ptr<EntitySelection>        entity_selection;
+        std::unique_ptr<BatchSelection>         batch_selection;
         std::unique_ptr<EngineConfig>           engine_config;
     };
 
