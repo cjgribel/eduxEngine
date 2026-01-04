@@ -786,6 +786,7 @@ namespace eeng
         // --- Create batch ---
         {
             static char new_batch_name[128] = "";
+            ImGui::SetNextItemWidth(220.0f);
             ImGui::InputText("New Batch Name", new_batch_name, sizeof(new_batch_name));
             ImGui::SameLine();
             if (ImGui::Button("New Batch"))
