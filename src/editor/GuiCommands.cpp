@@ -16,6 +16,7 @@
 #include "meta/EntityMetaHelpers.hpp"
 #include "meta/MetaAux.h"
 #include "MetaLiterals.h"
+#include "LogMacros.h"
 
 // Used by Copy command
 #include "ecs/SceneGraph.hpp"
@@ -85,6 +86,16 @@ namespace
         }
 
         return keys;
+    }
+
+    entt::id_type header_component_id()
+    {
+        static entt::id_type id = []()
+            {
+                auto header_type = eeng::meta::resolve_by_type_id_string("eeng.ecs.HeaderComponent");
+                return header_type ? header_type.id() : entt::id_type{};
+            }();
+        return id;
     }
 
     void ensure_storage(entt::registry& registry, entt::id_type component_id)
@@ -1035,9 +1046,34 @@ namespace eeng::editor {
         // Fetch component storage
         ensure_storage(*registry_sp, comp_id);
         auto storage = registry_sp->storage(comp_id);
-        assert(!storage->contains(entity_current));
+        if (storage->contains(entity_current))
+        {
+            if (auto mt = entt::resolve(comp_id); mt)
+            {
+                EENG_LOG_INFO(ctx_sp.get(),
+                    "AddComponent: %s already present on entity %u",
+                    eeng::meta::get_meta_type_display_name(mt).c_str(),
+                    entity_current.to_integral());
+            }
+            return CommandStatus::Done;
+        }
 
-        storage->push(entity_current);
+        auto comp_type = entt::resolve(comp_id);
+        if (!comp_type)
+            return CommandStatus::Done;
+
+        auto comp_any = comp_type.construct();
+        if (!comp_any)
+        {
+            EENG_LOG_WARN(ctx_sp.get(),
+                "AddComponent: failed to default-construct %s",
+                eeng::meta::get_meta_type_display_name(comp_type).c_str());
+            return CommandStatus::Done;
+        }
+
+        storage->push(entity_current, comp_any.base().data());
+        bind_refs_for_entity(entity_current, *ctx_sp);
+        mark_batch_dirty_for_entity(entity_current, *ctx_sp);
         return CommandStatus::Done;
     }
 
@@ -1059,9 +1095,23 @@ namespace eeng::editor {
         // Fetch component storage
         ensure_storage(*registry_sp, comp_id);
         auto storage = registry_sp->storage(comp_id);
-        assert(storage->contains(entity_current));
+        if (!storage->contains(entity_current))
+            return CommandStatus::Done;
+
+        if (comp_id == header_component_id() && header_component_id() != entt::id_type{})
+        {
+            if (auto mt = entt::resolve(comp_id); mt)
+            {
+                EENG_LOG_INFO(ctx_sp.get(),
+                    "Undo AddComponent: %s is protected; skipping remove on entity %u",
+                    eeng::meta::get_meta_type_display_name(mt).c_str(),
+                    entity_current.to_integral());
+            }
+            return CommandStatus::Done;
+        }
 
         storage->remove(entity_current);
+        mark_batch_dirty_for_entity(entity_current, *ctx_sp);
         return CommandStatus::Done;
     }
 
@@ -1109,7 +1159,29 @@ namespace eeng::editor {
         // Fetch component storage
         ensure_storage(*registry_sp, comp_id);
         auto storage = registry_sp->storage(comp_id);
-        assert(storage->contains(entity_current));
+        if (!storage->contains(entity_current))
+        {
+            if (auto mt = entt::resolve(comp_id); mt)
+            {
+                EENG_LOG_INFO(ctx_sp.get(),
+                    "RemoveComponent: %s not present on entity %u",
+                    eeng::meta::get_meta_type_display_name(mt).c_str(),
+                    entity_current.to_integral());
+            }
+            return CommandStatus::Done;
+        }
+
+        if (comp_id == header_component_id() && header_component_id() != entt::id_type{})
+        {
+            if (auto mt = entt::resolve(comp_id); mt)
+            {
+                EENG_LOG_INFO(ctx_sp.get(),
+                    "RemoveComponent: %s is protected; skipping remove on entity %u",
+                    eeng::meta::get_meta_type_display_name(mt).c_str(),
+                    entity_current.to_integral());
+            }
+            return CommandStatus::Done;
+        }
 
         // Fetch component type
         auto comp_type = entt::resolve(comp_id);
@@ -1121,6 +1193,7 @@ namespace eeng::editor {
             eeng::meta::SerializationPurpose::undo);
         // Remove component from entity
         storage->remove(entity_current);
+        mark_batch_dirty_for_entity(entity_current, *ctx_sp);
         return CommandStatus::Done;
     }
 
@@ -1157,6 +1230,8 @@ namespace eeng::editor {
             eeng::meta::SerializationPurpose::undo);
         // Add component to entity
         storage->push(entity_current, comp_any.base().data());
+        bind_refs_for_entity(entity_current, *ctx_sp);
+        mark_batch_dirty_for_entity(entity_current, *ctx_sp);
         return CommandStatus::Done;
     }
 

@@ -158,6 +158,64 @@ namespace eeng::editor
         }
     }
 
+    void SceneActions::add_components(EngineContext& ctx, const std::deque<ecs::Entity>& selection, entt::id_type comp_id)
+    {
+        if (!can_queue(ctx) || selection.empty() || comp_id == entt::id_type{})
+            return;
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+            return;
+
+        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+        auto& scenegraph = em.scene_graph();
+
+        for (const auto& entity : selection)
+        {
+            if (!entity.has_id())
+                continue;
+            if (!em.entity_valid(entity))
+                continue;
+            if (!scenegraph.contains(entity))
+                continue;
+
+            ctx.command_queue->add(
+                CommandFactory::Create<AddComponentToEntityCommand>(
+                    entity,
+                    comp_id,
+                    ctx_wptr));
+        }
+    }
+
+    void SceneActions::remove_components(EngineContext& ctx, const std::deque<ecs::Entity>& selection, entt::id_type comp_id)
+    {
+        if (!can_queue(ctx) || selection.empty() || comp_id == entt::id_type{})
+            return;
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+            return;
+
+        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+        auto& scenegraph = em.scene_graph();
+
+        for (const auto& entity : selection)
+        {
+            if (!entity.has_id())
+                continue;
+            if (!em.entity_valid(entity))
+                continue;
+            if (!scenegraph.contains(entity))
+                continue;
+
+            ctx.command_queue->add(
+                CommandFactory::Create<RemoveComponentFromEntityCommand>(
+                    entity,
+                    comp_id,
+                    ctx_wptr));
+        }
+    }
+
     void BatchActions::load_batch(EngineContext& ctx, const BatchId& id)
     {
         if (!can_queue(ctx) || !id.valid())

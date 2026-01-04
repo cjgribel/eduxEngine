@@ -32,6 +32,7 @@
 #include <entt/entt.hpp>
 // #include <entt/meta/pointer.hpp>
 #include <nlohmann/json.hpp> // -> TYPE HELPER
+#include <type_traits>
 
     /*
     Note:
@@ -117,6 +118,9 @@ namespace eeng
         template<typename T>
         void register_component()
         {
+            static_assert(std::is_default_constructible_v<T>,
+                "Component must be default constructible for editor add/remove.");
+
             entt::meta_factory<T>()
 
                 // Assure entt storage

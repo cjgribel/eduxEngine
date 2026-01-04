@@ -6,6 +6,7 @@
 #include "EngineContext.hpp"
 #include "editor/InspectorState.hpp"
 #include "engineapi/SelectionManager.hpp"
+#include "editor/EditorActions.hpp"
 #include "util/EventQueue.h"
 #include "meta/MetaInspect.hpp"      // for eeng::meta::inspect_entity
 #include "MetaLiterals.h"
@@ -14,7 +15,9 @@
 // #include "ecs/HeaderComponent.hpp"
 
 #include "imgui.h"
+#include <algorithm>
 #include <string>
+#include <vector>
 
 namespace eeng::gui
 {
@@ -54,95 +57,155 @@ namespace eeng::gui
                 registry_sp->valid(selected_entity);
 
             // --- Add / Remove Component ------------------------------------
-            
-            ImGui::BeginDisabled(); // <- entire Add/Remove Component & Behavior section done
+
+            struct ComponentItem
+            {
+                entt::id_type id{};
+                std::string name;
+            };
+
+            const auto& component_items = []() -> const std::vector<ComponentItem>&
+                {
+                    static std::vector<ComponentItem> items;
+                    static bool built = false;
+
+                    if (!built)
+                    {
+                        for (auto&& [id, type] : entt::resolve())
+                        {
+                            if (!type)
+                                continue;
+                            if (!eeng::meta::type_is_registered(type))
+                                continue;
+                            if (!type.func(eeng::literals::assure_component_storage_hs))
+                                continue;
+
+                            items.push_back(ComponentItem{
+                                type.id(),
+                                eeng::meta::get_meta_type_display_name(type)
+                                });
+                        }
+
+                        std::sort(
+                            items.begin(),
+                            items.end(),
+                            [](const ComponentItem& a, const ComponentItem& b)
+                            {
+                                return a.name < b.name;
+                            });
+
+                        built = true;
+                    }
+
+                    return items;
+                }();
+
+            static entt::id_type selected_comp_id{};
+            static ImGuiTextFilter comp_filter;
+
+            const bool has_selection = !entity_selection.empty();
+            const auto& selection = entity_selection.get_all();
+            const int selection_count = static_cast<int>(selection.size());
 
             ImGui::TextUnformatted("Add/Remove Component");
 
-            // Same static as before, now local to this function
-            static entt::id_type selected_comp_id = 0;
+            if (ImGui::Button("Components..."))
             {
-#if 0
-                const auto get_comp_name = [](entt::id_type comp_id) -> std::string
+                ImGui::OpenPopup("component_picker_popup");
+            }
+
+            if (ImGui::BeginPopup("component_picker_popup"))
+            {
+                comp_filter.Draw("Filter##component_picker");
+                ImGui::Separator();
+
+                const entt::id_type header_comp_id = []()
                     {
-                        return get_meta_type_name(entt::resolve(comp_id));
-                    };
+                        auto header_type = eeng::meta::resolve_by_type_id_string("eeng.ecs.HeaderComponent");
+                        return header_type ? header_type.id() : entt::id_type{};
+                    }();
 
-                std::string selected_entry_label;
-                if (selected_comp_id)
+                int selected_present_count = 0;
+                ImGui::BeginChild("component_picker_list", ImVec2(520.0f, 280.0f), true);
+                for (const auto& item : component_items)
                 {
-                    selected_entry_label = get_comp_name(selected_comp_id);
-                }
+                    if (!comp_filter.PassFilter(item.name.c_str()))
+                        continue;
 
-                if (ImGui::BeginCombo("##addcompcombo", selected_entry_label.c_str()))
-                {
-                    // For all meta types
-                    for (auto&& [id_, type] : entt::resolve())
+                    int present_count = 0;
+                    if (registry_sp)
                     {
-                        // Skip non-component types
-                        if (auto is_component =
-                            get_meta_type_prop<bool, false>(type, "is_component"_hs);
-                            !is_component)
+                        if (auto storage = registry_sp->storage(item.id); storage)
                         {
-                            continue;
-                        }
-
-                        // See your original note about id_ vs type.id()
-                        auto id = type.id();
-
-                        bool is_selected = (id == selected_comp_id);
-                        std::string label = get_comp_name(id);
-
-                        if (ImGui::Selectable(label.c_str(), is_selected))
-                        {
-                            selected_comp_id = id;
-                        }
-
-                        if (is_selected)
-                        {
-                            ImGui::SetItemDefaultFocus();
+                            for (const auto& entity : selection)
+                            {
+                                if (!entity.has_id())
+                                    continue;
+                                if (!registry_sp->valid(entity))
+                                    continue;
+                                if (storage->contains(entity))
+                                    ++present_count;
+                            }
                         }
                     }
-                    ImGui::EndCombo();
+
+                    if (item.id == selected_comp_id)
+                        selected_present_count = present_count;
+
+                    std::string label = item.name
+                        + " (" + std::to_string(present_count)
+                        + "/" + std::to_string(selection_count) + ")";
+
+                    ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                    if (selection_count > 0)
+                    {
+                        if (present_count == 0)
+                            color = ImVec4(0.65f, 0.65f, 0.65f, 1.0f);
+                        else if (present_count == selection_count)
+                            color = ImVec4(0.35f, 0.85f, 0.35f, 1.0f);
+                        else
+                            color = ImVec4(0.95f, 0.85f, 0.35f, 1.0f);
+                    }
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, color);
+                    const bool is_selected = (item.id == selected_comp_id);
+                    if (ImGui::Selectable(label.c_str(), is_selected))
+                    {
+                        selected_comp_id = item.id;
+                        selected_present_count = present_count;
+                    }
+                    ImGui::PopStyleColor();
                 }
-#endif
-            }
+                ImGui::EndChild();
 
-            // Add Component button
-            ImGui::SameLine();
-            ImGui::BeginDisabled(); // disable for now
-            if (ImGui::Button("Add##addcomponent") &&
-                selected_comp_id &&
-                !entity_selection.empty())
-            {
-#if 0
-                AddComponentToEntitySelectionEvent event{
-                    selected_comp_id,
-                    entity_selection
-                };
-                event_queue.enqueue_event(event);
-#endif
-            }
-            ImGui::EndDisabled();
+                const bool has_selected_component = selected_comp_id != entt::id_type{};
+                const bool can_add = has_selection && has_selected_component
+                    && (selected_present_count < selection_count);
+                const bool can_remove = has_selection && has_selected_component
+                    && (selected_present_count > 0)
+                    && (selected_comp_id != header_comp_id);
 
-            // Remove Component button
-            ImGui::SameLine();
-            ImGui::BeginDisabled(); // disable for now
-            if (ImGui::Button("Remove##removecomponent") &&
-                selected_comp_id &&
-                !entity_selection.empty())
-            {
-#if 0
-                RemoveComponentFromEntitySelectionEvent event{
-                    selected_comp_id,
-                    entity_selection
-                };
-                event_queue.enqueue_event(event);
-#endif
+                ImGui::BeginDisabled(!can_add);
+                if (ImGui::Button("Add##addcomponent"))
+                {
+                    editor::SceneActions::add_components(ctx, selection, selected_comp_id);
+                }
+                ImGui::EndDisabled();
+
+                ImGui::SameLine();
+
+                ImGui::BeginDisabled(!can_remove);
+                if (ImGui::Button("Remove##removecomponent"))
+                {
+                    editor::SceneActions::remove_components(ctx, selection, selected_comp_id);
+                }
+                ImGui::EndDisabled();
+
+                ImGui::EndPopup();
             }
-            ImGui::EndDisabled();
 
             // --- Add / Remove Behavior ------------------------------------
+            ImGui::BeginDisabled(); // TODO: script components are not wired yet.
             ImGui::TextUnformatted("Add/Remove Behavior");
             // Scripts combo (unchanged, just using ctx selection)
             static std::string selected_script_path;
@@ -206,7 +269,7 @@ namespace eeng::gui
             }
             ImGui::EndDisabled();
 
-            ImGui::EndDisabled(); // <- entire Add/Remove Component & Behavior section done
+            ImGui::EndDisabled();
 
             // --- Component inspector --------------------------------------
             // ImGui::SetNextItemOpen(true);

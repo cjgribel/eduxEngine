@@ -5,6 +5,7 @@
 
 #include <deque>
 #include <string>
+#include <entt/entt.hpp>
 #include "EngineContext.hpp"
 
 namespace eeng::editor
@@ -16,6 +17,8 @@ namespace eeng::editor
         static void copy_entities(EngineContext& ctx, const std::deque<ecs::Entity>& selection);
         static void parent_entities(EngineContext& ctx, const std::deque<ecs::Entity>& selection);
         static void unparent_entities(EngineContext& ctx, const std::deque<ecs::Entity>& selection);
+        static void add_components(EngineContext& ctx, const std::deque<ecs::Entity>& selection, entt::id_type comp_id);
+        static void remove_components(EngineContext& ctx, const std::deque<ecs::Entity>& selection, entt::id_type comp_id);
     };
 
     struct BatchActions
