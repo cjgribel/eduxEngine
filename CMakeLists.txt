@@ -191,6 +191,21 @@ include_directories(${imgui_SOURCE_DIR}/backends)
 message(STATUS "Dear ImGui fetched and included")
 
 #
+# Fetch ImGuiFileDialog
+#
+message(STATUS "Fetching ImGuiFileDialog")
+FetchContent_Declare(imgui_file_dialog
+    GIT_REPOSITORY https://github.com/aiekick/ImGuiFileDialog.git
+    GIT_TAG master
+)
+FetchContent_GetProperties(imgui_file_dialog)
+if(NOT imgui_file_dialog_POPULATED)
+    FetchContent_Populate(imgui_file_dialog)
+    message(STATUS "ImGuiFileDialog populated")
+endif()
+include_directories(${imgui_file_dialog_SOURCE_DIR})
+
+#
 # Fetch nlohmann
 #
 # Fetch nlohmann/json library
@@ -218,6 +233,7 @@ add_executable(Module1
     ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
     ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp # ImGui widgets for std::string
+    ${imgui_file_dialog_SOURCE_DIR}/ImGuiFileDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EngineFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GLDebugMessageCallback.cc
