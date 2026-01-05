@@ -27,7 +27,6 @@ namespace eeng
         void draw_storage(EngineContext& ctx) const;
 
         void draw_resource_browser(EngineContext& ctx) const;
-        void draw_content_tree(EngineContext& ctx) const;
 
         void draw_batch_registry(EngineContext& ctx) const;
         void draw_task_monitor(EngineContext& ctx) const;
