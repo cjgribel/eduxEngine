@@ -639,66 +639,78 @@ namespace eeng
 
         ImGui::Separator();
 
-        // --- Scene graph hierarchy -------------------------------------------
+        static gui::VerticalSplitterWidget scene_splitter{};
+        static bool scene_splitter_init = false;
+        ImVec2 pane_avail = ImGui::GetContentRegionAvail();
+        if (!scene_splitter_init)
         {
-            static float hierarchy_height = 150.0f;
+            const float line_h = ImGui::GetTextLineHeightWithSpacing();
+            const float desired_top = line_h * 10.0f;
+            scene_splitter.bottom_height = std::max(200.0f, pane_avail.y - desired_top);
+            scene_splitter_init = true;
+        }
+
+        const float top_height = scene_splitter.calc_top_height(pane_avail.y);
+
+        if (ImGui::BeginChild("SceneTopPane", ImVec2(0.0f, top_height), false))
+        {
+            auto& selection = *ctx.entity_selection;
+            std::string selection_list;
+            if (selection.empty())
+            {
+                selection_list = "(none)";
+            }
+            else
+            {
+                selection_list.reserve(selection.size() * 6); // tiny pre-reserve
+                bool first = true;
+                for (auto entity : selection.get_all())
+                {
+                    if (!first)
+                        selection_list += ", ";
+                    first = false;
+                    selection_list += std::to_string(entity.to_integral());
+                }
+            }
+
+            constexpr const char* selection_label = "Selected entities:";
+            const float available_width = ImGui::GetContentRegionAvail().x;
+            const float label_width = ImGui::CalcTextSize(selection_label).x + ImGui::GetStyle().ItemSpacing.x;
+            const float wrap_width = std::max(0.0f, available_width - label_width);
+            const float list_height = ImGui::CalcTextSize(selection_list.c_str(), nullptr, false, wrap_width).y;
+            const float selection_height = std::max(ImGui::GetTextLineHeightWithSpacing(), list_height);
+            const float available = ImGui::GetContentRegionAvail().y;
+            const float hierarchy_height = std::max(0.0f, available - selection_height - ImGui::GetStyle().ItemSpacing.y);
 
             if (ImGui::BeginChild("SceneHierarchyRegion",
-                ImVec2(0.0f, hierarchy_height), // full width, fixed height
-                true,                           // border
+                ImVec2(0.0f, hierarchy_height),
+                true,
                 ImGuiWindowFlags_HorizontalScrollbar))
             {
                 gui::SceneHierarchyWidget hierarchy{ ctx };
                 hierarchy.draw();
             }
             ImGui::EndChild();
-        }
 
-        // --- List selected ---------------------------------------------------
+            ImGui::Separator();
 
-        ImGui::Separator();
-
-        auto& selection = *ctx.entity_selection;
-        if (selection.size() > 0)
-        {
-
-            ImGui::TextUnformatted("Selected entities:");
-            // ImGui::SameLine();
-
-            std::string list;
-            list.reserve(selection.size() * 6); // tiny pre-reserve
-
-            bool first = true;
-            for (auto entity : selection.get_all())
-            {
-                if (!first)
-                    list += ", ";
-                first = false;
-
-                list += std::to_string(entity.to_integral());
-            }
-
-            // This will wrap nicely inside the window.
+            ImGui::TextUnformatted(selection_label);
             ImGui::SameLine();
-            ImGui::TextWrapped("%s", list.c_str());
+            if (selection.empty())
+                ImGui::TextDisabled("%s", selection_list.c_str());
+            else
+                ImGui::TextWrapped("%s", selection_list.c_str());
         }
+        ImGui::EndChild();
 
-        ImGui::Separator();
+        scene_splitter.draw_handle(pane_avail.y);
 
-        // --- Entity inspector ------------------------------------------------
-
-        //static Editor::InspectorState inspector{};
-        // if (Inspector::inspect_entity(inspector, *dispatcher)) {}
-
+        if (ImGui::BeginChild("InspectorRegion", ImVec2(0.0f, scene_splitter.bottom_height), true))
         {
-            if (ImGui::BeginChild("InspectorRegion", ImVec2(0.0f, 0.0f), true))
-            {
-                // Entity inspector should draw *here* (no new window)
-                gui::EntityInspectorWidget inspector{ ctx };
-                inspector.draw();
-            }
-            ImGui::EndChild();
+            gui::EntityInspectorWidget inspector{ ctx };
+            inspector.draw();
         }
+        ImGui::EndChild();
 
         // --- Command Queue (NOT HERE) ----------------------------------------
 
