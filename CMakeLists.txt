@@ -29,6 +29,7 @@ else()
     message(STATUS "Non-Apple platform detected")
 endif()
 add_compile_definitions(ENTT_USE_ATOMIC)
+# add_compile_definitions(EENG_ENTITY_DESTROY_IDEMPOTENT)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # ^ consider target_include_directories

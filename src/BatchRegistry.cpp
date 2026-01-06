@@ -656,6 +656,8 @@ namespace eeng
                 {
                     std::lock_guard lk(mtx_);
                     B->live.push_back(created);
+                    if (created.guid.valid())
+                        entity_to_batch_[created.guid] = id;
                 }
 
                 mark_closure_dirty(id);
@@ -703,6 +705,13 @@ namespace eeng
                             return er.guid == entity_ref.guid;
                         }),
                         live.end());
+
+                    if (entity_ref.guid.valid())
+                    {
+                        auto it_map = entity_to_batch_.find(entity_ref.guid);
+                        if (it_map != entity_to_batch_.end() && it_map->second == id)
+                            entity_to_batch_.erase(it_map);
+                    }
                 }
 
                 // MT: queue destroy
@@ -751,6 +760,8 @@ namespace eeng
 
                     B = &it->second;
                     B->live.push_back(entity_ref);
+                    if (entity_ref.guid.valid())
+                        entity_to_batch_[entity_ref.guid] = id;
                 }
 
                 // If entity isn't live or registry is gone, nothing more to do.
@@ -839,6 +850,13 @@ namespace eeng
                         }),
                         live.end());
                     removed = (live.size() != old_size);
+
+                    if (removed && entity_ref.guid.valid())
+                    {
+                        auto it_map = entity_to_batch_.find(entity_ref.guid);
+                        if (it_map != entity_to_batch_.end() && it_map->second == id)
+                            entity_to_batch_.erase(it_map);
+                    }
                 }
 
                 if (removed)
@@ -894,6 +912,8 @@ namespace eeng
                 {
                     std::lock_guard lk(mtx_);
                     B->live.push_back(created);
+                    if (created.guid.valid())
+                        entity_to_batch_[created.guid] = id;
                 }
 
                 auto registry_sp = ctx.entity_manager->registry_wptr().lock();
@@ -1120,6 +1140,20 @@ namespace eeng
             out.push_back(&b);
         }
         return out;
+    }
+
+    bool BatchRegistry::try_get_loaded_batch_for_entity(const ecs::EntityRef& entity_ref, BatchId& out_id) const
+    {
+        if (!entity_ref.guid.valid())
+            return false;
+
+        std::lock_guard lk(mtx_);
+        const auto it = entity_to_batch_.find(entity_ref.guid);
+        if (it == entity_to_batch_.end())
+            return false;
+
+        out_id = it->second;
+        return true;
     }
 
     void BatchRegistry::mark_closure_dirty(const BatchId& id)
@@ -1452,6 +1486,15 @@ namespace eeng
                 ctx.entity_manager->register_entities_from_deserialization(new_entities);
             });
 
+        {
+            std::lock_guard lk(mtx_);
+            for (const auto& er : B.live)
+            {
+                if (er.guid.valid())
+                    entity_to_batch_[er.guid] = B.id;
+            }
+        }
+
         // ABORT IF ASSET LOAD FAILED ???
 
         // 3) Bind AssetRef<> + EntityRef<> inside components
@@ -1479,6 +1522,18 @@ namespace eeng
                     }
                 }
             });
+
+        {
+            std::lock_guard lk(mtx_);
+            for (const auto& er : B.live)
+            {
+                if (!er.guid.valid())
+                    continue;
+                auto it = entity_to_batch_.find(er.guid);
+                if (it != entity_to_batch_.end() && it->second == B.id)
+                    entity_to_batch_.erase(it);
+            }
+        }
 
         B.live.clear();
 

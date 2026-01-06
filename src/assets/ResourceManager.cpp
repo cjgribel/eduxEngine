@@ -564,6 +564,7 @@ namespace eeng
         const auto& tree = index_data->trees->content_tree;
 
         // 1) Validate selection: each selected GUID must be a dependency-tree root.
+        //    We do not allow unimporting sub-assets; the root owns the full folder.
         std::unordered_set<Guid> unique_roots;
         unique_roots.reserve(roots.size());
         for (const Guid& guid : roots)
@@ -600,7 +601,9 @@ namespace eeng
         groups.reserve(unique_roots.size());
         std::unordered_set<Guid> all_assets;
 
-        // 2) Build per-root groups from the dependency tree (for lease checks + folder resolution).
+        // 2) Build per-root groups from the dependency tree.
+        //    This produces the full subtree (for lease checks) and collects on-disk
+        //    directories to resolve the folder to move into .trash.
         for (const Guid& root : unique_roots)
         {
             RootGroup group;
@@ -609,6 +612,7 @@ namespace eeng
 
             tree.traverse_breadthfirst(root, [&](const Guid& guid, size_t)
                 {
+                    // Track the dependency subtree for lease checks.
                     group.subtree.push_back(guid);
                     all_assets.insert(guid);
 
@@ -619,6 +623,7 @@ namespace eeng
                         return;
                     }
 
+                    // Collect each asset's parent directory to resolve the folder root later.
                     const auto& path = entry_it->second->absolute_path;
                     if (!path.empty())
                         group.asset_dirs.push_back(path.parent_path());
@@ -626,6 +631,7 @@ namespace eeng
 
             if (missing_entry)
             {
+                // Index data is incomplete; avoid deleting partial folders.
                 if (error_out) *error_out = "Asset entry missing for subtree.";
                 return false;
             }
@@ -634,6 +640,7 @@ namespace eeng
         }
 
         // 3) Hard-stop if any asset in the subtree is currently leased.
+        //    We cannot safely remove assets that are still referenced by live systems.
         for (const Guid& guid : all_assets)
         {
             if (held_by_any(guid))
@@ -645,6 +652,7 @@ namespace eeng
         }
 
         // 4) Resolve each subtree's on-disk root folder and move it to .trash.
+        //    This is a soft delete: the folder is renamed, preserving GUIDs.
         const auto assets_root = assets_root_;
         if (assets_root.empty())
         {
@@ -665,6 +673,7 @@ namespace eeng
         for (auto& group : groups)
         {
             // Use the shared ancestor of all files in the subtree as the folder root.
+            // Reject if the ancestor is the global assets root (too broad).
             const std::filesystem::path common_root = common_ancestor_path(group.asset_dirs);
             if (common_root.empty() || common_root == assets_root)
             {
@@ -674,6 +683,7 @@ namespace eeng
 
             if (!std::filesystem::exists(common_root))
             {
+                // The index says the files exist, but they no longer do.
                 if (error_out) *error_out = "Asset folder not found on disk.";
                 return false;
             }
@@ -685,6 +695,7 @@ namespace eeng
             if (std::filesystem::exists(dest_path))
                 dest_path = trash_root / (dest_name + "_" + Guid::generate().to_string());
 
+            // Move the whole folder into .trash to keep its files intact.
             std::filesystem::rename(common_root, dest_path, ec);
             if (ec)
             {

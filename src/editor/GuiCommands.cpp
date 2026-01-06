@@ -7,12 +7,20 @@
 
 #include <iostream>
 #include <cassert>
+#include <chrono>
+#include <functional>
+#include <future>
+#include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include "MetaSerialize.hpp"
 #include "GuiCommands.hpp"
 #include "BatchRegistry.hpp"
 #include "ecs/EntityManager.hpp"
+#include "ResourceManager.hpp"
+#include "ThreadPool.hpp"
+#include "assets/importers/AssimpImporter.hpp"
 #include "meta/EntityMetaHelpers.hpp"
 #include "meta/MetaAux.h"
 #include "MetaLiterals.h"
@@ -23,11 +31,15 @@
 
 namespace
 {
+    using eeng::BatchId;
     using eeng::Guid;
     using eeng::EngineContext;
     using eeng::EngineContextWeakPtr;
     using eeng::EntityManager;
     using eeng::ecs::Entity;
+    using eeng::editor::CommandStatus;
+    using eeng::TaskResult;
+    using eeng::ResourceManager;
 
     struct HeaderJsonKeys
     {
@@ -72,6 +84,119 @@ namespace
         }
 
         return keys;
+    }
+
+    void set_ui_in_flight(
+        const std::shared_ptr<std::atomic<bool>>& flag,
+        bool value)
+    {
+        if (flag)
+            flag->store(value, std::memory_order_relaxed);
+    }
+
+    CommandStatus poll_task_future(
+        std::shared_future<TaskResult>& future,
+        bool& in_flight_flag,
+        const std::function<void(const TaskResult&)>& on_ready = {})
+    {
+        if (!future.valid())
+        {
+            in_flight_flag = false;
+            return CommandStatus::Done;
+        }
+
+        if (future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+            return CommandStatus::InFlight;
+
+        in_flight_flag = false;
+        const TaskResult result = future.get();
+        future = {};
+
+        if (on_ready)
+            on_ready(result);
+
+        return result.success ? CommandStatus::Done : CommandStatus::Failed;
+    }
+
+    TaskResult make_task_error(
+        TaskResult::TaskType type,
+        std::string_view message,
+        const Guid& guid = {})
+    {
+        TaskResult res;
+        res.type = type;
+        res.add_result(guid, false, message);
+        return res;
+    }
+
+    std::shared_future<TaskResult> queue_unimport_task(
+        ResourceManager& rm,
+        EngineContext& ctx,
+        std::vector<Guid> roots)
+    {
+        return rm.queue_import_job(
+            [roots = std::move(roots)](ResourceManager& rm, EngineContext& ctx) mutable -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Unimport;
+
+                std::string error;
+                if (!rm.unimport_assets(roots, ctx, &error))
+                {
+                    if (error.empty())
+                        error = "Unimport failed.";
+                    res.add_result(Guid{}, false, error);
+                    return res;
+                }
+
+                for (const Guid& root : roots)
+                    res.add_result(root, true, "Unimport ok");
+
+                const auto& assets_root = rm.assets_root();
+                if (!assets_root.empty())
+                    rm.scan_assets_async(assets_root, ctx);
+                return res;
+            },
+            ctx);
+    }
+
+    std::shared_future<TaskResult> queue_restore_task(
+        ResourceManager& rm,
+        EngineContext& ctx,
+        std::vector<Guid> roots)
+    {
+        return rm.queue_import_job(
+            [roots = std::move(roots)](ResourceManager& rm, EngineContext& ctx) mutable -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Restore;
+
+                bool restored_any = false;
+                for (const Guid& root : roots)
+                {
+                    std::string error;
+                    if (!rm.restore_from_trash(root, ctx, &error))
+                    {
+                        if (error.empty())
+                            error = "Restore failed.";
+                        res.add_result(root, false, error);
+                        continue;
+                    }
+
+                    restored_any = true;
+                    res.add_result(root, true, "Restore ok");
+                }
+
+                if (restored_any)
+                {
+                    const auto& assets_root = rm.assets_root();
+                    if (!assets_root.empty())
+                        rm.scan_assets_async(assets_root, ctx);
+                }
+
+                return res;
+            },
+            ctx);
     }
 
     const HeaderJsonKeys& header_keys()
@@ -323,6 +448,75 @@ namespace
         auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
         br.mark_closure_dirty_for_entity(entity, ctx);
     }
+
+    void detach_entity_from_loaded_batch(Entity entity, EngineContext& ctx)
+    {
+        if (!ctx.batch_registry || !ctx.entity_manager)
+            return;
+
+        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+        eeng::ecs::EntityRef entity_ref{};
+        if (!em.try_get_entity_ref(entity, entity_ref))
+            return;
+        if (!entity_ref.guid.valid())
+            return;
+
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+        BatchId batch{};
+        if (br.try_get_loaded_batch_for_entity(entity_ref, batch))
+            br.queue_detach_entity(batch, entity_ref, ctx);
+    }
+
+    void sync_branch_batch_with_parent(Entity root_entity, Entity parent_entity, EngineContext& ctx)
+    {
+        if (!ctx.batch_registry || !ctx.entity_manager)
+            return;
+
+        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+        auto& scenegraph = em.scene_graph();
+
+        if (!scenegraph.contains(root_entity))
+            return;
+
+        BatchId parent_batch{};
+        bool parent_has_batch = false;
+
+        if (parent_entity.has_id())
+        {
+            const auto parent_ref = em.get_entity_ref(parent_entity);
+            if (parent_ref.is_bound() && parent_ref.guid.valid())
+                parent_has_batch = br.try_get_loaded_batch_for_entity(parent_ref, parent_batch);
+        }
+
+        const auto branch = scenegraph.get_branch_topdown(root_entity);
+        for (const auto& entity : branch)
+        {
+            if (!entity.has_id() || !em.entity_valid(entity))
+                continue;
+
+            const auto entity_ref = em.get_entity_ref(entity);
+            if (!entity_ref.is_bound() || !entity_ref.guid.valid())
+                continue;
+
+            BatchId current_batch{};
+            const bool has_current = br.try_get_loaded_batch_for_entity(entity_ref, current_batch);
+
+            if (parent_has_batch)
+            {
+                if (!has_current || current_batch != parent_batch)
+                {
+                    if (has_current)
+                        br.queue_detach_entity(current_batch, entity_ref, ctx);
+                    br.queue_attach_entity(parent_batch, entity_ref, ctx);
+                }
+            }
+            else if (has_current)
+            {
+                br.queue_detach_entity(current_batch, entity_ref, ctx);
+            }
+        }
+    }
 }
 
 namespace eeng::editor {
@@ -385,7 +579,11 @@ namespace eeng::editor {
         }
 
         if (created_entity.has_id())
+        {
+            const auto parent_ref = em.get_entity_parent(created_entity);
+            sync_branch_batch_with_parent(created_entity, parent_ref.entity, *ctx_sp);
             mark_batch_dirty_for_entity(created_entity, *ctx_sp);
+        }
 
         // std::cout << "CreateEntityCommand::execute() " << entt::to_integral(created_entity) << std::endl;
         return CommandStatus::Done;
@@ -411,6 +609,7 @@ namespace eeng::editor {
             if (entity_opt && entity_opt->has_id())
             {
                 mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
+                detach_entity_from_loaded_batch(*entity_opt, *ctx_sp);
                 ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
             }
             return CommandStatus::Done;
@@ -419,6 +618,7 @@ namespace eeng::editor {
         if (created_entity.has_id())
         {
             mark_batch_dirty_for_entity(created_entity, *ctx_sp);
+            detach_entity_from_loaded_batch(created_entity, *ctx_sp);
             ctx_sp->entity_manager->queue_entity_for_destruction(created_entity);
         }
         // destroy_func(created_entity);
@@ -475,6 +675,7 @@ namespace eeng::editor {
         }
 
         mark_batch_dirty_for_entity(entity_current, *ctx_sp);
+        detach_entity_from_loaded_batch(entity_current, *ctx_sp);
         ctx_sp->entity_manager->queue_entity_for_destruction(entity_current);
         // destroy_func(entity);
         return CommandStatus::Done;
@@ -569,6 +770,7 @@ namespace eeng::editor {
             if (!entity_opt || !entity_opt->has_id())
                 continue;
             mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
+            detach_entity_from_loaded_batch(*entity_opt, *ctx_sp);
             ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
         }
         return CommandStatus::Done;
@@ -693,6 +895,7 @@ namespace eeng::editor {
             return CommandStatus::Done;
 
         mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
+        detach_entity_from_loaded_batch(*entity_opt, *ctx_sp);
         ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
 
         // Meta::deserialize_entities(entity_json, context);
@@ -833,6 +1036,7 @@ namespace eeng::editor {
             if (!entity_opt || !entity_opt->has_id())
                 continue;
             mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
+            detach_entity_from_loaded_batch(*entity_opt, *ctx_sp);
             ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
         }
         return CommandStatus::Done;
@@ -915,6 +1119,7 @@ namespace eeng::editor {
 
         // Transform dirtying on reparent is handled by EntityManager.
         ctx_sp->entity_manager->reparent_entity(entity_current, parent_current);
+        sync_branch_batch_with_parent(entity_current, parent_current, *ctx_sp);
         return CommandStatus::Done;
     }
 
@@ -949,6 +1154,7 @@ namespace eeng::editor {
 
         // Transform dirtying on reparent is handled by EntityManager.
         ctx_sp->entity_manager->reparent_entity(*entity_opt, parent_current);
+        sync_branch_batch_with_parent(*entity_opt, parent_current, *ctx_sp);
         return CommandStatus::Done;
     }
 
@@ -1236,6 +1442,286 @@ namespace eeng::editor {
     }
 
     std::string RemoveComponentFromEntityCommand::get_name() const
+    {
+        return display_name;
+    }
+
+    // --- ImportModelCommand --------------------------------------------------
+
+    ImportModelCommand::ImportModelCommand(
+        std::filesystem::path source_file,
+        assets::ImportFlags flags,
+        std::string model_name,
+        EngineContextWeakPtr ctx,
+        std::shared_ptr<std::atomic<bool>> in_flight)
+        : source_file(std::move(source_file))
+        , flags(flags)
+        , model_name(std::move(model_name))
+        , ctx(std::move(ctx))
+        , ui_in_flight(std::move(in_flight))
+        , display_name("Import Model")
+    {
+    }
+
+    CommandStatus ImportModelCommand::execute()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->resource_manager)
+        {
+            set_ui_in_flight(ui_in_flight, false);
+            return CommandStatus::Done;
+        }
+
+        auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+
+        if (was_undone && !imported_roots.empty())
+        {
+            pending_action = PendingAction::Restore;
+            future = queue_restore_task(rm, *ctx_sp, imported_roots);
+            in_flight = true;
+            set_ui_in_flight(ui_in_flight, true);
+            return poll_task_future(future, in_flight, [this](const TaskResult& result)
+                {
+                    if (result.success)
+                        was_undone = false;
+                    set_ui_in_flight(ui_in_flight, false);
+                    pending_action = PendingAction::None;
+                });
+        }
+
+        if (!ctx_sp->thread_pool)
+        {
+            EENG_LOG_WARN(ctx_sp.get(), "Asset import skipped: ThreadPool unavailable.");
+            set_ui_in_flight(ui_in_flight, false);
+            return CommandStatus::Done;
+        }
+
+        const auto& assets_root = rm.assets_root();
+        if (assets_root.empty())
+        {
+            EENG_LOG_WARN(ctx_sp.get(), "Asset import skipped: assets root not set.");
+            set_ui_in_flight(ui_in_flight, false);
+            return CommandStatus::Done;
+        }
+
+        assets::AssimpImportOptions opts{};
+        opts.assets_root = assets_root;
+        opts.source_file = source_file;
+        opts.model_name = model_name.empty() ? source_file.stem().string() : model_name;
+        opts.flags = flags;
+
+        pending_action = PendingAction::Import;
+        set_ui_in_flight(ui_in_flight, true);
+
+        auto promise = std::make_shared<std::promise<TaskResult>>();
+        future = promise->get_future().share();
+        in_flight = true;
+
+        auto ctx_wptr = ctx_sp->weak_from_this();
+        ctx_sp->thread_pool->queue_task([opts = std::move(opts), ctx_wptr, promise]() mutable
+            {
+                auto ctx_sp = ctx_wptr.lock();
+                if (!ctx_sp || !ctx_sp->resource_manager)
+                {
+                    promise->set_value(make_task_error(
+                        TaskResult::TaskType::Import,
+                        "Import failed: context expired."));
+                    return;
+                }
+
+                auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+                assets::AssimpImporter importer;
+                auto plan = importer.prepare_import_plan(opts, *ctx_sp);
+                if (!plan.result.success)
+                {
+                    const auto error = plan.result.error_message.empty()
+                        ? std::string("Import failed.")
+                        : plan.result.error_message;
+                    const auto res = make_task_error(TaskResult::TaskType::Import, error);
+                    rm.queue_import_job(
+                        [res, promise](ResourceManager&, EngineContext&) mutable -> TaskResult
+                        {
+                            promise->set_value(res);
+                            return res;
+                        },
+                        *ctx_sp);
+                    return;
+                }
+
+                auto plan_ptr = std::make_shared<assets::AssimpImportPlan>(std::move(plan));
+                rm.queue_import_job(
+                    [plan_ptr, promise](ResourceManager& rm, EngineContext& ctx) mutable -> TaskResult
+                    {
+                        TaskResult res;
+                        res.type = TaskResult::TaskType::Import;
+                        try
+                        {
+                            const auto result = assets::AssimpImporter::apply_import_plan(*plan_ptr, ctx);
+                            if (!result.success)
+                            {
+                                const auto error = result.error_message.empty()
+                                    ? std::string("Import failed.")
+                                    : result.error_message;
+                                res.add_result(Guid{}, false, error);
+                            }
+                            else
+                            {
+                                const Guid root_guid = result.gpu_model.guid.valid()
+                                    ? result.gpu_model.guid
+                                    : result.model_guid;
+                                res.add_result(root_guid, true, "Import ok");
+                                if (!plan_ptr->assets_root.empty())
+                                    rm.scan_assets_async(plan_ptr->assets_root, ctx);
+                            }
+                        }
+                        catch (const std::exception& ex)
+                        {
+                            res.add_result(Guid{}, false, ex.what());
+                        }
+                        catch (...)
+                        {
+                            res.add_result(Guid{}, false, "unknown exception in import job");
+                        }
+
+                        promise->set_value(res);
+                        return res;
+                    },
+                    *ctx_sp);
+            });
+
+        return poll_task_future(future, in_flight, [this](const TaskResult& result)
+            {
+                if (result.success && pending_action == PendingAction::Import)
+                {
+                    imported_roots.clear();
+                    for (const auto& op : result.results)
+                    {
+                        if (op.guid.valid())
+                            imported_roots.push_back(op.guid);
+                    }
+                    was_undone = false;
+                }
+                set_ui_in_flight(ui_in_flight, false);
+                pending_action = PendingAction::None;
+            });
+    }
+
+    CommandStatus ImportModelCommand::undo()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->resource_manager)
+            return CommandStatus::Done;
+
+        if (imported_roots.empty())
+            return CommandStatus::Done;
+
+        auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+        pending_action = PendingAction::Unimport;
+        future = queue_unimport_task(rm, *ctx_sp, imported_roots);
+        in_flight = true;
+        return poll_task_future(future, in_flight, [this](const TaskResult& result)
+            {
+                if (result.success)
+                    was_undone = true;
+                pending_action = PendingAction::None;
+            });
+    }
+
+    CommandStatus ImportModelCommand::update()
+    {
+        return poll_task_future(future, in_flight, [this](const TaskResult& result)
+            {
+                if (pending_action == PendingAction::Import && result.success)
+                {
+                    imported_roots.clear();
+                    for (const auto& op : result.results)
+                    {
+                        if (op.guid.valid())
+                            imported_roots.push_back(op.guid);
+                    }
+                    was_undone = false;
+                }
+                else if (pending_action == PendingAction::Unimport && result.success)
+                {
+                    was_undone = true;
+                }
+                else if (pending_action == PendingAction::Restore && result.success)
+                {
+                    was_undone = false;
+                }
+
+                if (pending_action == PendingAction::Import ||
+                    pending_action == PendingAction::Restore)
+                {
+                    set_ui_in_flight(ui_in_flight, false);
+                }
+                pending_action = PendingAction::None;
+            });
+    }
+
+    std::string ImportModelCommand::get_name() const
+    {
+        return display_name;
+    }
+
+    // --- UnimportAssetsCommand ----------------------------------------------
+
+    UnimportAssetsCommand::UnimportAssetsCommand(
+        std::vector<Guid> roots,
+        EngineContextWeakPtr ctx)
+        : roots(std::move(roots))
+        , ctx(std::move(ctx))
+        , display_name("Unimport Assets")
+    {
+    }
+
+    CommandStatus UnimportAssetsCommand::execute()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->resource_manager)
+            return CommandStatus::Done;
+
+        if (roots.empty())
+            return CommandStatus::Done;
+
+        auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+        pending_action = PendingAction::Unimport;
+        future = queue_unimport_task(rm, *ctx_sp, roots);
+        in_flight = true;
+        return poll_task_future(future, in_flight, [this](const TaskResult&)
+            {
+                pending_action = PendingAction::None;
+            });
+    }
+
+    CommandStatus UnimportAssetsCommand::undo()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->resource_manager)
+            return CommandStatus::Done;
+
+        if (roots.empty())
+            return CommandStatus::Done;
+
+        auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+        pending_action = PendingAction::Restore;
+        future = queue_restore_task(rm, *ctx_sp, roots);
+        in_flight = true;
+        return poll_task_future(future, in_flight, [this](const TaskResult&)
+            {
+                pending_action = PendingAction::None;
+            });
+    }
+
+    CommandStatus UnimportAssetsCommand::update()
+    {
+        return poll_task_future(future, in_flight, [this](const TaskResult&)
+            {
+                pending_action = PendingAction::None;
+            });
+    }
+
+    std::string UnimportAssetsCommand::get_name() const
     {
         return display_name;
     }

@@ -198,6 +198,17 @@ namespace eeng
 
     void EntityManager::queue_entity_for_destruction(const ecs::Entity& entity)
     {
+#ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
+        if (!entity.has_id() || !registry_->valid(entity))
+            return;
+
+        if (entity_to_guid_map_.find(entity) == entity_to_guid_map_.end())
+            return;
+
+        if (!entities_pending_destruction_set_.insert(entity).second)
+            return;
+#endif
+
         entities_pending_destruction_.push_back(entity);
     }
 
@@ -209,10 +220,24 @@ namespace eeng
             // Fetch entity
             auto entity = entities_pending_destruction_.front();
             entities_pending_destruction_.pop_front();
+#ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
+            entities_pending_destruction_set_.erase(entity);
+#endif
 
             // Remove entity mappings
             auto guid_it = entity_to_guid_map_.find(entity);
+#ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
+            if (guid_it == entity_to_guid_map_.end())
+            {
+                if (scene_graph_->contains(entity))
+                    scene_graph_->erase_node(entity);
+                if (registry_->valid(entity))
+                    registry_->destroy(entity);
+                continue;
+            }
+#else
             assert(guid_it != entity_to_guid_map_.end());
+#endif
             auto guid = guid_it->second;
             entity_to_guid_map_.erase(entity);
 
@@ -248,6 +273,19 @@ namespace eeng
         }
 
         return ecs::EntityRef{ get_entity_guid(entity), entity };
+    }
+
+    bool EntityManager::try_get_entity_ref(const ecs::Entity& entity, ecs::EntityRef& out) const
+    {
+        if (!entity.has_id())
+            return false;
+
+        auto it = entity_to_guid_map_.find(entity);
+        if (it == entity_to_guid_map_.end())
+            return false;
+
+        out = ecs::EntityRef{ it->second, entity };
+        return true;
     }
 
     HeaderComponent& EntityManager::get_entity_header(const ecs::Entity& entity)

@@ -15,8 +15,15 @@
 #include "Command.hpp"
 #include "AssignFieldCommand.hpp"
 #include "MetaSerialize.hpp"
+#include <atomic>
+#include <filesystem>
 #include <entt/fwd.hpp>
 #include <vector>
+
+namespace eeng::assets
+{
+    enum class ImportFlags : unsigned int;
+}
 
 namespace eeng::editor {
 
@@ -222,6 +229,71 @@ namespace eeng::editor {
         CommandStatus execute() override;
 
         CommandStatus undo() override;
+
+        std::string get_name() const override;
+    };
+
+    // --- ImportModelCommand --------------------------------------------------
+
+    class ImportModelCommand : public Command
+    {
+        std::filesystem::path source_file;
+        assets::ImportFlags flags{};
+        std::string model_name;
+        EngineContextWeakPtr ctx;
+        std::string display_name;
+        std::shared_ptr<std::atomic<bool>> ui_in_flight;
+
+        std::shared_future<TaskResult> future;
+        bool in_flight{ false };
+
+        enum class PendingAction : std::uint8_t { None, Import, Unimport, Restore };
+        PendingAction pending_action{ PendingAction::None };
+
+        std::vector<Guid> imported_roots;
+        bool was_undone{ false };
+
+    public:
+        ImportModelCommand(
+            std::filesystem::path source_file,
+            assets::ImportFlags flags,
+            std::string model_name,
+            EngineContextWeakPtr ctx,
+            std::shared_ptr<std::atomic<bool>> in_flight = {});
+
+        CommandStatus execute() override;
+
+        CommandStatus undo() override;
+
+        CommandStatus update() override;
+
+        std::string get_name() const override;
+    };
+
+    // --- UnimportAssetsCommand ----------------------------------------------
+
+    class UnimportAssetsCommand : public Command
+    {
+        std::vector<Guid> roots;
+        EngineContextWeakPtr ctx;
+        std::string display_name;
+
+        std::shared_future<TaskResult> future;
+        bool in_flight{ false };
+
+        enum class PendingAction : std::uint8_t { None, Unimport, Restore };
+        PendingAction pending_action{ PendingAction::None };
+
+    public:
+        UnimportAssetsCommand(
+            std::vector<Guid> roots,
+            EngineContextWeakPtr ctx);
+
+        CommandStatus execute() override;
+
+        CommandStatus undo() override;
+
+        CommandStatus update() override;
 
         std::string get_name() const override;
     };

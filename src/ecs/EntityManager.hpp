@@ -5,6 +5,7 @@
 #include "IEntityManager.hpp"
 #include "Guid.h"
 #include "ecs/SceneGraph.hpp"
+#include <unordered_set>
 
 namespace eeng::ecs
 {
@@ -71,6 +72,7 @@ namespace eeng
         const ecs::SceneGraph& scene_graph() const;
 
         ecs::EntityRef get_entity_ref(const ecs::Entity& entity) const;
+        bool try_get_entity_ref(const ecs::Entity& entity, ecs::EntityRef& out) const;
 
         ecs::HeaderComponent& get_entity_header(const ecs::Entity& entity);
         const ecs::HeaderComponent& get_entity_header(const ecs::Entity& entity) const;
@@ -102,6 +104,7 @@ namespace eeng
         std::shared_ptr<entt::registry>     registry_;
         std::unordered_map<Guid, ecs::Entity>    guid_to_entity_map_;
         std::unordered_map<ecs::Entity, Guid>    entity_to_guid_map_;
+        std::unordered_set<ecs::Entity>          entities_pending_destruction_set_;
         // On create:
         // guid_to_entity_map[guid] = entity;
         // On destroy:

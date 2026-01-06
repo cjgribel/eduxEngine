@@ -202,6 +202,7 @@ namespace eeng {
         void process_dirty_batches(EngineContext& ctx);
 
         std::vector<const BatchInfo*> list() const;
+        bool try_get_loaded_batch_for_entity(const ecs::EntityRef& entity_ref, BatchId& out_id) const;
 
     private:
 
@@ -228,6 +229,7 @@ namespace eeng {
         mutable std::mutex                           mtx_;
         std::unordered_map<eeng::BatchId, BatchInfo> batches_;
         std::unordered_set<eeng::BatchId>           dirty_batches_;
+        std::unordered_map<Guid, BatchId>           entity_to_batch_;
         std::filesystem::path                        index_path_;
     };
 } // namespace eeng
