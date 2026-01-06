@@ -4,9 +4,18 @@
 #pragma once
 
 #include <deque>
+#include <atomic>
+#include <filesystem>
+#include <memory>
 #include <string>
+#include <vector>
 #include <entt/entt.hpp>
 #include "EngineContext.hpp"
+
+namespace eeng::assets
+{
+    enum class ImportFlags : unsigned int;
+}
 
 namespace eeng::editor
 {
@@ -33,5 +42,21 @@ namespace eeng::editor
             EngineContext& ctx,
             const BatchId& id,
             const std::deque<ecs::Entity>& selection);
+    };
+
+    struct AssetActions
+    {
+        /// @brief Import a model file via Assimp (parse on worker, write+scan on RM strand).
+        static void import_model(
+            EngineContext& ctx,
+            const std::filesystem::path& source_file,
+            assets::ImportFlags flags,
+            std::string model_name = {},
+            std::shared_ptr<std::atomic<bool>> in_flight = {});
+
+        /// @brief Unimport assets by GUID (serialized on RM strand).
+        static void unimport_assets(
+            EngineContext& ctx,
+            std::vector<Guid> roots);
     };
 }

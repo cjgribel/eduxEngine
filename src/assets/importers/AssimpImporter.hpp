@@ -7,12 +7,14 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "Guid.h"
 #include "AssetRef.hpp"
+#include "AssetMetaData.hpp"
 #include "EngineContext.hpp"
 #include "assets/types/ModelAssets.hpp"
 
@@ -81,6 +83,37 @@ namespace eeng::assets
         std::unordered_map<unsigned, size_t> material_index_map;
     };
 
+    struct AssimpAssetCopy
+    {
+        std::filesystem::path source;
+        std::filesystem::path destination;
+    };
+
+    template<typename T>
+    struct AssimpAssetWrite
+    {
+        T asset;
+        AssetMetaData meta;
+        std::filesystem::path asset_path;
+        std::filesystem::path meta_path;
+    };
+
+    struct AssimpImportPlan
+    {
+        std::filesystem::path assets_root;
+        std::vector<std::filesystem::path> directories;
+        std::vector<AssimpAssetCopy> file_copies;
+
+        std::vector<AssimpAssetWrite<TextureAsset>> textures;
+        std::vector<AssimpAssetWrite<GpuTextureAsset>> gpu_textures;
+        std::vector<AssimpAssetWrite<MaterialAsset>> materials;
+        std::vector<AssimpAssetWrite<GpuMaterialAsset>> gpu_materials;
+        std::optional<AssimpAssetWrite<ModelDataAsset>> model;
+        std::optional<AssimpAssetWrite<GpuModelAsset>> gpu_model;
+
+        AssimpImportResult result;
+    };
+
     /// @brief Assimp-backed model importer that builds CPU/GPU assets.
     ///
     /// Policy notes:
@@ -94,10 +127,24 @@ namespace eeng::assets
         AssimpImporter();
         ~AssimpImporter();
 
+        /// @brief Parse and build an import plan (heavy work).
+        /// @note Embedded textures may be exported during parsing.
+        AssimpImportPlan prepare_import_plan(
+            const AssimpImportOptions& options,
+            EngineContext& ctx);
+
+        /// @brief Apply a prepared import plan (file IO + rm.import).
+        /// @note Policy: run on the RM strand to serialize with scans.
+        static AssimpImportResult apply_import_plan(
+            const AssimpImportPlan& plan,
+            EngineContext& ctx);
+
+        /// @note Performs file IO + rm.import on the caller thread; serialize with scans.
         AssimpImportResult import_model(
             const AssimpImportOptions& options,
             EngineContext& ctx);
 
+        /// @note Performs file IO + rm.import on the caller thread; serialize with scans.
         AssimpImportResult import_model_with_animations(
             const AssimpImportOptions& options,
             const std::vector<std::filesystem::path>& animation_inputs,
@@ -113,6 +160,11 @@ namespace eeng::assets
 
         AssimpParseResult parse_scene(
             const std::filesystem::path& source_file,
+            const AssimpImportOptions& options,
+            EngineContext& ctx);
+
+        AssimpImportPlan build_import_plan(
+            const AssimpParseResult& parsed,
             const AssimpImportOptions& options,
             EngineContext& ctx);
 

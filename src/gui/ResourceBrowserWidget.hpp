@@ -8,23 +8,35 @@
 #include "AssetTreeViews.hpp"
 #include "editor/InspectorState.hpp"
 #include "editor/AssignFieldCommand.hpp"
+#include "editor/EditorActions.hpp"
 #include "meta/MetaInspect.hpp"
 #include "MetaAux.h"
+#include "AssimpImporter.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
+#include "ImGuiFileDialog.h"
 
+#include <atomic>
 #include <algorithm>
+#include <cctype>
 #include <deque>
+#include <filesystem>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace eeng::gui
 {
     namespace detail
     {
+        inline constexpr const char* kModelImportDialog = "ResourceBrowserImportDialog";
+        inline constexpr const char* kModelImportFilters =
+            "Model files{.fbx,.obj,.dae,.gltf,.glb,.3ds,.ply,.blend},All files{.*}";
+
         inline void update_asset_selection(GuidSelection& selection, const Guid& guid)
         {
             const bool ctrl = ImGui::GetIO().KeyCtrl;
@@ -97,6 +109,38 @@ namespace eeng::gui
             }
 
             return merged;
+        }
+
+        inline bool is_assimp_extension(std::filesystem::path path)
+        {
+            auto ext = path.extension().string();
+            if (ext.empty())
+                return false;
+            for (char& c : ext)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+            static constexpr const char* kExts[] = {
+                ".fbx", ".obj", ".dae", ".gltf", ".glb", ".3ds", ".ply", ".blend"
+            };
+
+            for (const char* known : kExts)
+            {
+                if (ext == known)
+                    return true;
+            }
+            return false;
+        }
+
+        inline assets::ImportFlags default_assimp_flags()
+        {
+            using assets::ImportFlags;
+            return static_cast<ImportFlags>(
+                static_cast<unsigned>(ImportFlags::GenerateTangents) |
+                static_cast<unsigned>(ImportFlags::GenerateNormals) |
+                static_cast<unsigned>(ImportFlags::GenerateUVs) |
+                static_cast<unsigned>(ImportFlags::SortByPType) |
+                static_cast<unsigned>(ImportFlags::FlipUVs) |
+                static_cast<unsigned>(ImportFlags::OptimizeGraph));
         }
     }
 
@@ -311,12 +355,40 @@ namespace eeng::gui
 
         void draw()
         {
-            bool busy = false;
+            static std::shared_ptr<std::atomic<bool>> import_in_flight =
+                std::make_shared<std::atomic<bool>>(false);
+            bool busy = resource_manager.is_busy() ||
+                import_in_flight->load(std::memory_order_relaxed);
             if (busy) ImGui::BeginDisabled();
 
-            if (ImGui::Button("Import")) { /* Import a batch of mock assets (META) */ }
+            if (ImGui::Button("Import..."))
+            {
+                IGFD::FileDialogConfig config;
+                const auto& assets_root = resource_manager.assets_root();
+                config.path = assets_root.empty() ? "." : assets_root.string();
+                ImGuiFileDialog::Instance()->OpenDialog(
+                    detail::kModelImportDialog,
+                    "Import Model (Assimp)",
+                    detail::kModelImportFilters,
+                    config);
+            }
             ImGui::SameLine();
-            if (ImGui::Button("Unimport")) { /* ... */ }
+            if (ImGui::Button("Unimport"))
+            {
+                if (ctx.asset_selection->empty())
+                {
+                    EENG_LOG_WARN(&ctx, "Unimport skipped: no assets selected.");
+                }
+                else
+                {
+                    std::vector<Guid> roots;
+                    roots.insert(roots.end(),
+                        ctx.asset_selection->get_all().begin(),
+                        ctx.asset_selection->get_all().end());
+
+                    editor::AssetActions::unimport_assets(ctx, std::move(roots));
+                }
+            }
             ImGui::SameLine();
 
             static auto batch_id1 = Guid::generate();
@@ -335,10 +407,6 @@ namespace eeng::gui
                 resource_manager.unbind_and_unload_async(to_reload, batch_id1, ctx);
             }
 
-            if (ImGui::Button("Import##batch2")) { /* Import a batch of mock assets (META) */ }
-            ImGui::SameLine();
-            if (ImGui::Button("Unimport##batch2")) { /* ... */ }
-            ImGui::SameLine();
             if (ImGui::Button("Load (Batch 2)"))
             {
                 auto to_reload = detail::compute_selected_bottomup_closure(ctx);
@@ -352,6 +420,36 @@ namespace eeng::gui
             }
 
             if (busy) ImGui::EndDisabled();
+
+            if (ImGuiFileDialog::Instance()->Display(detail::kModelImportDialog))
+            {
+                if (ImGuiFileDialog::Instance()->IsOk())
+                {
+                    const auto file_path = std::filesystem::path(
+                        ImGuiFileDialog::Instance()->GetFilePathName());
+
+                    if (!detail::is_assimp_extension(file_path))
+                    {
+                        EENG_LOG_WARN(&ctx, "Import skipped: unsupported extension %s",
+                            file_path.extension().string().c_str());
+                    }
+                    else if (busy)
+                    {
+                        EENG_LOG_WARN(&ctx, "Import skipped: resource manager busy.");
+                    }
+                    else
+                    {
+                        editor::AssetActions::import_model(
+                            ctx,
+                            file_path,
+                            detail::default_assimp_flags(),
+                            file_path.stem().string(),
+                            import_in_flight);
+                    }
+                }
+
+                ImGuiFileDialog::Instance()->Close();
+            }
         }
     };
 

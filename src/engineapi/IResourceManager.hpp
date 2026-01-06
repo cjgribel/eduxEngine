@@ -36,7 +36,7 @@ namespace eeng
     // Result of a task (load/unload/reload)
     struct TaskResult
     {
-        enum class TaskType { None, Load, Unload, Reload, Scan };
+        enum class TaskType { None, Load, Unload, Reload, Scan, Import };
         // enum class TaskType  { None, ResourceLoad, ResourceUnload, ResourceReload, ResourceScan, BatchLoad, BatchUnload, BatchSave, BatchRebindClosure };
 
         TaskType type{ TaskType::None };

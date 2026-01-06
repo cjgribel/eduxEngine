@@ -9,6 +9,10 @@
 #include "meta/MetaAux.h"
 #include "LogMacros.h"
 
+#include <algorithm>
+#include <functional>
+#include <unordered_set>
+
 namespace
 {
     std::vector<eeng::Guid> collect_hook_guids(
@@ -70,7 +74,7 @@ namespace eeng
 
                 try
                 {
-                    auto data = asset_index_->scan_assets(root, *ctx_ptr); // blocking scan (no RM locks)
+                    auto data = asset_index_->scan_assets(root, *ctx_ptr); // blocking scan on RM strand
                     const auto count = data ? data->entries.size() : 0;
 
                     {
@@ -85,6 +89,36 @@ namespace eeng
                     res.add_result(Guid{}, false, ex.what());
                 }
                 // enqueue_event doesn't throw
+                (void)ctx_ptr->event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
+                return res;
+            });
+    }
+
+    std::shared_future<TaskResult>
+        ResourceManager::queue_import_job(ImportJob job, EngineContext& ctx)
+    {
+        auto& s = strand(ctx);
+        auto* ctx_ptr = &ctx;
+
+        return s.submit([this, job = std::move(job), ctx_ptr]() mutable -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Import;
+                try
+                {
+                    res = job(*this, *ctx_ptr);
+                    if (res.type == TaskResult::TaskType::None)
+                        res.type = TaskResult::TaskType::Import;
+                }
+                catch (const std::exception& ex)
+                {
+                    res.add_result(Guid{}, false, ex.what());
+                }
+                catch (...)
+                {
+                    res.add_result(Guid{}, false, "unknown exception in import job");
+                }
+
                 (void)ctx_ptr->event_queue->enqueue_event(ResourceTaskCompletedEvent{ res });
                 return res;
             });
@@ -472,6 +506,133 @@ namespace eeng
     const AssetIndex& ResourceManager::asset_index() const
     {
         return *asset_index_;
+    }
+
+    void ResourceManager::set_assets_root(std::filesystem::path root)
+    {
+        assets_root_ = std::move(root);
+    }
+
+    const std::filesystem::path& ResourceManager::assets_root() const
+    {
+        return assets_root_;
+    }
+
+    bool ResourceManager::unimport_assets(const std::vector<Guid>& roots, EngineContext& ctx, std::string* error_out)
+    {
+        if (roots.empty())
+        {
+            if (error_out) *error_out = "No assets selected.";
+            return false;
+        }
+
+        // Policy: treat guid_parent as ownership; delete subtree only if no leases exist.
+        auto index_data = asset_index_->get_index_data();
+        if (!index_data)
+        {
+            if (error_out) *error_out = "Asset index unavailable.";
+            return false;
+        }
+
+        std::unordered_set<Guid> visited;
+        std::vector<Guid> ordered;
+        ordered.reserve(roots.size());
+
+        std::function<void(const Guid&)> visit;
+        visit = [&](const Guid& guid)
+            {
+                if (!visited.insert(guid).second)
+                    return;
+
+                auto it = index_data->by_parent.find(guid);
+                if (it != index_data->by_parent.end())
+                {
+                    for (const AssetEntry* child : it->second)
+                    {
+                        if (child)
+                            visit(child->meta.guid);
+                    }
+                }
+
+                ordered.push_back(guid);
+            };
+
+        for (const Guid& root : roots)
+            visit(root);
+
+        for (const Guid& guid : ordered)
+        {
+            if (held_by_any(guid))
+            {
+                if (error_out)
+                    *error_out = "Asset leased: " + guid.to_string();
+                return false;
+            }
+        }
+
+        std::vector<std::filesystem::path> cleanup_dirs;
+        cleanup_dirs.reserve(ordered.size() * 2);
+        size_t removed_assets = 0;
+
+        for (const Guid& guid : ordered)
+        {
+            auto it = index_data->by_guid.find(guid);
+            if (it == index_data->by_guid.end() || !it->second)
+                continue;
+
+            const AssetEntry& entry = *it->second;
+            const auto& asset_path = entry.absolute_path;
+            if (asset_path.empty())
+                continue;
+
+            std::error_code ec;
+            if (std::filesystem::remove(asset_path, ec))
+                ++removed_assets;
+            else if (ec)
+                EENG_LOG_WARN(&ctx, "Unimport: failed to remove asset file %s (%s)",
+                    asset_path.string().c_str(), ec.message().c_str());
+
+            const auto meta_path = asset_path.parent_path() /
+                (asset_path.stem().string() + ".meta.json");
+            ec.clear();
+            if (!std::filesystem::remove(meta_path, ec) && ec)
+                EENG_LOG_WARN(&ctx, "Unimport: failed to remove meta file %s (%s)",
+                    meta_path.string().c_str(), ec.message().c_str());
+
+            cleanup_dirs.push_back(asset_path.parent_path());
+            cleanup_dirs.push_back(meta_path.parent_path());
+        }
+
+        if (!cleanup_dirs.empty() && !assets_root_.empty())
+        {
+            std::sort(cleanup_dirs.begin(), cleanup_dirs.end(),
+                [](const std::filesystem::path& a, const std::filesystem::path& b)
+                {
+                    return a.native().size() > b.native().size();
+                });
+
+            cleanup_dirs.erase(std::unique(cleanup_dirs.begin(), cleanup_dirs.end()),
+                cleanup_dirs.end());
+
+            for (const auto& dir : cleanup_dirs)
+            {
+                std::filesystem::path current = dir;
+                std::error_code ec;
+                while (!current.empty())
+                {
+                    if (!assets_root_.empty() && current == assets_root_)
+                        break;
+                    if (!std::filesystem::remove(current, ec))
+                        break;
+                    if (ec)
+                        break;
+                    current = current.parent_path();
+                }
+            }
+        }
+
+        EENG_LOG_INFO(&ctx, "Unimported %zu assets.", removed_assets);
+        return true;
     }
 
     AssetIndex& ResourceManager::asset_index()

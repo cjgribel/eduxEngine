@@ -459,6 +459,137 @@ namespace eeng::assets
 
     AssimpImporter::~AssimpImporter() = default;
 
+    AssimpImportPlan AssimpImporter::prepare_import_plan(
+        const AssimpImportOptions& options,
+        EngineContext& ctx)
+    {
+        AssimpImportPlan plan;
+        plan.assets_root = options.assets_root;
+
+        if (options.assets_root.empty())
+        {
+            plan.result.success = false;
+            plan.result.error_message = "Assimp import failed: assets_root is empty";
+            return plan;
+        }
+
+        if (options.source_file.empty())
+        {
+            plan.result.success = false;
+            plan.result.error_message = "Assimp import failed: source_file is empty";
+            return plan;
+        }
+
+        try
+        {
+            // Phase 1: parse file into CPU data (meshes, nodes, animations, materials/textures).
+            AssimpParseResult parsed = parse_scene(options.source_file, options, ctx);
+            // Phase 2: build an import plan (no rm.import yet).
+            plan = build_import_plan(parsed, options, ctx);
+        }
+        catch (const std::exception& ex)
+        {
+            plan.result.success = false;
+            plan.result.error_message = ex.what();
+        }
+
+        return plan;
+    }
+
+    AssimpImportResult AssimpImporter::apply_import_plan(
+        const AssimpImportPlan& plan,
+        EngineContext& ctx)
+    {
+        AssimpImportResult result = plan.result;
+        if (!result.success)
+            return result;
+
+        try
+        {
+            auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+
+            for (const auto& dir : plan.directories)
+                std::filesystem::create_directories(dir);
+
+            for (const auto& copy : plan.file_copies)
+            {
+                if (copy.destination.empty())
+                    continue;
+                std::filesystem::create_directories(copy.destination.parent_path());
+                if (!std::filesystem::exists(copy.destination))
+                {
+                    std::filesystem::copy_file(copy.source, copy.destination,
+                        std::filesystem::copy_options::overwrite_existing);
+                }
+            }
+
+            for (const auto& entry : plan.textures)
+            {
+                resource_manager.import(
+                    entry.asset,
+                    entry.asset_path.string(),
+                    entry.meta,
+                    entry.meta_path.string());
+            }
+
+            for (const auto& entry : plan.gpu_textures)
+            {
+                resource_manager.import(
+                    entry.asset,
+                    entry.asset_path.string(),
+                    entry.meta,
+                    entry.meta_path.string());
+            }
+
+            for (const auto& entry : plan.materials)
+            {
+                resource_manager.import(
+                    entry.asset,
+                    entry.asset_path.string(),
+                    entry.meta,
+                    entry.meta_path.string());
+            }
+
+            for (const auto& entry : plan.gpu_materials)
+            {
+                resource_manager.import(
+                    entry.asset,
+                    entry.asset_path.string(),
+                    entry.meta,
+                    entry.meta_path.string());
+            }
+
+            if (plan.model.has_value())
+            {
+                const auto& entry = *plan.model;
+                resource_manager.import(
+                    entry.asset,
+                    entry.asset_path.string(),
+                    entry.meta,
+                    entry.meta_path.string());
+            }
+
+            if (plan.gpu_model.has_value())
+            {
+                const auto& entry = *plan.gpu_model;
+                resource_manager.import(
+                    entry.asset,
+                    entry.asset_path.string(),
+                    entry.meta,
+                    entry.meta_path.string());
+            }
+
+            result.success = true;
+        }
+        catch (const std::exception& ex)
+        {
+            result.success = false;
+            result.error_message = ex.what();
+        }
+
+        return result;
+    }
+
     AssimpImportResult AssimpImporter::import_model(
         const AssimpImportOptions& options,
         EngineContext& ctx)
@@ -472,10 +603,8 @@ namespace eeng::assets
 
         try
         {
-            // Phase 1: parse file into CPU data (meshes, nodes, animations, materials/textures).
-            AssimpParseResult parsed = parse_scene(options.source_file, options, ctx);
-            // Phase 2: build CPU/GPU assets and serialize into the asset database.
-            result = build_assets(parsed, options, ctx);
+            AssimpImportPlan plan = prepare_import_plan(options, ctx);
+            result = apply_import_plan(plan, ctx);
         }
         catch (const std::exception& ex)
         {
@@ -883,14 +1012,14 @@ namespace eeng::assets
         return import_model(merged, ctx);
     }
 
-    AssimpImportResult AssimpImporter::build_assets(
+    AssimpImportPlan AssimpImporter::build_import_plan(
         const AssimpParseResult& parsed,
         const AssimpImportOptions& options,
         EngineContext& ctx)
     {
-        AssimpImportResult result;
-
-        auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+        (void)ctx;
+        AssimpImportPlan plan;
+        plan.assets_root = options.assets_root;
 
         const std::string model_folder_name = options.model_name.empty()
             ? options.source_file.stem().string()
@@ -904,12 +1033,15 @@ namespace eeng::assets
         const auto gpumtl_path = asset_path / "gpu_materials";
         const auto gputex_path = asset_path / "gpu_textures";
 
-        std::filesystem::create_directories(model_path);
-        std::filesystem::create_directories(mtl_path);
-        std::filesystem::create_directories(tex_path);
-        std::filesystem::create_directories(gpumodel_path);
-        std::filesystem::create_directories(gpumtl_path);
-        std::filesystem::create_directories(gputex_path);
+        plan.directories = {
+            asset_path,
+            model_path,
+            mtl_path,
+            tex_path,
+            gpumodel_path,
+            gpumtl_path,
+            gputex_path
+        };
 
         const Guid model_guid = Guid::generate();
         const Guid gpu_model_guid = Guid::generate();
@@ -982,11 +1114,7 @@ namespace eeng::assets
             const auto dst_path = tex_path / rel_path;
             if (!rel_path.empty() && src_path != dst_path && std::filesystem::exists(src_path))
             {
-                std::filesystem::create_directories(dst_path.parent_path());
-                if (!std::filesystem::exists(dst_path))
-                {
-                    std::filesystem::copy_file(src_path, dst_path, std::filesystem::copy_options::overwrite_existing);
-                }
+                plan.file_copies.push_back(AssimpAssetCopy{ src_path, dst_path });
             }
 
             textures[i].source_path = rel_path.string();
@@ -999,16 +1127,17 @@ namespace eeng::assets
             const auto tex_file_path = tex_path / (tex_file_base + ".json");
             const auto tex_meta_file_path = tex_path / (tex_file_base + ".meta.json");
 
-            resource_manager.import(
+            plan.textures.push_back(AssimpAssetWrite<TextureAsset>{
                 textures[i],
-                tex_file_path.string(),
                 AssetMetaData{
                     tex_guid,
                     model_guid,
                     model_folder_name + "_Texture" + std::to_string(i),
                     meta::get_meta_type_id_string<TextureAsset>()
                 },
-                tex_meta_file_path.string());
+                tex_file_path,
+                tex_meta_file_path
+                });
 
             const auto gpu_tex_guid = gpu_texture_guids[i];
             const auto gpu_tex_file_base = gpu_tex_guid.to_string();
@@ -1019,16 +1148,17 @@ namespace eeng::assets
             gpu_tex.texture_ref = AssetRef<TextureAsset>{ tex_guid };
             gpu_tex.state = GpuLoadState::Uninitialized;
 
-            resource_manager.import(
+            plan.gpu_textures.push_back(AssimpAssetWrite<GpuTextureAsset>{
                 gpu_tex,
-                gpu_tex_file_path.string(),
                 AssetMetaData{
                     gpu_tex_guid,
                     tex_guid,
                     model_folder_name + "_GpuTexture" + std::to_string(i),
                     meta::get_meta_type_id_string<GpuTextureAsset>()
                 },
-                gpu_tex_meta_file_path.string());
+                gpu_tex_file_path,
+                gpu_tex_meta_file_path
+                });
         }
 
         std::vector<MaterialAsset> materials = parsed.materials;
@@ -1045,16 +1175,17 @@ namespace eeng::assets
             const auto mtl_file_path = mtl_path / (mtl_file_base + ".json");
             const auto mtl_meta_file_path = mtl_path / (mtl_file_base + ".meta.json");
 
-            resource_manager.import(
+            plan.materials.push_back(AssimpAssetWrite<MaterialAsset>{
                 materials[i],
-                mtl_file_path.string(),
                 AssetMetaData{
                     mtl_guid,
                     model_guid,
                     model_folder_name + "_Material" + std::to_string(i),
                     meta::get_meta_type_id_string<MaterialAsset>()
                 },
-                mtl_meta_file_path.string());
+                mtl_file_path,
+                mtl_meta_file_path
+                });
 
             const auto gpu_mtl_guid = gpu_material_guids[i];
             const auto gpu_mtl_file_base = gpu_mtl_guid.to_string();
@@ -1075,16 +1206,17 @@ namespace eeng::assets
                     gpu_mtl.textures[t] = AssetRef<GpuTextureAsset>{ gpu_it->second };
             }
 
-            resource_manager.import(
+            plan.gpu_materials.push_back(AssimpAssetWrite<GpuMaterialAsset>{
                 gpu_mtl,
-                gpu_mtl_file_path.string(),
                 AssetMetaData{
                     gpu_mtl_guid,
                     mtl_guid,
                     model_folder_name + "_GpuMaterial" + std::to_string(i),
                     meta::get_meta_type_id_string<GpuMaterialAsset>()
                 },
-                gpu_mtl_meta_file_path.string());
+                gpu_mtl_file_path,
+                gpu_mtl_meta_file_path
+                });
         }
 
         ModelDataAsset model = parsed.model_data;
@@ -1098,16 +1230,17 @@ namespace eeng::assets
         const auto model_file_path = model_path / (model_file_base + ".json");
         const auto model_meta_file_path = model_path / (model_file_base + ".meta.json");
 
-        resource_manager.import(
+        plan.model = AssimpAssetWrite<ModelDataAsset>{
             model,
-            model_file_path.string(),
             AssetMetaData{
                 model_guid,
                 Guid::invalid(),
                 model_folder_name,
                 meta::get_meta_type_id_string<ModelDataAsset>()
             },
-            model_meta_file_path.string());
+            model_file_path,
+            model_meta_file_path
+        };
 
         GpuModelAsset gpu_model{};
         gpu_model.model_ref = AssetRef<ModelDataAsset>{ model_guid };
@@ -1129,20 +1262,30 @@ namespace eeng::assets
         const auto gpu_model_file_path = gpumodel_path / (gpu_model_file_base + ".json");
         const auto gpu_model_meta_file_path = gpumodel_path / (gpu_model_file_base + ".meta.json");
 
-        resource_manager.import(
+        plan.gpu_model = AssimpAssetWrite<GpuModelAsset>{
             gpu_model,
-            gpu_model_file_path.string(),
             AssetMetaData{
                 gpu_model_guid,
                 model_guid,
                 model_folder_name + "_GpuModel",
                 meta::get_meta_type_id_string<GpuModelAsset>()
             },
-            gpu_model_meta_file_path.string());
+            gpu_model_file_path,
+            gpu_model_meta_file_path
+        };
 
-        result.success = true;
-        result.gpu_model = AssetRef<GpuModelAsset>{ gpu_model_guid };
-        result.model_guid = model_guid;
-        return result;
+        plan.result.success = true;
+        plan.result.gpu_model = AssetRef<GpuModelAsset>{ gpu_model_guid };
+        plan.result.model_guid = model_guid;
+        return plan;
+    }
+
+    AssimpImportResult AssimpImporter::build_assets(
+        const AssimpParseResult& parsed,
+        const AssimpImportOptions& options,
+        EngineContext& ctx)
+    {
+        AssimpImportPlan plan = build_import_plan(parsed, options, ctx);
+        return apply_import_plan(plan, ctx);
     }
 } // namespace eeng::assets

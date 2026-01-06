@@ -441,6 +441,9 @@ namespace eeng
         case TaskResult::TaskType::Scan:
             task_name = "Scan";
             break;
+        case TaskResult::TaskType::Import:
+            task_name = "Import";
+            break;
         default:
             task_name = "Unknown";
         }

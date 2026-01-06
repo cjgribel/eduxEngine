@@ -16,6 +16,8 @@
 #include <stdexcept>
 #include <string>
 #include <mutex> // std::mutex - > maybe AssetIndex
+#include <functional>
+#include <vector>
 
 namespace eeng
 {
@@ -27,6 +29,7 @@ namespace eeng
     private:
         std::unique_ptr<Storage>    storage_;
         std::unique_ptr<AssetIndex> asset_index_;
+        std::filesystem::path       assets_root_;
 
         mutable std::mutex status_mutex_;
         std::unordered_map<Guid, AssetStatus> statuses_;
@@ -102,6 +105,11 @@ namespace eeng
         std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override;
         std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx) override;
 
+        using ImportJob = std::function<TaskResult(ResourceManager&, EngineContext&)>;
+        /// @brief Queue an import job on the RM strand (serialize asset file IO vs scans).
+        /// @note Heavy parsing should happen off-strand; this job should only write assets + queue scan.
+        std::shared_future<TaskResult> queue_import_job(ImportJob job, EngineContext& ctx);
+
     private:
         TaskResult load_and_bind_impl(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx);
         TaskResult unbind_and_unload_impl(std::deque<Guid> guids, const BatchId& batch, EngineContext& ctx);
@@ -161,10 +169,17 @@ namespace eeng
         const AssetIndex& asset_index() const;
         AssetIndex& asset_index();
 
+        void set_assets_root(std::filesystem::path root);
+        const std::filesystem::path& assets_root() const;
+
+        /// @note Policy: call only on the RM strand (queue_import_job) to avoid scan/import races.
+        bool unimport_assets(const std::vector<Guid>& roots, EngineContext& ctx, std::string* error_out = nullptr);
+
         // void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
 
         // TODO -> Serialize via strand? Touches entt::meta, but assumed to be thread-safe
-        /// @brief Import new resource to resource index
+        /// @brief Import new resource to resource index.
+        /// @note Policy: call only on the RM strand (queue_import_job) or when scans are not running.
         /// @tparam T 
         /// @param t 
         /// @return 
@@ -232,6 +247,7 @@ namespace eeng
 
         /// @brief Re-serialize a loaded asset to disk using its existing GUID/path.
         /// @note Updates AssetMetaData::contained_assets based on current AssetRef links.
+        /// @note Policy: call on the RM strand or when scans are not running.
         template<typename T>
         void save_loaded_asset(const Guid& guid)
         {

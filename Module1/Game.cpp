@@ -351,6 +351,7 @@ bool Game::init()
         std::filesystem::path imported_assets_root = "/Users/ag1498/GitHub/eduxEngine/Module1/project1/imported_assets/";
         std::filesystem::path batches_root = "/Users/ag1498/GitHub/eduxEngine/Module1/project1/batches/";
         //std::filesystem::path asset_root = "C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/";
+        resource_manager.set_assets_root(imported_assets_root);
 
         // 1.   IMPORT resources concurrently
         //
