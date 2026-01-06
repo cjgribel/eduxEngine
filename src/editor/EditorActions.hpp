@@ -58,5 +58,10 @@ namespace eeng::editor
         static void unimport_assets(
             EngineContext& ctx,
             std::vector<Guid> roots);
+
+        /// @brief Restore assets from trash by root GUID (serialized on RM strand).
+        static void restore_assets(
+            EngineContext& ctx,
+            std::vector<Guid> roots);
     };
 }

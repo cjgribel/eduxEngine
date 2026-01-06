@@ -359,6 +359,40 @@ namespace eeng::gui
                 std::make_shared<std::atomic<bool>>(false);
             bool busy = resource_manager.is_busy() ||
                 import_in_flight->load(std::memory_order_relaxed);
+            auto index_data = resource_manager.asset_index().get_index_data();
+            auto& selection = *ctx.asset_selection;
+
+            bool unimport_has_selection = !selection.empty();
+            bool unimport_missing = false;
+            bool unimport_has_non_root = false;
+            if (unimport_has_selection)
+            {
+                if (!index_data || !index_data->trees)
+                {
+                    unimport_missing = true;
+                }
+                else
+                {
+                    const auto& tree = index_data->trees->content_tree;
+                    for (const Guid& guid : selection.get_all())
+                    {
+                        if (!tree.contains(guid))
+                        {
+                            unimport_missing = true;
+                            break;
+                        }
+                        if (!tree.is_root(guid))
+                        {
+                            unimport_has_non_root = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            const bool unimport_enabled = unimport_has_selection &&
+                !unimport_missing &&
+                !unimport_has_non_root;
             if (busy) ImGui::BeginDisabled();
 
             if (ImGui::Button("Import..."))
@@ -373,20 +407,34 @@ namespace eeng::gui
                     config);
             }
             ImGui::SameLine();
+            if (!unimport_enabled) ImGui::BeginDisabled();
             if (ImGui::Button("Unimport"))
             {
-                if (ctx.asset_selection->empty())
+                if (!unimport_enabled)
                 {
-                    EENG_LOG_WARN(&ctx, "Unimport skipped: no assets selected.");
+                    EENG_LOG_WARN(&ctx, "Unimport skipped: selection not eligible.");
                 }
                 else
                 {
                     std::vector<Guid> roots;
                     roots.insert(roots.end(),
-                        ctx.asset_selection->get_all().begin(),
-                        ctx.asset_selection->get_all().end());
+                        selection.get_all().begin(),
+                        selection.get_all().end());
 
                     editor::AssetActions::unimport_assets(ctx, std::move(roots));
+                }
+            }
+            if (!unimport_enabled)
+            {
+                ImGui::EndDisabled();
+                if (ImGui::IsItemHovered())
+                {
+                    if (!unimport_has_selection)
+                        ImGui::SetTooltip("Select a dependency-tree root to unimport.");
+                    else if (unimport_missing)
+                        ImGui::SetTooltip("Asset tree not available or selection not found.");
+                    else if (unimport_has_non_root)
+                        ImGui::SetTooltip("Only dependency-tree roots can be unimported.");
                 }
             }
             ImGui::SameLine();

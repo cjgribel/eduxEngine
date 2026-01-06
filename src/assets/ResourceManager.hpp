@@ -173,7 +173,12 @@ namespace eeng
         const std::filesystem::path& assets_root() const;
 
         /// @note Policy: call only on the RM strand (queue_import_job) to avoid scan/import races.
+        /// @note Behavior: moves the asset root folder to assets_root/.trash (soft delete).
         bool unimport_assets(const std::vector<Guid>& roots, EngineContext& ctx, std::string* error_out = nullptr);
+
+        /// @note Policy: call only on the RM strand (queue_import_job) to avoid scan/import races.
+        /// @note Behavior: moves assets_root/.trash/<root> back to assets_root.
+        bool restore_from_trash(const Guid& root, EngineContext& ctx, std::string* error_out = nullptr);
 
         // void start_async_scan(const std::filesystem::path& root, EngineContext& ctx);
 

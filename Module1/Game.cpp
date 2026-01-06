@@ -241,6 +241,9 @@ namespace eeng::dev
 #endif
                     }
                     //
+                    EENG_LOG(ctx.get(), "[startup] Rebuilding batch 1...");
+                    br.queue_rebuild_closure(batch_id1, *ctx).get();
+                    //
                     EENG_LOG(ctx.get(), "[startup] Saving all batches...");
                     br.queue_save_all_async(*ctx).get();
                     //

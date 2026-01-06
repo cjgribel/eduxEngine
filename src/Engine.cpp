@@ -444,6 +444,12 @@ namespace eeng
         case TaskResult::TaskType::Import:
             task_name = "Import";
             break;
+        case TaskResult::TaskType::Unimport:
+            task_name = "Unimport";
+            break;
+        case TaskResult::TaskType::Restore:
+            task_name = "Restore";
+            break;
         default:
             task_name = "Unknown";
         }

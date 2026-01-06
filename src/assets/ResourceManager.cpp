@@ -8,7 +8,7 @@
 #include "EventQueue.h"
 #include "meta/MetaAux.h"
 #include "LogMacros.h"
-
+#include "assets/AssetTreeViews.hpp"
 #include <algorithm>
 #include <functional>
 #include <unordered_set>
@@ -27,6 +27,31 @@ namespace
             out.push_back(g);
         }
         return out;
+    }
+
+    std::filesystem::path common_ancestor_path(const std::vector<std::filesystem::path>& paths)
+    {
+        if (paths.empty())
+            return {};
+
+        auto it = paths.begin();
+        std::filesystem::path common = *it++;
+        for (; it != paths.end(); ++it)
+        {
+            std::filesystem::path next;
+            auto a = common.begin();
+            auto b = it->begin();
+            for (; a != common.end() && b != it->end(); ++a, ++b)
+            {
+                if (*a != *b)
+                    break;
+                next /= *a;
+            }
+            common = std::move(next);
+            if (common.empty())
+                break;
+        }
+        return common;
     }
 
 }
@@ -526,41 +551,90 @@ namespace eeng
             return false;
         }
 
-        // Policy: treat guid_parent as ownership; delete subtree only if no leases exist.
+        // Policy: only dependency-tree roots are unimported; remove full dependency subtree
+        // only when no assets in that subtree are leased.
         auto index_data = asset_index_->get_index_data();
-        if (!index_data)
+        if (!index_data || !index_data->trees)
         {
-            if (error_out) *error_out = "Asset index unavailable.";
+            if (error_out) *error_out = "Asset tree unavailable.";
             return false;
         }
 
-        std::unordered_set<Guid> visited;
-        std::vector<Guid> ordered;
-        ordered.reserve(roots.size());
+        // content_tree is the dependency tree shown in the Resource Browser.
+        const auto& tree = index_data->trees->content_tree;
 
-        std::function<void(const Guid&)> visit;
-        visit = [&](const Guid& guid)
+        // 1) Validate selection: each selected GUID must be a dependency-tree root.
+        std::unordered_set<Guid> unique_roots;
+        unique_roots.reserve(roots.size());
+        for (const Guid& guid : roots)
+        {
+            if (!tree.contains(guid))
             {
-                if (!visited.insert(guid).second)
-                    return;
+                if (error_out) *error_out = "Selected asset not found in dependency tree.";
+                return false;
+            }
 
-                auto it = index_data->by_parent.find(guid);
-                if (it != index_data->by_parent.end())
+            if (!tree.is_root(guid))
+            {
+                if (error_out) *error_out = "Only dependency-tree roots can be unimported.";
+                return false;
+            }
+
+            unique_roots.insert(guid);
+        }
+
+        if (unique_roots.empty())
+        {
+            if (error_out) *error_out = "No root assets selected.";
+            return false;
+        }
+
+        struct RootGroup
+        {
+            Guid root{};
+            std::vector<Guid> subtree;
+            std::vector<std::filesystem::path> asset_dirs;
+        };
+
+        std::vector<RootGroup> groups;
+        groups.reserve(unique_roots.size());
+        std::unordered_set<Guid> all_assets;
+
+        // 2) Build per-root groups from the dependency tree (for lease checks + folder resolution).
+        for (const Guid& root : unique_roots)
+        {
+            RootGroup group;
+            group.root = root;
+            bool missing_entry = false;
+
+            tree.traverse_breadthfirst(root, [&](const Guid& guid, size_t)
                 {
-                    for (const AssetEntry* child : it->second)
+                    group.subtree.push_back(guid);
+                    all_assets.insert(guid);
+
+                    auto entry_it = index_data->by_guid.find(guid);
+                    if (entry_it == index_data->by_guid.end() || !entry_it->second)
                     {
-                        if (child)
-                            visit(child->meta.guid);
+                        missing_entry = true;
+                        return;
                     }
-                }
 
-                ordered.push_back(guid);
-            };
+                    const auto& path = entry_it->second->absolute_path;
+                    if (!path.empty())
+                        group.asset_dirs.push_back(path.parent_path());
+                });
 
-        for (const Guid& root : roots)
-            visit(root);
+            if (missing_entry)
+            {
+                if (error_out) *error_out = "Asset entry missing for subtree.";
+                return false;
+            }
 
-        for (const Guid& guid : ordered)
+            groups.push_back(std::move(group));
+        }
+
+        // 3) Hard-stop if any asset in the subtree is currently leased.
+        for (const Guid& guid : all_assets)
         {
             if (held_by_any(guid))
             {
@@ -570,68 +644,141 @@ namespace eeng
             }
         }
 
-        std::vector<std::filesystem::path> cleanup_dirs;
-        cleanup_dirs.reserve(ordered.size() * 2);
-        size_t removed_assets = 0;
-
-        for (const Guid& guid : ordered)
+        // 4) Resolve each subtree's on-disk root folder and move it to .trash.
+        const auto assets_root = assets_root_;
+        if (assets_root.empty())
         {
-            auto it = index_data->by_guid.find(guid);
-            if (it == index_data->by_guid.end() || !it->second)
-                continue;
-
-            const AssetEntry& entry = *it->second;
-            const auto& asset_path = entry.absolute_path;
-            if (asset_path.empty())
-                continue;
-
-            std::error_code ec;
-            if (std::filesystem::remove(asset_path, ec))
-                ++removed_assets;
-            else if (ec)
-                EENG_LOG_WARN(&ctx, "Unimport: failed to remove asset file %s (%s)",
-                    asset_path.string().c_str(), ec.message().c_str());
-
-            const auto meta_path = asset_path.parent_path() /
-                (asset_path.stem().string() + ".meta.json");
-            ec.clear();
-            if (!std::filesystem::remove(meta_path, ec) && ec)
-                EENG_LOG_WARN(&ctx, "Unimport: failed to remove meta file %s (%s)",
-                    meta_path.string().c_str(), ec.message().c_str());
-
-            cleanup_dirs.push_back(asset_path.parent_path());
-            cleanup_dirs.push_back(meta_path.parent_path());
+            if (error_out) *error_out = "Assets root not set.";
+            return false;
         }
 
-        if (!cleanup_dirs.empty() && !assets_root_.empty())
+        std::error_code ec;
+        // Keep soft-deleted assets under assets_root/.trash to preserve GUIDs.
+        const auto trash_root = assets_root / ".trash";
+        std::filesystem::create_directories(trash_root, ec);
+        if (ec)
         {
-            std::sort(cleanup_dirs.begin(), cleanup_dirs.end(),
-                [](const std::filesystem::path& a, const std::filesystem::path& b)
-                {
-                    return a.native().size() > b.native().size();
-                });
+            if (error_out) *error_out = "Failed to create trash folder: " + ec.message();
+            return false;
+        }
 
-            cleanup_dirs.erase(std::unique(cleanup_dirs.begin(), cleanup_dirs.end()),
-                cleanup_dirs.end());
-
-            for (const auto& dir : cleanup_dirs)
+        for (auto& group : groups)
+        {
+            // Use the shared ancestor of all files in the subtree as the folder root.
+            const std::filesystem::path common_root = common_ancestor_path(group.asset_dirs);
+            if (common_root.empty() || common_root == assets_root)
             {
-                std::filesystem::path current = dir;
-                std::error_code ec;
-                while (!current.empty())
-                {
-                    if (!assets_root_.empty() && current == assets_root_)
-                        break;
-                    if (!std::filesystem::remove(current, ec))
-                        break;
-                    if (ec)
-                        break;
-                    current = current.parent_path();
-                }
+                if (error_out) *error_out = "Failed to resolve a unique asset folder.";
+                return false;
+            }
+
+            if (!std::filesystem::exists(common_root))
+            {
+                if (error_out) *error_out = "Asset folder not found on disk.";
+                return false;
+            }
+
+            // Encode root GUID in the folder name so restore can locate it later.
+            std::string dest_name = common_root.filename().string() + "_" + group.root.to_string();
+            std::filesystem::path dest_path = trash_root / dest_name;
+            // Avoid clobbering when a prior trash entry exists.
+            if (std::filesystem::exists(dest_path))
+                dest_path = trash_root / (dest_name + "_" + Guid::generate().to_string());
+
+            std::filesystem::rename(common_root, dest_path, ec);
+            if (ec)
+            {
+                if (error_out) *error_out = "Failed to move asset folder: " + ec.message();
+                return false;
+            }
+
+            EENG_LOG_INFO(&ctx, "Unimported assets (moved to trash): %s", dest_path.string().c_str());
+        }
+        return true;
+    }
+
+    bool ResourceManager::restore_from_trash(const Guid& root, EngineContext& ctx, std::string* error_out)
+    {
+        if (!root.valid())
+        {
+            if (error_out) *error_out = "Invalid root GUID.";
+            return false;
+        }
+
+        if (assets_root_.empty())
+        {
+            if (error_out) *error_out = "Assets root not set.";
+            return false;
+        }
+
+        const auto trash_root = assets_root_ / ".trash";
+        if (!std::filesystem::exists(trash_root))
+        {
+            if (error_out) *error_out = "Trash folder not found.";
+            return false;
+        }
+
+        const std::string suffix = "_" + root.to_string();
+        std::filesystem::path trash_match;
+        size_t matches = 0;
+
+        for (const auto& entry : std::filesystem::directory_iterator(trash_root))
+        {
+            if (!entry.is_directory())
+                continue;
+
+            const std::string name = entry.path().filename().string();
+            if (name.ends_with(suffix))
+            {
+                trash_match = entry.path();
+                matches++;
             }
         }
 
-        EENG_LOG_INFO(&ctx, "Unimported %zu assets.", removed_assets);
+        if (matches == 0)
+        {
+            if (error_out) *error_out = "No trashed asset root found for GUID.";
+            return false;
+        }
+
+        if (matches > 1)
+        {
+            if (error_out) *error_out = "Multiple trashed roots found for GUID.";
+            return false;
+        }
+
+        std::string original_name = trash_match.filename().string();
+        if (original_name.size() <= suffix.size())
+        {
+            if (error_out) *error_out = "Trash entry name invalid.";
+            return false;
+        }
+        original_name.erase(original_name.size() - suffix.size());
+        if (!original_name.empty() && original_name.back() == '_')
+            original_name.pop_back();
+
+        if (original_name.empty())
+        {
+            if (error_out) *error_out = "Failed to resolve original folder name.";
+            return false;
+        }
+
+        const auto dest_path = assets_root_ / original_name;
+        if (std::filesystem::exists(dest_path))
+        {
+            if (error_out) *error_out = "Restore destination already exists.";
+            return false;
+        }
+
+        std::error_code ec;
+        std::filesystem::rename(trash_match, dest_path, ec);
+        if (ec)
+        {
+            if (error_out) *error_out = "Failed to restore asset folder: " + ec.message();
+            return false;
+        }
+
+        EENG_LOG_INFO(&ctx, "Restored assets from trash: %s", dest_path.string().c_str());
         return true;
     }
 

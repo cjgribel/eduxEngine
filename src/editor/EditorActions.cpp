@@ -336,7 +336,7 @@ namespace eeng::editor
             [roots = std::move(roots)](ResourceManager& rm, EngineContext& ctx) mutable -> TaskResult
             {
                 TaskResult res;
-                res.type = TaskResult::TaskType::Import;
+                res.type = TaskResult::TaskType::Unimport;
 
                 std::string error;
                 if (!rm.unimport_assets(roots, ctx, &error))
@@ -351,6 +351,53 @@ namespace eeng::editor
                 const auto& assets_root = rm.assets_root();
                 if (!assets_root.empty())
                     rm.scan_assets_async(assets_root, ctx);
+                return res;
+            },
+            ctx);
+    }
+
+    void AssetActions::restore_assets(EngineContext& ctx, std::vector<Guid> roots)
+    {
+        if (roots.empty())
+        {
+            EENG_LOG_WARN(&ctx, "Restore skipped: no assets selected.");
+            return;
+        }
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+            return;
+
+        auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+        rm.queue_import_job(
+            [roots = std::move(roots)](ResourceManager& rm, EngineContext& ctx) mutable -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Restore;
+
+                bool restored_any = false;
+                for (const Guid& root : roots)
+                {
+                    std::string error;
+                    if (!rm.restore_from_trash(root, ctx, &error))
+                    {
+                        if (error.empty())
+                            error = "Restore failed.";
+                        res.add_result(root, false, error);
+                        continue;
+                    }
+
+                    restored_any = true;
+                    res.add_result(root, true, "Restore ok");
+                }
+
+                if (restored_any)
+                {
+                    const auto& assets_root = rm.assets_root();
+                    if (!assets_root.empty())
+                        rm.scan_assets_async(assets_root, ctx);
+                }
+
                 return res;
             },
             ctx);

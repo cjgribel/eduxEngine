@@ -107,8 +107,14 @@ namespace eeng
     {
         std::vector<AssetEntry> assets;
 
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(root))
+        for (std::filesystem::recursive_directory_iterator it(root), end; it != end; ++it)
         {
+            const auto& entry = *it;
+            if (entry.is_directory() && entry.path().filename() == ".trash")
+            {
+                it.disable_recursion_pending();
+                continue;
+            }
             if (!entry.is_regular_file()) continue;
 
             const auto& meta_path = entry.path();
