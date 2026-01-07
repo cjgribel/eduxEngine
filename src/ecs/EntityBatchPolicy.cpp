@@ -81,6 +81,37 @@ namespace eeng::ecs
         return decision;
     }
 
+    BatchEntityDecision EntityBatchPolicy::resolve_existing_entity_batch(
+        const ecs::Entity& entity,
+        const BatchPolicyContext& ctx,
+        std::string_view context_label)
+    {
+        BatchEntityDecision decision{};
+        if (!ctx.batch_registry || !ctx.entity_manager)
+        {
+            policy_log(ctx.engine_context, context_label, "aborted: missing batch or entity manager.");
+            return decision;
+        }
+
+        auto& em = *ctx.entity_manager;
+        auto& br = *ctx.batch_registry;
+
+        if (!em.try_get_entity_ref(entity, decision.entity_ref))
+        {
+            policy_log(ctx.engine_context, context_label, "failed: entity not registered.");
+            return decision;
+        }
+
+        if (!br.try_get_loaded_batch_for_entity(decision.entity_ref, decision.batch))
+        {
+            policy_log(ctx.engine_context, context_label, "failed: entity has no loaded batch.");
+            return decision;
+        }
+
+        decision.ok = true;
+        return decision;
+    }
+
     void EntityBatchPolicy::sync_branch_to_parent_batch(
         const ecs::Entity& root_entity,
         const ecs::Entity& parent_entity,

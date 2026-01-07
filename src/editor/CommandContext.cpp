@@ -40,7 +40,7 @@ namespace eeng::editor
             : nullptr;
     }
 
-    ThreadPool* CommandContext::thread_pool(EngineContext& ctx) const
+    ::ThreadPool* CommandContext::thread_pool(EngineContext& ctx) const
     {
         return ctx.thread_pool.get();
     }

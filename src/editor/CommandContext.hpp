@@ -5,12 +5,13 @@
 
 #include "EngineContext.hpp"
 
+class ThreadPool;
+
 namespace eeng
 {
     class BatchRegistry;
     class EntityManager;
     class ResourceManager;
-    class ThreadPool;
 }
 
 namespace eeng::editor
@@ -27,7 +28,7 @@ namespace eeng::editor
         EntityManager* entity_manager(EngineContext& ctx) const;
         BatchRegistry* batch_registry(EngineContext& ctx) const;
         ResourceManager* resource_manager(EngineContext& ctx) const;
-        ThreadPool* thread_pool(EngineContext& ctx) const;
+        ::ThreadPool* thread_pool(EngineContext& ctx) const;
 
     private:
         EngineContextWeakPtr ctx_;

@@ -33,9 +33,22 @@ namespace eeng::ecs
         ecs::EntityRef parent_ref{};
     };
 
+    struct BatchEntityDecision
+    {
+        bool ok{ false };
+        BatchId batch{};
+        ecs::EntityRef entity_ref{};
+    };
+
     class EntityBatchPolicy
     {
     public:
+        // Resolve the loaded batch for a live entity.
+        static BatchEntityDecision resolve_existing_entity_batch(
+            const ecs::Entity& entity,
+            const BatchPolicyContext& ctx,
+            std::string_view context_label);
+
         // Resolve a target batch for a new entity.
         // preferred_batch/default_batch are optional fallbacks supplied by the caller.
         static BatchPolicyDecision resolve_new_entity_batch(

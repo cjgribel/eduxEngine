@@ -3,6 +3,7 @@
 
 #include "editor/CommandBatchHelpers.hpp"
 #include "BatchRegistry.hpp"
+#include "ecs/EntityBatchPolicy.hpp"
 #include "ecs/EntityManager.hpp"
 #include "engineapi/SelectionManager.hpp"
 #include "LogMacros.h"
@@ -16,26 +17,20 @@ namespace eeng::editor
         ecs::EntityRef& out_entity_ref,
         const char* context_label)
     {
-        if (!ctx.batch_registry || !ctx.entity_manager)
-        {
-            EENG_LOG(&ctx, "%s aborted: missing batch or entity manager.", context_label);
+        auto* br = ctx.batch_registry
+            ? static_cast<BatchRegistry*>(ctx.batch_registry.get())
+            : nullptr;
+        auto* em = ctx.entity_manager
+            ? static_cast<EntityManager*>(ctx.entity_manager.get())
+            : nullptr;
+        ecs::BatchPolicyContext policy_ctx{ br, em, &ctx };
+        const auto decision =
+            ecs::EntityBatchPolicy::resolve_existing_entity_batch(entity, policy_ctx, context_label);
+        if (!decision.ok)
             return false;
-        }
 
-        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
-        if (!em.try_get_entity_ref(entity, out_entity_ref))
-        {
-            EENG_LOG(&ctx, "%s failed: entity not registered.", context_label);
-            return false;
-        }
-
-        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
-        if (!br.try_get_loaded_batch_for_entity(out_entity_ref, out_batch))
-        {
-            EENG_LOG(&ctx, "%s failed: entity has no loaded batch.", context_label);
-            return false;
-        }
-
+        out_batch = decision.batch;
+        out_entity_ref = decision.entity_ref;
         return true;
     }
 
@@ -46,52 +41,38 @@ namespace eeng::editor
         ecs::EntityRef& out_parent_ref,
         const char* context_label)
     {
-        // Policy: all live entities must belong to a loaded batch.
-        // New entities use the parent's batch; otherwise use selected batch or fallback to "default".
-        if (!ctx.batch_registry || !ctx.entity_manager)
-        {
-            EENG_LOG(&ctx, "%s aborted: missing batch or entity manager.", context_label);
-            return false;
-        }
+        auto* br = ctx.batch_registry
+            ? static_cast<BatchRegistry*>(ctx.batch_registry.get())
+            : nullptr;
+        auto* em = ctx.entity_manager
+            ? static_cast<EntityManager*>(ctx.entity_manager.get())
+            : nullptr;
+        ecs::BatchPolicyContext policy_ctx{ br, em, &ctx };
 
-        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
-        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
-
-        if (parent_entity.has_id())
-        {
-            if (!em.try_get_entity_ref(parent_entity, out_parent_ref))
-            {
-                EENG_LOG(&ctx, "%s failed: parent entity not registered.", context_label);
-                return false;
-            }
-
-            if (!br.try_get_loaded_batch_for_entity(out_parent_ref, out_batch))
-            {
-                EENG_LOG(&ctx, "%s failed: parent has no loaded batch.", context_label);
-                return false;
-            }
-
-            return true;
-        }
-
-        BatchId selected{};
+        BatchId preferred_batch{};
+        const BatchId* preferred_ptr = nullptr;
         if (ctx.batch_selection && !ctx.batch_selection->empty())
         {
-            selected = ctx.batch_selection->last();
-        }
-        else if (!br.try_get_batch_id_by_name(eeng::BatchRegistry::kDefaultBatchName, selected))
-        {
-            EENG_LOG(&ctx, "%s failed: default batch not found.", context_label);
-            return false;
+            preferred_batch = ctx.batch_selection->last();
+            preferred_ptr = &preferred_batch;
         }
 
-        if (!br.is_batch_loaded(selected))
-        {
-            EENG_LOG(&ctx, "%s failed: target batch is not loaded.", context_label);
-            return false;
-        }
+        BatchId default_batch{};
+        const BatchId* default_ptr = nullptr;
+        if (br && br->try_get_batch_id_by_name(eeng::BatchRegistry::kDefaultBatchName, default_batch))
+            default_ptr = &default_batch;
 
-        out_batch = selected;
+        const auto decision = ecs::EntityBatchPolicy::resolve_new_entity_batch(
+            parent_entity,
+            preferred_ptr,
+            default_ptr,
+            policy_ctx,
+            context_label);
+        if (!decision.ok)
+            return false;
+
+        out_batch = decision.batch;
+        out_parent_ref = decision.parent_ref;
         return true;
     }
 
@@ -148,66 +129,23 @@ namespace eeng::editor
         ecs::Entity parent_entity,
         EngineContext& ctx)
     {
-        if (!ctx.batch_registry || !ctx.entity_manager)
-            return;
+        auto* br = ctx.batch_registry
+            ? static_cast<BatchRegistry*>(ctx.batch_registry.get())
+            : nullptr;
+        auto* em = ctx.entity_manager
+            ? static_cast<EntityManager*>(ctx.entity_manager.get())
+            : nullptr;
+        ecs::BatchPolicyContext policy_ctx{ br, em, &ctx };
 
-        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
-        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
-        auto& scenegraph = em.scene_graph();
+        BatchId default_batch{};
+        const BatchId* default_ptr = nullptr;
+        if (br && br->try_get_batch_id_by_name(BatchRegistry::kDefaultBatchName, default_batch))
+            default_ptr = &default_batch;
 
-        if (!scenegraph.contains(root_entity))
-            return;
-
-        BatchId parent_batch{};
-        bool parent_has_batch = false;
-
-        if (parent_entity.has_id())
-        {
-            const auto parent_ref = em.get_entity_ref(parent_entity);
-            if (parent_ref.is_bound() && parent_ref.guid.valid())
-                parent_has_batch = br.try_get_loaded_batch_for_entity(parent_ref, parent_batch);
-        }
-        else
-        {
-            BatchId default_batch{};
-            if (br.try_get_batch_id_by_name(BatchRegistry::kDefaultBatchName, default_batch)
-                && br.is_batch_loaded(default_batch))
-            {
-                parent_batch = default_batch;
-                parent_has_batch = true;
-            }
-            else
-            {
-                EENG_LOG(&ctx, "sync_branch_batch_with_parent: default batch missing or unloaded.");
-            }
-        }
-
-        const auto branch = scenegraph.get_branch_topdown(root_entity);
-        for (const auto& entity : branch)
-        {
-            if (!entity.has_id() || !em.entity_valid(entity))
-                continue;
-
-            const auto entity_ref = em.get_entity_ref(entity);
-            if (!entity_ref.is_bound() || !entity_ref.guid.valid())
-                continue;
-
-            BatchId current_batch{};
-            const bool has_current = br.try_get_loaded_batch_for_entity(entity_ref, current_batch);
-
-            if (parent_has_batch)
-            {
-                if (!has_current || current_batch != parent_batch)
-                {
-                    if (has_current)
-                        br.queue_detach_entity(current_batch, entity_ref, ctx);
-                    br.queue_attach_entity(parent_batch, entity_ref, ctx);
-                }
-            }
-            else if (has_current)
-            {
-                br.queue_detach_entity(current_batch, entity_ref, ctx);
-            }
-        }
+        ecs::EntityBatchPolicy::sync_branch_to_parent_batch(
+            root_entity,
+            parent_entity,
+            default_ptr,
+            policy_ctx);
     }
 }
