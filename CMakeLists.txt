@@ -266,6 +266,8 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/BatchCommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/AssignFieldCommand.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandAsync.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandAssetHelpers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandBatchHelpers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandEntityHelpers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandSnapshot.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/EditorActions.cpp
