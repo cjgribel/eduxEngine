@@ -15,9 +15,11 @@
 #include "editor/CommandAsync.hpp"
 #include "editor/CommandAssetHelpers.hpp"
 #include "editor/CommandBatchHelpers.hpp"
+#include "editor/CommandContext.hpp"
 #include "editor/CommandEntityHelpers.hpp"
 #include "editor/CommandSnapshot.hpp"
 #include "ecs/EntityManager.hpp"
+#include "ecs/EntityBatchPolicy.hpp"
 #include "ResourceManager.hpp"
 #include "ThreadPool.hpp"
 #include "assets/importers/AssimpImporter.hpp"
@@ -28,6 +30,14 @@
 #include "ecs/SceneGraph.hpp"
 
 namespace eeng::editor {
+    using eeng::BatchId;
+    using eeng::BatchRegistry;
+    using eeng::EngineContext;
+    using eeng::EngineContextWeakPtr;
+    using eeng::EntityManager;
+    using eeng::Guid;
+    using eeng::ResourceManager;
+    using eeng::TaskResult;
     namespace ecs = eeng::ecs;
     using ecs::Entity;
 
@@ -41,11 +51,15 @@ namespace eeng::editor {
 
     CommandStatus CreateEntityCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!em || !br)
+            return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
             return update();
@@ -55,25 +69,37 @@ namespace eeng::editor {
         {
             Entity parent_current{};
             if (parent_entity.has_id()
-                && em.entity_valid(parent_entity)
-                && em.scene_graph().contains(parent_entity))
+                && em->entity_valid(parent_entity)
+                && em->scene_graph().contains(parent_entity))
             {
                 parent_current = parent_entity;
             }
 
-            ecs::EntityRef parent_ref{};
-            if (!resolve_batch_for_new_entity(
-                    parent_current,
-                    *ctx_sp,
-                    created_batch,
-                    parent_ref,
-                    "CreateEntity"))
+            BatchId preferred_batch{};
+            const BatchId* preferred_ptr = nullptr;
+            if (ctx_sp->batch_selection && !ctx_sp->batch_selection->empty())
             {
-                return CommandStatus::Failed;
+                preferred_batch = ctx_sp->batch_selection->last();
+                preferred_ptr = &preferred_batch;
             }
 
-            auto& br = static_cast<eeng::BatchRegistry&>(*ctx_sp->batch_registry);
-            create_future = br.queue_create_entity(created_batch, "", parent_ref, *ctx_sp);
+            BatchId default_batch{};
+            const BatchId* default_ptr = nullptr;
+            if (br->try_get_batch_id_by_name(BatchRegistry::kDefaultBatchName, default_batch))
+                default_ptr = &default_batch;
+
+            ecs::BatchPolicyContext policy_ctx{ br, em, ctx_sp.get() };
+            auto decision = ecs::EntityBatchPolicy::resolve_new_entity_batch(
+                parent_current,
+                preferred_ptr,
+                default_ptr,
+                policy_ctx,
+                "CreateEntity");
+            if (!decision.ok)
+                return CommandStatus::Failed;
+
+            created_batch = decision.batch;
+            create_future = br->queue_create_entity(created_batch, "", decision.parent_ref, *ctx_sp);
             async_stage = AsyncStage::Create;
             return update();
         }
@@ -109,8 +135,9 @@ namespace eeng::editor {
 
     CommandStatus CreateEntityCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
@@ -123,10 +150,13 @@ namespace eeng::editor {
                 return CommandStatus::Done;
         }
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
         if (created_guid.valid())
         {
-            auto entity_opt = em.get_entity_from_guid(created_guid);
+            auto entity_opt = em->get_entity_from_guid(created_guid);
             if (entity_opt && entity_opt->has_id())
             {
                 mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
@@ -1018,25 +1048,30 @@ namespace eeng::editor {
 
     CommandStatus ReparentEntityBranchCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
-        auto& scenegraph = em.scene_graph();
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!em || !br)
+            return CommandStatus::Done;
+
+        auto& scenegraph = em->scene_graph();
 
         if (!entity_guid.valid())
         {
             if (!entity.has_id())
                 return CommandStatus::Done;
-            if (!em.entity_valid(entity))
+            if (!em->entity_valid(entity))
                 return CommandStatus::Done;
             if (!scenegraph.contains(entity))
                 return CommandStatus::Done;
-            entity_guid = em.get_entity_guid(entity);
+            entity_guid = em->get_entity_guid(entity);
         }
 
-        auto entity_opt = em.get_entity_from_guid(entity_guid);
+        auto entity_opt = em->get_entity_from_guid(entity_guid);
         if (!entity_opt || !entity_opt->has_id())
             return CommandStatus::Done;
         if (!scenegraph.contains(*entity_opt))
@@ -1046,8 +1081,8 @@ namespace eeng::editor {
 
         if (!new_parent_guid.valid() && new_parent_entity.has_id())
         {
-            if (em.entity_valid(new_parent_entity) && scenegraph.contains(new_parent_entity))
-                new_parent_guid = em.get_entity_guid(new_parent_entity);
+            if (em->entity_valid(new_parent_entity) && scenegraph.contains(new_parent_entity))
+                new_parent_guid = em->get_entity_guid(new_parent_entity);
         }
 
         if (scenegraph.is_root(entity_current))
@@ -1056,13 +1091,13 @@ namespace eeng::editor {
         }
         else
         {
-            prev_parent_guid = em.get_entity_parent(entity_current).guid;
+            prev_parent_guid = em->get_entity_parent(entity_current).guid;
         }
 
         Entity parent_current{};
         if (new_parent_guid.valid())
         {
-            auto parent_opt = em.get_entity_from_guid(new_parent_guid);
+            auto parent_opt = em->get_entity_from_guid(new_parent_guid);
             if (!parent_opt || !parent_opt->has_id())
                 return CommandStatus::Done;
             if (!scenegraph.contains(*parent_opt))
@@ -1071,24 +1106,40 @@ namespace eeng::editor {
         }
 
         // Transform dirtying on reparent is handled by EntityManager.
-        ctx_sp->entity_manager->reparent_entity(entity_current, parent_current);
-        sync_branch_batch_with_parent(entity_current, parent_current, *ctx_sp);
+        em->reparent_entity(entity_current, parent_current);
+
+        BatchId default_batch{};
+        const BatchId* default_ptr = nullptr;
+        if (br->try_get_batch_id_by_name(BatchRegistry::kDefaultBatchName, default_batch))
+            default_ptr = &default_batch;
+
+        ecs::BatchPolicyContext policy_ctx{ br, em, ctx_sp.get() };
+        ecs::EntityBatchPolicy::sync_branch_to_parent_batch(
+            entity_current,
+            parent_current,
+            default_ptr,
+            policy_ctx);
         return CommandStatus::Done;
     }
 
     CommandStatus ReparentEntityBranchCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
-        auto& scenegraph = em.scene_graph();
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!em || !br)
+            return CommandStatus::Done;
+
+        auto& scenegraph = em->scene_graph();
 
         if (!entity_guid.valid())
             return CommandStatus::Done;
 
-        auto entity_opt = em.get_entity_from_guid(entity_guid);
+        auto entity_opt = em->get_entity_from_guid(entity_guid);
         if (!entity_opt || !entity_opt->has_id())
             return CommandStatus::Done;
         if (!scenegraph.contains(*entity_opt))
@@ -1097,7 +1148,7 @@ namespace eeng::editor {
         Entity parent_current{};
         if (prev_parent_guid.valid())
         {
-            auto parent_opt = em.get_entity_from_guid(prev_parent_guid);
+            auto parent_opt = em->get_entity_from_guid(prev_parent_guid);
             if (!parent_opt || !parent_opt->has_id())
                 return CommandStatus::Done;
             if (!scenegraph.contains(*parent_opt))
@@ -1106,8 +1157,19 @@ namespace eeng::editor {
         }
 
         // Transform dirtying on reparent is handled by EntityManager.
-        ctx_sp->entity_manager->reparent_entity(*entity_opt, parent_current);
-        sync_branch_batch_with_parent(*entity_opt, parent_current, *ctx_sp);
+        em->reparent_entity(*entity_opt, parent_current);
+
+        BatchId default_batch{};
+        const BatchId* default_ptr = nullptr;
+        if (br->try_get_batch_id_by_name(BatchRegistry::kDefaultBatchName, default_batch))
+            default_ptr = &default_batch;
+
+        ecs::BatchPolicyContext policy_ctx{ br, em, ctx_sp.get() };
+        ecs::EntityBatchPolicy::sync_branch_to_parent_batch(
+            *entity_opt,
+            parent_current,
+            default_ptr,
+            policy_ctx);
         return CommandStatus::Done;
     }
 

@@ -255,6 +255,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/GpuAssetOps.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/Entity.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/EntityManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/EntityBatchPolicy.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/SceneGraph.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/TransformComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/HeaderComponent.cpp
@@ -268,6 +269,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandAsync.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandAssetHelpers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandBatchHelpers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandContext.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandEntityHelpers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandSnapshot.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/EditorActions.cpp
