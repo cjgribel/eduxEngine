@@ -2,60 +2,15 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "editor/BatchCommands.hpp"
+#include "editor/CommandAsync.hpp"
 #include "ecs/EntityManager.hpp"
 #include "LogMacros.h"
 #include <algorithm>
-#include <chrono>
 
 namespace eeng::editor
 {
     namespace
     {
-        CommandStatus poll_future(std::shared_future<TaskResult>& future, bool& in_flight_flag)
-        {
-            if (!future.valid())
-            {
-                in_flight_flag = false;
-                return CommandStatus::Done;
-            }
-
-            if (future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-                return CommandStatus::InFlight;
-
-            in_flight_flag = false;
-            const auto result = future.get();
-            return result.success ? CommandStatus::Done : CommandStatus::Failed;
-        }
-
-        CommandStatus poll_bool_futures(std::vector<std::shared_future<bool>>& futures, bool& in_flight_flag)
-        {
-            if (futures.empty())
-            {
-                in_flight_flag = false;
-                return CommandStatus::Done;
-            }
-
-            for (auto& future : futures)
-            {
-                if (!future.valid())
-                    continue;
-                if (future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-                    return CommandStatus::InFlight;
-            }
-
-            in_flight_flag = false;
-            bool all_ok = true;
-            for (auto& future : futures)
-            {
-                if (!future.valid())
-                    continue;
-                if (!future.get())
-                    all_ok = false;
-            }
-
-            return all_ok ? CommandStatus::Done : CommandStatus::Failed;
-        }
-
         bool is_batch_loaded(const std::vector<const BatchInfo*>& batches, const BatchId& id)
         {
             for (const auto* batch : batches)
@@ -119,7 +74,7 @@ namespace eeng::editor
         auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
         future = br.queue_load(batch_id, *ctx_sp);
         in_flight = true;
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchLoadCommand::undo()
@@ -131,12 +86,12 @@ namespace eeng::editor
         auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
         future = br.queue_unload(batch_id, *ctx_sp);
         in_flight = true;
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchLoadCommand::update()
     {
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     std::string BatchLoadCommand::get_name() const
@@ -160,7 +115,7 @@ namespace eeng::editor
         auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
         future = br.queue_unload(batch_id, *ctx_sp);
         in_flight = true;
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchUnloadCommand::undo()
@@ -172,12 +127,12 @@ namespace eeng::editor
         auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
         future = br.queue_load(batch_id, *ctx_sp);
         in_flight = true;
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchUnloadCommand::update()
     {
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     std::string BatchUnloadCommand::get_name() const
@@ -200,7 +155,7 @@ namespace eeng::editor
         auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
         future = br.queue_load_all_async(*ctx_sp);
         in_flight = true;
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchLoadAllCommand::undo()
@@ -212,12 +167,12 @@ namespace eeng::editor
         auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
         future = br.queue_unload_all_async(*ctx_sp);
         in_flight = true;
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchLoadAllCommand::update()
     {
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     std::string BatchLoadAllCommand::get_name() const
@@ -240,7 +195,7 @@ namespace eeng::editor
         auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
         future = br.queue_unload_all_async(*ctx_sp);
         in_flight = true;
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchUnloadAllCommand::undo()
@@ -252,12 +207,12 @@ namespace eeng::editor
         auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
         future = br.queue_load_all_async(*ctx_sp);
         in_flight = true;
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchUnloadAllCommand::update()
     {
-        return poll_future(future, in_flight);
+        return poll_task_future(future, in_flight);
     }
 
     std::string BatchUnloadAllCommand::get_name() const

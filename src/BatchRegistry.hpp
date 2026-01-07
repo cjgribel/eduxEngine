@@ -94,6 +94,9 @@ namespace eeng {
         BatchRegistry() = default;
         ~BatchRegistry() = default;
 
+        static constexpr const char* kEditorBatchName = "editor";
+        static constexpr const char* kDefaultBatchName = "default";
+
         void save_index(const std::filesystem::path& index_path);
         void load_or_create_index(const std::filesystem::path& index_path);
         void save_index();
@@ -203,6 +206,8 @@ namespace eeng {
 
         std::vector<const BatchInfo*> list() const;
         bool try_get_loaded_batch_for_entity(const ecs::EntityRef& entity_ref, BatchId& out_id) const;
+        bool try_get_batch_id_by_name(const std::string& name, BatchId& out_id) const;
+        bool is_batch_loaded(const BatchId& id) const;
 
     private:
 

@@ -291,15 +291,20 @@ namespace eeng
             {
                 std::lock_guard lk(mtx_);
                 batches_.clear();
+                entity_to_batch_.clear();
+                index_path_ = index_path;
             }
+            // Policy: only seed default batches on brand new indices; do not recreate if missing later.
+            create_batch(std::string(kEditorBatchName));
+            create_batch(std::string(kDefaultBatchName));
             save_index(index_path);
-            index_path_ = index_path;
             return;
         }
 
         nlohmann::json j; f >> j;
         std::lock_guard lk(mtx_);
         batches_.clear();
+        entity_to_batch_.clear();
         for (auto& b : j["batches"])
         {
             BatchInfo bi;
@@ -1154,6 +1159,35 @@ namespace eeng
 
         out_id = it->second;
         return true;
+    }
+
+    bool BatchRegistry::try_get_batch_id_by_name(const std::string& name, BatchId& out_id) const
+    {
+        if (name.empty())
+            return false;
+
+        std::lock_guard lk(mtx_);
+        for (const auto& [id, info] : batches_)
+        {
+            if (info.name == name)
+            {
+                out_id = id;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool BatchRegistry::is_batch_loaded(const BatchId& id) const
+    {
+        if (!id.valid())
+            return false;
+
+        std::lock_guard lk(mtx_);
+        auto it = batches_.find(id);
+        if (it == batches_.end())
+            return false;
+        return it->second.state == BatchInfo::State::Loaded;
     }
 
     void BatchRegistry::mark_closure_dirty(const BatchId& id)

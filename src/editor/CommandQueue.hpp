@@ -34,8 +34,11 @@ namespace eeng::editor
         InFlightAction in_flight_action{};
 
     public:
-        void add(CommandPtr&& command)
+        bool add(CommandPtr&& command)
         {
+            if (has_in_flight())
+                return false;
+
             //discard_unexecuted(); // Might not work if multiple commands are added between executions
 
             // Remove current_index -> latest_index
@@ -47,6 +50,7 @@ namespace eeng::editor
 
             queue.push_back(std::move(command));
             // has_new_ = true;
+            return true;
         }
 
         // ???

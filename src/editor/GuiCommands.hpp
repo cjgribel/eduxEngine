@@ -17,6 +17,7 @@
 #include "MetaSerialize.hpp"
 #include <atomic>
 #include <filesystem>
+#include <future>
 #include <entt/fwd.hpp>
 #include <vector>
 
@@ -31,10 +32,16 @@ namespace eeng::editor {
     {
         ecs::Entity created_entity;
         Guid created_guid;
+        BatchId created_batch;
         ecs::Entity parent_entity;
         nlohmann::json entity_json{};
+        std::shared_future<ecs::EntityRef> create_future{};
+        std::shared_future<bool> attach_future{};
+        std::shared_future<bool> destroy_future{};
         EngineContextWeakPtr ctx;
         std::string display_name;
+        enum class AsyncStage { None, Create, Attach, Destroy };
+        AsyncStage async_stage{ AsyncStage::None };
 
     public:
         CreateEntityCommand(
@@ -45,6 +52,8 @@ namespace eeng::editor {
 
         CommandStatus undo() override;
 
+        CommandStatus update() override;
+
         std::string get_name() const override;
     };
 
@@ -54,9 +63,14 @@ namespace eeng::editor {
     {
         ecs::Entity entity;
         Guid entity_guid;
+        BatchId entity_batch;
         nlohmann::json entity_json{};
+        std::shared_future<bool> destroy_future{};
+        std::shared_future<bool> attach_future{};
         EngineContextWeakPtr ctx;
         std::string display_name;
+        enum class AsyncStage { None, Destroy, Attach };
+        AsyncStage async_stage{ AsyncStage::None };
 
     public:
         DestroyEntityCommand(
@@ -68,6 +82,8 @@ namespace eeng::editor {
 
         CommandStatus undo() override;
 
+        CommandStatus update() override;
+
         std::string get_name() const override;
     };
 
@@ -77,9 +93,14 @@ namespace eeng::editor {
     {
         ecs::Entity root_entity;
         Guid root_guid;
+        BatchId branch_batch;
         nlohmann::json branch_json{};
+        std::vector<std::shared_future<bool>> destroy_futures{};
+        std::vector<std::shared_future<bool>> attach_futures{};
         EngineContextWeakPtr ctx;
         std::string display_name;
+        enum class AsyncStage { None, Destroy, Attach };
+        AsyncStage async_stage{ AsyncStage::None };
 
     public:
         DestroyEntityBranchCommand(
@@ -91,6 +112,8 @@ namespace eeng::editor {
 
         CommandStatus undo() override;
 
+        CommandStatus update() override;
+
         std::string get_name() const override;
     };
 
@@ -100,9 +123,14 @@ namespace eeng::editor {
     {
         ecs::Entity entity_source;
         Guid source_guid;
+        BatchId target_batch;
         nlohmann::json copy_json{};
+        std::shared_future<bool> attach_future{};
+        std::shared_future<bool> destroy_future{};
         EngineContextWeakPtr ctx;
         std::string display_name;
+        enum class AsyncStage { None, Attach, Destroy };
+        AsyncStage async_stage{ AsyncStage::None };
 
     public:
         CopyEntityCommand(
@@ -113,6 +141,8 @@ namespace eeng::editor {
 
         CommandStatus undo() override;
 
+        CommandStatus update() override;
+
         std::string get_name() const override;
     };
 
@@ -122,9 +152,14 @@ namespace eeng::editor {
     {
         ecs::Entity root_entity;
         Guid root_guid;
+        BatchId target_batch;
         nlohmann::json branch_json{};
+        std::vector<std::shared_future<bool>> attach_futures{};
+        std::vector<std::shared_future<bool>> destroy_futures{};
         EngineContextWeakPtr ctx;
         std::string display_name;
+        enum class AsyncStage { None, Attach, Destroy };
+        AsyncStage async_stage{ AsyncStage::None };
 
     public:
         CopyEntityBranchCommand(
@@ -134,6 +169,8 @@ namespace eeng::editor {
         CommandStatus execute() override;
 
         CommandStatus undo() override;
+
+        CommandStatus update() override;
 
         std::string get_name() const override;
     };

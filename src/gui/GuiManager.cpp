@@ -234,10 +234,24 @@ namespace eeng
             return;
         }
 
+        BatchId default_batch_id{};
+        bool has_default_batch = false;
+        for (const auto* b : batches)
+        {
+            if (!b)
+                continue;
+            if (b->name == BatchRegistry::kDefaultBatchName)
+            {
+                default_batch_id = b->id;
+                has_default_batch = true;
+                break;
+            }
+        }
+
         // Selection state (shared across GUI)
         auto& batch_selection = *ctx.batch_selection;
         if (batch_selection.empty() && !batches.empty())
-            batch_selection.add(batches.front()->id);
+            batch_selection.add(has_default_batch ? default_batch_id : batches.front()->id);
 
         BatchId selected_id{};
         if (!batch_selection.empty())
@@ -256,8 +270,9 @@ namespace eeng
         if (selected_index < 0 && !batches.empty())
         {
             batch_selection.clear();
-            batch_selection.add(batches.front()->id);
-            selected_id = batches.front()->id;
+            const auto fallback_id = has_default_batch ? default_batch_id : batches.front()->id;
+            batch_selection.add(fallback_id);
+            selected_id = fallback_id;
             selected_index = 0;
         }
 

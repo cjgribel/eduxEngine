@@ -10,6 +10,7 @@
 #include "MetaLiterals.h"
 #include "MetaAux.h"
 #include "engineapi/SelectionManager.hpp"
+#include "LogMacros.h"
 
 #include "imgui.h"
 #include <iostream>
@@ -22,13 +23,17 @@ namespace eeng::meta {
 
     namespace
     {
-        void generate_command(auto& cmd_queue, auto& cmd_builder)
+        void generate_command(editor::CommandQueue& cmd_queue, auto& cmd_builder, EngineContext& ctx)
         {
             // assert(!cmd_queue_wptr.expired());
             // auto cmd_queue_sptr = cmd_queue_wptr.lock();
             // cmd_queue_sptr->add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
 
-            cmd_queue.add(editor::CommandFactory::Create<editor::AssignFieldCommand>(cmd_builder.build()));
+            if (!cmd_queue.add(
+                    editor::CommandFactory::Create<editor::AssignFieldCommand>(cmd_builder.build())))
+            {
+                EENG_LOG_WARN(&ctx, "Edit ignored: command queue busy.");
+            }
         }
     }
 
@@ -163,7 +168,7 @@ namespace eeng::meta {
                 {
                     // Build & issue command
                     cmdb.prev_value(any).new_value(copy_any);
-                    generate_command(*ctx.command_queue, cmdb);
+                    generate_command(*ctx.command_queue, cmdb, ctx);
 
                     mod = true;
                 }
@@ -184,7 +189,7 @@ namespace eeng::meta {
                 {
                     // Build & issue command
                     cmdb.prev_value(any).new_value(copy_any);
-                    generate_command(*ctx.command_queue, cmdb);
+                    generate_command(*ctx.command_queue, cmdb, ctx);
 
                     mod = true;
                 }
@@ -358,7 +363,7 @@ namespace eeng::meta {
                 {
                     // Build & issue command
                     cmdb.prev_value(any).new_value(value_copy);
-                    generate_command(*ctx.command_queue, cmdb);
+                    generate_command(*ctx.command_queue, cmdb, ctx);
 
                     mod = true;
                 }

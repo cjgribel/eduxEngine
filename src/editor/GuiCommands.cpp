@@ -7,8 +7,6 @@
 
 #include <iostream>
 #include <cassert>
-#include <chrono>
-#include <functional>
 #include <future>
 #include <string_view>
 #include <unordered_map>
@@ -17,6 +15,8 @@
 #include "MetaSerialize.hpp"
 #include "GuiCommands.hpp"
 #include "BatchRegistry.hpp"
+#include "editor/CommandAsync.hpp"
+#include "editor/CommandSnapshot.hpp"
 #include "ecs/EntityManager.hpp"
 #include "ResourceManager.hpp"
 #include "ThreadPool.hpp"
@@ -25,6 +25,7 @@
 #include "meta/MetaAux.h"
 #include "MetaLiterals.h"
 #include "LogMacros.h"
+#include "engineapi/SelectionManager.hpp"
 
 // Used by Copy command
 #include "ecs/SceneGraph.hpp"
@@ -32,91 +33,17 @@
 namespace
 {
     using eeng::BatchId;
+    using eeng::BatchRegistry;
     using eeng::Guid;
     using eeng::EngineContext;
     using eeng::EngineContextWeakPtr;
     using eeng::EntityManager;
     using eeng::ecs::Entity;
+    using eeng::ecs::EntityRef;
+    namespace ecs = eeng::ecs;
     using eeng::editor::CommandStatus;
     using eeng::TaskResult;
     using eeng::ResourceManager;
-
-    struct HeaderJsonKeys
-    {
-        std::string type_id;
-        std::string guid_key;
-        std::string parent_key;
-        std::string entityref_guid_key;
-    };
-
-    HeaderJsonKeys resolve_header_keys()
-    {
-        HeaderJsonKeys keys{};
-
-        auto header_type = eeng::meta::resolve_by_type_id_string("eeng.ecs.HeaderComponent");
-        if (!header_type)
-            return keys;
-
-        keys.type_id = eeng::meta::get_meta_type_id_string(header_type);
-
-        for (auto [id, meta_data] : header_type.data())
-        {
-            if (eeng::DataMetaInfo* info = meta_data.custom(); info)
-            {
-                if (info->name == "guid")
-                    keys.guid_key = get_meta_data_display_name(id, meta_data);
-                else if (info->name == "parent_entity")
-                    keys.parent_key = get_meta_data_display_name(id, meta_data);
-            }
-        }
-
-        auto entity_ref_type = eeng::meta::resolve_by_type_id_string("eeng.ecs.EntityRef");
-        if (entity_ref_type)
-        {
-            for (auto [id, meta_data] : entity_ref_type.data())
-            {
-                if (eeng::DataMetaInfo* info = meta_data.custom(); info && info->name == "guid")
-                {
-                    keys.entityref_guid_key = get_meta_data_display_name(id, meta_data);
-                    break;
-                }
-            }
-        }
-
-        return keys;
-    }
-
-    void set_ui_in_flight(
-        const std::shared_ptr<std::atomic<bool>>& flag,
-        bool value)
-    {
-        if (flag)
-            flag->store(value, std::memory_order_relaxed);
-    }
-
-    CommandStatus poll_task_future(
-        std::shared_future<TaskResult>& future,
-        bool& in_flight_flag,
-        const std::function<void(const TaskResult&)>& on_ready = {})
-    {
-        if (!future.valid())
-        {
-            in_flight_flag = false;
-            return CommandStatus::Done;
-        }
-
-        if (future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-            return CommandStatus::InFlight;
-
-        in_flight_flag = false;
-        const TaskResult result = future.get();
-        future = {};
-
-        if (on_ready)
-            on_ready(result);
-
-        return result.success ? CommandStatus::Done : CommandStatus::Failed;
-    }
 
     TaskResult make_task_error(
         TaskResult::TaskType type,
@@ -199,30 +126,6 @@ namespace
             ctx);
     }
 
-    const HeaderJsonKeys& header_keys()
-    {
-        static HeaderJsonKeys keys{};
-        static bool initialized = false;
-
-        if (!initialized || keys.type_id.empty())
-        {
-            keys = resolve_header_keys();
-            initialized = true;
-        }
-
-        return keys;
-    }
-
-    entt::id_type header_component_id()
-    {
-        static entt::id_type id = []()
-            {
-                auto header_type = eeng::meta::resolve_by_type_id_string("eeng.ecs.HeaderComponent");
-                return header_type ? header_type.id() : entt::id_type{};
-            }();
-        return id;
-    }
-
     void ensure_storage(entt::registry& registry, entt::id_type component_id)
     {
         if (!registry.storage(component_id))
@@ -269,171 +172,6 @@ namespace
         return *entity_opt;
     }
 
-    bool update_entity_guid_in_json(nlohmann::json& entity_json, const Guid& guid)
-    {
-        const auto& keys = header_keys();
-        if (!entity_json.contains("components"))
-            return false;
-
-        const auto old_guid = entity_json.value("entity_guid", Guid::invalid().raw());
-        entity_json["entity_guid"] = guid.raw();
-
-        auto& components = entity_json["components"];
-        if (!components.is_object())
-            return false;
-
-        auto update_guid_field = [&](nlohmann::json& comp_json) -> bool
-            {
-                if (!comp_json.is_object())
-                    return false;
-
-                if (!keys.guid_key.empty() && comp_json.contains(keys.guid_key))
-                {
-                    comp_json[keys.guid_key] = guid.raw();
-                    return true;
-                }
-
-                if (comp_json.contains("Guid"))
-                {
-                    comp_json["Guid"] = guid.raw();
-                    return true;
-                }
-
-                if (comp_json.contains("guid"))
-                {
-                    comp_json["guid"] = guid.raw();
-                    return true;
-                }
-
-                return false;
-            };
-
-        if (!keys.type_id.empty())
-        {
-            auto it = components.find(keys.type_id);
-            if (it != components.end() && update_guid_field(it.value()))
-                return true;
-        }
-
-        for (auto& [comp_name, comp_json] : components.items())
-        {
-            if (!comp_json.is_object())
-                continue;
-
-            if (comp_json.contains("Parent Entity") || comp_json.contains("parent_entity"))
-            {
-                if (update_guid_field(comp_json))
-                    return true;
-            }
-        }
-
-        for (auto& [comp_name, comp_json] : components.items())
-        {
-            if (!comp_json.is_object())
-                continue;
-
-            if (comp_json.contains("Guid") && comp_json["Guid"].is_number_unsigned()
-                && comp_json["Guid"].get<Guid::underlying_type>() == old_guid)
-            {
-                comp_json["Guid"] = guid.raw();
-                return true;
-            }
-
-            if (comp_json.contains("guid") && comp_json["guid"].is_number_unsigned()
-                && comp_json["guid"].get<Guid::underlying_type>() == old_guid)
-            {
-                comp_json["guid"] = guid.raw();
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    bool update_parent_guid_in_json(nlohmann::json& entity_json, const Guid& parent_guid)
-    {
-        const auto& keys = header_keys();
-        if (!entity_json.contains("components"))
-            return false;
-
-        auto& components = entity_json["components"];
-        if (!components.is_object())
-            return false;
-
-        if (!keys.type_id.empty() && !keys.parent_key.empty())
-        {
-            auto it = components.find(keys.type_id);
-            if (it != components.end() && it.value().is_object())
-            {
-                auto& header_json = it.value();
-                if (header_json.contains(keys.parent_key))
-                {
-                    auto& parent_json = header_json[keys.parent_key];
-                    if (!keys.entityref_guid_key.empty())
-                    {
-                        parent_json[keys.entityref_guid_key] = parent_guid.raw();
-                        return true;
-                    }
-                    if (parent_json.contains("Guid"))
-                    {
-                        parent_json["Guid"] = parent_guid.raw();
-                        return true;
-                    }
-                    if (parent_json.contains("guid"))
-                    {
-                        parent_json["guid"] = parent_guid.raw();
-                        return true;
-                    }
-                }
-            }
-        }
-
-        for (auto& [comp_name, comp_json] : components.items())
-        {
-            if (!comp_json.is_object())
-                continue;
-
-            if (comp_json.contains("Parent Entity"))
-            {
-                auto& parent_json = comp_json["Parent Entity"];
-                if (parent_json.contains("Guid"))
-                {
-                    parent_json["Guid"] = parent_guid.raw();
-                    return true;
-                }
-                if (parent_json.contains("guid"))
-                {
-                    parent_json["guid"] = parent_guid.raw();
-                    return true;
-                }
-            }
-
-            if (comp_json.contains("parent_entity"))
-            {
-                auto& parent_json = comp_json["parent_entity"];
-                if (parent_json.contains("Guid"))
-                {
-                    parent_json["Guid"] = parent_guid.raw();
-                    return true;
-                }
-                if (parent_json.contains("guid"))
-                {
-                    parent_json["guid"] = parent_guid.raw();
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    Guid guid_from_json(const nlohmann::json& entity_json)
-    {
-        if (!entity_json.contains("entity_guid"))
-            return Guid::invalid();
-        return Guid{ entity_json["entity_guid"].get<Guid::underlying_type>() };
-    }
-
     void bind_refs_for_entity(Entity entity, EngineContext& ctx)
     {
         if (ctx.resource_manager)
@@ -449,22 +187,139 @@ namespace
         br.mark_closure_dirty_for_entity(entity, ctx);
     }
 
-    void detach_entity_from_loaded_batch(Entity entity, EngineContext& ctx)
+    bool resolve_loaded_batch_for_entity(
+        Entity entity,
+        EngineContext& ctx,
+        BatchId& out_batch,
+        eeng::ecs::EntityRef& out_entity_ref,
+        const char* context_label)
     {
         if (!ctx.batch_registry || !ctx.entity_manager)
-            return;
+        {
+            EENG_LOG(&ctx, "%s aborted: missing batch or entity manager.", context_label);
+            return false;
+        }
 
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
-        eeng::ecs::EntityRef entity_ref{};
-        if (!em.try_get_entity_ref(entity, entity_ref))
-            return;
-        if (!entity_ref.guid.valid())
-            return;
+        if (!em.try_get_entity_ref(entity, out_entity_ref))
+        {
+            EENG_LOG(&ctx, "%s failed: entity not registered.", context_label);
+            return false;
+        }
 
         auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+        if (!br.try_get_loaded_batch_for_entity(out_entity_ref, out_batch))
+        {
+            EENG_LOG(&ctx, "%s failed: entity has no loaded batch.", context_label);
+            return false;
+        }
+
+        return true;
+    }
+
+    // Policy: all live entities must belong to a loaded batch.
+    // New entities use the parent's batch; otherwise use selected batch or fallback to "default".
+    bool resolve_batch_for_new_entity(
+        const Entity& parent_entity,
+        EngineContext& ctx,
+        BatchId& out_batch,
+        eeng::ecs::EntityRef& out_parent_ref,
+        const char* context_label)
+    {
+        if (!ctx.batch_registry || !ctx.entity_manager)
+        {
+            EENG_LOG(&ctx, "%s aborted: missing batch or entity manager.", context_label);
+            return false;
+        }
+
+        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+
+        if (parent_entity.has_id())
+        {
+            if (!em.try_get_entity_ref(parent_entity, out_parent_ref))
+            {
+                EENG_LOG(&ctx, "%s failed: parent entity not registered.", context_label);
+                return false;
+            }
+
+            if (!br.try_get_loaded_batch_for_entity(out_parent_ref, out_batch))
+            {
+                EENG_LOG(&ctx, "%s failed: parent has no loaded batch.", context_label);
+                return false;
+            }
+
+            return true;
+        }
+
+        BatchId selected{};
+        if (ctx.batch_selection && !ctx.batch_selection->empty())
+        {
+            selected = ctx.batch_selection->last();
+        }
+        else if (!br.try_get_batch_id_by_name(eeng::BatchRegistry::kDefaultBatchName, selected))
+        {
+            EENG_LOG(&ctx, "%s failed: default batch not found.", context_label);
+            return false;
+        }
+
+        if (!br.is_batch_loaded(selected))
+        {
+            EENG_LOG(&ctx, "%s failed: target batch is not loaded.", context_label);
+            return false;
+        }
+
+        out_batch = selected;
+        return true;
+    }
+
+    // Policy: destruction is batch-owned; missing batch is an error.
+    bool queue_destroy_entity_in_batch(
+        Entity entity,
+        EngineContext& ctx,
+        std::shared_future<bool>& out_future,
+        const char* context_label)
+    {
         BatchId batch{};
-        if (br.try_get_loaded_batch_for_entity(entity_ref, batch))
-            br.queue_detach_entity(batch, entity_ref, ctx);
+        ecs::EntityRef entity_ref{};
+        if (!resolve_loaded_batch_for_entity(entity, ctx, batch, entity_ref, context_label))
+            return false;
+
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+        out_future = br.queue_destroy_entity(batch, entity_ref, ctx);
+        return true;
+    }
+
+    bool queue_attach_entity_to_batch(
+        Entity entity,
+        const BatchId& batch,
+        EngineContext& ctx,
+        std::shared_future<bool>& out_future,
+        const char* context_label)
+    {
+        if (!ctx.batch_registry || !ctx.entity_manager)
+        {
+            EENG_LOG(&ctx, "%s aborted: missing batch or entity manager.", context_label);
+            return false;
+        }
+
+        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+        ecs::EntityRef entity_ref{};
+        if (!em.try_get_entity_ref(entity, entity_ref))
+        {
+            EENG_LOG(&ctx, "%s failed: entity not registered.", context_label);
+            return false;
+        }
+
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+        if (!br.is_batch_loaded(batch))
+        {
+            EENG_LOG(&ctx, "%s failed: target batch is not loaded.", context_label);
+            return false;
+        }
+
+        out_future = br.queue_attach_entity(batch, entity_ref, ctx);
+        return true;
     }
 
     void sync_branch_batch_with_parent(Entity root_entity, Entity parent_entity, EngineContext& ctx)
@@ -487,6 +342,20 @@ namespace
             const auto parent_ref = em.get_entity_ref(parent_entity);
             if (parent_ref.is_bound() && parent_ref.guid.valid())
                 parent_has_batch = br.try_get_loaded_batch_for_entity(parent_ref, parent_batch);
+        }
+        else
+        {
+            BatchId default_batch{};
+            if (br.try_get_batch_id_by_name(BatchRegistry::kDefaultBatchName, default_batch)
+                && br.is_batch_loaded(default_batch))
+            {
+                parent_batch = default_batch;
+                parent_has_batch = true;
+            }
+            else
+            {
+                EENG_LOG(&ctx, "sync_branch_batch_with_parent: default batch missing or unloaded.");
+            }
         }
 
         const auto branch = scenegraph.get_branch_topdown(root_entity);
@@ -538,6 +407,9 @@ namespace eeng::editor {
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
 
+        if (async_stage != AsyncStage::None)
+            return update();
+
         // First execution: create a fresh entity and capture a redo snapshot.
         if (entity_json.is_null())
         {
@@ -549,44 +421,50 @@ namespace eeng::editor {
                 parent_current = parent_entity;
             }
 
-            auto [guid, entity] = ctx_sp->entity_manager->create_entity_live_parent(
-                "",
-                "",
-                parent_current,
-                Entity{});
-            created_guid = guid;
-            created_entity = entity;
+            ecs::EntityRef parent_ref{};
+            if (!resolve_batch_for_new_entity(
+                    parent_current,
+                    *ctx_sp,
+                    created_batch,
+                    parent_ref,
+                    "CreateEntity"))
+            {
+                return CommandStatus::Failed;
+            }
 
-            auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
-            if (!registry_sp)
-                return CommandStatus::Done;
-
-            entity_json = meta::serialize_entity_for_undo(
-                static_cast<EntityManager&>(*ctx_sp->entity_manager).get_entity_ref(created_entity),
-                registry_sp);
-            if (!created_guid.valid())
-                created_guid = guid_from_json(entity_json);
+            auto& br = static_cast<eeng::BatchRegistry&>(*ctx_sp->batch_registry);
+            create_future = br.queue_create_entity(created_batch, "", parent_ref, *ctx_sp);
+            async_stage = AsyncStage::Create;
+            return update();
         }
         // Redo path: recreate from the serialized snapshot.
         else
         {
+            if (!created_batch.valid())
+            {
+                EENG_LOG(ctx_sp.get(), "CreateEntity redo failed: missing batch.");
+                return CommandStatus::Failed;
+            }
+
             auto er = meta::deserialize_entity_and_register_for_undo(
                 entity_json,
                 *ctx_sp);
             created_entity = er.entity;
             created_guid = er.guid;
             bind_refs_for_entity(created_entity, *ctx_sp);
-        }
 
-        if (created_entity.has_id())
-        {
-            const auto parent_ref = em.get_entity_parent(created_entity);
-            sync_branch_batch_with_parent(created_entity, parent_ref.entity, *ctx_sp);
-            mark_batch_dirty_for_entity(created_entity, *ctx_sp);
+            if (!queue_attach_entity_to_batch(
+                    created_entity,
+                    created_batch,
+                    *ctx_sp,
+                    attach_future,
+                    "CreateEntity redo"))
+            {
+                return CommandStatus::Failed;
+            }
+            async_stage = AsyncStage::Attach;
+            return update();
         }
-
-        // std::cout << "CreateEntityCommand::execute() " << entt::to_integral(created_entity) << std::endl;
-        return CommandStatus::Done;
     }
 
     CommandStatus CreateEntityCommand::undo()
@@ -594,6 +472,9 @@ namespace eeng::editor {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
+
+        if (async_stage != AsyncStage::None)
+            return update();
 
         // If we never created a live entity, only proceed if a GUID was recorded.
         if (!created_entity.has_id())
@@ -609,8 +490,16 @@ namespace eeng::editor {
             if (entity_opt && entity_opt->has_id())
             {
                 mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
-                detach_entity_from_loaded_batch(*entity_opt, *ctx_sp);
-                ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
+                if (!queue_destroy_entity_in_batch(
+                        *entity_opt,
+                        *ctx_sp,
+                        destroy_future,
+                        "CreateEntity undo"))
+                {
+                    return CommandStatus::Failed;
+                }
+                async_stage = AsyncStage::Destroy;
+                return update();
             }
             return CommandStatus::Done;
         }
@@ -618,12 +507,95 @@ namespace eeng::editor {
         if (created_entity.has_id())
         {
             mark_batch_dirty_for_entity(created_entity, *ctx_sp);
-            detach_entity_from_loaded_batch(created_entity, *ctx_sp);
-            ctx_sp->entity_manager->queue_entity_for_destruction(created_entity);
+            if (!queue_destroy_entity_in_batch(
+                    created_entity,
+                    *ctx_sp,
+                    destroy_future,
+                    "CreateEntity undo"))
+            {
+                return CommandStatus::Failed;
+            }
+            async_stage = AsyncStage::Destroy;
+            return update();
         }
         // destroy_func(created_entity);
 
         // std::cout << "CreateEntityCommand::undo() " << entt::to_integral(created_entity) << std::endl;
+        return CommandStatus::Done;
+    }
+
+    CommandStatus CreateEntityCommand::update()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->entity_manager)
+            return CommandStatus::Done;
+
+        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
+
+        if (async_stage == AsyncStage::Create)
+        {
+            bool in_flight = true;
+            ecs::EntityRef created_ref{};
+            auto status = poll_entity_future(create_future, in_flight, created_ref);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            created_entity = created_ref.entity;
+            created_guid = created_ref.guid;
+
+            auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
+            if (!registry_sp)
+                return CommandStatus::Failed;
+
+            entity_json = meta::serialize_entity_for_undo(
+                em.get_entity_ref(created_entity),
+                registry_sp);
+            if (!created_guid.valid())
+                created_guid = guid_from_json(entity_json);
+
+            mark_batch_dirty_for_entity(created_entity, *ctx_sp);
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (async_stage == AsyncStage::Attach)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_future(attach_future, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            mark_batch_dirty_for_entity(created_entity, *ctx_sp);
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (async_stage == AsyncStage::Destroy)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_future(destroy_future, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
         return CommandStatus::Done;
     }
 
@@ -652,6 +624,9 @@ namespace eeng::editor {
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
 
+        if (async_stage != AsyncStage::None)
+            return update();
+
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
@@ -674,11 +649,22 @@ namespace eeng::editor {
                 registry_sp);
         }
 
+        ecs::EntityRef entity_ref{};
+        if (!resolve_loaded_batch_for_entity(
+                entity_current,
+                *ctx_sp,
+                entity_batch,
+                entity_ref,
+                "DestroyEntity"))
+        {
+            return CommandStatus::Failed;
+        }
+
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx_sp->batch_registry);
+        destroy_future = br.queue_destroy_entity(entity_batch, entity_ref, *ctx_sp);
         mark_batch_dirty_for_entity(entity_current, *ctx_sp);
-        detach_entity_from_loaded_batch(entity_current, *ctx_sp);
-        ctx_sp->entity_manager->queue_entity_for_destruction(entity_current);
-        // destroy_func(entity);
-        return CommandStatus::Done;
+        async_stage = AsyncStage::Destroy;
+        return update();
     }
 
     CommandStatus DestroyEntityCommand::undo()
@@ -687,8 +673,17 @@ namespace eeng::editor {
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
 
+        if (async_stage != AsyncStage::None)
+            return update();
+
         if (entity_json.is_null())
             return CommandStatus::Done;
+
+        if (!entity_batch.valid())
+        {
+            EENG_LOG(ctx_sp.get(), "DestroyEntity undo failed: missing batch.");
+            return CommandStatus::Failed;
+        }
 
         auto er = meta::deserialize_entity_and_register_for_undo(
             entity_json,
@@ -696,8 +691,60 @@ namespace eeng::editor {
         entity = er.entity;
         entity_guid = er.guid;
         bind_refs_for_entity(er.entity, *ctx_sp);
-        if (er.entity.has_id())
-            mark_batch_dirty_for_entity(er.entity, *ctx_sp);
+
+        if (!queue_attach_entity_to_batch(
+                er.entity,
+                entity_batch,
+                *ctx_sp,
+                attach_future,
+                "DestroyEntity undo"))
+        {
+            return CommandStatus::Failed;
+        }
+
+        async_stage = AsyncStage::Attach;
+        return update();
+    }
+
+    CommandStatus DestroyEntityCommand::update()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->entity_manager)
+            return CommandStatus::Done;
+
+        if (async_stage == AsyncStage::Destroy)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_future(destroy_future, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (async_stage == AsyncStage::Attach)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_future(attach_future, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            mark_batch_dirty_for_entity(entity, *ctx_sp);
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
         return CommandStatus::Done;
     }
 
@@ -724,6 +771,9 @@ namespace eeng::editor {
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
 
+        if (async_stage != AsyncStage::None)
+            return update();
+
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
@@ -745,6 +795,17 @@ namespace eeng::editor {
             auto& scenegraph = em.scene_graph();
             if (!scenegraph.contains(root_current))
                 return CommandStatus::Done;
+
+            ecs::EntityRef root_ref{};
+            if (!resolve_loaded_batch_for_entity(
+                    root_current,
+                    *ctx_sp,
+                    branch_batch,
+                    root_ref,
+                    "DestroyEntityBranch"))
+            {
+                return CommandStatus::Failed;
+            }
             auto branch = scenegraph.get_branch_topdown(root_current);
 
             branch_json = nlohmann::json::array();
@@ -760,6 +821,7 @@ namespace eeng::editor {
         if (!branch_json.is_array())
             return CommandStatus::Done;
 
+        destroy_futures.clear();
         for (auto it = branch_json.rbegin(); it != branch_json.rend(); ++it)
         {
             auto guid = guid_from_json(*it);
@@ -769,11 +831,22 @@ namespace eeng::editor {
             auto entity_opt = em.get_entity_from_guid(guid);
             if (!entity_opt || !entity_opt->has_id())
                 continue;
+
             mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
-            detach_entity_from_loaded_batch(*entity_opt, *ctx_sp);
-            ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
+            std::shared_future<bool> future{};
+            if (!queue_destroy_entity_in_batch(
+                    *entity_opt,
+                    *ctx_sp,
+                    future,
+                    "DestroyEntityBranch"))
+            {
+                return CommandStatus::Failed;
+            }
+            destroy_futures.push_back(std::move(future));
         }
-        return CommandStatus::Done;
+
+        async_stage = AsyncStage::Destroy;
+        return update();
     }
 
     CommandStatus DestroyEntityBranchCommand::undo()
@@ -782,8 +855,17 @@ namespace eeng::editor {
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
 
+        if (async_stage != AsyncStage::None)
+            return update();
+
         if (branch_json.is_null() || !branch_json.is_array())
             return CommandStatus::Done;
+
+        if (!branch_batch.valid())
+        {
+            EENG_LOG(ctx_sp.get(), "DestroyEntityBranch undo failed: missing batch.");
+            return CommandStatus::Failed;
+        }
 
         std::vector<ecs::Entity> created_entities;
         created_entities.reserve(branch_json.size());
@@ -798,11 +880,67 @@ namespace eeng::editor {
 
         ctx_sp->entity_manager->register_entities_from_deserialization(created_entities);
 
+        attach_futures.clear();
+        attach_futures.reserve(created_entities.size());
+
         for (auto entity : created_entities)
         {
             bind_refs_for_entity(entity, *ctx_sp);
-            mark_batch_dirty_for_entity(entity, *ctx_sp);
+            std::shared_future<bool> future{};
+            if (!queue_attach_entity_to_batch(
+                    entity,
+                    branch_batch,
+                    *ctx_sp,
+                    future,
+                    "DestroyEntityBranch undo"))
+            {
+                return CommandStatus::Failed;
+            }
+            attach_futures.push_back(std::move(future));
         }
+
+        async_stage = AsyncStage::Attach;
+        return update();
+    }
+
+    CommandStatus DestroyEntityBranchCommand::update()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->entity_manager)
+            return CommandStatus::Done;
+
+        if (async_stage == AsyncStage::Destroy)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_futures(destroy_futures, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (async_stage == AsyncStage::Attach)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_futures(attach_futures, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
         return CommandStatus::Done;
     }
 
@@ -828,6 +966,9 @@ namespace eeng::editor {
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
 
+        if (async_stage != AsyncStage::None)
+            return update();
+
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
@@ -845,6 +986,19 @@ namespace eeng::editor {
             const auto source_current = resolve_entity_from_guid(em, source_guid);
             if (!source_current.has_id())
                 return CommandStatus::Done;
+
+            BatchId source_batch{};
+            ecs::EntityRef source_ref{};
+            if (!resolve_loaded_batch_for_entity(
+                    source_current,
+                    *ctx_sp,
+                    source_batch,
+                    source_ref,
+                    "CopyEntity"))
+            {
+                return CommandStatus::Failed;
+            }
+            target_batch = source_batch;
 
             copy_json = meta::serialize_entity_for_undo(em.get_entity_ref(source_current), registry_sp);
             const Guid new_guid = Guid::generate();
@@ -867,9 +1021,25 @@ namespace eeng::editor {
             *ctx_sp);
         const auto entity_copy = er.entity;
         bind_refs_for_entity(entity_copy, *ctx_sp);
-        if (entity_copy.has_id())
-            mark_batch_dirty_for_entity(entity_copy, *ctx_sp);
-        return CommandStatus::Done;
+
+        if (!target_batch.valid())
+        {
+            EENG_LOG(ctx_sp.get(), "CopyEntity failed: missing target batch.");
+            return CommandStatus::Failed;
+        }
+
+        if (!queue_attach_entity_to_batch(
+                entity_copy,
+                target_batch,
+                *ctx_sp,
+                attach_future,
+                "CopyEntity"))
+        {
+            return CommandStatus::Failed;
+        }
+
+        async_stage = AsyncStage::Attach;
+        return update();
 
         // assert(entity != entt::null);
         // entity_json = Meta::serialize_entities(&entity, 1, context.registry);
@@ -881,6 +1051,9 @@ namespace eeng::editor {
         auto ctx_sp = ctx.lock();
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
+
+        if (async_stage != AsyncStage::None)
+            return update();
 
         if (copy_json.is_null())
             return CommandStatus::Done;
@@ -895,12 +1068,60 @@ namespace eeng::editor {
             return CommandStatus::Done;
 
         mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
-        detach_entity_from_loaded_batch(*entity_opt, *ctx_sp);
-        ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
+        if (!queue_destroy_entity_in_batch(
+                *entity_opt,
+                *ctx_sp,
+                destroy_future,
+                "CopyEntity undo"))
+        {
+            return CommandStatus::Failed;
+        }
+        async_stage = AsyncStage::Destroy;
+        return update();
 
         // Meta::deserialize_entities(entity_json, context);
 
         // entity_json = nlohmann::json{};
+    }
+
+    CommandStatus CopyEntityCommand::update()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->entity_manager)
+            return CommandStatus::Done;
+
+        if (async_stage == AsyncStage::Attach)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_future(attach_future, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (async_stage == AsyncStage::Destroy)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_future(destroy_future, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
         return CommandStatus::Done;
     }
 
@@ -926,6 +1147,9 @@ namespace eeng::editor {
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
 
+        if (async_stage != AsyncStage::None)
+            return update();
+
         auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
@@ -946,6 +1170,19 @@ namespace eeng::editor {
                 return CommandStatus::Done;
             if (!scenegraph.contains(root_current))
                 return CommandStatus::Done;
+
+            BatchId root_batch{};
+            ecs::EntityRef root_ref{};
+            if (!resolve_loaded_batch_for_entity(
+                    root_current,
+                    *ctx_sp,
+                    root_batch,
+                    root_ref,
+                    "CopyEntityBranch"))
+            {
+                return CommandStatus::Failed;
+            }
+            target_batch = root_batch;
 
             auto source_entities = scenegraph.get_branch_topdown(root_current);
             std::unordered_map<Entity, Guid> guid_map;
@@ -1007,12 +1244,33 @@ namespace eeng::editor {
 
         ctx_sp->entity_manager->register_entities_from_deserialization(created_entities);
 
+        if (!target_batch.valid())
+        {
+            EENG_LOG(ctx_sp.get(), "CopyEntityBranch failed: missing target batch.");
+            return CommandStatus::Failed;
+        }
+
+        attach_futures.clear();
+        attach_futures.reserve(created_entities.size());
+
         for (auto entity : created_entities)
         {
             bind_refs_for_entity(entity, *ctx_sp);
-            mark_batch_dirty_for_entity(entity, *ctx_sp);
+            std::shared_future<bool> future{};
+            if (!queue_attach_entity_to_batch(
+                    entity,
+                    target_batch,
+                    *ctx_sp,
+                    future,
+                    "CopyEntityBranch"))
+            {
+                return CommandStatus::Failed;
+            }
+            attach_futures.push_back(std::move(future));
         }
-        return CommandStatus::Done;
+
+        async_stage = AsyncStage::Attach;
+        return update();
     }
 
     CommandStatus CopyEntityBranchCommand::undo()
@@ -1021,11 +1279,15 @@ namespace eeng::editor {
         if (!ctx_sp || !ctx_sp->entity_manager)
             return CommandStatus::Done;
 
+        if (async_stage != AsyncStage::None)
+            return update();
+
         if (branch_json.is_null() || !branch_json.is_array())
             return CommandStatus::Done;
 
         auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
 
+        destroy_futures.clear();
         for (auto it = branch_json.rbegin(); it != branch_json.rend(); ++it)
         {
             const auto guid = guid_from_json(*it);
@@ -1036,9 +1298,60 @@ namespace eeng::editor {
             if (!entity_opt || !entity_opt->has_id())
                 continue;
             mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
-            detach_entity_from_loaded_batch(*entity_opt, *ctx_sp);
-            ctx_sp->entity_manager->queue_entity_for_destruction(*entity_opt);
+            std::shared_future<bool> future{};
+            if (!queue_destroy_entity_in_batch(
+                    *entity_opt,
+                    *ctx_sp,
+                    future,
+                    "CopyEntityBranch undo"))
+            {
+                return CommandStatus::Failed;
+            }
+            destroy_futures.push_back(std::move(future));
         }
+
+        async_stage = AsyncStage::Destroy;
+        return update();
+    }
+
+    CommandStatus CopyEntityBranchCommand::update()
+    {
+        auto ctx_sp = ctx.lock();
+        if (!ctx_sp || !ctx_sp->entity_manager)
+            return CommandStatus::Done;
+
+        if (async_stage == AsyncStage::Attach)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_futures(attach_futures, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (async_stage == AsyncStage::Destroy)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_futures(destroy_futures, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
         return CommandStatus::Done;
     }
 
