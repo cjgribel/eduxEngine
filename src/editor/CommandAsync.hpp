@@ -11,6 +11,7 @@
 
 namespace eeng::editor
 {
+    // Shared polling helpers for command futures.
     void set_ui_in_flight(
         const std::shared_ptr<std::atomic<bool>>& flag,
         bool value);

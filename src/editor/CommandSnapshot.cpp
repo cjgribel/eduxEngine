@@ -8,6 +8,7 @@ namespace eeng::editor
 {
     namespace
     {
+        // Cache header/parent field names so undo/redo JSON stays in sync with meta.
         HeaderJsonKeys resolve_header_keys()
         {
             HeaderJsonKeys keys{};
@@ -51,6 +52,7 @@ namespace eeng::editor
         static HeaderJsonKeys keys{};
         static bool initialized = false;
 
+        // Lazy init avoids meta queries until the editor first needs snapshot data.
         if (!initialized || keys.type_id.empty())
         {
             keys = resolve_header_keys();
@@ -62,6 +64,7 @@ namespace eeng::editor
 
     entt::id_type header_component_id()
     {
+        // Cache the header component id for fast comparisons.
         static entt::id_type id = []()
             {
                 auto header_type = eeng::meta::resolve_by_type_id_string("eeng.ecs.HeaderComponent");
@@ -72,6 +75,7 @@ namespace eeng::editor
 
     bool update_entity_guid_in_json(nlohmann::json& entity_json, const Guid& guid)
     {
+        // Update the primary entity guid and any component fields that mirror it.
         const auto& keys = header_keys();
         if (!entity_json.contains("components"))
             return false;
@@ -153,6 +157,7 @@ namespace eeng::editor
 
     bool update_parent_guid_in_json(nlohmann::json& entity_json, const Guid& parent_guid)
     {
+        // Update parent guid fields across supported schema variants.
         const auto& keys = header_keys();
         if (!entity_json.contains("components"))
             return false;
@@ -230,6 +235,7 @@ namespace eeng::editor
 
     Guid guid_from_json(const nlohmann::json& entity_json)
     {
+        // Read the entity guid from a snapshot payload.
         if (!entity_json.contains("entity_guid"))
             return Guid::invalid();
         return Guid{ entity_json["entity_guid"].get<Guid::underlying_type>() };

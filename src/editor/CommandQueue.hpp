@@ -36,6 +36,7 @@ namespace eeng::editor
     public:
         bool add(CommandPtr&& command)
         {
+            // Policy: ignore new commands while an async command is in flight.
             if (has_in_flight())
                 return false;
 

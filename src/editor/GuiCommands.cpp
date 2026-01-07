@@ -5,7 +5,6 @@
 //  Copyright © 2024 Carl Johan Gribel. All rights reserved.
 //
 
-#include <iostream>
 #include <cassert>
 #include <future>
 #include <string_view>
@@ -16,14 +15,13 @@
 #include "GuiCommands.hpp"
 #include "BatchRegistry.hpp"
 #include "editor/CommandAsync.hpp"
+#include "editor/CommandEntityHelpers.hpp"
 #include "editor/CommandSnapshot.hpp"
 #include "ecs/EntityManager.hpp"
 #include "ResourceManager.hpp"
 #include "ThreadPool.hpp"
 #include "assets/importers/AssimpImporter.hpp"
-#include "meta/EntityMetaHelpers.hpp"
 #include "meta/MetaAux.h"
-#include "MetaLiterals.h"
 #include "LogMacros.h"
 #include "engineapi/SelectionManager.hpp"
 
@@ -124,67 +122,6 @@ namespace
                 return res;
             },
             ctx);
-    }
-
-    void ensure_storage(entt::registry& registry, entt::id_type component_id)
-    {
-        if (!registry.storage(component_id))
-        {
-            auto meta_type = entt::resolve(component_id);
-            assert(meta_type);
-
-            auto assure_fn = meta_type.func(eeng::literals::assure_component_storage_hs);
-            assert(assure_fn);
-
-            auto result = assure_fn.invoke(
-                {},
-                entt::forward_as_meta(registry)
-            );
-            if (!result)
-            {
-                throw std::runtime_error(
-                    "Failed to invoke assure_storage for " + eeng::meta::get_meta_type_display_name(meta_type));
-            }
-        }
-    }
-
-    bool try_capture_guid(EntityManager& em, const Entity& entity, Guid& guid)
-    {
-        if (!entity.has_id())
-            return false;
-        if (!em.entity_valid(entity))
-            return false;
-        if (!em.scene_graph().contains(entity))
-            return false;
-        guid = em.get_entity_guid(entity);
-        return guid.valid();
-    }
-
-    Entity resolve_entity_from_guid(EntityManager& em, const Guid& guid)
-    {
-        if (!guid.valid())
-            return Entity{};
-        auto entity_opt = em.get_entity_from_guid(guid);
-        if (!entity_opt || !entity_opt->has_id())
-            return Entity{};
-        if (!em.entity_valid(*entity_opt))
-            return Entity{};
-        return *entity_opt;
-    }
-
-    void bind_refs_for_entity(Entity entity, EngineContext& ctx)
-    {
-        if (ctx.resource_manager)
-            eeng::meta::bind_asset_refs_for_entity(entity, ctx);
-        eeng::meta::bind_entity_refs_for_entity(entity, ctx);
-    }
-
-    void mark_batch_dirty_for_entity(Entity entity, EngineContext& ctx)
-    {
-        if (!ctx.batch_registry)
-            return;
-        auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
-        br.mark_closure_dirty_for_entity(entity, ctx);
     }
 
     bool resolve_loaded_batch_for_entity(

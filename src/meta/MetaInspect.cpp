@@ -29,6 +29,7 @@ namespace eeng::meta {
             // auto cmd_queue_sptr = cmd_queue_wptr.lock();
             // cmd_queue_sptr->add(editor::CommandFactory::Create<editor::ComponentCommand>(cmd_builder.build()));
 
+            // Skip edits while another command is in flight to keep undo/redo coherent.
             if (!cmd_queue.add(
                     editor::CommandFactory::Create<editor::AssignFieldCommand>(cmd_builder.build())))
             {

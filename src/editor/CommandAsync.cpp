@@ -6,6 +6,7 @@
 
 namespace eeng::editor
 {
+    // Update UI "busy" flags without coupling commands to UI internals.
     void set_ui_in_flight(
         const std::shared_ptr<std::atomic<bool>>& flag,
         bool value)
@@ -14,6 +15,7 @@ namespace eeng::editor
             flag->store(value, std::memory_order_relaxed);
     }
 
+    // Poll a TaskResult future without blocking; clears the future when ready.
     CommandStatus poll_task_future(
         std::shared_future<TaskResult>& future,
         bool& in_flight_flag,
@@ -38,6 +40,7 @@ namespace eeng::editor
         return result.success ? CommandStatus::Done : CommandStatus::Failed;
     }
 
+    // Poll a bool future without blocking.
     CommandStatus poll_bool_future(
         std::shared_future<bool>& future,
         bool& in_flight_flag)
@@ -56,6 +59,7 @@ namespace eeng::editor
         return ok ? CommandStatus::Done : CommandStatus::Failed;
     }
 
+    // Poll an EntityRef future; unbound results are treated as failure.
     CommandStatus poll_entity_future(
         std::shared_future<ecs::EntityRef>& future,
         bool& in_flight_flag,
@@ -75,6 +79,7 @@ namespace eeng::editor
         return out_entity_ref.is_bound() ? CommandStatus::Done : CommandStatus::Failed;
     }
 
+    // Poll a batch of bool futures and aggregate success.
     CommandStatus poll_bool_futures(
         std::vector<std::shared_future<bool>>& futures,
         bool& in_flight_flag)

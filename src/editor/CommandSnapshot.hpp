@@ -15,6 +15,7 @@ namespace eeng::editor
         std::string entityref_guid_key;
     };
 
+    // Snapshot helper accessors.
     const HeaderJsonKeys& header_keys();
     entt::id_type header_component_id();
     bool update_entity_guid_in_json(nlohmann::json& entity_json, const Guid& guid);

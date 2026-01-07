@@ -27,6 +27,7 @@ namespace eeng::editor
             if (!ctx.command_queue->has_in_flight())
                 return true;
 
+            // Keep command order deterministic by ignoring new work while busy.
             EENG_LOG_WARN(&ctx, "%s ignored: command queue busy.", action_label);
             return false;
         }
@@ -35,6 +36,7 @@ namespace eeng::editor
         {
             if (!ctx.command_queue->add(std::move(command)))
             {
+                // Queue enforces the same policy as can_queue_action (defensive).
                 EENG_LOG_WARN(&ctx, "%s ignored: command queue busy.", action_label);
                 return false;
             }
