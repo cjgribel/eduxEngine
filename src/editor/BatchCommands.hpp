@@ -12,6 +12,8 @@
 #include "BatchRegistry.hpp"
 #include "engineapi/IResourceManager.hpp"
 
+#define EENG_BATCH_UNLOAD_AUTOSAVE
+
 namespace eeng::editor
 {
     class BatchLoadCommand : public Command
@@ -36,10 +38,22 @@ namespace eeng::editor
 
     class BatchUnloadCommand : public Command
     {
+#ifdef EENG_BATCH_UNLOAD_AUTOSAVE
+        enum class UnloadStage
+        {
+            None,
+            Saving,
+            Unloading
+        };
+#endif
+
         BatchId batch_id{};
         EngineContextWeakPtr ctx;
         std::shared_future<TaskResult> future{};
         bool in_flight{ false };
+#ifdef EENG_BATCH_UNLOAD_AUTOSAVE
+        UnloadStage stage{ UnloadStage::None };
+#endif
         std::string display_name;
 
     public:
@@ -75,9 +89,21 @@ namespace eeng::editor
 
     class BatchUnloadAllCommand : public Command
     {
+#ifdef EENG_BATCH_UNLOAD_AUTOSAVE
+        enum class UnloadStage
+        {
+            None,
+            Saving,
+            Unloading
+        };
+#endif
+
         EngineContextWeakPtr ctx;
         std::shared_future<TaskResult> future{};
         bool in_flight{ false };
+#ifdef EENG_BATCH_UNLOAD_AUTOSAVE
+        UnloadStage stage{ UnloadStage::None };
+#endif
         std::string display_name;
 
     public:

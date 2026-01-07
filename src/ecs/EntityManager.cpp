@@ -6,6 +6,7 @@
 #include "TransformComponent.hpp"
 #include <entt/entt.hpp>
 #include <cassert>
+#include <iostream>
 #include <stdexcept>
 
 namespace eeng
@@ -229,6 +230,20 @@ namespace eeng
 #ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
             if (guid_it == entity_to_guid_map_.end())
             {
+                std::string name = "<unknown>";
+                std::string guid_str = "<unknown>";
+                if (registry_->valid(entity) && registry_->all_of<HeaderComponent>(entity))
+                {
+                    const auto& header = registry_->get<HeaderComponent>(entity);
+                    name = header.name;
+                    if (header.guid.valid())
+                        guid_str = header.guid.to_string();
+                }
+                std::cerr
+                    << "[WARN] EntityManager::destroy_pending_entities: "
+                    << "missing guid map for entity=" << entity.to_integral()
+                    << " name=\"" << name << "\" guid=" << guid_str
+                    << std::endl;
                 if (scene_graph_->contains(entity))
                     scene_graph_->erase_node(entity);
                 if (registry_->valid(entity))

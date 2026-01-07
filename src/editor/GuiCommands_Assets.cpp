@@ -1,5 +1,8 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
+// Table of contents:
+// - ImportModelCommand: import model assets asynchronously with undo/redo support.
+// - UnimportAssetsCommand: remove assets by guid and restore on undo.
 
 #include "GuiCommands.hpp"
 #include "editor/CommandAsync.hpp"

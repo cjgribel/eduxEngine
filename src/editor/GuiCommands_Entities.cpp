@@ -1,5 +1,12 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
+// Table of contents:
+// - CreateEntityCommand: create an entity in a batch and serialize for undo/redo.
+// - DestroyEntityCommand: destroy a single entity and restore from snapshot on undo.
+// - DestroyEntityBranchCommand: destroy a branch and restore it on undo.
+// - CopyEntityCommand: clone one entity into the same batch.
+// - CopyEntityBranchCommand: clone an entity branch into the same batch.
+// - ReparentEntityBranchCommand: reparent a branch and sync batch membership.
 
 #include <unordered_map>
 #include <utility>
@@ -312,18 +319,17 @@ namespace eeng::editor {
                 registry_sp);
         }
 
-        ecs::EntityRef entity_ref{};
-        if (!resolve_loaded_batch_for_entity(
-                entity_current,
-                *ctx_sp,
-                entity_batch,
-                entity_ref,
-                "DestroyEntity"))
-        {
+        ecs::BatchPolicyContext policy_ctx{ br, em, ctx_sp.get() };
+        const auto decision = ecs::EntityBatchPolicy::resolve_existing_entity_batch(
+            entity_current,
+            policy_ctx,
+            "DestroyEntity");
+        if (!decision.ok)
             return CommandStatus::Failed;
-        }
 
-        destroy_future = br->queue_destroy_entity(entity_batch, entity_ref, *ctx_sp);
+        entity_batch = decision.batch;
+
+        destroy_future = br->queue_destroy_entity(entity_batch, decision.entity_ref, *ctx_sp);
         mark_batch_dirty_for_entity(entity_current, *ctx_sp);
         async_stage = AsyncStage::Destroy;
         return update();

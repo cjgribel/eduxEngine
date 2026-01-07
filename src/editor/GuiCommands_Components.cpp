@@ -1,5 +1,8 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
+// Table of contents:
+// - AddComponentToEntityCommand: add a component to an entity.
+// - RemoveComponentFromEntityCommand: remove a component from an entity (header protected).
 
 #include <cassert>
 #include "GuiCommands.hpp"

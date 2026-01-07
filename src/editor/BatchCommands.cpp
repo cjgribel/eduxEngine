@@ -4,6 +4,7 @@
 #include "editor/BatchCommands.hpp"
 #include "editor/CommandAsync.hpp"
 #include "editor/CommandContext.hpp"
+#include "ecs/EntityBatchPolicy.hpp"
 #include "ecs/EntityManager.hpp"
 #include "LogMacros.h"
 #include <algorithm>
@@ -12,50 +13,9 @@ namespace eeng::editor
 {
     namespace
     {
-        bool is_batch_loaded(const std::vector<const BatchInfo*>& batches, const BatchId& id)
-        {
-            for (const auto* batch : batches)
-            {
-                if (!batch)
-                    continue;
-                if (batch->id == id)
-                    return batch->state == BatchInfo::State::Loaded;
-            }
-            return false;
-        }
-
         bool contains_batch(const std::vector<BatchId>& batches, const BatchId& id)
         {
             return std::find(batches.begin(), batches.end(), id) != batches.end();
-        }
-
-        std::vector<BatchId> find_loaded_batches_for_entity(
-            const std::vector<const BatchInfo*>& batches,
-            const ecs::EntityRef& entity_ref)
-        {
-            std::vector<BatchId> result;
-            if (!entity_ref.guid.valid())
-                return result;
-
-            // Policy: loaded batches are the source of truth for membership right now.
-            // This is a naive scan, but it's editor-only and keeps us consistent with BR state.
-            for (const auto* batch : batches)
-            {
-                if (!batch || batch->state != BatchInfo::State::Loaded)
-                    continue;
-
-                const auto& live = batch->live;
-                const auto it = std::find_if(live.begin(), live.end(),
-                    [&](const ecs::EntityRef& er)
-                    {
-                        return er.guid == entity_ref.guid;
-                    });
-
-                if (it != live.end() && !contains_batch(result, batch->id))
-                    result.push_back(batch->id);
-            }
-
-            return result;
         }
     }
 
@@ -126,9 +86,28 @@ namespace eeng::editor
         if (!br)
             return CommandStatus::Done;
 
+#ifdef EENG_BATCH_UNLOAD_AUTOSAVE
+        if (stage != UnloadStage::None)
+            return update();
+
+        if (br->is_batch_loaded(batch_id))
+        {
+            future = br->queue_save_batch(batch_id, *ctx_sp);
+            stage = UnloadStage::Saving;
+        }
+        else
+        {
+            future = br->queue_unload(batch_id, *ctx_sp);
+            stage = UnloadStage::Unloading;
+        }
+
+        in_flight = true;
+        return update();
+#else
         future = br->queue_unload(batch_id, *ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
+#endif
     }
 
     CommandStatus BatchUnloadCommand::undo()
@@ -149,7 +128,50 @@ namespace eeng::editor
 
     CommandStatus BatchUnloadCommand::update()
     {
+#ifdef EENG_BATCH_UNLOAD_AUTOSAVE
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
+        {
+            stage = UnloadStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (stage == UnloadStage::Saving)
+        {
+            auto status = poll_task_future(future, in_flight);
+            if (status == CommandStatus::InFlight)
+                return status;
+            if (status == CommandStatus::Failed)
+            {
+                stage = UnloadStage::None;
+                return status;
+            }
+
+            auto* br = cmd_ctx.batch_registry(*ctx_sp);
+            if (!br)
+            {
+                stage = UnloadStage::None;
+                return CommandStatus::Done;
+            }
+
+            future = br->queue_unload(batch_id, *ctx_sp);
+            in_flight = true;
+            stage = UnloadStage::Unloading;
+        }
+
+        if (stage == UnloadStage::Unloading)
+        {
+            auto status = poll_task_future(future, in_flight);
+            if (status != CommandStatus::InFlight)
+                stage = UnloadStage::None;
+            return status;
+        }
+
+        return CommandStatus::Done;
+#else
         return poll_task_future(future, in_flight);
+#endif
     }
 
     std::string BatchUnloadCommand::get_name() const
@@ -222,9 +244,19 @@ namespace eeng::editor
         if (!br)
             return CommandStatus::Done;
 
+#ifdef EENG_BATCH_UNLOAD_AUTOSAVE
+        if (stage != UnloadStage::None)
+            return update();
+
+        future = br->queue_save_all_async(*ctx_sp);
+        in_flight = true;
+        stage = UnloadStage::Saving;
+        return update();
+#else
         future = br->queue_unload_all_async(*ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
+#endif
     }
 
     CommandStatus BatchUnloadAllCommand::undo()
@@ -245,7 +277,50 @@ namespace eeng::editor
 
     CommandStatus BatchUnloadAllCommand::update()
     {
+#ifdef EENG_BATCH_UNLOAD_AUTOSAVE
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
+        {
+            stage = UnloadStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (stage == UnloadStage::Saving)
+        {
+            auto status = poll_task_future(future, in_flight);
+            if (status == CommandStatus::InFlight)
+                return status;
+            if (status == CommandStatus::Failed)
+            {
+                stage = UnloadStage::None;
+                return status;
+            }
+
+            auto* br = cmd_ctx.batch_registry(*ctx_sp);
+            if (!br)
+            {
+                stage = UnloadStage::None;
+                return CommandStatus::Done;
+            }
+
+            future = br->queue_unload_all_async(*ctx_sp);
+            in_flight = true;
+            stage = UnloadStage::Unloading;
+        }
+
+        if (stage == UnloadStage::Unloading)
+        {
+            auto status = poll_task_future(future, in_flight);
+            if (status != CommandStatus::InFlight)
+                stage = UnloadStage::None;
+            return status;
+        }
+
+        return CommandStatus::Done;
+#else
         return poll_task_future(future, in_flight);
+#endif
     }
 
     std::string BatchUnloadAllCommand::get_name() const
@@ -391,8 +466,7 @@ namespace eeng::editor
         if (!target_batch.valid())
             return CommandStatus::Done;
 
-        const auto batches = br->list();
-        if (!is_batch_loaded(batches, target_batch))
+        if (!br->is_batch_loaded(target_batch))
         {
             // Policy: avoid orphaning entities by refusing to move into unloaded batches.
             return CommandStatus::Failed;
@@ -404,32 +478,29 @@ namespace eeng::editor
             assignments.clear();
             assignments.reserve(selection.size());
 
+            ecs::BatchPolicyContext policy_ctx{ br, em, ctx_sp.get() };
             for (const auto& entity : selection)
             {
                 if (!entity.has_id() || !em->entity_valid(entity))
                     continue;
 
-                const auto entity_ref = em->get_entity_ref(entity);
-                if (!entity_ref.is_bound() || !entity_ref.guid.valid())
-                    continue;
-
-                auto prev_batches = find_loaded_batches_for_entity(batches, entity_ref);
-                const bool target_in_prev = contains_batch(prev_batches, target_batch);
-
-                bool has_other = false;
-                for (const auto& id : prev_batches)
+                // Policy: every live entity is in exactly one loaded batch.
+                const auto decision = ecs::EntityBatchPolicy::resolve_existing_entity_batch(
+                    entity,
+                    policy_ctx,
+                    "AssignEntitiesToBatch");
+                if (!decision.ok)
                 {
-                    if (id != target_batch)
-                    {
-                        has_other = true;
-                        break;
-                    }
+                    assignments.clear();
+                    return CommandStatus::Failed;
                 }
 
-                if (!has_other && target_in_prev)
+                const bool target_in_prev = (decision.batch == target_batch);
+                if (target_in_prev)
                     continue;
 
-                assignments.push_back(Assignment{ entity_ref, std::move(prev_batches) });
+                std::vector<BatchId> prev_batches{ decision.batch };
+                assignments.push_back(Assignment{ decision.entity_ref, std::move(prev_batches) });
             }
 
             prepared = true;
