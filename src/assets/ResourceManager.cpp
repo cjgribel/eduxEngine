@@ -478,19 +478,6 @@ namespace eeng
         return it != leases_.end() && it->second.holders.count(b) != 0;
     }
 
-    // std::optional<TaskResult> ResourceManager::last_task_result() const {
-    //     std::shared_future<TaskResult> f;
-    //     { std::lock_guard lk(task_mutex_); f = current_task_; }
-    //     if (!f.valid() || f.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
-    //         return std::nullopt;
-    //     return f.get(); // OK for shared_future, doesn’t consume the state
-    // }
-
-    // std::shared_future<TaskResult> ResourceManager::active_task() const {
-    //     std::lock_guard lk(task_mutex_);
-    //     return current_task_; // copy of shared_future is cheap
-    // }
-
     AssetIndexDataPtr ResourceManager::get_index_data() const
     {
         return asset_index_->get_index_data();
@@ -808,38 +795,6 @@ namespace eeng
         invoke_meta_function(guid, ctx, literals::unload_asset_hs, "unload_asset");
     }
 
-    // public
-    // std::future<void> ResourceManager::reload_asset_async(const Guid& guid, EngineContext& ctx)
-    // {
-    //     {
-    //         std::lock_guard lock(status_mutex_);
-    //         statuses_[guid].error_message.clear();
-    //     }
-
-    //     return ctx.thread_pool->queue_task([=, this, &ctx]() {
-    //         try
-    //         {
-    //             this->unload_asset(guid, ctx);
-    //             this->load_asset(guid, ctx);
-
-    //             // Wait for unload to complete inside thread
-    //             // this->unload_asset_async(guid, ctx).get();
-
-    //             // Wait for load to complete
-    //             // this->load_asset_async(guid, ctx).get();
-
-    //             std::lock_guard lock(status_mutex_);
-    //             statuses_[guid].state = LoadState::Loaded;
-    //         }
-    //         catch (const std::exception& ex)
-    //         {
-    //             std::lock_guard lock(status_mutex_);
-    //             statuses_[guid].state = LoadState::Failed;
-    //             statuses_[guid].error_message = ex.what();
-    //         }
-    //         });
-    // }
-
     void ResourceManager::bind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
     {
         invoke_meta_function(guid, batch_id, ctx, literals::bind_asset_hs, "resolve_asset");
@@ -865,33 +820,6 @@ namespace eeng
             return *res_ptr;
         throw std::runtime_error("Unexpected return type form meta function validate_asset_recursive");
     }
-
-    // std::vector<Guid> ResourceManager::collect_referenced_asset_guids(const Guid& guid)
-    // {
-    //     std::vector<Guid> out;
-
-    //     auto mh_opt = storage_->handle_for_guid(guid); // Guid -> MetaHandle{ofs, ver, type}
-    //     if (!mh_opt || !mh_opt->valid())
-    //         return out;
-
-    //     storage_->modify(*mh_opt, [&](entt::meta_any any)
-    //         {
-    //             using namespace entt::literals;
-
-    //             if (auto mf = mh_opt->type.func(literals::collect_asset_guids_hs); mf)
-    //             {
-    //                 mf.invoke(
-    //                     {},
-    //                     entt::forward_as_meta(any),
-    //                     entt::forward_as_meta(out));
-    //             }
-    //         });
-
-    //     // optional: dedup/filter invalid
-    //     std::sort(out.begin(), out.end());
-    //     out.erase(std::unique(out.begin(), out.end()), out.end());
-    //     return out;
-    // }
 
     entt::meta_any ResourceManager::invoke_meta_function(
         const Guid& guid,
