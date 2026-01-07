@@ -4,6 +4,7 @@
 #include "GuiCommands.hpp"
 #include "editor/CommandAsync.hpp"
 #include "editor/CommandAssetHelpers.hpp"
+#include "editor/CommandContext.hpp"
 #include "ResourceManager.hpp"
 #include "ThreadPool.hpp"
 #include "assets/importers/AssimpImporter.hpp"
@@ -33,19 +34,25 @@ namespace eeng::editor {
 
     CommandStatus ImportModelCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->resource_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
         {
             set_ui_in_flight(ui_in_flight, false);
             return CommandStatus::Done;
         }
 
-        auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+        auto* rm = cmd_ctx.resource_manager(*ctx_sp);
+        if (!rm)
+        {
+            set_ui_in_flight(ui_in_flight, false);
+            return CommandStatus::Done;
+        }
 
         if (was_undone && !imported_roots.empty())
         {
             pending_action = PendingAction::Restore;
-            future = queue_restore_task(rm, *ctx_sp, imported_roots);
+            future = queue_restore_task(*rm, *ctx_sp, imported_roots);
             in_flight = true;
             set_ui_in_flight(ui_in_flight, true);
             return poll_task_future(future, in_flight, [this](const TaskResult& result)
@@ -57,14 +64,15 @@ namespace eeng::editor {
                 });
         }
 
-        if (!ctx_sp->thread_pool)
+        auto* thread_pool = cmd_ctx.thread_pool(*ctx_sp);
+        if (!thread_pool)
         {
             EENG_LOG_WARN(ctx_sp.get(), "Asset import skipped: ThreadPool unavailable.");
             set_ui_in_flight(ui_in_flight, false);
             return CommandStatus::Done;
         }
 
-        const auto& assets_root = rm.assets_root();
+        const auto& assets_root = rm->assets_root();
         if (assets_root.empty())
         {
             EENG_LOG_WARN(ctx_sp.get(), "Asset import skipped: assets root not set.");
@@ -86,7 +94,7 @@ namespace eeng::editor {
         in_flight = true;
 
         auto ctx_wptr = ctx_sp->weak_from_this();
-        ctx_sp->thread_pool->queue_task([opts = std::move(opts), ctx_wptr, promise]() mutable
+        thread_pool->queue_task([opts = std::move(opts), ctx_wptr, promise]() mutable
             {
                 auto ctx_sp = ctx_wptr.lock();
                 if (!ctx_sp || !ctx_sp->resource_manager)
@@ -176,16 +184,20 @@ namespace eeng::editor {
 
     CommandStatus ImportModelCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->resource_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (imported_roots.empty())
             return CommandStatus::Done;
 
-        auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+        auto* rm = cmd_ctx.resource_manager(*ctx_sp);
+        if (!rm)
+            return CommandStatus::Done;
+
         pending_action = PendingAction::Unimport;
-        future = queue_unimport_task(rm, *ctx_sp, imported_roots);
+        future = queue_unimport_task(*rm, *ctx_sp, imported_roots);
         in_flight = true;
         return poll_task_future(future, in_flight, [this](const TaskResult& result)
             {
@@ -245,16 +257,20 @@ namespace eeng::editor {
 
     CommandStatus UnimportAssetsCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->resource_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (roots.empty())
             return CommandStatus::Done;
 
-        auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+        auto* rm = cmd_ctx.resource_manager(*ctx_sp);
+        if (!rm)
+            return CommandStatus::Done;
+
         pending_action = PendingAction::Unimport;
-        future = queue_unimport_task(rm, *ctx_sp, roots);
+        future = queue_unimport_task(*rm, *ctx_sp, roots);
         in_flight = true;
         return poll_task_future(future, in_flight, [this](const TaskResult&)
             {
@@ -264,16 +280,20 @@ namespace eeng::editor {
 
     CommandStatus UnimportAssetsCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->resource_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (roots.empty())
             return CommandStatus::Done;
 
-        auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+        auto* rm = cmd_ctx.resource_manager(*ctx_sp);
+        if (!rm)
+            return CommandStatus::Done;
+
         pending_action = PendingAction::Restore;
-        future = queue_restore_task(rm, *ctx_sp, roots);
+        future = queue_restore_task(*rm, *ctx_sp, roots);
         in_flight = true;
         return poll_task_future(future, in_flight, [this](const TaskResult&)
             {

@@ -6,6 +6,7 @@
 //
 
 #include "editor/AssignFieldCommand.hpp"
+#include "editor/CommandContext.hpp"
 #include "editor/MetaFieldAssign.hpp"
 #include "meta/EntityMetaHelpers.hpp"
 #include "EngineContextHelpers.hpp"
@@ -28,6 +29,13 @@
 
 namespace
 {
+    std::shared_ptr<eeng::EngineContext> lock_context(const eeng::EngineContextWeakPtr& ctx)
+    {
+        // Use CommandContext to keep command access patterns consistent.
+        eeng::editor::CommandContext cmd_ctx{ ctx };
+        return cmd_ctx.lock();
+    }
+
     std::optional<eeng::ecs::Entity> resolve_target_entity(const eeng::editor::FieldTarget& target)
     {
         if (target.kind != eeng::editor::FieldTarget::Kind::Component)
@@ -38,7 +46,7 @@ namespace
         eeng::ecs::Entity entity = target.entity;
         if (target.entity_guid.valid())
         {
-            auto ctx_sp = target.ctx.lock();
+            auto ctx_sp = lock_context(target.ctx);
             if (ctx_sp && ctx_sp->entity_manager)
             {
                 if (auto entity_opt = ctx_sp->entity_manager->get_entity_from_guid(target.entity_guid))
@@ -111,7 +119,7 @@ namespace
         const eeng::editor::MetaFieldPath& meta_path,
         bool is_undo)
     {
-        auto ctx_sp = target.ctx.lock();
+        auto ctx_sp = lock_context(target.ctx);
         if (!ctx_sp)
             return;
 
@@ -162,7 +170,7 @@ namespace
 
         if (target.kind == eeng::editor::FieldTarget::Kind::Component)
         {
-            auto ctx_sp = target.ctx.lock();
+            auto ctx_sp = lock_context(target.ctx);
             if (!ctx_sp)
                 return false;
 
@@ -197,7 +205,7 @@ namespace
 
         else if (target.kind == eeng::editor::FieldTarget::Kind::Asset)
         {
-            auto ctx_sp = target.ctx.lock();
+            auto ctx_sp = lock_context(target.ctx);
             if (!ctx_sp)
                 return false;
 
@@ -246,7 +254,7 @@ namespace eeng::editor
 
         if (component_ctx)
         {
-            if (auto ctx_sp = edit.target.ctx.lock())
+            if (auto ctx_sp = lock_context(edit.target.ctx))
                 invoke_component_post_assign_hook(*ctx_sp, edit.target, component_ctx->entity, edit.meta_path, false);
         }
 
@@ -258,7 +266,7 @@ namespace eeng::editor
             const auto asset_guids_after = collect_asset_guids_if_component_target(component_ctx);
             if (asset_guids_before != asset_guids_after)
             {
-                if (auto ctx_sp = edit.target.ctx.lock())
+                if (auto ctx_sp = lock_context(edit.target.ctx))
                     mark_batch_dirty_for_entity(*ctx_sp, component_ctx->entity);
             }
         }
@@ -277,7 +285,7 @@ namespace eeng::editor
 
         if (component_ctx)
         {
-            if (auto ctx_sp = edit.target.ctx.lock())
+            if (auto ctx_sp = lock_context(edit.target.ctx))
                 invoke_component_post_assign_hook(*ctx_sp, edit.target, component_ctx->entity, edit.meta_path, true);
         }
 
@@ -289,7 +297,7 @@ namespace eeng::editor
             const auto asset_guids_after = collect_asset_guids_if_component_target(component_ctx);
             if (asset_guids_before != asset_guids_after)
             {
-                if (auto ctx_sp = edit.target.ctx.lock())
+                if (auto ctx_sp = lock_context(edit.target.ctx))
                     mark_batch_dirty_for_entity(*ctx_sp, component_ctx->entity);
             }
         }

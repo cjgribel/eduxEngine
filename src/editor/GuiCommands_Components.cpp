@@ -4,6 +4,7 @@
 #include <cassert>
 #include "GuiCommands.hpp"
 #include "MetaSerialize.hpp"
+#include "editor/CommandContext.hpp"
 #include "editor/CommandEntityHelpers.hpp"
 #include "editor/CommandSnapshot.hpp"
 #include "ecs/EntityManager.hpp"
@@ -33,21 +34,25 @@ namespace eeng::editor {
 
     CommandStatus AddComponentToEntityCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        auto registry_sp = em->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         if (!entity_guid.valid())
         {
-            if (!try_capture_guid(em, entity, entity_guid))
+            if (!try_capture_guid(*em, entity, entity_guid))
                 return CommandStatus::Done;
         }
-        const auto entity_current = resolve_entity_from_guid(em, entity_guid);
+        const auto entity_current = resolve_entity_from_guid(*em, entity_guid);
         if (!entity_current.has_id())
             return CommandStatus::Done;
 
@@ -87,16 +92,20 @@ namespace eeng::editor {
 
     CommandStatus AddComponentToEntityCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        auto registry_sp = em->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
-        const auto entity_current = resolve_entity_from_guid(em, entity_guid);
+        const auto entity_current = resolve_entity_from_guid(*em, entity_guid);
         if (!entity_current.has_id())
             return CommandStatus::Done;
 
@@ -146,21 +155,25 @@ namespace eeng::editor {
 
     CommandStatus RemoveComponentFromEntityCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        auto registry_sp = em->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         if (!entity_guid.valid())
         {
-            if (!try_capture_guid(em, entity, entity_guid))
+            if (!try_capture_guid(*em, entity, entity_guid))
                 return CommandStatus::Done;
         }
-        const auto entity_current = resolve_entity_from_guid(em, entity_guid);
+        const auto entity_current = resolve_entity_from_guid(*em, entity_guid);
         if (!entity_current.has_id())
             return CommandStatus::Done;
 
@@ -207,16 +220,20 @@ namespace eeng::editor {
 
     CommandStatus RemoveComponentFromEntityCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        auto registry_sp = em->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
-        const auto entity_current = resolve_entity_from_guid(em, entity_guid);
+        const auto entity_current = resolve_entity_from_guid(*em, entity_guid);
         if (!entity_current.has_id())
             return CommandStatus::Done;
 

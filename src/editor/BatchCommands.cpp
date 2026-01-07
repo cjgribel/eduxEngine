@@ -3,6 +3,7 @@
 
 #include "editor/BatchCommands.hpp"
 #include "editor/CommandAsync.hpp"
+#include "editor/CommandContext.hpp"
 #include "ecs/EntityManager.hpp"
 #include "LogMacros.h"
 #include <algorithm>
@@ -67,24 +68,32 @@ namespace eeng::editor
 
     CommandStatus BatchLoadCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        future = br.queue_load(batch_id, *ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        future = br->queue_load(batch_id, *ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchLoadCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        future = br.queue_unload(batch_id, *ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        future = br->queue_unload(batch_id, *ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
@@ -108,24 +117,32 @@ namespace eeng::editor
 
     CommandStatus BatchUnloadCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        future = br.queue_unload(batch_id, *ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        future = br->queue_unload(batch_id, *ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchUnloadCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        future = br.queue_load(batch_id, *ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        future = br->queue_load(batch_id, *ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
@@ -148,24 +165,32 @@ namespace eeng::editor
 
     CommandStatus BatchLoadAllCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        future = br.queue_load_all_async(*ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        future = br->queue_load_all_async(*ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchLoadAllCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        future = br.queue_unload_all_async(*ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        future = br->queue_unload_all_async(*ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
@@ -188,24 +213,32 @@ namespace eeng::editor
 
     CommandStatus BatchUnloadAllCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        future = br.queue_unload_all_async(*ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        future = br->queue_unload_all_async(*ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
 
     CommandStatus BatchUnloadAllCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        future = br.queue_load_all_async(*ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        future = br->queue_load_all_async(*ctx_sp);
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
@@ -229,34 +262,42 @@ namespace eeng::editor
 
     CommandStatus CreateBatchCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
         if (!created_id.valid())
             created_id = Guid::generate();
 
-        const auto new_id = br.create_batch_with_id(created_id, name);
+        const auto new_id = br->create_batch_with_id(created_id, name);
         if (!new_id.valid())
             return CommandStatus::Failed;
 
-        br.save_index();
+        br->save_index();
         return CommandStatus::Done;
     }
 
     CommandStatus CreateBatchCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
         BatchInfo snapshot{};
-        if (!br.delete_batch(created_id, &snapshot))
+        if (!br->delete_batch(created_id, &snapshot))
             return CommandStatus::Failed;
 
-        br.save_index();
+        br->save_index();
         return CommandStatus::Done;
     }
 
@@ -274,35 +315,43 @@ namespace eeng::editor
 
     CommandStatus DeleteBatchCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
         BatchInfo info{};
-        if (!br.delete_batch(batch_id, &info))
+        if (!br->delete_batch(batch_id, &info))
             return CommandStatus::Failed;
 
         snapshot = std::move(info);
-        br.save_index();
+        br->save_index();
         return CommandStatus::Done;
     }
 
     CommandStatus DeleteBatchCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (!snapshot.has_value())
             return CommandStatus::Failed;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        if (!br.restore_batch(std::move(*snapshot)))
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        if (!br->restore_batch(std::move(*snapshot)))
             return CommandStatus::Failed;
 
         snapshot.reset();
-        br.save_index();
+        br->save_index();
         return CommandStatus::Done;
     }
 
@@ -324,10 +373,17 @@ namespace eeng::editor
 
     CommandStatus AssignEntitiesToBatchCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
-        if (!ctx_sp->entity_manager)
+
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
+
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
         {
             EENG_LOG(ctx_sp.get(), "AssignEntitiesToBatch aborted: missing entity manager.");
             return CommandStatus::Failed;
@@ -335,10 +391,7 @@ namespace eeng::editor
         if (!target_batch.valid())
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
-
-        const auto batches = br.list();
+        const auto batches = br->list();
         if (!is_batch_loaded(batches, target_batch))
         {
             // Policy: avoid orphaning entities by refusing to move into unloaded batches.
@@ -353,10 +406,10 @@ namespace eeng::editor
 
             for (const auto& entity : selection)
             {
-                if (!entity.has_id() || !em.entity_valid(entity))
+                if (!entity.has_id() || !em->entity_valid(entity))
                     continue;
 
-                const auto entity_ref = em.get_entity_ref(entity);
+                const auto entity_ref = em->get_entity_ref(entity);
                 if (!entity_ref.is_bound() || !entity_ref.guid.valid())
                     continue;
 
@@ -397,11 +450,11 @@ namespace eeng::editor
             {
                 if (prev_id == target_batch)
                     continue;
-                futures.push_back(br.queue_detach_entity(prev_id, assignment.entity_ref, *ctx_sp));
+                futures.push_back(br->queue_detach_entity(prev_id, assignment.entity_ref, *ctx_sp));
             }
 
             if (!target_in_prev)
-                futures.push_back(br.queue_attach_entity(target_batch, assignment.entity_ref, *ctx_sp));
+                futures.push_back(br->queue_attach_entity(target_batch, assignment.entity_ref, *ctx_sp));
         }
 
         in_flight = true;
@@ -410,14 +463,17 @@ namespace eeng::editor
 
     CommandStatus AssignEntitiesToBatchCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->batch_registry)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (assignments.empty())
             return CommandStatus::Done;
 
-        auto& br = static_cast<BatchRegistry&>(*ctx_sp->batch_registry);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!br)
+            return CommandStatus::Done;
 
         futures.clear();
         futures.reserve(assignments.size() * 2);
@@ -427,13 +483,13 @@ namespace eeng::editor
             const bool target_in_prev = contains_batch(assignment.prev_batches, target_batch);
 
             if (!target_in_prev)
-                futures.push_back(br.queue_detach_entity(target_batch, assignment.entity_ref, *ctx_sp));
+                futures.push_back(br->queue_detach_entity(target_batch, assignment.entity_ref, *ctx_sp));
 
             for (const auto& prev_id : assignment.prev_batches)
             {
                 if (prev_id == target_batch)
                     continue;
-                futures.push_back(br.queue_attach_entity(prev_id, assignment.entity_ref, *ctx_sp));
+                futures.push_back(br->queue_attach_entity(prev_id, assignment.entity_ref, *ctx_sp));
             }
         }
 

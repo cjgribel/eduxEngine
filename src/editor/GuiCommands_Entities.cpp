@@ -181,11 +181,14 @@ namespace eeng::editor {
 
     CommandStatus CreateEntityCommand::update()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
 
         if (async_stage == AsyncStage::Create)
         {
@@ -203,12 +206,12 @@ namespace eeng::editor {
             created_entity = created_ref.entity;
             created_guid = created_ref.guid;
 
-            auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
+            auto registry_sp = em->registry_wptr().lock();
             if (!registry_sp)
                 return CommandStatus::Failed;
 
             entity_json = meta::serialize_entity_for_undo(
-                em.get_entity_ref(created_entity),
+                em->get_entity_ref(created_entity),
                 registry_sp);
             if (!created_guid.valid())
                 created_guid = guid_from_json(entity_json);
@@ -275,32 +278,37 @@ namespace eeng::editor {
 
     CommandStatus DestroyEntityCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
             return update();
 
-        auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        auto* br = cmd_ctx.batch_registry(*ctx_sp);
+        if (!em || !br)
+            return CommandStatus::Done;
+
+        auto registry_sp = em->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
         if (!entity_guid.valid())
         {
-            if (!try_capture_guid(em, entity, entity_guid))
+            if (!try_capture_guid(*em, entity, entity_guid))
                 return CommandStatus::Done;
         }
 
-        const auto entity_current = resolve_entity_from_guid(em, entity_guid);
+        const auto entity_current = resolve_entity_from_guid(*em, entity_guid);
         if (!entity_current.has_id())
             return CommandStatus::Done;
 
         if (entity_json.is_null())
         {
             entity_json = meta::serialize_entity_for_undo(
-                em.get_entity_ref(entity_current),
+                em->get_entity_ref(entity_current),
                 registry_sp);
         }
 
@@ -315,8 +323,7 @@ namespace eeng::editor {
             return CommandStatus::Failed;
         }
 
-        auto& br = static_cast<eeng::BatchRegistry&>(*ctx_sp->batch_registry);
-        destroy_future = br.queue_destroy_entity(entity_batch, entity_ref, *ctx_sp);
+        destroy_future = br->queue_destroy_entity(entity_batch, entity_ref, *ctx_sp);
         mark_batch_dirty_for_entity(entity_current, *ctx_sp);
         async_stage = AsyncStage::Destroy;
         return update();
@@ -324,8 +331,9 @@ namespace eeng::editor {
 
     CommandStatus DestroyEntityCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
@@ -363,8 +371,9 @@ namespace eeng::editor {
 
     CommandStatus DestroyEntityCommand::update()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage == AsyncStage::Destroy)
@@ -422,32 +431,35 @@ namespace eeng::editor {
 
     CommandStatus DestroyEntityBranchCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
             return update();
 
-        auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
-        if (!registry_sp)
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
+        auto registry_sp = em->registry_wptr().lock();
+        if (!registry_sp)
+            return CommandStatus::Done;
 
         if (branch_json.is_null())
         {
             if (!root_guid.valid())
             {
-                if (!try_capture_guid(em, root_entity, root_guid))
+                if (!try_capture_guid(*em, root_entity, root_guid))
                     return CommandStatus::Done;
             }
 
-            const auto root_current = resolve_entity_from_guid(em, root_guid);
+            const auto root_current = resolve_entity_from_guid(*em, root_guid);
             if (!root_current.has_id())
                 return CommandStatus::Done;
 
-            auto& scenegraph = em.scene_graph();
+            auto& scenegraph = em->scene_graph();
             if (!scenegraph.contains(root_current))
                 return CommandStatus::Done;
 
@@ -468,7 +480,7 @@ namespace eeng::editor {
             for (const auto& entity : branch)
             {
                 branch_json.push_back(meta::serialize_entity_for_undo(
-                    em.get_entity_ref(entity),
+                    em->get_entity_ref(entity),
                     registry_sp));
             }
         }
@@ -483,7 +495,7 @@ namespace eeng::editor {
             if (!guid.valid())
                 continue;
 
-            auto entity_opt = em.get_entity_from_guid(guid);
+            auto entity_opt = em->get_entity_from_guid(guid);
             if (!entity_opt || !entity_opt->has_id())
                 continue;
 
@@ -506,8 +518,9 @@ namespace eeng::editor {
 
     CommandStatus DestroyEntityBranchCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
@@ -533,7 +546,11 @@ namespace eeng::editor {
             created_entities.push_back(er.entity);
         }
 
-        ctx_sp->entity_manager->register_entities_from_deserialization(created_entities);
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        em->register_entities_from_deserialization(created_entities);
 
         attach_futures.clear();
         attach_futures.reserve(created_entities.size());
@@ -560,8 +577,9 @@ namespace eeng::editor {
 
     CommandStatus DestroyEntityBranchCommand::update()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage == AsyncStage::Destroy)
@@ -617,28 +635,31 @@ namespace eeng::editor {
 
     CommandStatus CopyEntityCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
             return update();
 
-        auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
-        if (!registry_sp)
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
+        auto registry_sp = em->registry_wptr().lock();
+        if (!registry_sp)
+            return CommandStatus::Done;
 
         if (copy_json.is_null())
         {
             if (!source_guid.valid())
             {
-                if (!try_capture_guid(em, entity_source, source_guid))
+                if (!try_capture_guid(*em, entity_source, source_guid))
                     return CommandStatus::Done;
             }
 
-            const auto source_current = resolve_entity_from_guid(em, source_guid);
+            const auto source_current = resolve_entity_from_guid(*em, source_guid);
             if (!source_current.has_id())
                 return CommandStatus::Done;
 
@@ -655,7 +676,7 @@ namespace eeng::editor {
             }
             target_batch = source_batch;
 
-            copy_json = meta::serialize_entity_for_undo(em.get_entity_ref(source_current), registry_sp);
+            copy_json = meta::serialize_entity_for_undo(em->get_entity_ref(source_current), registry_sp);
             const Guid new_guid = Guid::generate();
             if (!update_entity_guid_in_json(copy_json, new_guid))
             {
@@ -663,7 +684,7 @@ namespace eeng::editor {
                 return CommandStatus::Done;
             }
 
-            const auto parent_ref = em.get_entity_parent(source_current);
+            const auto parent_ref = em->get_entity_parent(source_current);
             if (!update_parent_guid_in_json(copy_json, parent_ref.guid))
             {
                 copy_json = nlohmann::json{};
@@ -703,8 +724,9 @@ namespace eeng::editor {
 
     CommandStatus CopyEntityCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
@@ -713,12 +735,15 @@ namespace eeng::editor {
         if (copy_json.is_null())
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
         auto guid = guid_from_json(copy_json);
         if (!guid.valid())
             return CommandStatus::Done;
 
-        auto entity_opt = em.get_entity_from_guid(guid);
+        auto entity_opt = em->get_entity_from_guid(guid);
         if (!entity_opt || !entity_opt->has_id())
             return CommandStatus::Done;
 
@@ -741,8 +766,9 @@ namespace eeng::editor {
 
     CommandStatus CopyEntityCommand::update()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage == AsyncStage::Attach)
@@ -798,29 +824,33 @@ namespace eeng::editor {
 
     CommandStatus CopyEntityBranchCommand::execute()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
             return update();
 
-        auto registry_sp = ctx_sp->entity_manager->registry_wptr().lock();
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        auto registry_sp = em->registry_wptr().lock();
         if (!registry_sp)
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
-        auto& scenegraph = em.scene_graph();
+        auto& scenegraph = em->scene_graph();
 
         if (branch_json.is_null())
         {
             if (!root_guid.valid())
             {
-                if (!try_capture_guid(em, root_entity, root_guid))
+                if (!try_capture_guid(*em, root_entity, root_guid))
                     return CommandStatus::Done;
             }
 
-            const auto root_current = resolve_entity_from_guid(em, root_guid);
+            const auto root_current = resolve_entity_from_guid(*em, root_guid);
             if (!root_current.has_id())
                 return CommandStatus::Done;
             if (!scenegraph.contains(root_current))
@@ -849,7 +879,7 @@ namespace eeng::editor {
             {
                 const auto source_entity = source_entities[i];
                 auto entity_json = meta::serialize_entity_for_undo(
-                    em.get_entity_ref(source_entity),
+                    em->get_entity_ref(source_entity),
                     registry_sp);
 
                 const Guid new_guid = Guid::generate();
@@ -871,7 +901,7 @@ namespace eeng::editor {
                 }
                 else
                 {
-                    parent_guid = em.get_entity_parent(source_entity).guid;
+                    parent_guid = em->get_entity_parent(source_entity).guid;
                 }
                 if (!update_parent_guid_in_json(entity_json, parent_guid))
                 {
@@ -897,7 +927,7 @@ namespace eeng::editor {
             created_entities.push_back(er.entity);
         }
 
-        ctx_sp->entity_manager->register_entities_from_deserialization(created_entities);
+        em->register_entities_from_deserialization(created_entities);
 
         if (!target_batch.valid())
         {
@@ -930,8 +960,9 @@ namespace eeng::editor {
 
     CommandStatus CopyEntityBranchCommand::undo()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage != AsyncStage::None)
@@ -940,7 +971,9 @@ namespace eeng::editor {
         if (branch_json.is_null() || !branch_json.is_array())
             return CommandStatus::Done;
 
-        auto& em = static_cast<EntityManager&>(*ctx_sp->entity_manager);
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
 
         destroy_futures.clear();
         for (auto it = branch_json.rbegin(); it != branch_json.rend(); ++it)
@@ -949,7 +982,7 @@ namespace eeng::editor {
             if (!guid.valid())
                 continue;
 
-            auto entity_opt = em.get_entity_from_guid(guid);
+            auto entity_opt = em->get_entity_from_guid(guid);
             if (!entity_opt || !entity_opt->has_id())
                 continue;
             mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
@@ -971,8 +1004,9 @@ namespace eeng::editor {
 
     CommandStatus CopyEntityBranchCommand::update()
     {
-        auto ctx_sp = ctx.lock();
-        if (!ctx_sp || !ctx_sp->entity_manager)
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
             return CommandStatus::Done;
 
         if (async_stage == AsyncStage::Attach)
