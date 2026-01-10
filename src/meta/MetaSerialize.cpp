@@ -235,6 +235,7 @@ namespace eeng::meta
         nlohmann::json entity_json;
         // entity_json["entity"] = entity.to_integral();
         entity_json["entity_guid"] = entity_ref.guid.raw();
+        entity_json["components"] = nlohmann::json::object();
 
         // For all component types
         for (auto&& [id, type] : registry->storage())
