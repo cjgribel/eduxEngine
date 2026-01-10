@@ -55,7 +55,17 @@ namespace eeng::ecs
         return tree->contains(entity);
     }
 
+    bool SceneGraph::contains(const Entity& entity) const
+    {
+        return tree->contains(entity);
+    }
+
     bool SceneGraph::is_root(const Entity& entity)
+    {
+        return tree->is_root(entity);
+    }
+
+    bool SceneGraph::is_root(const Entity& entity) const
     {
         return tree->is_root(entity);
     }
@@ -71,6 +81,12 @@ namespace eeng::ecs
     }
 
     Entity SceneGraph::get_parent(const Entity& entity)
+    {
+        assert(!is_root(entity));
+        return tree->get_parent(entity);
+    }
+
+    Entity SceneGraph::get_parent(const Entity& entity) const
     {
         assert(!is_root(entity));
         return tree->get_parent(entity);
@@ -184,7 +200,29 @@ namespace eeng::ecs
         return stack;
     }
 
+    SceneGraph::BranchQueue SceneGraph::get_branch_topdown(const Entity& entity) const
+    {
+        BranchQueue stack;
+
+        tree->traverse_breadthfirst(entity, [&](const Entity& entity, size_t index) {
+            stack.push_back(entity);
+            });
+
+        return stack;
+    }
+
     SceneGraph::BranchQueue SceneGraph::get_branch_bottomup(const Entity& entity)
+    {
+        BranchQueue stack;
+
+        tree->traverse_breadthfirst(entity, [&](const Entity& entity, size_t index) {
+            stack.push_front(entity);
+            });
+
+        return stack;
+    }
+
+    SceneGraph::BranchQueue SceneGraph::get_branch_bottomup(const Entity& entity) const
     {
         BranchQueue stack;
 

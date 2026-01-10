@@ -6,6 +6,8 @@
 #include "MainThreadQueue.hpp"
 #include "EventQueue.h"
 #include "ThreadPool.hpp"
+#include "ecs/EntityManager.hpp"
+#include "LogMacros.h"
 #include <fstream>
 #include <algorithm>
 
@@ -109,6 +111,104 @@ namespace eeng::detail
         std::sort(out.closure.begin(), out.closure.end());
         out.closure.erase(std::unique(out.closure.begin(), out.closure.end()), out.closure.end());
         return out;
+    }
+
+    static std::vector<std::size_t> build_unload_order_indices(
+        const BatchInfo& batch_info,
+        EntityManager& entity_manager)
+    {
+        std::vector<std::size_t> order;
+        order.reserve(batch_info.live.size());
+
+        std::unordered_map<ecs::Entity, std::size_t> index_by_entity;
+        index_by_entity.reserve(batch_info.live.size());
+        std::unordered_set<ecs::Entity> batch_entities;
+        batch_entities.reserve(batch_info.live.size());
+
+        for (std::size_t i = 0; i < batch_info.live.size(); ++i)
+        {
+            const auto& er = batch_info.live[i];
+            if (!er.is_bound())
+                continue;
+            index_by_entity[er.entity] = i;
+            batch_entities.insert(er.entity);
+        }
+
+        if (index_by_entity.empty())
+            return order;
+
+        const auto& scenegraph = entity_manager.scene_graph();
+        std::vector<ecs::Entity> roots;
+        roots.reserve(index_by_entity.size());
+
+        for (const auto& [entity, idx] : index_by_entity)
+        {
+            if (!scenegraph.contains(entity))
+                continue;
+            if (scenegraph.is_root(entity))
+            {
+                roots.push_back(entity);
+                continue;
+            }
+            const auto parent = scenegraph.get_parent(entity);
+            if (!batch_entities.contains(parent))
+                roots.push_back(entity);
+        }
+
+        std::unordered_set<ecs::Entity> visited;
+        visited.reserve(index_by_entity.size());
+
+        for (const auto& root : roots)
+        {
+            const auto branch = scenegraph.get_branch_bottomup(root);
+            for (const auto& entity : branch)
+            {
+                if (!batch_entities.contains(entity))
+                    continue;
+                if (visited.insert(entity).second)
+                    order.push_back(index_by_entity[entity]);
+            }
+        }
+
+        for (std::size_t i = 0; i < batch_info.live.size(); ++i)
+        {
+            const auto& er = batch_info.live[i];
+            if (!er.is_bound())
+                continue;
+            if (visited.insert(er.entity).second)
+                order.push_back(i);
+        }
+
+        return order;
+    }
+
+    static void queue_destruction_leaf_first(BatchInfo& batch_info, EngineContext& ctx)
+    {
+        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+        const auto& scenegraph = em.scene_graph();
+        for (const auto& er : batch_info.live)
+        {
+            if (!er.is_bound())
+                continue;
+            if (!scenegraph.contains(er.entity))
+            {
+                const std::string guid_str = er.guid.valid() ? er.guid.to_string() : std::string("<invalid>");
+                EENG_LOG_DEBUG(&ctx,
+                    "Batch unload: entity %u (guid %s) missing from scene graph; using fallback order in batch %s.",
+                    static_cast<unsigned int>(er.entity.to_integral()),
+                    guid_str.c_str(),
+                    batch_info.id.to_string().c_str());
+            }
+        }
+        for (auto idx : build_unload_order_indices(batch_info, em))
+        {
+            auto& er = batch_info.live[idx];
+            if (er.is_bound())
+            {
+                ctx.entity_manager->queue_entity_for_destruction(er.entity);
+                er.unbind();
+            }
+        }
     }
 }
 
@@ -1461,14 +1561,7 @@ namespace eeng
         // 1) Main-thread: despawn / queue-destroy entities
         ctx.main_thread_queue->push_and_wait([&]()
             {
-                for (auto& er : B.live)
-                {
-                    if (er.is_bound())
-                    {
-                        ctx.entity_manager->queue_entity_for_destruction(er.entity);
-                        er.unbind();
-                    }
-                }
+                detail::queue_destruction_leaf_first(B, ctx);
             });
 
         {

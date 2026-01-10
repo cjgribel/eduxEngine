@@ -45,12 +45,13 @@ namespace eeng::editor
             return;
 
         const auto& registry = entity_manager->registry();
+        const auto& scenegraph = entity_manager->scene_graph();
         const auto* batch_registry = ctx.batch_registry
             ? static_cast<const eeng::BatchRegistry*>(ctx.batch_registry.get())
             : nullptr;
 
         // Registered entities must be valid, have headers, and be assigned to a loaded batch.
-        entity_manager->for_each_registered_entity([&ctx, &registry, entity_manager, batch_registry](const Entity& entity, const Guid& guid) {
+        entity_manager->for_each_registered_entity([&ctx, &registry, &scenegraph, entity_manager, batch_registry](const Entity& entity, const Guid& guid) {
             const auto debug_name = get_entity_debug_name(*entity_manager, entity);
             if (!registry.valid(entity))
             {
@@ -64,6 +65,13 @@ namespace eeng::editor
             {
                 EENG_LOG_WARN(&ctx,
                     "CommandSanity: Registered entity %u (%s) missing HeaderComponent.",
+                    static_cast<unsigned int>(entity.to_integral()),
+                    debug_name.c_str());
+            }
+            if (!scenegraph.contains(entity))
+            {
+                EENG_LOG_WARN(&ctx,
+                    "CommandSanity: Registered entity %u (%s) missing from scene graph.",
                     static_cast<unsigned int>(entity.to_integral()),
                     debug_name.c_str());
             }

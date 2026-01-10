@@ -36,14 +36,17 @@ namespace eeng::ecs
         bool erase_node(const Entity& entity);
 
         bool contains(const Entity& entity);
+        bool contains(const Entity& entity) const;
 
         bool is_root(const Entity& entity);
+        bool is_root(const Entity& entity) const;
 
         bool is_leaf(const Entity& entity);
 
         unsigned get_nbr_children(const Entity& entity);
 
         Entity get_parent(const Entity& entity);
+        Entity get_parent(const Entity& entity) const;
 
         bool is_descendant_of(const Entity& entity, const Entity& parent_entity);
 
@@ -58,8 +61,10 @@ namespace eeng::ecs
         void traverse(std::shared_ptr<entt::registry>& registry);
 
         BranchQueue get_branch_topdown(const Entity& entity);
+        BranchQueue get_branch_topdown(const Entity& entity) const;
 
         BranchQueue get_branch_bottomup(const Entity& entity);
+        BranchQueue get_branch_bottomup(const Entity& entity) const;
 
         // template<class F> requires std::invocable<F, PayloadType&, size_t, size_t>
         // void traverse_depthfirst(
