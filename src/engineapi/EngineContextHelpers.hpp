@@ -14,6 +14,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
 
@@ -72,78 +73,164 @@ namespace eeng
             log_warn_once(ctx, log_tag, guid, message);
 #endif
         }
+
+        template<typename Ctx>
+        using ResourceManagerShared = std::conditional_t<std::is_const_v<Ctx>,
+            std::shared_ptr<const ResourceManager>,
+            std::shared_ptr<ResourceManager>>;
+
+        template<typename Ctx>
+        using ResourceManagerPtr = std::conditional_t<std::is_const_v<Ctx>,
+            const ResourceManager*,
+            ResourceManager*>;
+
+        template<typename Ctx>
+        using EventQueuePtr = std::conditional_t<std::is_const_v<Ctx>,
+            const EventQueue*,
+            EventQueue*>;
+
+        template<typename Ctx>
+        using EntityManagerPtr = std::conditional_t<std::is_const_v<Ctx>,
+            const EntityManager*,
+            EntityManager*>;
+
+        template<typename Ctx>
+        using RegistryShared = std::conditional_t<std::is_const_v<Ctx>,
+            std::shared_ptr<const entt::registry>,
+            std::shared_ptr<entt::registry>>;
+
+        template<typename Ctx>
+        using RegistryPtr = std::conditional_t<std::is_const_v<Ctx>,
+            const entt::registry*,
+            entt::registry*>;
+
+        template<typename Ctx>
+        ResourceManagerShared<Ctx> try_get_resource_manager_impl(Ctx& ctx, const char* log_tag)
+        {
+            using Rm = std::conditional_t<std::is_const_v<Ctx>, const ResourceManager, ResourceManager>;
+            auto rm = std::dynamic_pointer_cast<Rm>(ctx.resource_manager);
+            if (!rm)
+                detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "ResourceManager unavailable");
+            return rm;
+        }
+
+        template<typename Ctx>
+        ResourceManagerPtr<Ctx> try_get_resource_manager_ptr_impl(Ctx& ctx, const char* log_tag)
+        {
+            auto rm = try_get_resource_manager_impl(ctx, log_tag);
+            return rm ? rm.get() : nullptr;
+        }
+
+        template<typename Ctx>
+        EventQueuePtr<Ctx> try_get_event_queue_impl(Ctx& ctx, const char* log_tag)
+        {
+            if (!ctx.event_queue)
+            {
+                detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "EventQueue unavailable");
+                return nullptr;
+            }
+            return ctx.event_queue.get();
+        }
+
+        template<typename Ctx>
+        EntityManagerPtr<Ctx> try_get_entity_manager_ptr_impl(Ctx& ctx, const char* log_tag)
+        {
+            if (!ctx.entity_manager)
+            {
+                detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "EntityManager unavailable");
+                return nullptr;
+            }
+
+            using Em = std::conditional_t<std::is_const_v<Ctx>, const EntityManager, EntityManager>;
+            auto* em = dynamic_cast<Em*>(ctx.entity_manager.get());
+            if (!em)
+                detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "Concrete EntityManager unavailable");
+            return em;
+        }
+
+        template<typename Ctx>
+        RegistryShared<Ctx> try_get_registry_impl(Ctx& ctx, const char* log_tag)
+        {
+            if (!ctx.entity_manager)
+            {
+                detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "EntityManager unavailable");
+                return {};
+            }
+
+            using ManagerPtr = std::conditional_t<std::is_const_v<Ctx>, const IEntityManager*, IEntityManager*>;
+            auto* manager = static_cast<ManagerPtr>(ctx.entity_manager.get());
+            auto registry_sp = manager->registry_wptr().lock();
+            if (!registry_sp)
+                detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "Registry expired");
+            return registry_sp;
+        }
+
+        template<typename Ctx>
+        RegistryPtr<Ctx> try_get_registry_ptr_impl(Ctx& ctx, const char* log_tag)
+        {
+            auto registry_sp = try_get_registry_impl(ctx, log_tag);
+            return registry_sp ? registry_sp.get() : nullptr;
+        }
     } // namespace detail
 
     inline std::shared_ptr<ResourceManager> try_get_resource_manager(EngineContext& ctx, const char* log_tag)
     {
-        auto rm = std::dynamic_pointer_cast<ResourceManager>(ctx.resource_manager);
-        if (!rm)
-            detail::handle_failure(ctx, log_tag, "ResourceManager unavailable");
-        return rm;
+        return detail::try_get_resource_manager_impl(ctx, log_tag);
     }
 
     inline ResourceManager* try_get_resource_manager_ptr(EngineContext& ctx, const char* log_tag)
     {
-        auto rm = try_get_resource_manager(ctx, log_tag);
-        return rm ? rm.get() : nullptr;
+        return detail::try_get_resource_manager_ptr_impl(ctx, log_tag);
+    }
+
+    inline std::shared_ptr<const ResourceManager> try_get_resource_manager(const EngineContext& ctx, const char* log_tag)
+    {
+        return detail::try_get_resource_manager_impl(ctx, log_tag);
+    }
+
+    inline const ResourceManager* try_get_resource_manager_ptr(const EngineContext& ctx, const char* log_tag)
+    {
+        return detail::try_get_resource_manager_ptr_impl(ctx, log_tag);
     }
 
     inline EventQueue* try_get_event_queue(EngineContext& ctx, const char* log_tag)
     {
-        if (!ctx.event_queue)
-        {
-            detail::handle_failure(ctx, log_tag, "EventQueue unavailable");
-            return nullptr;
-        }
-        return ctx.event_queue.get();
+        return detail::try_get_event_queue_impl(ctx, log_tag);
+    }
+
+    inline const EventQueue* try_get_event_queue(const EngineContext& ctx, const char* log_tag)
+    {
+        return detail::try_get_event_queue_impl(ctx, log_tag);
     }
 
     inline EntityManager* try_get_entity_manager_ptr(EngineContext& ctx, const char* log_tag)
     {
-        if (!ctx.entity_manager)
-        {
-            detail::handle_failure(ctx, log_tag, "EntityManager unavailable");
-            return nullptr;
-        }
-
-        auto* em = dynamic_cast<EntityManager*>(ctx.entity_manager.get());
-        if (!em)
-            detail::handle_failure(ctx, log_tag, "Concrete EntityManager unavailable");
-        return em;
+        return detail::try_get_entity_manager_ptr_impl(ctx, log_tag);
     }
 
-    // inline const EntityManager* try_get_entity_manager_ptr(const EngineContext& ctx, const char* log_tag)
-    // {
-    //     if (!ctx.entity_manager)
-    //     {
-    //         detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "EntityManager unavailable");
-    //         return nullptr;
-    //     }
-
-    //     auto* em = dynamic_cast<const EntityManager*>(ctx.entity_manager.get());
-    //     if (!em)
-    //         detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "Concrete EntityManager unavailable");
-    //     return em;
-    // }
+    inline const EntityManager* try_get_entity_manager_ptr(const EngineContext& ctx, const char* log_tag)
+    {
+        return detail::try_get_entity_manager_ptr_impl(ctx, log_tag);
+    }
 
     inline std::shared_ptr<entt::registry> try_get_registry(EngineContext& ctx, const char* log_tag)
     {
-        if (!ctx.entity_manager)
-        {
-            detail::handle_failure(ctx, log_tag, "EntityManager unavailable");
-            return {};
-        }
-
-        auto registry_sp = ctx.entity_manager->registry_wptr().lock();
-        if (!registry_sp)
-            detail::handle_failure(ctx, log_tag, "Registry expired");
-        return registry_sp;
+        return detail::try_get_registry_impl(ctx, log_tag);
     }
 
     inline entt::registry* try_get_registry_ptr(EngineContext& ctx, const char* log_tag)
     {
-        auto registry_sp = try_get_registry(ctx, log_tag);
-        return registry_sp ? registry_sp.get() : nullptr;
+        return detail::try_get_registry_ptr_impl(ctx, log_tag);
+    }
+
+    inline std::shared_ptr<const entt::registry> try_get_registry(const EngineContext& ctx, const char* log_tag)
+    {
+        return detail::try_get_registry_impl(ctx, log_tag);
+    }
+
+    inline const entt::registry* try_get_registry_ptr(const EngineContext& ctx, const char* log_tag)
+    {
+        return detail::try_get_registry_ptr_impl(ctx, log_tag);
     }
 
     template<typename T, typename Fn>

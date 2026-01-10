@@ -4,6 +4,31 @@
 #include "editor/CommandSanityChecks.hpp"
 #include "EngineContextHelpers.hpp"
 #include "LogMacros.h"
+#include "ecs/HeaderComponent.hpp"
+#include <string>
+
+namespace
+{
+    // Helper to get entity name from HeaderComponent.
+    std::string get_entity_debug_name(const eeng::EntityManager& em, const eeng::ecs::Entity& entity)
+    {
+        const auto& reg = em.registry();
+        if (!reg.valid(entity))
+            return "<invalid entity>";
+        std::string name = "<unknown>";
+        std::string guid_str = "<unknown>";
+        if (reg.valid(entity) && reg.all_of<eeng::ecs::HeaderComponent>(entity))
+        {
+            const auto& header = reg.get<eeng::ecs::HeaderComponent>(entity);
+            name = header.name;
+            if (header.guid.valid())
+                guid_str = header.guid.to_string();
+        }
+        if (!reg.all_of<eeng::ecs::HeaderComponent>(entity))
+            return "<no header>";
+        return name + " (" + guid_str + ")";
+    }
+}
 
 namespace eeng::editor
 {
@@ -13,6 +38,30 @@ namespace eeng::editor
         EENG_LOG(&ctx, "Running command sanity checks...");
 
         using namespace eeng::ecs;
+
+        auto* entity_manager = eeng::try_get_entity_manager_ptr(ctx, "CommandSanityChecks");
+        if (!entity_manager)
+            return;
+
+        const auto& registry = entity_manager->registry();
+        entity_manager->for_each_registered_entity([&ctx, &registry](const Entity& entity, const Guid& guid) {
+            const auto debug_name = get_entity_debug_name(*entity_manager, entity);
+            if (!registry.valid(entity))
+            {
+                EENG_LOG_WARN(&ctx,
+                    "CommandSanity: Registered entity %u (%s) is invalid in registry.",
+                    static_cast<unsigned int>(entity.to_integral()),
+                    debug_name.c_str());
+                return;
+            }
+            if (!registry.all_of<HeaderComponent>(entity))
+            {
+                EENG_LOG_WARN(&ctx,
+                    "CommandSanity: Registered entity %u (%s) missing HeaderComponent.",
+                    static_cast<unsigned int>(entity.to_integral()),
+                    debug_name.c_str());
+            }
+            });
 
         // auto rm = eeng::try_get_resource_manager_ptr(ctx, "CommandSanityChecks");
         // auto em = try_get_entity_manager_ptr(ctx, "CommandSanityChecks");
