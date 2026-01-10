@@ -16,6 +16,8 @@ namespace
     std::string get_entity_debug_name(const eeng::EntityManager& em, const eeng::ecs::Entity& entity)
     {
         const auto& reg = em.registry();
+        if (!reg.valid(entity))
+            return "<invalid entity>";
         std::string name = "<unknown>";
         std::string guid_str = "<unknown>";
         if (reg.valid(entity) && reg.all_of<eeng::ecs::HeaderComponent>(entity))
@@ -211,86 +213,87 @@ namespace eeng
 
     void EntityManager::destroy_entity_now(const ecs::Entity& entity)
     {
-        // Log if entity is invalid
-        if (!entity.has_id() || !registry_->valid(entity))
+        bool is_valid = entity.has_id() && registry_->valid(entity);
+        bool is_registered = (entity_to_guid_map_.find(entity) != entity_to_guid_map_.end());
+        bool in_scene_graph = scene_graph_->contains(entity);
+
+        // Policy: log if entity is invalid
+        if (!is_valid)
         {
-            LogGlobals::log("EntityManager::destroy_entity_now: entity %s is invalid.",
-                 get_entity_debug_name(*this, entity).c_str());
-            return;
+            LogGlobals::log("EntityManager::destroy_entity_now: invalid entity");
         }
 
-        // Log if entity is not registered
-        if (entity_to_guid_map_.find(entity) == entity_to_guid_map_.end())
+        // Policy: log if entity is not registered
+        if (is_valid && !is_registered)
         {
             LogGlobals::log("EntityManager::destroy_entity_now: entity %s is not registered in EntityManager.",
-                 get_entity_debug_name(*this, entity).c_str());
-            return;
+                get_entity_debug_name(*this, entity).c_str());
+        }
+
+        // Policy: log if entity is not in scene graph
+        if (is_valid && !in_scene_graph)
+        {
+            LogGlobals::log("EntityManager::destroy_entity_now: entity %s is not in scene graph.",
+                get_entity_debug_name(*this, entity).c_str());
         }
 
         // Remove entity mappings
-        auto guid_it = entity_to_guid_map_.find(entity);
-        assert(guid_it != entity_to_guid_map_.end());
-        auto guid = guid_it->second;
-        entity_to_guid_map_.erase(entity);
+        if (is_registered)
+        {
+            auto guid_it = entity_to_guid_map_.find(entity);
+            //assert(guid_it != entity_to_guid_map_.end() && "Entity not registered in entity_to_guid_map_");
+            auto guid = guid_it->second;
+            entity_to_guid_map_.erase(entity);
 
-        auto entity_it = guid_to_entity_map_.find(guid);
-        assert(entity_it != guid_to_entity_map_.end());
-        guid_to_entity_map_.erase(guid);
-
-        // Remove from chunk registry
-        //chunk_registry.remove_entity(registry_->get<HeaderComponent>(entity).chunk_tag, entity);
+            auto entity_it = guid_to_entity_map_.find(guid);
+            //assert(entity_it != guid_to_entity_map_.end() && "GUID not registered in guid_to_entity_map_");
+            guid_to_entity_map_.erase(guid);
+        }
 
         // Remove from scene graph
-        if (scene_graph_->contains(entity))
+        if (in_scene_graph)
             scene_graph_->erase_node(entity);
 
         // Destroy entity
-        registry_->destroy(entity);
-        //registry_->destroy(entity, 0); // TODO: This is a fix to keep generations of entities equal
+        if (is_valid)
+            registry_->destroy(entity);
     }
 
     void EntityManager::queue_entity_for_destruction(const ecs::Entity& entity)
     {
-        // Policy: error if entity is invalid
-        assert(entity.has_id());
-        assert(registry_->valid(entity));
-        // assert(entity_to_guid_map_.find(entity) != entity_to_guid_map_.end());
+        bool is_valid = entity.has_id() && registry_->valid(entity);
+        bool is_registered = (entity_to_guid_map_.find(entity) != entity_to_guid_map_.end());
+        bool in_scene_graph = scene_graph_->contains(entity);
 
-#ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
-        if (!entity.has_id() || !registry_->valid(entity))
-            return;
+        // Policy: log if entity is invalid
+        if (!is_valid)
+        {
+            LogGlobals::log("EntityManager::queue_entity_for_destruction: invalid entity");
+        }
 
-        if (entity_to_guid_map_.find(entity) == entity_to_guid_map_.end())
-            return;
-
-        if (!entities_pending_destruction_set_.insert(entity).second)
-            return;
-#endif
-        // bool unique = entities_pending_destruction_set_.insert(entity).second;
-
-        // Policy: Log warnings but still queue the entity for destruction.
-        // if (!entity.has_id() || !registry_->valid(entity))
-        // {
-        //     std::cerr << "[WARN] EntityManager::queue_entity_for_destruction: "
-        //         << "entity " << get_entity_debug_name(*this, entity)
-        //         << " is invalid." << std::endl;
-        // }
-
-        // Log if entity is not registered
-        if (entity_to_guid_map_.find(entity) == entity_to_guid_map_.end())
+        // Policy: log if entity is not registered
+        if (is_valid && !is_registered)
         {
             LogGlobals::log("EntityManager::queue_entity_for_destruction: entity %s is not registered in EntityManager.",
-                 get_entity_debug_name(*this, entity).c_str());
+                get_entity_debug_name(*this, entity).c_str());
         }
 
-        // Log if entity is already queued for destruction
-        if (!entities_pending_destruction_set_.insert(entity).second)
+        // Policy: log if entity is not in scene graph
+        if (is_valid && !in_scene_graph)
         {
-            LogGlobals::log("EntityManager::queue_entity_for_destruction: entity %s is already queued for destruction.",
-                 get_entity_debug_name(*this, entity).c_str());
+            LogGlobals::log("EntityManager::queue_entity_for_destruction: entity %s is not in scene graph.",
+                get_entity_debug_name(*this, entity).c_str());
         }
 
-        entities_pending_destruction_.push_back(entity);
+        if (entities_pending_destruction_set_.insert(entity).second)
+        {
+            entities_pending_destruction_.push_back(entity);
+        }
+        else
+        {
+            LogGlobals::log("EntityManager::queue_entity_for_destruction: entity %s already queued.",
+                get_entity_debug_name(*this, entity).c_str());
+        }
     }
 
     int EntityManager::destroy_pending_entities()
@@ -301,60 +304,10 @@ namespace eeng
             // Fetch entity
             auto entity = entities_pending_destruction_.front();
             entities_pending_destruction_.pop_front();
+            entities_pending_destruction_set_.erase(entity);
 
             destroy_entity_now(entity);
 
-#if 0
-#ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
-            entities_pending_destruction_set_.erase(entity);
-#endif
-
-            // Remove entity mappings
-            auto guid_it = entity_to_guid_map_.find(entity);
-#ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
-            if (guid_it == entity_to_guid_map_.end())
-            {
-                std::string name = "<unknown>";
-                std::string guid_str = "<unknown>";
-                if (registry_->valid(entity) && registry_->all_of<HeaderComponent>(entity))
-                {
-                    const auto& header = registry_->get<HeaderComponent>(entity);
-                    name = header.name;
-                    if (header.guid.valid())
-                        guid_str = header.guid.to_string();
-                }
-                std::cerr
-                    << "[WARN] EntityManager::destroy_pending_entities: "
-                    << "missing guid map for entity=" << get_entity_debug_name(*this, entity)
-                    << " name=\"" << name << "\" guid=" << guid_str
-                    << std::endl;
-                if (scene_graph_->contains(entity))
-                    scene_graph_->erase_node(entity);
-                if (registry_->valid(entity))
-                    registry_->destroy(entity);
-                continue;
-            }
-#else
-            assert(guid_it != entity_to_guid_map_.end());
-#endif
-            auto guid = guid_it->second;
-            entity_to_guid_map_.erase(entity);
-
-            auto entity_it = guid_to_entity_map_.find(guid);
-            assert(entity_it != guid_to_entity_map_.end());
-            guid_to_entity_map_.erase(guid);
-
-            // Remove from chunk registry
-            //chunk_registry.remove_entity(registry_->get<HeaderComponent>(entity).chunk_tag, entity);
-
-            // Remove from scene graph
-            if (scene_graph_->contains(entity))
-                scene_graph_->erase_node(entity);
-
-            // Destroy entity. May lead to additional entities being added to the queue.
-            registry_->destroy(entity);
-            //registry_->destroy(entity, 0); // TODO: This is a fix to keep generations of entities equal
-#endif
             cycles++;
         }
 
