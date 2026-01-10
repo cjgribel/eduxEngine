@@ -30,6 +30,8 @@ namespace eeng
             case EngineFlag::WireframeRendering:
                 event_queue.dispatch(SetWireFrameRenderingEvent{ enabled });
                 break;
+            case EngineFlag::DebugLogging:
+                break;
             }
         }
     }

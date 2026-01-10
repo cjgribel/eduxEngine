@@ -82,14 +82,9 @@ namespace
             return std::nullopt;
         }
 
-        // void set_entity_parent(
-        //     const ecs::Entity& entity,
-        //     const ecs::Entity& entity_parent) override {
-        // }
+        void destroy_entity_now(const ecs::Entity& entity) override {}
 
-        void queue_entity_for_destruction(
-            const ecs::Entity& entity) override {
-        }
+        void queue_entity_for_destruction(const ecs::Entity& entity) override {}
 
         int destroy_pending_entities() override { return 0; }
 

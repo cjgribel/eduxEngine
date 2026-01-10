@@ -54,7 +54,7 @@ namespace eeng::ecs::systems
         if (!registry_sp)
             return;
 
-        auto* entity_manager = eeng::try_get_entity_manager(ctx, "TransformSystem");
+        auto* entity_manager = eeng::try_get_entity_manager_ptr(ctx, "TransformSystem");
         if (!entity_manager)
             return;
 

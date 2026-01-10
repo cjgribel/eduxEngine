@@ -89,6 +89,7 @@ namespace eeng
     {
         VSync,
         WireframeRendering,
+        DebugLogging,
         // ...
     };
 

@@ -1,3 +1,4 @@
+// Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "Engine.hpp"
@@ -9,6 +10,7 @@
 #include "MainThreadQueue.hpp"
 #include "InputManager.hpp"
 #include "editor/CommandQueue.hpp"
+#include "editor/CommandSanityChecks.hpp"
 #include "BatchRegistry.hpp"
 
 #include "LogMacros.h"
@@ -125,6 +127,14 @@ namespace eeng
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowTaskMonitor, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowCommandQueue, true);
 
+        // Post command hook with sanity checks
+#ifdef EENG_DEBUG
+        ctx->command_queue->register_post_command_hook([ctx_weak = std::weak_ptr<EngineContext>{ ctx }]() {
+            if (auto ctx_locked = ctx_weak.lock())
+                editor::run_command_sanity_checks(*ctx_locked);
+            });
+#endif
+
         EENG_LOG(ctx, "Engine initialized successfully.");
         return true;
     }
@@ -179,7 +189,9 @@ namespace eeng
             // entt::storage mutations etc
             ctx->main_thread_queue->execute_all();
 
-            ctx->entity_manager->destroy_pending_entities();
+            int nbr_destroyed = ctx->entity_manager->destroy_pending_entities();
+            // Log nbr of destroyed entities
+            if (nbr_destroyed > 0) { EENG_LOG_DEBUG(ctx, "Destroyed %d pending entities", nbr_destroyed); }
 
             // --- Event dispatch ---
             ctx->event_queue->dispatch_all_events();
@@ -237,10 +249,10 @@ namespace eeng
             const Uint32 elapsed_ms = SDL_GetTicks() - time_ms;
             if (elapsed_ms < min_frametime_ms)
                 SDL_Delay(min_frametime_ms - elapsed_ms);
-        }
+            }
 
         game->destroy();
-    }
+        }
 
     void Engine::shutdown()
     {
@@ -614,4 +626,4 @@ namespace eeng
         }
     }
 
-} // namespace eeng
+    } // namespace eeng

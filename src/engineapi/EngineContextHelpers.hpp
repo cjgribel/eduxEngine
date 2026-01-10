@@ -98,7 +98,7 @@ namespace eeng
         return ctx.event_queue.get();
     }
 
-    inline EntityManager* try_get_entity_manager(EngineContext& ctx, const char* log_tag)
+    inline EntityManager* try_get_entity_manager_ptr(EngineContext& ctx, const char* log_tag)
     {
         if (!ctx.entity_manager)
         {
@@ -111,6 +111,20 @@ namespace eeng
             detail::handle_failure(ctx, log_tag, "Concrete EntityManager unavailable");
         return em;
     }
+
+    // inline const EntityManager* try_get_entity_manager_ptr(const EngineContext& ctx, const char* log_tag)
+    // {
+    //     if (!ctx.entity_manager)
+    //     {
+    //         detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "EntityManager unavailable");
+    //         return nullptr;
+    //     }
+
+    //     auto* em = dynamic_cast<const EntityManager*>(ctx.entity_manager.get());
+    //     if (!em)
+    //         detail::handle_failure(const_cast<EngineContext&>(ctx), log_tag, "Concrete EntityManager unavailable");
+    //     return em;
+    // }
 
     inline std::shared_ptr<entt::registry> try_get_registry(EngineContext& ctx, const char* log_tag)
     {

@@ -9,6 +9,27 @@
 #include <iostream>
 #include <stdexcept>
 
+namespace
+{
+    // Helper to get entity name from HeaderComponent
+    std::string get_entity_debug_name(const eeng::EntityManager& em, const eeng::ecs::Entity& entity)
+    {
+        const auto& reg = em.registry();
+        std::string name = "<unknown>";
+        std::string guid_str = "<unknown>";
+        if (reg.valid(entity) && reg.all_of<eeng::ecs::HeaderComponent>(entity))
+        {
+            const auto& header = reg.get<eeng::ecs::HeaderComponent>(entity);
+            name = header.name;
+            if (header.guid.valid())
+                guid_str = header.guid.to_string();
+        }
+        if (!reg.all_of<eeng::ecs::HeaderComponent>(entity))
+            return "<no header>";
+        return name + " (" + guid_str + ")";
+    }
+}
+
 namespace eeng
 {
     //using Header = ecs::HeaderComponent;
@@ -187,18 +208,55 @@ namespace eeng
         }
     }
 
-    // void EntityManager::set_entity_parent(const Entity& entity, const Entity& entity_parent)
-    // {
-    //     get_entity_header(entity).parent_entity = get_entity_ref(entity_parent);
+    void EntityManager::destroy_entity_now(const ecs::Entity& entity)
+    {
+        // Log if entity is invalid
+        if (!entity.has_id() || !registry_->valid(entity))
+        {
+            std::cerr << "[WARN] EntityManager::destroy_entity_now: "
+                << "entity " << get_entity_debug_name(*this, entity)
+                << " is invalid." << std::endl;
+            return;
+        }
 
-    //     // assert(registry_->all_of<HeaderComponent>(entity));
-    //     // registry_->get<HeaderComponent>(entity).parent_entity = entity_parent;
+        // Log if entity is not registered
+        if (entity_to_guid_map_.find(entity) == entity_to_guid_map_.end())
+        {
+            std::cerr << "[WARN] EntityManager::destroy_entity_now: "
+                << "entity " << get_entity_debug_name(*this, entity)
+                << " is not registered in EntityManager." << std::endl;
+            return;
+        }
 
-    //     // register_entity_live_parent(entity);
-    // }
+        // Remove entity mappings
+        auto guid_it = entity_to_guid_map_.find(entity);
+        assert(guid_it != entity_to_guid_map_.end());
+        auto guid = guid_it->second;
+        entity_to_guid_map_.erase(entity);
+
+        auto entity_it = guid_to_entity_map_.find(guid);
+        assert(entity_it != guid_to_entity_map_.end());
+        guid_to_entity_map_.erase(guid);
+
+        // Remove from chunk registry
+        //chunk_registry.remove_entity(registry_->get<HeaderComponent>(entity).chunk_tag, entity);
+
+        // Remove from scene graph
+        if (scene_graph_->contains(entity))
+            scene_graph_->erase_node(entity);
+
+        // Destroy entity
+        registry_->destroy(entity);
+        //registry_->destroy(entity, 0); // TODO: This is a fix to keep generations of entities equal
+    }
 
     void EntityManager::queue_entity_for_destruction(const ecs::Entity& entity)
     {
+        // Policy: error if entity is invalid
+        assert(entity.has_id());
+        assert(registry_->valid(entity));
+        // assert(entity_to_guid_map_.find(entity) != entity_to_guid_map_.end());
+
 #ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
         if (!entity.has_id() || !registry_->valid(entity))
             return;
@@ -209,18 +267,47 @@ namespace eeng
         if (!entities_pending_destruction_set_.insert(entity).second)
             return;
 #endif
+        // bool unique = entities_pending_destruction_set_.insert(entity).second;
+
+        // Policy: Log warnings but still queue the entity for destruction.
+        // if (!entity.has_id() || !registry_->valid(entity))
+        // {
+        //     std::cerr << "[WARN] EntityManager::queue_entity_for_destruction: "
+        //         << "entity " << get_entity_debug_name(*this, entity)
+        //         << " is invalid." << std::endl;
+        // }
+
+        // Log if entity is not registered
+        if (entity_to_guid_map_.find(entity) == entity_to_guid_map_.end())
+        {
+            std::cerr << "[WARN] EntityManager::queue_entity_for_destruction: "
+                << "entity " << get_entity_debug_name(*this, entity)
+                << " is not registered in EntityManager." << std::endl;
+        }
+
+        // Log if entity is already queued for destruction
+        if (!entities_pending_destruction_set_.insert(entity).second)
+        {
+            std::cerr << "[WARN] EntityManager::queue_entity_for_destruction: "
+                << "entity " << get_entity_debug_name(*this, entity)
+                << " is already queued for destruction." << std::endl;
+        }
 
         entities_pending_destruction_.push_back(entity);
     }
 
     int EntityManager::destroy_pending_entities()
     {
-        int count = 0;
+        int cycles = 0;
         while (entities_pending_destruction_.size())
         {
             // Fetch entity
             auto entity = entities_pending_destruction_.front();
             entities_pending_destruction_.pop_front();
+
+            destroy_entity_now(entity);
+
+#if 0
 #ifdef EENG_ENTITY_DESTROY_IDEMPOTENT
             entities_pending_destruction_set_.erase(entity);
 #endif
@@ -241,7 +328,7 @@ namespace eeng
                 }
                 std::cerr
                     << "[WARN] EntityManager::destroy_pending_entities: "
-                    << "missing guid map for entity=" << entity.to_integral()
+                    << "missing guid map for entity=" << get_entity_debug_name(*this, entity)
                     << " name=\"" << name << "\" guid=" << guid_str
                     << std::endl;
                 if (scene_graph_->contains(entity))
@@ -270,11 +357,11 @@ namespace eeng
             // Destroy entity. May lead to additional entities being added to the queue.
             registry_->destroy(entity);
             //registry_->destroy(entity, 0); // TODO: This is a fix to keep generations of entities equal
-
-            count++;
+#endif
+            cycles++;
         }
 
-        return count;
+        return cycles;
     }
 
     ecs::SceneGraph& EntityManager::scene_graph() { return *scene_graph_; }
@@ -336,15 +423,15 @@ namespace eeng
         return it->second;
     }
 
-std::optional<ecs::Entity> EntityManager::get_entity_from_guid(const Guid& guid) const
-{
-    auto it = guid_to_entity_map_.find(guid);
-    if (it == guid_to_entity_map_.end())
+    std::optional<ecs::Entity> EntityManager::get_entity_from_guid(const Guid& guid) const
     {
-        return std::nullopt;
-    }
+        auto it = guid_to_entity_map_.find(guid);
+        if (it == guid_to_entity_map_.end())
+        {
+            return std::nullopt;
+        }
 
-    return it->second;
-}
+        return it->second;
+    }
 
 } // namespace eeng

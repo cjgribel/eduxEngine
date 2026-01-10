@@ -67,6 +67,9 @@ namespace eeng
         //     return create_entity_live_parent("", "", parent_entity, entt::null);
         // }
 
+        virtual void destroy_entity_now(
+            const ecs::Entity& entity) = 0;
+            
         virtual void queue_entity_for_destruction(
             const ecs::Entity& entity) = 0;
 

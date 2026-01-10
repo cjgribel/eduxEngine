@@ -56,6 +56,9 @@ namespace eeng
         //     const ecs::Entity& entity,
         //     const ecs::Entity& entity_parent) override;
 
+        void destroy_entity_now(
+            const ecs::Entity& entity) override;
+
         void queue_entity_for_destruction(
             const ecs::Entity& entity) override;
 
@@ -100,19 +103,13 @@ namespace eeng
             return entity_to_guid_map_.size();
         }
 
-    private:
-        std::shared_ptr<entt::registry>     registry_;
-        std::unordered_map<Guid, ecs::Entity>    guid_to_entity_map_;
-        std::unordered_map<ecs::Entity, Guid>    entity_to_guid_map_;
-        std::unordered_set<ecs::Entity>          entities_pending_destruction_set_;
-        // On create:
-        // guid_to_entity_map[guid] = entity;
-        // On destroy:
-        // guid_to_entity_map.erase(guid);
-
-        std::unique_ptr<ecs::SceneGraph>    scene_graph_;
-        std::deque<ecs::Entity>             entities_pending_destruction_;
-    };
-
-
-} // namespace eeng
+        private:
+            std::shared_ptr<entt::registry>         registry_;
+            std::unordered_map<Guid, ecs::Entity>   guid_to_entity_map_;
+            std::unordered_map<ecs::Entity, Guid>   entity_to_guid_map_;
+            
+            std::unique_ptr<ecs::SceneGraph>        scene_graph_;
+            std::deque<ecs::Entity>                 entities_pending_destruction_;
+            std::unordered_set<ecs::Entity>         entities_pending_destruction_set_;
+        };
+    } // namespace eeng

@@ -8,7 +8,9 @@
 #ifndef CommandQueue_hpp
 #define CommandQueue_hpp
 
+#include <functional>
 #include <optional>
+#include <utility>
 #include <vector>
 #include "Command.hpp"
 
@@ -33,7 +35,20 @@ namespace eeng::editor
         std::optional<size_t> in_flight_index;
         InFlightAction in_flight_action{};
 
+        std::function<void()> post_command_hook;
+
+        void maybe_run_post_command_hook()
+        {
+            if (post_command_hook)
+                post_command_hook();
+        }
+
     public:
+        void register_post_command_hook(std::function<void()> func)
+        {
+            post_command_hook = std::move(func);
+        }
+
         bool add(CommandPtr&& command)
         {
             // Policy: ignore new commands while an async command is in flight.
@@ -125,6 +140,7 @@ namespace eeng::editor
 
             current_index++;
             latest_index = std::max(current_index, latest_index);
+            maybe_run_post_command_hook();
         }
 
         void process()
@@ -149,6 +165,7 @@ namespace eeng::editor
                     }
 
                     in_flight_index.reset();
+                    maybe_run_post_command_hook();
                     return;
                 }
 
@@ -185,8 +202,12 @@ namespace eeng::editor
                 return;
             }
             if (result == CommandStatus::Failed)
+            {
+                maybe_run_post_command_hook();
                 return;
+            }
             current_index--;
+            maybe_run_post_command_hook();
         }
 
         void clear()
