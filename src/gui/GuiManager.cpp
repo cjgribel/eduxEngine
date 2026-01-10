@@ -590,9 +590,17 @@ namespace eeng
             // Wireframe rendering
             ImGui::SameLine();
             bool wf = ctx.engine_config->get_flag(EngineFlag::WireframeRendering);
-            if (ImGui::Checkbox("Wireframe rendering", &wf))
+            if (ImGui::Checkbox("Wireframe", &wf))
             {
                 ctx.engine_config->set_flag(EngineFlag::WireframeRendering, wf);
+            }
+
+            // Debug logging
+            ImGui::SameLine();
+            bool debug_logging = ctx.engine_config->get_flag(EngineFlag::DebugLogging);
+            if (ImGui::Checkbox("Debug logging", &debug_logging))
+            {
+                ctx.engine_config->set_flag(EngineFlag::DebugLogging, debug_logging);
             }
         }
 

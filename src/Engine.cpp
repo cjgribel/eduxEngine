@@ -107,6 +107,7 @@ namespace eeng
         // Event subscriptions
         ctx->event_queue->register_callback([&](const SetVsyncEvent& event) { this->on_set_vsync(event); });
         ctx->event_queue->register_callback([&](const SetWireFrameRenderingEvent& event) { this->on_set_wireframe(event); });
+        ctx->event_queue->register_callback([&](const SetDebugLoggingEvent& event) { this->on_set_debug_logging(event); });
         ctx->event_queue->register_callback([&](const SetMinFrameTimeEvent& event) { this->on_set_min_frametime(event); });
         ctx->event_queue->register_callback([&](const ResourceTaskCompletedEvent& event) { this->on_resource_task_completed(event); });
         ctx->event_queue->register_callback([&](const BatchTaskCompletedEvent& event) { this->on_batch_task_completed(event); });
@@ -114,6 +115,7 @@ namespace eeng
         // Engine config
         ctx->engine_config->set_flag(EngineFlag::VSync, true);
         ctx->engine_config->set_flag(EngineFlag::WireframeRendering, false);
+        ctx->engine_config->set_flag(EngineFlag::DebugLogging, true);
         ctx->engine_config->set_value(EngineValue::MinFrameTime, 1000.0f / 60.0f);
 
         // Gui flags
@@ -426,6 +428,11 @@ namespace eeng
     void Engine::on_set_wireframe(const SetWireFrameRenderingEvent& e)
     {
         wireframe_mode = e.enabled;
+    }
+
+    void Engine::on_set_debug_logging(const SetDebugLoggingEvent& e)
+    {
+        debug_logging = e.enabled;
     }
 
     void Engine::on_set_min_frametime(const SetMinFrameTimeEvent& e)

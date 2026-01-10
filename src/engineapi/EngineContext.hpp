@@ -45,6 +45,7 @@ namespace eeng
 
     struct SetVsyncEvent { bool enabled; };
     struct SetWireFrameRenderingEvent { bool enabled; };
+    struct SetDebugLoggingEvent { bool enabled; };
     struct SetMinFrameTimeEvent { float dt; };
     struct ResourceTaskCompletedEvent { TaskResult result; };
 

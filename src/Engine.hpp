@@ -65,9 +65,10 @@ namespace eeng
 
         int window_height;    ///< Window height in pixels
         int window_width;     ///< Window width in pixels
-        bool vsync;   ///< V-sync enabled state
-        bool wireframe_mode; ///< Wireframe rendering state
-        float min_frametime_ms; ///< Minimum frame duration in milliseconds (default 60 FPS)
+        bool vsync = false;   ///< V-sync enabled state
+        bool wireframe_mode = false; ///< Wireframe rendering state
+        bool debug_logging = false; ///< Debug logging enabled state
+        float min_frametime_ms = 0.0f; ///< Minimum frame duration in milliseconds (default 60 FPS)
 
         // EngineContext ctx;
         std::shared_ptr<EngineContext> ctx;
@@ -98,6 +99,7 @@ namespace eeng
 
         void on_set_vsync(const SetVsyncEvent& e);
         void on_set_wireframe(const SetWireFrameRenderingEvent& e);
+        void on_set_debug_logging(const SetDebugLoggingEvent& e);
         void on_set_min_frametime(const SetMinFrameTimeEvent& e);
         void on_resource_task_completed(const ResourceTaskCompletedEvent& e);
         void on_batch_task_completed(const BatchTaskCompletedEvent& e);
