@@ -4,6 +4,7 @@
 #include "EntityManager.hpp"
 #include "HeaderComponent.hpp"
 #include "TransformComponent.hpp"
+#include "LogGlobals.hpp"
 #include <entt/entt.hpp>
 #include <cassert>
 #include <iostream>
@@ -213,18 +214,16 @@ namespace eeng
         // Log if entity is invalid
         if (!entity.has_id() || !registry_->valid(entity))
         {
-            std::cerr << "[WARN] EntityManager::destroy_entity_now: "
-                << "entity " << get_entity_debug_name(*this, entity)
-                << " is invalid." << std::endl;
+            LogGlobals::log("EntityManager::destroy_entity_now: entity %s is invalid.",
+                 get_entity_debug_name(*this, entity).c_str());
             return;
         }
 
         // Log if entity is not registered
         if (entity_to_guid_map_.find(entity) == entity_to_guid_map_.end())
         {
-            std::cerr << "[WARN] EntityManager::destroy_entity_now: "
-                << "entity " << get_entity_debug_name(*this, entity)
-                << " is not registered in EntityManager." << std::endl;
+            LogGlobals::log("EntityManager::destroy_entity_now: entity %s is not registered in EntityManager.",
+                 get_entity_debug_name(*this, entity).c_str());
             return;
         }
 
@@ -280,17 +279,15 @@ namespace eeng
         // Log if entity is not registered
         if (entity_to_guid_map_.find(entity) == entity_to_guid_map_.end())
         {
-            std::cerr << "[WARN] EntityManager::queue_entity_for_destruction: "
-                << "entity " << get_entity_debug_name(*this, entity)
-                << " is not registered in EntityManager." << std::endl;
+            LogGlobals::log("EntityManager::queue_entity_for_destruction: entity %s is not registered in EntityManager.",
+                 get_entity_debug_name(*this, entity).c_str());
         }
 
         // Log if entity is already queued for destruction
         if (!entities_pending_destruction_set_.insert(entity).second)
         {
-            std::cerr << "[WARN] EntityManager::queue_entity_for_destruction: "
-                << "entity " << get_entity_debug_name(*this, entity)
-                << " is already queued for destruction." << std::endl;
+            LogGlobals::log("EntityManager::queue_entity_for_destruction: entity %s is already queued for destruction.",
+                 get_entity_debug_name(*this, entity).c_str());
         }
 
         entities_pending_destruction_.push_back(entity);
