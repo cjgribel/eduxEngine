@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
 
     auto engine = eeng::make_default_engine();
 
-    if (!engine->init("eduxEngine", 1600, 900))
+    if (!engine->init("eduxEngine", 1920, 1080))
     {
         std::cerr << "Engine failed to initialize." << std::endl;
         return -1;
