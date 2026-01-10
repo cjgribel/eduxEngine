@@ -11,6 +11,7 @@
 #include "ecs/TransformComponent.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/ModelComponent.hpp"
+#include "ecs/StickyNoteComponent.hpp"
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
 #include "ecs/systems/TransformSystem.hpp"
@@ -168,6 +169,7 @@ namespace eeng
             assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
             *ptr = Guid{ j.get<uint64_t>() };
         }
+
     } // namespace
 
     void register_component_meta_types(EngineContext& ctx)
@@ -317,6 +319,41 @@ namespace eeng
             .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_assign", "Post-assign hook for component edits." })
             ;
         register_component<ecs::TransformComponent>();
+
+
+        // --- StickyNoteComponent -------------------------------------------
+
+        entt::meta_factory<eeng::ecs::StickyNoteComponent>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.StickyNoteComponent", .name = "StickyNoteComponent", .tooltip = "World-space debug notes." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::StickyNoteComponent::max_age>("max_age"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "max_age", "Max Age", "Seconds before a line expires. <= 0 disables aging." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::StickyNoteComponent::enabled>("enabled"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Whether the sticky note is active." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::StickyNoteComponent::world_offset>("world_offset"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "world_offset", "World Offset", "Offset applied to the world position." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::StickyNoteComponent::color_bg>("color_bg"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "color_bg", "Background Color", "ImGui background color (ABGR)." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::StickyNoteComponent::color_text>("color_text"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "color_text", "Text Color", "ImGui text color (ABGR)." })
+            .traits(MetaFlags::none)
+
+            // Line struct not registered
+            // .data<&eeng::ecs::StickyNoteComponent::lines>("lines"_hs)
+            // .custom<DataMetaInfo>(DataMetaInfo{ "lines", "Lines", "Lines of text in the sticky note." })
+            // .traits(MetaFlags::none)
+
+            ;
+        register_component<ecs::StickyNoteComponent>();
 
 
         // --- HeaderComponent -------------------------------------------------

@@ -295,6 +295,8 @@ bool Game::init()
     animationSystem = std::make_unique<eeng::ecs::systems::AnimationSystem>();
     transformSystem = std::make_unique<eeng::ecs::systems::TransformSystem>();
     transformSystem->init(*ctx);
+    debugRenderSystem = std::make_unique<eeng::ecs::systems::DebugRenderSystem>();
+    stickyNoteSystem = std::make_unique<eeng::ecs::systems::StickyNoteSystem>();
 
     // LEVEL CYCLE API TESTS
     {
@@ -968,6 +970,12 @@ void Game::update(
     if (transformSystem)
         transformSystem->update(*ctx, deltaTime);
 
+    if (stickyNoteSystem)
+    {
+        auto& registry = ctx->entity_manager->registry();
+        stickyNoteSystem->update(registry, *ctx, deltaTime);
+    }
+
     // Intersect player view ray with AABBs of other objects 
     glm_aux::intersect_ray_AABB(player.viewRay, character_aabb2.min, character_aabb2.max);
     glm_aux::intersect_ray_AABB(player.viewRay, character_aabb3.min, character_aabb3.max);
@@ -1004,6 +1012,18 @@ void Game::render(
     matrices.V = glm::lookAt(camera.pos, camera.lookAt, camera.up);
 
     matrices.VP = glm_aux::create_viewport_matrix(0.0f, 0.0f, windowWidth, windowHeight, 0.0f, 1.0f);
+
+    // Debug gizmos (ImGui overlay)
+    if (debugRenderSystem || stickyNoteSystem)
+    {
+        const auto VP_P_V = matrices.VP * matrices.P * matrices.V;
+        auto& registry = ctx->entity_manager->registry();
+
+        if (debugRenderSystem)
+            debugRenderSystem->render(registry, *ctx, VP_P_V, matrices.windowSize.y);
+        if (stickyNoteSystem)
+            stickyNoteSystem->render(registry, *ctx, VP_P_V, matrices.windowSize.y);
+    }
 
     // Begin rendering pass
     forwardRenderer->beginPass(matrices.P, matrices.V, pointlight.pos, pointlight.color, camera.pos);
