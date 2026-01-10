@@ -4,6 +4,7 @@
 #include "editor/CommandSanityChecks.hpp"
 #include "EngineContextHelpers.hpp"
 #include "LogMacros.h"
+#include "BatchRegistry.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include <string>
 
@@ -44,7 +45,12 @@ namespace eeng::editor
             return;
 
         const auto& registry = entity_manager->registry();
-        entity_manager->for_each_registered_entity([&ctx, &registry](const Entity& entity, const Guid& guid) {
+        const auto* batch_registry = ctx.batch_registry
+            ? static_cast<const eeng::BatchRegistry*>(ctx.batch_registry.get())
+            : nullptr;
+
+        // Registered entities must be valid, have headers, and be assigned to a loaded batch.
+        entity_manager->for_each_registered_entity([&ctx, &registry, entity_manager, batch_registry](const Entity& entity, const Guid& guid) {
             const auto debug_name = get_entity_debug_name(*entity_manager, entity);
             if (!registry.valid(entity))
             {
@@ -61,7 +67,107 @@ namespace eeng::editor
                     static_cast<unsigned int>(entity.to_integral()),
                     debug_name.c_str());
             }
+
+            if (batch_registry)
+            {
+                ecs::EntityRef entity_ref{ guid, entity };
+                BatchId batch_id{};
+                // Registration map -> batch map must exist and point to a loaded batch.
+                if (!batch_registry->try_get_loaded_batch_for_entity(entity_ref, batch_id))
+                {
+                    EENG_LOG_WARN(&ctx,
+                        "CommandSanity: Registered entity %u (%s) has no batch assignment.",
+                        static_cast<unsigned int>(entity.to_integral()),
+                        debug_name.c_str());
+                }
+                else if (!batch_registry->is_batch_loaded(batch_id))
+                {
+                    EENG_LOG_WARN(&ctx,
+                        "CommandSanity: Registered entity %u (%s) maps to unloaded batch %s.",
+                        static_cast<unsigned int>(entity.to_integral()),
+                        debug_name.c_str(),
+                        batch_id.to_string().c_str());
+                }
+            }
             });
+
+        if (batch_registry)
+        {
+            // Loaded batch live lists must contain valid, registered entities that map back to the same batch.
+            const auto batches = batch_registry->list();
+            for (const auto* info : batches)
+            {
+                if (!info || info->state != BatchInfo::State::Loaded)
+                    continue;
+
+                for (const auto& entity_ref : info->live)
+                {
+                    const auto debug_name = get_entity_debug_name(*entity_manager, entity_ref.entity);
+                    // Live entries must be bound and carry a valid guid.
+                    if (!entity_ref.is_bound() || !entity_ref.guid.valid())
+                    {
+                        EENG_LOG_WARN(&ctx,
+                            "CommandSanity: Batch %s has unbound live entity (%s).",
+                            info->id.to_string().c_str(),
+                            debug_name.c_str());
+                        continue;
+                    }
+
+                    // Live entities must exist in the registry.
+                    if (!entity_manager->entity_valid(entity_ref.entity))
+                    {
+                        EENG_LOG_WARN(&ctx,
+                            "CommandSanity: Batch %s contains invalid live entity %u (%s).",
+                            info->id.to_string().c_str(),
+                            static_cast<unsigned int>(entity_ref.entity.to_integral()),
+                            debug_name.c_str());
+                        continue;
+                    }
+
+                    // Live entities must be registered with EntityManager.
+                    ecs::EntityRef registered_ref{};
+                    if (!entity_manager->try_get_entity_ref(entity_ref.entity, registered_ref))
+                    {
+                        EENG_LOG_WARN(&ctx,
+                            "CommandSanity: Batch %s live entity %u (%s) is not registered.",
+                            info->id.to_string().c_str(),
+                            static_cast<unsigned int>(entity_ref.entity.to_integral()),
+                            debug_name.c_str());
+                        continue;
+                    }
+
+                    // The registered guid must match the live entity guid.
+                    if (registered_ref.guid != entity_ref.guid)
+                    {
+                        EENG_LOG_WARN(&ctx,
+                            "CommandSanity: Batch %s live entity %u (%s) guid mismatch.",
+                            info->id.to_string().c_str(),
+                            static_cast<unsigned int>(entity_ref.entity.to_integral()),
+                            debug_name.c_str());
+                    }
+
+                    // Live entries must map back to the same loaded batch.
+                    BatchId mapped_batch{};
+                    if (!batch_registry->try_get_loaded_batch_for_entity(entity_ref, mapped_batch))
+                    {
+                        EENG_LOG_WARN(&ctx,
+                            "CommandSanity: Batch %s live entity %u (%s) missing batch map entry.",
+                            info->id.to_string().c_str(),
+                            static_cast<unsigned int>(entity_ref.entity.to_integral()),
+                            debug_name.c_str());
+                    }
+                    else if (mapped_batch != info->id)
+                    {
+                        EENG_LOG_WARN(&ctx,
+                            "CommandSanity: Batch %s live entity %u (%s) mapped to batch %s.",
+                            info->id.to_string().c_str(),
+                            static_cast<unsigned int>(entity_ref.entity.to_integral()),
+                            debug_name.c_str(),
+                            mapped_batch.to_string().c_str());
+                    }
+                }
+            }
+        }
 
         // auto rm = eeng::try_get_resource_manager_ptr(ctx, "CommandSanityChecks");
         // auto em = try_get_entity_manager_ptr(ctx, "CommandSanityChecks");
