@@ -3,10 +3,12 @@
 
 #include "Game.hpp"
 #include "glmcommon.hpp"
+#include "ImGuiHelpers.hpp"
 #include "imgui.h"
 #include "LogMacros.h"
 #include <entt/entt.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <cstdio>
 
 // FOR TESTS ->
 #include "util/ThreadPool.hpp"
@@ -65,7 +67,7 @@ namespace eeng::dev
             ctx->thread_pool->queue_task([source_assets_root, imported_assets_root, batches_root, ctx]() {
                 try
                 {
-#if 0
+#if 1
                     // Just scan & load existing batch index
 
                     // Scan assets
@@ -1117,7 +1119,7 @@ void Game::render(
         shapeRenderer->pop_states<ShapeRendering::Color4u>();
     }
 
-#if 0
+#if 1
     // Demo draw other shapes
     {
         shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
@@ -1173,31 +1175,28 @@ void Game::renderUI()
 
         // In-world position label
         const auto VP_P_V = matrices.VP * matrices.P * matrices.V;
-        auto world_pos = glm::vec3(horseWorldMatrix[3]);
+        const auto world_pos = glm::vec3(horseWorldMatrix[3]);
         glm::ivec2 window_coords;
         if (glm_aux::window_coords_from_world_pos(world_pos, VP_P_V, window_coords))
         {
-            ImGui::SetNextWindowPos(
-                ImVec2{ float(window_coords.x), float(matrices.windowSize.y - window_coords.y) },
-                ImGuiCond_Always,
-                ImVec2{ 0.0f, 0.0f });
-            ImGui::PushStyleColor(ImGuiCol_WindowBg, 0x80000000);
-            ImGui::PushStyleColor(ImGuiCol_Text, 0xffffffff);
+            char label[256];
+            std::snprintf(
+                label,
+                sizeof(label),
+                "In-world GUI element\nWindow pos (%i, %i)\nWorld pos (%1.1f, %1.1f, %1.1f)",
+                window_coords.x,
+                window_coords.y,
+                world_pos.x,
+                world_pos.y,
+                world_pos.z);
 
-            ImGuiWindowFlags flags =
-                ImGuiWindowFlags_NoDecoration |
-                ImGuiWindowFlags_NoInputs |
-                // ImGuiWindowFlags_NoBackground |
-                ImGuiWindowFlags_AlwaysAutoResize;
-
-            if (ImGui::Begin("window_name", nullptr, flags))
-            {
-                ImGui::Text("In-world GUI element");
-                ImGui::Text("Window pos (%i, %i)", window_coords.x, window_coords.x);
-                ImGui::Text("World pos (%1.1f, %1.1f, %1.1f)", world_pos.x, world_pos.y, world_pos.z);
-                ImGui::End();
-            }
-            ImGui::PopStyleColor(2);
+            eeng::gui::ImGuiPrintTextAt(
+                window_coords,
+                matrices.windowSize.y,
+                label,
+                "window_name",
+                0x80000000,
+                0xffffffff);
         }
     }
 
