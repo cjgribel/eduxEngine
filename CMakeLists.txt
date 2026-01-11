@@ -290,6 +290,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaInspect.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaClone.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/GuidSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/GLMSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/ModelDataAssetSerialization.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp

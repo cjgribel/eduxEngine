@@ -25,6 +25,7 @@
 #include "meta/GLMMetaReg.hpp"
 //#include "Storage.hpp"
 #include "MetaInfo.h"
+#include "serializers/GuidSerialize.hpp"
 // #include "IResourceManager.hpp" 
 //#include "ResourceManager.hpp" // For AssetRef<T>, AssetMetaData, ResourceManager::load<>/unload
 #include "LogMacros.h"
@@ -32,7 +33,9 @@
 // #include <iostream>
 #include <entt/entt.hpp>
 // #include <entt/meta/pointer.hpp>
+#ifdef JSON
 #include <nlohmann/json.hpp> // -> TYPE HELPER
+#endif
 #include <type_traits>
 
     /*
@@ -151,27 +154,6 @@ namespace eeng
         }
     } // namespace
 
-    namespace
-    {
-        // TODO -> editor/GuidSerialize.hpp (takes nlohmann::json dependency with it)
-        // Guid to and from json
-
-        void serialize_Guid(nlohmann::json& j, const entt::meta_any& any)
-        {
-            auto ptr = any.try_cast<Guid>();
-            assert(ptr && "serialize_Guid: could not cast meta_any to Guid");
-            j = ptr->raw();
-        }
-
-        void deserialize_Guid(const nlohmann::json& j, entt::meta_any& any)
-        {
-            auto ptr = any.try_cast<Guid>();
-            assert(ptr && "deserialize_Guid: could not cast meta_any to Guid");
-            *ptr = Guid{ j.get<uint64_t>() };
-        }
-
-    } // namespace
-
     void register_component_meta_types(EngineContext& ctx)
     {
         EENG_LOG_INFO(&ctx, "Registering component meta types...");
@@ -182,8 +164,8 @@ namespace eeng
         .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.Guid", .name = "Guid", .tooltip = "A globally unique identifier." })
             .traits(MetaFlags::none)
 
-            .func<&serialize_Guid>(eeng::literals::serialize_hs)
-            .func<&deserialize_Guid>(eeng::literals::deserialize_hs)
+            .func<&eeng::serializers::serialize_Guid>(eeng::literals::serialize_hs)
+            .func<&eeng::serializers::deserialize_Guid>(eeng::literals::deserialize_hs)
 
             .func<&eeng::editor::inspect_Guid>(eeng::literals::inspect_hs)
             .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_Guid", "Inspect GUID" })
