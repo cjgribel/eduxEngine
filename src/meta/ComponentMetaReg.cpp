@@ -17,6 +17,7 @@
 #include "ecs/systems/TransformSystem.hpp"
 #include "mock/MockTypes.hpp"
 #include "mock/CopySignaller.hpp"
+#include "editor/ecs/ManipulatorGizmoComponent.hpp"
 
 #include "editor/EntityRefInspect.hpp"
 #include "editor/GuidInspect.hpp"
@@ -301,6 +302,151 @@ namespace eeng
             .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_assign", "Post-assign hook for component edits." })
             ;
         register_component<ecs::TransformComponent>();
+
+
+        // --- ManipulatorGizmoComponent --------------------------------------
+
+        using GizmoMode = eeng::editor::ManipulatorGizmo::Mode;
+        using GizmoSpace = eeng::editor::ManipulatorGizmo::Space;
+        using GizmoSettings = eeng::editor::ManipulatorGizmo::Settings;
+        using GizmoComponent = eeng::editor::ManipulatorGizmoComponent;
+
+        auto gizmo_mode_info = TypeMetaInfo
+        {
+            .id = "eeng.editor.ManipulatorGizmoMode",
+            .name = "ManipulatorGizmoMode",
+            .tooltip = "Gizmo operation mode (translate/rotate/scale).",
+            .underlying_type = entt::resolve<std::underlying_type_t<GizmoMode>>()
+        };
+        entt::meta_factory<GizmoMode>()
+            .custom<TypeMetaInfo>(gizmo_mode_info)
+            .traits(MetaFlags::none)
+
+            .data<GizmoMode::Translate>("Translate"_hs)
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Translate", "Translate gizmo." })
+            .traits(MetaFlags::none)
+
+            .data<GizmoMode::Rotate>("Rotate"_hs)
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Rotate", "Rotate gizmo." })
+            .traits(MetaFlags::none)
+
+            .data<GizmoMode::Scale>("Scale"_hs)
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Scale", "Scale gizmo." })
+            .traits(MetaFlags::none)
+            ;
+        meta::register_type<GizmoMode>();
+        warm_start_meta_type<GizmoMode>();
+
+        auto gizmo_space_info = TypeMetaInfo
+        {
+            .id = "eeng.editor.ManipulatorGizmoSpace",
+            .name = "ManipulatorGizmoSpace",
+            .tooltip = "Gizmo orientation space (local/world).",
+            .underlying_type = entt::resolve<std::underlying_type_t<GizmoSpace>>()
+        };
+        entt::meta_factory<GizmoSpace>()
+            .custom<TypeMetaInfo>(gizmo_space_info)
+            .traits(MetaFlags::none)
+
+            .data<GizmoSpace::Local>("Local"_hs)
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Local", "Align gizmo to local axes." })
+            .traits(MetaFlags::none)
+
+            .data<GizmoSpace::World>("World"_hs)
+            .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "World", "Align gizmo to world axes." })
+            .traits(MetaFlags::none)
+            ;
+        meta::register_type<GizmoSpace>();
+        warm_start_meta_type<GizmoSpace>();
+
+        entt::meta_factory<GizmoSettings>()
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.editor.ManipulatorGizmoSettings", .name = "ManipulatorGizmoSettings", .tooltip = "Gizmo visual and snapping settings." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::screen_size>("screen_size"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "screen_size", "Screen Size", "Target gizmo size in pixels." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::axis_length>("axis_length"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "axis_length", "Axis Length", "Base axis length in world units." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::axis_radius>("axis_radius"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "axis_radius", "Axis Radius", "Axis cylinder radius in world units." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::plane_size>("plane_size"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "plane_size", "Plane Size", "Plane handle size in world units." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::plane_offset>("plane_offset"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "plane_offset", "Plane Offset", "Plane handle offset from origin." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::rotate_radius>("rotate_radius"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "rotate_radius", "Rotate Radius", "Rotation ring radius." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::rotate_thickness>("rotate_thickness"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "rotate_thickness", "Rotate Thickness", "Rotation ring thickness for picking." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::scale_box_size>("scale_box_size"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "scale_box_size", "Scale Box Size", "Axis scale handle size." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::uniform_scale_size>("uniform_scale_size"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "uniform_scale_size", "Uniform Scale Size", "Uniform scale handle size." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::linear_snap>("linear_snap"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "linear_snap", "Linear Snap", "Translation snap increment." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::angular_snap_deg>("angular_snap_deg"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "angular_snap_deg", "Angular Snap (deg)", "Rotation snap increment in degrees." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::scale_snap>("scale_snap"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "scale_snap", "Scale Snap", "Scale snap increment." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::min_scale>("min_scale"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "min_scale", "Min Scale", "Clamp to avoid degenerate scales." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::allow_uniform_scale>("allow_uniform_scale"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "allow_uniform_scale", "Allow Uniform Scale", "Enable center uniform scale handle." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoSettings::draw_on_top>("draw_on_top"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "draw_on_top", "Draw On Top", "Disable depth test for gizmo rendering." })
+            .traits(MetaFlags::none)
+            ;
+        meta::register_type<GizmoSettings>();
+        warm_start_meta_type<GizmoSettings>();
+
+        entt::meta_factory<GizmoComponent>()
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.editor.ManipulatorGizmoComponent", .name = "ManipulatorGizmoComponent", .tooltip = "Editor gizmo settings and runtime state." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoComponent::enabled>("enabled"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable or disable the gizmo." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoComponent::mode>("mode"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "mode", "Mode", "Translate/rotate/scale mode." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoComponent::space>("space"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "space", "Space", "Local or world alignment." })
+            .traits(MetaFlags::none)
+
+            .data<&GizmoComponent::settings>("settings"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "settings", "Settings", "Gizmo rendering and snapping settings." })
+            .traits(MetaFlags::none)
+            ;
+        register_component<GizmoComponent>();
 
 
         // --- StickyNoteComponent -------------------------------------------

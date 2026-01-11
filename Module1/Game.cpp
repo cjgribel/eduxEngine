@@ -18,6 +18,7 @@
 
 #include "ecs/ModelComponent.hpp"
 #include "ecs/TransformComponent.hpp"
+#include "editor/ecs/ManipulatorGizmoComponent.hpp"
 
 #include "ecs/MockComponents.hpp"
 #include "mock/MockTypes.hpp"
@@ -43,6 +44,94 @@ namespace {
             });
     }
 #endif
+
+    eeng::ecs::Entity ensure_editor_gizmo_entity(eeng::EngineContext& ctx)
+    {
+        eeng::ecs::Entity entity{};
+        eeng::Guid guid{};
+
+        if (!ctx.entity_manager)
+            return entity;
+
+        auto& reg = ctx.entity_manager->registry();
+
+        auto find_existing = [&]() -> eeng::ecs::Entity
+        {
+            auto view = reg.view<eeng::editor::ManipulatorGizmoComponent>();
+            if (!view.empty())
+                return eeng::ecs::Entity{*view.begin()};
+            return {};
+        };
+
+        if (ctx.batch_registry)
+        {
+            auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+            eeng::BatchId editor_id{};
+            if (br.try_get_batch_id_by_name(eeng::BatchRegistry::kEditorBatchName, editor_id))
+            {
+                if (!br.is_batch_loaded(editor_id))
+                    br.queue_load(editor_id, ctx).get();
+            }
+        }
+
+        entity = find_existing();
+        if (entity.has_id())
+            return entity;
+
+        const auto add_component = [&]()
+        {
+            if (reg.valid(entity) && !reg.all_of<eeng::editor::ManipulatorGizmoComponent>(entity))
+                reg.emplace<eeng::editor::ManipulatorGizmoComponent>(entity);
+        };
+
+        if (ctx.batch_registry)
+        {
+            auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+            eeng::BatchId editor_id{};
+            if (br.try_get_batch_id_by_name(eeng::BatchRegistry::kEditorBatchName, editor_id))
+            {
+                if (!br.is_batch_loaded(editor_id))
+                    br.queue_load(editor_id, ctx).get();
+
+                auto fut = br.queue_create_entity(editor_id, "Editor Gizmo", eeng::ecs::EntityRef{}, ctx);
+                auto er = fut.get();
+                entity = er.entity;
+                guid = er.guid;
+            }
+        }
+
+        if (!entity.has_id())
+        {
+            auto [new_guid, new_entity] = ctx.entity_manager->create_entity_live_parent(
+                eeng::BatchRegistry::kEditorBatchName,
+                "Editor Gizmo",
+                eeng::ecs::Entity::EntityNull,
+                eeng::ecs::Entity::EntityNull);
+            entity = new_entity;
+            guid = new_guid;
+
+            if (ctx.batch_registry)
+            {
+                auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+                eeng::BatchId editor_id{};
+                if (br.try_get_batch_id_by_name(eeng::BatchRegistry::kEditorBatchName, editor_id)
+                    && br.is_batch_loaded(editor_id))
+                {
+                    br.queue_attach_entity(editor_id, eeng::ecs::EntityRef{ guid, entity }, ctx).get();
+                }
+            }
+        }
+
+        if (entity.has_id())
+        {
+            if (ctx.main_thread_queue)
+                ctx.main_thread_queue->push_and_wait(add_component);
+            else
+                add_component();
+        }
+
+        return entity;
+    }
 }
 
 namespace eeng::dev
@@ -290,7 +379,7 @@ bool Game::init()
     shapeRenderer = std::make_shared<ShapeRendering::ShapeRenderer>();
     shapeRenderer->init();
 
-    gizmo = std::make_unique<eeng::editor::ManipulatorGizmo>();
+    gizmoSystem = std::make_unique<eeng::editor::ManipulatorGizmoSystem>();
 
     renderSystem = std::make_unique<eeng::ecs::systems::RenderSystem>();
     renderSystem->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
@@ -299,6 +388,7 @@ bool Game::init()
     transformSystem->init(*ctx);
     debugRenderSystem = std::make_unique<eeng::ecs::systems::DebugRenderSystem>();
     stickyNoteSystem = std::make_unique<eeng::ecs::systems::StickyNoteSystem>();
+    ensure_editor_gizmo_entity(*ctx);
 
     // LEVEL CYCLE API TESTS
     {
@@ -981,11 +1071,11 @@ void Game::update(
     }
 
     // TODO: consider scheduling transform cache updates as an Engine-level system phase.
-    if (gizmo)
+    if (gizmoSystem)
     {
         // Use the latest cached camera matrices from the previous frame.
         // These are refreshed in render() once the window size is known.
-        gizmo->update(*ctx, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
+        gizmoSystem->update(*ctx, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
     }
 
     if (transformSystem)
@@ -1169,8 +1259,8 @@ void Game::render(
     }
 #endif
 
-    if (gizmo)
-        gizmo->render(*ctx, *shapeRenderer, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
+    if (gizmoSystem)
+        gizmoSystem->render(*ctx, *shapeRenderer, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
 
     // Draw shape batches
     shapeRenderer->render(matrices.P * matrices.V);
