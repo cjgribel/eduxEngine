@@ -10,7 +10,7 @@
 #include "ecs/systems/RenderSystem.hpp"
 #include "ecs/systems/StickyNoteSystem.hpp"
 #include "ecs/systems/TransformSystem.hpp"
-#include "editor/ecs/ManipulatorGizmoSystem.hpp"
+#include "editor/EditorRuntime.hpp"
 #include <entt/fwd.hpp> // For entt::registry - remove from here
 
 // --> ENGINE API
@@ -91,7 +91,7 @@ private:
     std::unique_ptr<eeng::ecs::systems::TransformSystem> transformSystem;
     std::unique_ptr<eeng::ecs::systems::DebugRenderSystem> debugRenderSystem;
     std::unique_ptr<eeng::ecs::systems::StickyNoteSystem> stickyNoteSystem;
-    std::unique_ptr<eeng::editor::ManipulatorGizmoSystem> gizmoSystem;
+    std::unique_ptr<eeng::editor::EditorRuntime> editorRuntime;
 
     // Entity registry - to use in labs
     std::shared_ptr<entt::registry> entity_registry; // unique + and out weak ptrs?

@@ -553,6 +553,14 @@ namespace
             || handle == ManipulatorGizmo::Handle::TranslateZX;
     }
 
+    bool is_translate_handle(ManipulatorGizmo::Handle handle)
+    {
+        return handle == ManipulatorGizmo::Handle::TranslateX
+            || handle == ManipulatorGizmo::Handle::TranslateY
+            || handle == ManipulatorGizmo::Handle::TranslateZ
+            || is_translate_plane(handle);
+    }
+
     bool is_rotate_handle(ManipulatorGizmo::Handle handle)
     {
         return handle == ManipulatorGizmo::Handle::RotateX
@@ -776,130 +784,145 @@ namespace eeng::editor
         // ------------------------------------------------------------------
         // Hover detection (ray tests) when idle.
         // ------------------------------------------------------------------
+        const auto update_translate_hover = [&]()
+        {
+            const float axis_len = settings_.axis_length * gizmo_scale;
+            const float axis_radius = settings_.axis_radius * gizmo_scale;
+
+            // Axis handles (X/Y/Z).
+            for (Handle handle : { Handle::TranslateX, Handle::TranslateY, Handle::TranslateZ })
+            {
+                const glm::vec3 axis_dir = safe_axis_dir_from_handle(handle, basis);
+                const glm::vec3 seg_a = world_pos;
+                const glm::vec3 seg_b = world_pos + axis_dir * axis_len;
+
+                const RayLineResult hit = closest_points_ray_segment(ray, seg_a, seg_b);
+
+                if (hit.dist2 <= axis_radius * axis_radius && hit.ray_t < ray.z_near)
+                {
+                    ray.z_near = hit.ray_t;
+                    hovered_handle_ = handle;
+                }
+            }
+
+            // Plane handles (XY/YZ/ZX).
+            for (Handle handle : { Handle::TranslateXY, Handle::TranslateYZ, Handle::TranslateZX })
+            {
+                glm::vec3 u, v;
+                plane_axes_from_handle(handle, basis, u, v);
+                if (glm::length(u) < kEpsilon || glm::length(v) < kEpsilon)
+                    continue;
+
+                const Plane plane{ world_pos, glm::normalize(glm::cross(u, v)) };
+                float t = 0.0f;
+                if (!intersect_ray_plane(ray, plane, t))
+                    continue;
+
+                const glm::vec3 hit_point = ray.origin + ray.dir * t;
+                const glm::vec3 local = hit_point - world_pos;
+
+                // Compute plane coordinates in the (u, v) basis.
+                const float u_coord = glm::dot(local, u);
+                const float v_coord = glm::dot(local, v);
+
+                const float offset = settings_.plane_offset * gizmo_scale;
+                const float size = settings_.plane_size * gizmo_scale;
+
+                if (u_coord >= offset && u_coord <= offset + size
+                    && v_coord >= offset && v_coord <= offset + size)
+                {
+                    if (t < ray.z_near)
+                    {
+                        ray.z_near = t;
+                        hovered_handle_ = handle;
+                    }
+                }
+            }
+        };
+
+        const auto update_rotate_hover = [&]()
+        {
+            const float ring_radius = settings_.rotate_radius * gizmo_scale;
+            const float ring_thickness = settings_.rotate_thickness * gizmo_scale;
+
+            for (Handle handle : { Handle::RotateX, Handle::RotateY, Handle::RotateZ })
+            {
+                const glm::vec3 axis_dir = safe_axis_dir_from_handle(handle, basis);
+
+                // Rotation plane is orthogonal to the axis and passes through the gizmo origin.
+                const Plane plane{ world_pos, axis_dir };
+                float t = 0.0f;
+                if (!intersect_ray_plane(ray, plane, t))
+                    continue;
+
+                const glm::vec3 hit_point = ray.origin + ray.dir * t;
+                const float dist = glm::length(hit_point - world_pos);
+
+                // Accept hits within the ring thickness.
+                if (std::fabs(dist - ring_radius) <= ring_thickness)
+                {
+                    if (t < ray.z_near)
+                    {
+                        ray.z_near = t;
+                        hovered_handle_ = handle;
+                    }
+                }
+            }
+        };
+
+        const auto update_scale_hover = [&]()
+        {
+            const float axis_len = settings_.axis_length * gizmo_scale;
+            const float box_size = settings_.scale_box_size * gizmo_scale;
+
+            // Axis scale handles at the axis tips.
+            for (Handle handle : { Handle::ScaleX, Handle::ScaleY, Handle::ScaleZ })
+            {
+                const glm::vec3 axis_dir = safe_axis_dir_from_handle(handle, basis);
+                const glm::vec3 center = world_pos + axis_dir * axis_len;
+
+                const glm::vec3 half = glm::vec3(box_size * 0.5f);
+                const glm::vec3 aabb_min = center - half;
+                const glm::vec3 aabb_max = center + half;
+
+                float t = 0.0f;
+                if (intersect_ray_aabb(ray, aabb_min, aabb_max, t) && t < ray.z_near)
+                {
+                    ray.z_near = t;
+                    hovered_handle_ = handle;
+                }
+            }
+
+            // Uniform scale handle at the origin (optional).
+            if (settings_.allow_uniform_scale)
+            {
+                const float uniform_size = settings_.uniform_scale_size * gizmo_scale;
+                const glm::vec3 half = glm::vec3(uniform_size * 0.5f);
+                const glm::vec3 aabb_min = world_pos - half;
+                const glm::vec3 aabb_max = world_pos + half;
+
+                float t = 0.0f;
+                if (intersect_ray_aabb(ray, aabb_min, aabb_max, t) && t < ray.z_near)
+                {
+                    ray.z_near = t;
+                    hovered_handle_ = Handle::ScaleUniform;
+                }
+            }
+        };
+
         if (!dragging_)
         {
-            if (mode_ == Mode::Translate)
+            switch (mode_)
             {
-                const float axis_len = settings_.axis_length * gizmo_scale;
-                const float axis_radius = settings_.axis_radius * gizmo_scale;
-
-                // Axis handles (X/Y/Z).
-                for (Handle handle : { Handle::TranslateX, Handle::TranslateY, Handle::TranslateZ })
-                {
-                    const glm::vec3 axis_dir = safe_axis_dir_from_handle(handle, basis);
-                    const glm::vec3 seg_a = world_pos;
-                    const glm::vec3 seg_b = world_pos + axis_dir * axis_len;
-
-                    const RayLineResult hit = closest_points_ray_segment(ray, seg_a, seg_b);
-
-                    if (hit.dist2 <= axis_radius * axis_radius && hit.ray_t < ray.z_near)
-                    {
-                        ray.z_near = hit.ray_t;
-                        hovered_handle_ = handle;
-                    }
-                }
-
-                // Plane handles (XY/YZ/ZX).
-                for (Handle handle : { Handle::TranslateXY, Handle::TranslateYZ, Handle::TranslateZX })
-                {
-                    glm::vec3 u, v;
-                    plane_axes_from_handle(handle, basis, u, v);
-                    if (glm::length(u) < kEpsilon || glm::length(v) < kEpsilon)
-                        continue;
-
-                    const Plane plane{ world_pos, glm::normalize(glm::cross(u, v)) };
-                    float t = 0.0f;
-                    if (!intersect_ray_plane(ray, plane, t))
-                        continue;
-
-                    const glm::vec3 hit_point = ray.origin + ray.dir * t;
-                    const glm::vec3 local = hit_point - world_pos;
-
-                    // Compute plane coordinates in the (u, v) basis.
-                    const float u_coord = glm::dot(local, u);
-                    const float v_coord = glm::dot(local, v);
-
-                    const float offset = settings_.plane_offset * gizmo_scale;
-                    const float size = settings_.plane_size * gizmo_scale;
-
-                    if (u_coord >= offset && u_coord <= offset + size
-                        && v_coord >= offset && v_coord <= offset + size)
-                    {
-                        if (t < ray.z_near)
-                        {
-                            ray.z_near = t;
-                            hovered_handle_ = handle;
-                        }
-                    }
-                }
-            }
-            else if (mode_ == Mode::Rotate)
-            {
-                const float ring_radius = settings_.rotate_radius * gizmo_scale;
-                const float ring_thickness = settings_.rotate_thickness * gizmo_scale;
-
-                for (Handle handle : { Handle::RotateX, Handle::RotateY, Handle::RotateZ })
-                {
-                    const glm::vec3 axis_dir = safe_axis_dir_from_handle(handle, basis);
-
-                    // Rotation plane is orthogonal to the axis and passes through the gizmo origin.
-                    const Plane plane{ world_pos, axis_dir };
-                    float t = 0.0f;
-                    if (!intersect_ray_plane(ray, plane, t))
-                        continue;
-
-                    const glm::vec3 hit_point = ray.origin + ray.dir * t;
-                    const float dist = glm::length(hit_point - world_pos);
-
-                    // Accept hits within the ring thickness.
-                    if (std::fabs(dist - ring_radius) <= ring_thickness)
-                    {
-                        if (t < ray.z_near)
-                        {
-                            ray.z_near = t;
-                            hovered_handle_ = handle;
-                        }
-                    }
-                }
-            }
-            else if (mode_ == Mode::Scale)
-            {
-                const float axis_len = settings_.axis_length * gizmo_scale;
-                const float box_size = settings_.scale_box_size * gizmo_scale;
-
-                // Axis scale handles at the axis tips.
-                for (Handle handle : { Handle::ScaleX, Handle::ScaleY, Handle::ScaleZ })
-                {
-                    const glm::vec3 axis_dir = safe_axis_dir_from_handle(handle, basis);
-                    const glm::vec3 center = world_pos + axis_dir * axis_len;
-
-                    const glm::vec3 half = glm::vec3(box_size * 0.5f);
-                    const glm::vec3 aabb_min = center - half;
-                    const glm::vec3 aabb_max = center + half;
-
-                    float t = 0.0f;
-                    if (intersect_ray_aabb(ray, aabb_min, aabb_max, t) && t < ray.z_near)
-                    {
-                        ray.z_near = t;
-                        hovered_handle_ = handle;
-                    }
-                }
-
-                // Uniform scale handle at the origin (optional).
-                if (settings_.allow_uniform_scale)
-                {
-                    const float uniform_size = settings_.uniform_scale_size * gizmo_scale;
-                    const glm::vec3 half = glm::vec3(uniform_size * 0.5f);
-                    const glm::vec3 aabb_min = world_pos - half;
-                    const glm::vec3 aabb_max = world_pos + half;
-
-                    float t = 0.0f;
-                    if (intersect_ray_aabb(ray, aabb_min, aabb_max, t) && t < ray.z_near)
-                    {
-                        ray.z_near = t;
-                        hovered_handle_ = Handle::ScaleUniform;
-                    }
-                }
+            case Mode::Translate:
+                update_translate_hover();
+                break;
+            case Mode::Rotate:
+                update_rotate_hover();
+                break;
+            case Mode::Scale:
+                update_scale_hover();
+                break;
             }
         }
 
@@ -989,22 +1012,8 @@ namespace eeng::editor
             }
         }
 
-        // ------------------------------------------------------------------
-        // Drag update.
-        // ------------------------------------------------------------------
-        if (dragging_ && active_handle_ != Handle::None)
+        const auto update_translate_drag = [&](const glm::mat4& parent_inv) -> bool
         {
-            // Ensure the entity is still valid during drag.
-            if (!drag_state_.entity.has_id())
-            {
-                dragging_ = false;
-                active_handle_ = Handle::None;
-                return;
-            }
-
-            // Cached parent inverse for world->local conversion.
-            const glm::mat4 parent_inv = glm::inverse(drag_state_.parent_world_matrix);
-
             if (active_handle_ == Handle::TranslateX
                 || active_handle_ == Handle::TranslateY
                 || active_handle_ == Handle::TranslateZ)
@@ -1031,15 +1040,15 @@ namespace eeng::editor
                 //   local_pos = parent_inv * [new_world_pos, 1]
                 const glm::vec3 new_local = glm::vec3(parent_inv * glm::vec4(new_world_pos, 1.0f));
                 tfm->set_position(new_local);
+                return true;
             }
-            else if (active_handle_ == Handle::TranslateXY
-                || active_handle_ == Handle::TranslateYZ
-                || active_handle_ == Handle::TranslateZX)
+
+            if (is_translate_plane(active_handle_))
             {
                 const Plane plane{ drag_state_.start_world_pos, drag_state_.plane_normal_world };
                 float t = 0.0f;
                 if (!intersect_ray_plane(ray, plane, t))
-                    return;
+                    return false;
 
                 // Compute hit point in world space.
                 const glm::vec3 hit_point = ray.origin + ray.dir * t;
@@ -1066,45 +1075,51 @@ namespace eeng::editor
                 const glm::vec3 new_local = glm::vec3(parent_inv * glm::vec4(new_world_pos, 1.0f));
                 tfm->set_position(new_local);
             }
-            else if (active_handle_ == Handle::RotateX
-                || active_handle_ == Handle::RotateY
-                || active_handle_ == Handle::RotateZ)
+
+            return true;
+        };
+
+        const auto update_rotate_drag = [&]() -> bool
+        {
+            const Plane plane{ drag_state_.start_world_pos, drag_state_.axis_dir_world };
+            float t = 0.0f;
+            if (!intersect_ray_plane(ray, plane, t))
+                return false;
+
+            const glm::vec3 hit_point = ray.origin + ray.dir * t;
+            const glm::vec3 current_vec = glm::normalize(hit_point - drag_state_.start_world_pos);
+
+            // Signed angle between start and current vectors around axis:
+            //   angle = atan2( dot(axis, cross(v0, v1)), dot(v0, v1) )
+            const glm::vec3 v0 = drag_state_.rotation_start_vec;
+            const glm::vec3 v1 = current_vec;
+            if (glm::length(v0) < kEpsilon || glm::length(v1) < kEpsilon)
+                return false;
+            const float det = glm::dot(drag_state_.axis_dir_world, glm::cross(v0, v1));
+            const float dotp = glm::dot(v0, v1);
+            float angle = std::atan2(det, dotp);
+
+            if (ctrl_pressed && settings_.angular_snap_deg > 0.0f)
             {
-                const Plane plane{ drag_state_.start_world_pos, drag_state_.axis_dir_world };
-                float t = 0.0f;
-                if (!intersect_ray_plane(ray, plane, t))
-                    return;
-
-                const glm::vec3 hit_point = ray.origin + ray.dir * t;
-                const glm::vec3 current_vec = glm::normalize(hit_point - drag_state_.start_world_pos);
-
-                // Signed angle between start and current vectors around axis:
-                //   angle = atan2( dot(axis, cross(v0, v1)), dot(v0, v1) )
-                const glm::vec3 v0 = drag_state_.rotation_start_vec;
-                const glm::vec3 v1 = current_vec;
-                if (glm::length(v0) < kEpsilon || glm::length(v1) < kEpsilon)
-                    return;
-                const float det = glm::dot(drag_state_.axis_dir_world, glm::cross(v0, v1));
-                const float dotp = glm::dot(v0, v1);
-                float angle = std::atan2(det, dotp);
-
-                if (ctrl_pressed && settings_.angular_snap_deg > 0.0f)
-                {
-                    const float snap_rad = glm::radians(settings_.angular_snap_deg);
-                    angle = std::round(angle / snap_rad) * snap_rad;
-                }
-
-                // Apply world-space rotation:
-                //   new_world = delta_world * start_world
-                const glm::quat delta_world = glm::angleAxis(angle, drag_state_.axis_dir_world);
-                const glm::quat new_world = glm::normalize(delta_world * drag_state_.start_world_rot);
-
-                // Convert to local rotation using parent world rotation:
-                //   local = inverse(parent_world) * world
-                const glm::quat new_local = glm::normalize(glm::inverse(drag_state_.parent_world_rot) * new_world);
-                tfm->set_rotation(new_local);
+                const float snap_rad = glm::radians(settings_.angular_snap_deg);
+                angle = std::round(angle / snap_rad) * snap_rad;
             }
-            else if (active_handle_ == Handle::ScaleX
+
+            // Apply world-space rotation:
+            //   new_world = delta_world * start_world
+            const glm::quat delta_world = glm::angleAxis(angle, drag_state_.axis_dir_world);
+            const glm::quat new_world = glm::normalize(delta_world * drag_state_.start_world_rot);
+
+            // Convert to local rotation using parent world rotation:
+            //   local = inverse(parent_world) * world
+            const glm::quat new_local = glm::normalize(glm::inverse(drag_state_.parent_world_rot) * new_world);
+            tfm->set_rotation(new_local);
+            return true;
+        };
+
+        const auto update_scale_drag = [&]() -> bool
+        {
+            if (active_handle_ == Handle::ScaleX
                 || active_handle_ == Handle::ScaleY
                 || active_handle_ == Handle::ScaleZ)
             {
@@ -1131,20 +1146,22 @@ namespace eeng::editor
                     new_scale = snap_vector_to_grid(new_scale, settings_.scale_snap);
 
                 tfm->set_scale(clamp_scale(new_scale, settings_.min_scale));
+                return true;
             }
-            else if (active_handle_ == Handle::ScaleUniform)
+
+            if (active_handle_ == Handle::ScaleUniform)
             {
                 const Plane plane{ drag_state_.start_world_pos, drag_state_.plane_normal_world };
                 float t = 0.0f;
                 if (!intersect_ray_plane(ray, plane, t))
-                    return;
+                    return false;
 
                 // Uniform scale factor = current radius / start radius.
                 const glm::vec3 hit_point = ray.origin + ray.dir * t;
                 const float current_radius = glm::length(hit_point - drag_state_.start_world_pos);
 
                 if (drag_state_.axis_param_start <= kEpsilon)
-                    return;
+                    return false;
 
                 float factor = current_radius / drag_state_.axis_param_start;
 
@@ -1153,6 +1170,83 @@ namespace eeng::editor
 
                 glm::vec3 new_scale = drag_state_.start_local_scale * factor;
                 tfm->set_scale(clamp_scale(new_scale, settings_.min_scale));
+            }
+
+            return true;
+        };
+
+        const auto commit_translate_drag = [&]()
+        {
+            if (!nearly_equal_vec3(drag_state_.start_local_pos, tfm->position))
+            {
+                build_assign_command(
+                    ctx,
+                    entity,
+                    "position",
+                    "position"_hs,
+                    entt::meta_any{ drag_state_.start_local_pos },
+                    entt::meta_any{ tfm->position });
+            }
+        };
+
+        const auto commit_rotate_drag = [&]()
+        {
+            if (!nearly_equal_quat(drag_state_.start_local_rot, tfm->rotation))
+            {
+                build_assign_command(
+                    ctx,
+                    entity,
+                    "rotation",
+                    "rotation"_hs,
+                    entt::meta_any{ drag_state_.start_local_rot },
+                    entt::meta_any{ tfm->rotation });
+            }
+        };
+
+        const auto commit_scale_drag = [&]()
+        {
+            if (!nearly_equal_vec3(drag_state_.start_local_scale, tfm->scale))
+            {
+                build_assign_command(
+                    ctx,
+                    entity,
+                    "scale",
+                    "scale"_hs,
+                    entt::meta_any{ drag_state_.start_local_scale },
+                    entt::meta_any{ tfm->scale });
+            }
+        };
+
+        // ------------------------------------------------------------------
+        // Drag update.
+        // ------------------------------------------------------------------
+        if (dragging_ && active_handle_ != Handle::None)
+        {
+            // Ensure the entity is still valid during drag.
+            if (!drag_state_.entity.has_id())
+            {
+                dragging_ = false;
+                active_handle_ = Handle::None;
+                return;
+            }
+
+            // Cached parent inverse for world->local conversion.
+            const glm::mat4 parent_inv = glm::inverse(drag_state_.parent_world_matrix);
+
+            if (is_translate_handle(active_handle_))
+            {
+                if (!update_translate_drag(parent_inv))
+                    return;
+            }
+            else if (is_rotate_handle(active_handle_))
+            {
+                if (!update_rotate_drag())
+                    return;
+            }
+            else if (is_scale_handle(active_handle_))
+            {
+                if (!update_scale_drag())
+                    return;
             }
         }
 
@@ -1163,50 +1257,19 @@ namespace eeng::editor
         {
             dragging_ = false;
 
-            // Build an undoable command for the modified field.
             if (active_handle_ != Handle::None)
             {
-                if (active_handle_ == Handle::TranslateX
-                    || active_handle_ == Handle::TranslateY
-                    || active_handle_ == Handle::TranslateZ
-                    || is_translate_plane(active_handle_))
+                if (is_translate_handle(active_handle_))
                 {
-                    if (!nearly_equal_vec3(drag_state_.start_local_pos, tfm->position))
-                    {
-                        build_assign_command(
-                            ctx,
-                            entity,
-                            "position",
-                            "position"_hs,
-                            entt::meta_any{ drag_state_.start_local_pos },
-                            entt::meta_any{ tfm->position });
-                    }
+                    commit_translate_drag();
                 }
                 else if (is_rotate_handle(active_handle_))
                 {
-                    if (!nearly_equal_quat(drag_state_.start_local_rot, tfm->rotation))
-                    {
-                        build_assign_command(
-                            ctx,
-                            entity,
-                            "rotation",
-                            "rotation"_hs,
-                            entt::meta_any{ drag_state_.start_local_rot },
-                            entt::meta_any{ tfm->rotation });
-                    }
+                    commit_rotate_drag();
                 }
                 else if (is_scale_handle(active_handle_))
                 {
-                    if (!nearly_equal_vec3(drag_state_.start_local_scale, tfm->scale))
-                    {
-                        build_assign_command(
-                            ctx,
-                            entity,
-                            "scale",
-                            "scale"_hs,
-                            entt::meta_any{ drag_state_.start_local_scale },
-                            entt::meta_any{ tfm->scale });
-                    }
+                    commit_scale_drag();
                 }
             }
 
