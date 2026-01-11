@@ -290,6 +290,8 @@ bool Game::init()
     shapeRenderer = std::make_shared<ShapeRendering::ShapeRenderer>();
     shapeRenderer->init();
 
+    gizmo = std::make_unique<eeng::editor::ManipulatorGizmo>();
+
     renderSystem = std::make_unique<eeng::ecs::systems::RenderSystem>();
     renderSystem->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
     animationSystem = std::make_unique<eeng::ecs::systems::AnimationSystem>();
@@ -938,6 +940,18 @@ void Game::update(
 {
     updateCamera();
 
+    // Keep camera matrices in sync for systems that run during update (e.g. gizmos).
+    if (matrices.windowSize.x > 0 && matrices.windowSize.y > 0)
+    {
+        const float aspectRatio = float(matrices.windowSize.x) / matrices.windowSize.y;
+        matrices.P = glm::perspective(glm::radians(60.0f), aspectRatio, camera.nearPlane, camera.farPlane);
+        matrices.V = glm::lookAt(camera.pos, camera.lookAt, camera.up);
+        matrices.VP = glm_aux::create_viewport_matrix(0.0f, 0.0f,
+            static_cast<float>(matrices.windowSize.x),
+            static_cast<float>(matrices.windowSize.y),
+            0.0f, 1.0f);
+    }
+
     updatePlayer(deltaTime);
 
     pointlight.pos = glm::vec3(
@@ -967,6 +981,13 @@ void Game::update(
     }
 
     // TODO: consider scheduling transform cache updates as an Engine-level system phase.
+    if (gizmo)
+    {
+        // Use the latest cached camera matrices from the previous frame.
+        // These are refreshed in render() once the window size is known.
+        gizmo->update(*ctx, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
+    }
+
     if (transformSystem)
         transformSystem->update(*ctx, deltaTime);
 
@@ -1147,6 +1168,9 @@ void Game::render(
         shapeRenderer->pop_states<glm::mat4>();
     }
 #endif
+
+    if (gizmo)
+        gizmo->render(*ctx, *shapeRenderer, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
 
     // Draw shape batches
     shapeRenderer->render(matrices.P * matrices.V);

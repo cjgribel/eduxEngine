@@ -1,226 +1,158 @@
-//
-//  UISystems.hpp
-//
-//  Created by Carl Johan Gribel on 2023-11-04.
-//  Copyright © 2023 Carl Johan Gribel. All rights reserved.
-//
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
 
-#ifndef EditorUISystems_hpp
-#define EditorUISystems_hpp
+#pragma once
 
-//#include <stdio.h>
-//#include "vec.h"
-#include "SceneAPI.hpp"
-#include "ImPrimitiveRenderer.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
-using namespace linalg;
-using namespace ImPrimitiveRendererNS;
+#include "ecs/Entity.hpp"
 
-// TODO: Aux calsses. WHERE?
-
-struct LineIntersectionResult
+namespace ShapeRendering
 {
-    float s = 0.0f, t = 0.0f, dist = 0.0f;
-    v3f c0, c1;
-};
+    class ShapeRenderer;
+}
 
-struct Plane
+namespace eeng
 {
-    v3f p, n;
-};
+    struct EngineContext;
+}
 
-namespace EditorUI {
-
-enum class WidgetState
+namespace eeng::editor
 {
-    Default, Hovered, Engaged, Passive
-};
-
-class TransformWidgetBase
-{
-public:
-    const Color4u color;
-    const float screenspace_size;
-    
-    virtual bool hover(Ray& ray, const Transform& tfm, float scale) const = 0;
-    virtual void engage(Ray& ray, const Transform& tfm, float scale) = 0;
-    virtual void update(Ray& ray, Transform& tfm, float scale) = 0;
-    virtual void render(Scene& scene,
-                        std::shared_ptr<ImPrimitiveRenderer> renderer,
-                        const Transform& tfm,
-                        float scale,
-                        WidgetState state) const = 0;
-    
-    TransformWidgetBase(Color4u color, float screenspace_size)
-    : color(color), screenspace_size(screenspace_size) {}
-};
-
-class AxisTranslateSubWidget : public TransformWidgetBase
-{
-    const v3f dir;
-    const float radius;
-    const float length;
-
-    // OR store point + dir at the point of engagement
-    float t_ofs = 0.0f;
-    float t_current = 0.0f;
-    
-public:
-    AxisTranslateSubWidget(const v3f& dir, 
-               float radius,
-               float length,
-               Color4u color,
-               float screenspace_size) :
-    dir(dir),
-    radius(radius),
-    length(length),
-    TransformWidgetBase(color, screenspace_size) {}
-    
-    virtual bool hover(Ray& ray, const Transform& tfm, float scale) const override;
-    virtual void engage(Ray& ray, const Transform& tfm, float scale) override;
-    virtual void update(Ray& ray, Transform& tfm, float scale) override;
-    virtual void render(Scene& scene,
-                        std::shared_ptr<ImPrimitiveRenderer> renderer,
-                        const Transform& tfm,
-                        float scale,
-                        WidgetState state) const override;
-};
-
-class ScaleSubWidget : public TransformWidgetBase
-{
-    const v3f dir;
-    const float radius;
-
-    float t_ofs = 0.0f;
-    float t_current = 0.0f;
-    v3f scaling_engaged;
-    
-public:
-    ScaleSubWidget(const v3f& dir,
-                float radius,
-                Color4u color,
-                float screenspace_size) :
-    dir(dir),
-    radius(radius),
-    TransformWidgetBase(color, screenspace_size) {}
-    
-    virtual bool hover(Ray& ray, const Transform& tfm, float scale) const override;
-    virtual void engage(Ray& ray, const Transform& tfm, float scale) override;
-    virtual void update(Ray& ray, Transform& tfm, float scale) override;
-    virtual void render(Scene& scene,
-                        std::shared_ptr<ImPrimitiveRenderer> renderer,
-                        const Transform& tfm,
-                        float scale,
-                        WidgetState state) const override;
-};
-
-class PlaneTranslateSubWidget : public TransformWidgetBase
-{
-    const v3f puv[3]; // position and two axes
-    
-    Plane plane_engaged;
-    v3f p_engaged;
-    
-    void get_transformed_quad(v3f points[4], 
-                              const Transform& tfm,
-                              float scale) const;
-public:
-    PlaneTranslateSubWidget(const v3f& p,
-                const v3f& u,
-                const v3f& v,
-                Color4u color,
-                float screenspace_size) :
-    puv {p, u, v},
-    TransformWidgetBase(color, screenspace_size) {}
-    
-    virtual bool hover(Ray& ray,  const Transform& tfm, float scale) const override;
-    virtual void engage(Ray& ray,  const Transform& tfm, float scale) override;
-    virtual void update(Ray& ray, Transform& tfm, float scale) override;
-    virtual void render(Scene& scene,
-                        std::shared_ptr<ImPrimitiveRenderer> renderer,
-                        const Transform& tfm,
-                        float scale,
-                        WidgetState state) const override;
-};
-
-class RotationSubWidget : public TransformWidgetBase
-{
-    const v3f u, v;
-    const float radius_outer, radius_inner;
-    
-    // Engaged data
-    Plane plane_engaged;
-    v3f p_engaged;
-    v3f rot_engaged;
-    
-    // Engaged data, for drawing
-    v3f axis0_enagaged;
-    v3f axis1_enagaged;
-public:
-    RotationSubWidget(const v3f& u,
-                   const v3f& v,
-                   const float radius_outer,
-                   const float radius_inner,
-                   Color4u color,
-                   float screenspace_size) :
-    u(u), v(v),
-    radius_outer(radius_outer), radius_inner(radius_inner),
-    TransformWidgetBase(color, screenspace_size) {}
-    
-    virtual bool hover(Ray& ray, const Transform& tfm, float scale) const override;
-    virtual void engage(Ray& ray, const Transform& tfm, float scale) override;
-    virtual void update(Ray& ray, Transform& tfm, float scale) override;
-    virtual void render(Scene& scene,
-                        std::shared_ptr<ImPrimitiveRenderer> renderer,
-                        const Transform& tfm,
-                        float scale,
-                        WidgetState state) const override;
-};
-
-struct TransformWidgetComponent
-{
-    PrimaryEntity target_entity;
-    using WidgetPtr = std::shared_ptr<TransformWidgetBase>;
-    
-    TransformWidgetComponent();
-    
-    std::vector<WidgetPtr> widgets;
-    WidgetPtr hovered_widget = nullptr;
-    WidgetPtr engaged_widget = nullptr;
-    float linear_snap = 1.0f;
-    float angular_snap = 10.0f;
-//    float scale_snap = 10.0f;
-    
-    void set_target_entity(PrimaryEntity entity)
+    class ManipulatorGizmo
     {
-        if (target_entity != entity) {
-            WidgetPtr hovered_widget = nullptr;
-            WidgetPtr engaged_widget = nullptr;
-        }
-        target_entity = entity;
-    }
-    inline bool any_engaged() { return (bool)engaged_widget; }
-    inline bool is_engaged(WidgetPtr w) { return (w == engaged_widget); }
-    inline bool any_hovered() { return (bool)hovered_widget; }
-    inline bool is_hovered(WidgetPtr w) { return (w == hovered_widget); }
-    inline void engage(WidgetPtr w) { engaged_widget = w; }
-    inline void disengage() { engaged_widget = nullptr; }
-};
+    public:
+        enum class Mode
+        {
+            Translate,
+            Rotate,
+            Scale
+        };
 
-class TransformWidgetSystem
-{
-public:
-    static void init(Scene& scene,
-                     entt::dispatcher& dispatcher);
-    
-    static void update(Scene& scene,
-                       entt::dispatcher& dispatcher,
-                       float dt);
-    
-    static void primitive_render(Scene& scene,
-                                 std::shared_ptr<ImPrimitiveRenderer> renderer);
-};
+        enum class Space
+        {
+            Local,
+            World
+        };
 
-} // namespace EditorUI
+        enum class Handle
+        {
+            None,
 
-#endif /* UISystems_hpp */
+            TranslateX,
+            TranslateY,
+            TranslateZ,
+            TranslateXY,
+            TranslateYZ,
+            TranslateZX,
+
+            RotateX,
+            RotateY,
+            RotateZ,
+
+            ScaleX,
+            ScaleY,
+            ScaleZ,
+            ScaleUniform
+        };
+
+        struct Settings
+        {
+            // Screen-space size for the gizmo (pixels along an axis).
+            float screen_size = 90.0f;
+
+            // Base dimensions in world units before screen-space scaling.
+            float axis_length = 1.0f;
+            float axis_radius = 0.03f;
+            float plane_size = 0.25f;
+            float plane_offset = 0.10f;
+            float rotate_radius = 1.0f;
+            float rotate_thickness = 0.06f;
+            float scale_box_size = 0.12f;
+            float uniform_scale_size = 0.18f;
+
+            // Snapping increments (applied when Ctrl is held).
+            float linear_snap = 1.0f;
+            float angular_snap_deg = 15.0f;
+            float scale_snap = 0.1f;
+
+            // Clamp scale to avoid degenerate transforms.
+            float min_scale = 0.001f;
+
+            bool allow_uniform_scale = true;
+            bool draw_on_top = true;
+        };
+
+        ManipulatorGizmo();
+
+        void update(
+            EngineContext& ctx,
+            const glm::mat4& view,
+            const glm::mat4& proj,
+            const glm::mat4& viewport,
+            const glm::ivec2& window_size);
+
+        void render(
+            EngineContext& ctx,
+            ShapeRendering::ShapeRenderer& renderer,
+            const glm::mat4& view,
+            const glm::mat4& proj,
+            const glm::mat4& viewport,
+            const glm::ivec2& window_size) const;
+
+        void set_mode(Mode mode);
+        Mode mode() const;
+
+        void set_space(Space space);
+        Space space() const;
+
+        Settings& settings();
+        const Settings& settings() const;
+
+    private:
+        struct DragState
+        {
+            ecs::Entity entity{};
+
+            // World-space anchor values at drag start.
+            glm::vec3 start_world_pos{};
+            glm::quat start_world_rot{ 1.0f, 0.0f, 0.0f, 0.0f };
+
+            // Local-space values at drag start.
+            glm::vec3 start_local_pos{};
+            glm::quat start_local_rot{ 1.0f, 0.0f, 0.0f, 0.0f };
+            glm::vec3 start_local_scale{ 1.0f };
+
+            // Parent transform cached at drag start for stable conversion.
+            glm::mat4 parent_world_matrix{ 1.0f };
+            glm::quat parent_world_rot{ 1.0f, 0.0f, 0.0f, 0.0f };
+
+            // Axis/plane data for the active handle.
+            glm::vec3 axis_dir_world{};
+            glm::vec3 plane_u_world{};
+            glm::vec3 plane_v_world{};
+            glm::vec3 plane_normal_world{};
+            glm::vec3 plane_hit_start{};
+
+            // Parametric axis offset (used for axis translation/scale).
+            float axis_param_start = 0.0f;
+
+            // Rotation drag start vector (on the rotation plane).
+            glm::vec3 rotation_start_vec{};
+        };
+
+        Settings settings_{};
+        Mode mode_ = Mode::Translate;
+        Space space_ = Space::Local;
+
+        Handle hovered_handle_ = Handle::None;
+        Handle active_handle_ = Handle::None;
+
+        bool dragging_ = false;
+        bool was_mouse_down_ = false;
+        bool toggle_space_armed_ = false;
+
+        DragState drag_state_{};
+    };
+} // namespace eeng::editor

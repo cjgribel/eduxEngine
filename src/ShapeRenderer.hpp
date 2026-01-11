@@ -10,6 +10,7 @@
 
 #include <glm/glm.hpp>
 
+#include "glcommon.h"
 #include "glmcommon.hpp"
 #include "hash_combine.h"
 

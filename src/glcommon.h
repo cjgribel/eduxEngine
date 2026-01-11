@@ -5,6 +5,7 @@
 #define GLCOMMON_H
 
 #include <iostream>
+#include <stdexcept>
 #include <GL/glew.h>
 #ifdef __APPLE__
 #include <OpenGL/gl.h>
