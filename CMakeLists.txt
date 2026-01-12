@@ -283,9 +283,9 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/MetaFieldAssign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GLMInspect.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/EditorRuntime.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ManipulatorGizmo.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/TransformGizmo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/EditorBootstrapSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/ManipulatorGizmoSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/TransformGizmoSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/Profiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/ThreadPool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/AssetMetaReg.cpp

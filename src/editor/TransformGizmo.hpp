@@ -20,7 +20,7 @@ namespace eeng
 
 namespace eeng::editor
 {
-    class ManipulatorGizmo
+    class TransformGizmo
     {
     public:
         enum class Mode
@@ -84,7 +84,7 @@ namespace eeng::editor
             bool draw_on_top = true;
         };
 
-        ManipulatorGizmo();
+        TransformGizmo();
 
         void update(
             EngineContext& ctx,

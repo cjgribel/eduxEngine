@@ -20,7 +20,7 @@ namespace eeng::editor
         const glm::mat4& viewport,
         const glm::ivec2& window_size)
     {
-        gizmo_system_.update(ctx, view, proj, viewport, window_size);
+        transform_gizmo_system_.update(ctx, view, proj, viewport, window_size);
     }
 
     void EditorRuntime::render(
@@ -31,6 +31,6 @@ namespace eeng::editor
         const glm::mat4& viewport,
         const glm::ivec2& window_size) const
     {
-        gizmo_system_.render(ctx, renderer, view, proj, viewport, window_size);
+        transform_gizmo_system_.render(ctx, renderer, view, proj, viewport, window_size);
     }
 } // namespace eeng::editor

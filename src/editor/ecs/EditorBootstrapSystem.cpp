@@ -8,7 +8,7 @@
 #include "EngineContextHelpers.hpp"
 #include "MainThreadQueue.hpp"
 #include "ThreadPool.hpp"
-#include "editor/ecs/ManipulatorGizmoComponent.hpp"
+#include "editor/ecs/TransformGizmoComponent.hpp"
 
 #include <entt/entt.hpp>
 #include <memory>
@@ -16,6 +16,7 @@
 
 namespace
 {
+    // Look up the editor batch id by name; returns false if missing/invalid.
     bool try_get_editor_batch_id(eeng::BatchRegistry& br, eeng::BatchId& out_id)
     {
         if (!br.try_get_batch_id_by_name(eeng::BatchRegistry::kEditorBatchName, out_id))
@@ -33,6 +34,7 @@ namespace eeng::editor
 
         initialized_ = true;
 
+        // Subscribe once during initialization; event queue callbacks are read-only after init.
         auto* event_queue = eeng::try_get_event_queue(ctx, "EditorBootstrapSystem");
         if (event_queue)
         {
@@ -47,7 +49,7 @@ namespace eeng::editor
         }
 
         // Attempt to create/attach the gizmo immediately if possible.
-        request_ensure_gizmo(ctx);
+        request_ensure_transform_gizmo(ctx);
     }
 
     void EditorBootstrapSystem::on_batch_task_completed(
@@ -57,18 +59,20 @@ namespace eeng::editor
         if (!event.success)
             return;
 
+        // LoadAll can include the editor batch; schedule a single ensure pass.
         if (event.type == BatchTaskType::LoadAll)
         {
-            request_ensure_gizmo(ctx);
+            request_ensure_transform_gizmo(ctx);
             return;
         }
 
         if (event.type != BatchTaskType::Load)
             return;
 
+        // Fast path: batch name is known for this event.
         if (event.batch_name == BatchRegistry::kEditorBatchName)
         {
-            request_ensure_gizmo(ctx);
+            request_ensure_transform_gizmo(ctx);
             return;
         }
 
@@ -77,21 +81,23 @@ namespace eeng::editor
 
         auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
         BatchId editor_id{};
+        // Fallback: compare ids in case name was not populated.
         if (try_get_editor_batch_id(br, editor_id) && editor_id == event.batch_id)
-            request_ensure_gizmo(ctx);
+            request_ensure_transform_gizmo(ctx);
     }
 
-    void EditorBootstrapSystem::request_ensure_gizmo(EngineContext& ctx)
+    void EditorBootstrapSystem::request_ensure_transform_gizmo(EngineContext& ctx)
     {
-        if (ensure_in_flight_.exchange(true))
+        // Coalesce back-to-back requests into a single background job.
+        if (ensure_transform_gizmo_in_flight_.exchange(true))
         {
-            ensure_requested_.store(true);
+            ensure_transform_gizmo_requested_.store(true);
             return;
         }
 
         if (!ctx.thread_pool)
         {
-            ensure_in_flight_.store(false);
+            ensure_transform_gizmo_in_flight_.store(false);
             return;
         }
 
@@ -100,21 +106,23 @@ namespace eeng::editor
             {
                 auto ctx_locked = ctx_weak.lock();
                 if (ctx_locked)
-                    ensure_editor_gizmo_entity(*ctx_locked);
+                    ensure_editor_transform_gizmo_entity(*ctx_locked);
 
-                ensure_in_flight_.store(false);
+                ensure_transform_gizmo_in_flight_.store(false);
 
-                if (ensure_requested_.exchange(false) && ctx_locked)
-                    request_ensure_gizmo(*ctx_locked);
+                // If something triggered another request while we were running, schedule again.
+                if (ensure_transform_gizmo_requested_.exchange(false) && ctx_locked)
+                    request_ensure_transform_gizmo(*ctx_locked);
             });
     }
 
-    void EditorBootstrapSystem::ensure_editor_gizmo_entity(EngineContext& ctx)
+    void EditorBootstrapSystem::ensure_editor_transform_gizmo_entity(EngineContext& ctx)
     {
         auto* em_ptr = eeng::try_get_entity_manager_ptr(ctx, "EditorBootstrapSystem");
         if (!em_ptr)
             return;
 
+        // Collect any existing TransformGizmo components (main-thread only).
         std::vector<ecs::EntityRef> existing_refs;
 
         if (ctx.main_thread_queue)
@@ -125,7 +133,7 @@ namespace eeng::editor
                     if (!registry_sp)
                         return;
 
-                    auto view = registry_sp->view<ManipulatorGizmoComponent>();
+                    auto view = registry_sp->view<TransformGizmoComponent>();
                     for (const auto entity : view)
                     {
                         existing_refs.emplace_back(em_ptr->get_entity_ref(ecs::Entity{ entity }));
@@ -137,6 +145,7 @@ namespace eeng::editor
         if (ctx.batch_registry)
             br = &static_cast<BatchRegistry&>(*ctx.batch_registry);
 
+        // Attach to the editor batch if loaded and not already attached.
         const auto try_attach_to_editor_batch = [&](const ecs::EntityRef& ref)
         {
             if (!br || !ref.is_bound())
@@ -155,6 +164,7 @@ namespace eeng::editor
             br->queue_attach_entity(editor_id, ref, ctx).get();
         };
 
+        // Prefer a gizmo already attached to the editor batch; otherwise keep the first.
         ecs::EntityRef existing{};
         if (!existing_refs.empty())
         {
@@ -187,6 +197,7 @@ namespace eeng::editor
             return;
         }
 
+        // If none exists, create one in the editor batch (if loaded).
         ecs::EntityRef created{};
 
         if (br)
@@ -197,10 +208,11 @@ namespace eeng::editor
                 if (!br->is_batch_loaded(editor_id))
                     return;
 
-                created = br->queue_create_entity(editor_id, "Editor Gizmo", ecs::EntityRef{}, ctx).get();
+                created = br->queue_create_entity(editor_id, "Transform Gizmo", ecs::EntityRef{}, ctx).get();
             }
         }
 
+        // Add the component to the created entity on the main thread.
         if (created.is_bound())
         {
             if (ctx.main_thread_queue)
@@ -211,20 +223,21 @@ namespace eeng::editor
                         if (!registry_sp || !registry_sp->valid(created.entity))
                             return;
 
-                        if (!registry_sp->all_of<ManipulatorGizmoComponent>(created.entity))
-                            registry_sp->emplace<ManipulatorGizmoComponent>(created.entity);
+                        if (!registry_sp->all_of<TransformGizmoComponent>(created.entity))
+                            registry_sp->emplace<TransformGizmoComponent>(created.entity);
                     });
             }
             return;
         }
 
+        // Fallback: create a live entity (still attach to editor batch if possible).
         if (ctx.main_thread_queue)
         {
             ctx.main_thread_queue->push_and_wait([&]()
                 {
                     auto [guid, entity] = em_ptr->create_entity_live_parent(
                         BatchRegistry::kEditorBatchName,
-                        "Editor Gizmo",
+                        "Transform Gizmo",
                         ecs::Entity::EntityNull,
                         ecs::Entity::EntityNull);
 
@@ -234,8 +247,8 @@ namespace eeng::editor
                     if (!registry_sp || !registry_sp->valid(entity))
                         return;
 
-                    if (!registry_sp->all_of<ManipulatorGizmoComponent>(entity))
-                        registry_sp->emplace<ManipulatorGizmoComponent>(entity);
+                    if (!registry_sp->all_of<TransformGizmoComponent>(entity))
+                        registry_sp->emplace<TransformGizmoComponent>(entity);
                 });
         }
 

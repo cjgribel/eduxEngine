@@ -1,7 +1,7 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-#include "editor/ManipulatorGizmo.hpp"
+#include "editor/TransformGizmo.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -20,7 +20,7 @@
 
 namespace
 {
-    using eeng::editor::ManipulatorGizmo;
+    using eeng::editor::TransformGizmo;
     using namespace entt::literals;
 
     constexpr float kEpsilon = 1e-6f;
@@ -40,29 +40,29 @@ namespace
         glm::vec3 normal{};
     };
 
-    glm::vec3 axis_color_base(ManipulatorGizmo::Handle handle)
+    glm::vec3 axis_color_base(TransformGizmo::Handle handle)
     {
         switch (handle)
         {
-        case ManipulatorGizmo::Handle::TranslateX:
-        case ManipulatorGizmo::Handle::RotateX:
-        case ManipulatorGizmo::Handle::ScaleX:
+        case TransformGizmo::Handle::TranslateX:
+        case TransformGizmo::Handle::RotateX:
+        case TransformGizmo::Handle::ScaleX:
             return glm::vec3(1.0f, 0.1f, 0.1f);
-        case ManipulatorGizmo::Handle::TranslateY:
-        case ManipulatorGizmo::Handle::RotateY:
-        case ManipulatorGizmo::Handle::ScaleY:
+        case TransformGizmo::Handle::TranslateY:
+        case TransformGizmo::Handle::RotateY:
+        case TransformGizmo::Handle::ScaleY:
             return glm::vec3(0.2f, 1.0f, 0.2f);
-        case ManipulatorGizmo::Handle::TranslateZ:
-        case ManipulatorGizmo::Handle::RotateZ:
-        case ManipulatorGizmo::Handle::ScaleZ:
+        case TransformGizmo::Handle::TranslateZ:
+        case TransformGizmo::Handle::RotateZ:
+        case TransformGizmo::Handle::ScaleZ:
             return glm::vec3(0.2f, 0.4f, 1.0f);
-        case ManipulatorGizmo::Handle::TranslateXY:
+        case TransformGizmo::Handle::TranslateXY:
             return glm::vec3(1.0f, 1.0f, 0.2f);
-        case ManipulatorGizmo::Handle::TranslateYZ:
+        case TransformGizmo::Handle::TranslateYZ:
             return glm::vec3(0.2f, 1.0f, 1.0f);
-        case ManipulatorGizmo::Handle::TranslateZX:
+        case TransformGizmo::Handle::TranslateZX:
             return glm::vec3(1.0f, 0.2f, 1.0f);
-        case ManipulatorGizmo::Handle::ScaleUniform:
+        case TransformGizmo::Handle::ScaleUniform:
             return glm::vec3(1.0f);
         default:
             break;
@@ -92,12 +92,12 @@ namespace
     }
 
     ShapeRendering::Color4u resolve_handle_color(
-        ManipulatorGizmo::Handle handle,
-        ManipulatorGizmo::Handle hovered,
-        ManipulatorGizmo::Handle active)
+        TransformGizmo::Handle handle,
+        TransformGizmo::Handle hovered,
+        TransformGizmo::Handle active)
     {
         // If any handle is active, dim the rest to reduce visual noise.
-        if (active != ManipulatorGizmo::Handle::None && handle != active)
+        if (active != TransformGizmo::Handle::None && handle != active)
             return ShapeRendering::Color4u::Gray;
 
         // Highlight hovered/active handles.
@@ -361,15 +361,15 @@ namespace
 
     GizmoBasis compute_gizmo_basis(
         const eeng::ecs::TransformComponent& tfm,
-        ManipulatorGizmo::Mode mode,
-        ManipulatorGizmo::Space space)
+        TransformGizmo::Mode mode,
+        TransformGizmo::Space space)
     {
         GizmoBasis basis{};
 
         // Scale handles are always drawn in local space for predictable scaling.
-        const bool use_local = (mode == ManipulatorGizmo::Mode::Scale)
+        const bool use_local = (mode == TransformGizmo::Mode::Scale)
             ? true
-            : (space == ManipulatorGizmo::Space::Local);
+            : (space == TransformGizmo::Space::Local);
 
         if (use_local)
         {
@@ -451,36 +451,36 @@ namespace
         return std::fabs(glm::dot(a, b)) >= (1.0f - eps);
     }
 
-    bool is_axis_handle(ManipulatorGizmo::Handle handle)
+    bool is_axis_handle(TransformGizmo::Handle handle)
     {
-        return handle == ManipulatorGizmo::Handle::TranslateX
-            || handle == ManipulatorGizmo::Handle::TranslateY
-            || handle == ManipulatorGizmo::Handle::TranslateZ
-            || handle == ManipulatorGizmo::Handle::RotateX
-            || handle == ManipulatorGizmo::Handle::RotateY
-            || handle == ManipulatorGizmo::Handle::RotateZ
-            || handle == ManipulatorGizmo::Handle::ScaleX
-            || handle == ManipulatorGizmo::Handle::ScaleY
-            || handle == ManipulatorGizmo::Handle::ScaleZ;
+        return handle == TransformGizmo::Handle::TranslateX
+            || handle == TransformGizmo::Handle::TranslateY
+            || handle == TransformGizmo::Handle::TranslateZ
+            || handle == TransformGizmo::Handle::RotateX
+            || handle == TransformGizmo::Handle::RotateY
+            || handle == TransformGizmo::Handle::RotateZ
+            || handle == TransformGizmo::Handle::ScaleX
+            || handle == TransformGizmo::Handle::ScaleY
+            || handle == TransformGizmo::Handle::ScaleZ;
     }
 
     glm::vec3 axis_dir_from_handle(
-        ManipulatorGizmo::Handle handle,
+        TransformGizmo::Handle handle,
         const GizmoBasis& basis)
     {
         switch (handle)
         {
-        case ManipulatorGizmo::Handle::TranslateX:
-        case ManipulatorGizmo::Handle::RotateX:
-        case ManipulatorGizmo::Handle::ScaleX:
+        case TransformGizmo::Handle::TranslateX:
+        case TransformGizmo::Handle::RotateX:
+        case TransformGizmo::Handle::ScaleX:
             return basis.x;
-        case ManipulatorGizmo::Handle::TranslateY:
-        case ManipulatorGizmo::Handle::RotateY:
-        case ManipulatorGizmo::Handle::ScaleY:
+        case TransformGizmo::Handle::TranslateY:
+        case TransformGizmo::Handle::RotateY:
+        case TransformGizmo::Handle::ScaleY:
             return basis.y;
-        case ManipulatorGizmo::Handle::TranslateZ:
-        case ManipulatorGizmo::Handle::RotateZ:
-        case ManipulatorGizmo::Handle::ScaleZ:
+        case TransformGizmo::Handle::TranslateZ:
+        case TransformGizmo::Handle::RotateZ:
+        case TransformGizmo::Handle::ScaleZ:
             return basis.z;
         default:
             break;
@@ -488,21 +488,21 @@ namespace
         return glm::vec3(0.0f);
     }
 
-    glm::vec3 fallback_axis_from_handle(ManipulatorGizmo::Handle handle)
+    glm::vec3 fallback_axis_from_handle(TransformGizmo::Handle handle)
     {
         switch (handle)
         {
-        case ManipulatorGizmo::Handle::TranslateX:
-        case ManipulatorGizmo::Handle::RotateX:
-        case ManipulatorGizmo::Handle::ScaleX:
+        case TransformGizmo::Handle::TranslateX:
+        case TransformGizmo::Handle::RotateX:
+        case TransformGizmo::Handle::ScaleX:
             return glm::vec3(1.0f, 0.0f, 0.0f);
-        case ManipulatorGizmo::Handle::TranslateY:
-        case ManipulatorGizmo::Handle::RotateY:
-        case ManipulatorGizmo::Handle::ScaleY:
+        case TransformGizmo::Handle::TranslateY:
+        case TransformGizmo::Handle::RotateY:
+        case TransformGizmo::Handle::ScaleY:
             return glm::vec3(0.0f, 1.0f, 0.0f);
-        case ManipulatorGizmo::Handle::TranslateZ:
-        case ManipulatorGizmo::Handle::RotateZ:
-        case ManipulatorGizmo::Handle::ScaleZ:
+        case TransformGizmo::Handle::TranslateZ:
+        case TransformGizmo::Handle::RotateZ:
+        case TransformGizmo::Handle::ScaleZ:
             return glm::vec3(0.0f, 0.0f, 1.0f);
         default:
             break;
@@ -512,7 +512,7 @@ namespace
     }
 
     glm::vec3 safe_axis_dir_from_handle(
-        ManipulatorGizmo::Handle handle,
+        TransformGizmo::Handle handle,
         const GizmoBasis& basis)
     {
         const glm::vec3 axis = axis_dir_from_handle(handle, basis);
@@ -520,22 +520,22 @@ namespace
     }
 
     void plane_axes_from_handle(
-        ManipulatorGizmo::Handle handle,
+        TransformGizmo::Handle handle,
         const GizmoBasis& basis,
         glm::vec3& out_u,
         glm::vec3& out_v)
     {
         switch (handle)
         {
-        case ManipulatorGizmo::Handle::TranslateXY:
+        case TransformGizmo::Handle::TranslateXY:
             out_u = basis.x;
             out_v = basis.y;
             break;
-        case ManipulatorGizmo::Handle::TranslateYZ:
+        case TransformGizmo::Handle::TranslateYZ:
             out_u = basis.y;
             out_v = basis.z;
             break;
-        case ManipulatorGizmo::Handle::TranslateZX:
+        case TransformGizmo::Handle::TranslateZX:
             out_u = basis.z;
             out_v = basis.x;
             break;
@@ -546,34 +546,34 @@ namespace
         }
     }
 
-    bool is_translate_plane(ManipulatorGizmo::Handle handle)
+    bool is_translate_plane(TransformGizmo::Handle handle)
     {
-        return handle == ManipulatorGizmo::Handle::TranslateXY
-            || handle == ManipulatorGizmo::Handle::TranslateYZ
-            || handle == ManipulatorGizmo::Handle::TranslateZX;
+        return handle == TransformGizmo::Handle::TranslateXY
+            || handle == TransformGizmo::Handle::TranslateYZ
+            || handle == TransformGizmo::Handle::TranslateZX;
     }
 
-    bool is_translate_handle(ManipulatorGizmo::Handle handle)
+    bool is_translate_handle(TransformGizmo::Handle handle)
     {
-        return handle == ManipulatorGizmo::Handle::TranslateX
-            || handle == ManipulatorGizmo::Handle::TranslateY
-            || handle == ManipulatorGizmo::Handle::TranslateZ
+        return handle == TransformGizmo::Handle::TranslateX
+            || handle == TransformGizmo::Handle::TranslateY
+            || handle == TransformGizmo::Handle::TranslateZ
             || is_translate_plane(handle);
     }
 
-    bool is_rotate_handle(ManipulatorGizmo::Handle handle)
+    bool is_rotate_handle(TransformGizmo::Handle handle)
     {
-        return handle == ManipulatorGizmo::Handle::RotateX
-            || handle == ManipulatorGizmo::Handle::RotateY
-            || handle == ManipulatorGizmo::Handle::RotateZ;
+        return handle == TransformGizmo::Handle::RotateX
+            || handle == TransformGizmo::Handle::RotateY
+            || handle == TransformGizmo::Handle::RotateZ;
     }
 
-    bool is_scale_handle(ManipulatorGizmo::Handle handle)
+    bool is_scale_handle(TransformGizmo::Handle handle)
     {
-        return handle == ManipulatorGizmo::Handle::ScaleX
-            || handle == ManipulatorGizmo::Handle::ScaleY
-            || handle == ManipulatorGizmo::Handle::ScaleZ
-            || handle == ManipulatorGizmo::Handle::ScaleUniform;
+        return handle == TransformGizmo::Handle::ScaleX
+            || handle == TransformGizmo::Handle::ScaleY
+            || handle == TransformGizmo::Handle::ScaleZ
+            || handle == TransformGizmo::Handle::ScaleUniform;
     }
 
     glm::vec3 snap_vector_to_grid(
@@ -610,7 +610,7 @@ namespace
         eeng::ecs::TransformComponent*& out_tfm,
         eeng::ecs::TransformComponent*& out_parent_tfm)
     {
-        auto* em_ptr = eeng::try_get_entity_manager_ptr(ctx, "ManipulatorGizmo");
+        auto* em_ptr = eeng::try_get_entity_manager_ptr(ctx, "TransformGizmo");
         if (!em_ptr || !ctx.entity_selection)
             return false;
 
@@ -666,39 +666,39 @@ namespace
 
 namespace eeng::editor
 {
-    ManipulatorGizmo::ManipulatorGizmo() = default;
+    TransformGizmo::TransformGizmo() = default;
 
-    void ManipulatorGizmo::set_mode(Mode mode)
+    void TransformGizmo::set_mode(Mode mode)
     {
         mode_ = mode;
     }
 
-    ManipulatorGizmo::Mode ManipulatorGizmo::mode() const
+    TransformGizmo::Mode TransformGizmo::mode() const
     {
         return mode_;
     }
 
-    void ManipulatorGizmo::set_space(Space space)
+    void TransformGizmo::set_space(Space space)
     {
         space_ = space;
     }
 
-    ManipulatorGizmo::Space ManipulatorGizmo::space() const
+    TransformGizmo::Space TransformGizmo::space() const
     {
         return space_;
     }
 
-    ManipulatorGizmo::Settings& ManipulatorGizmo::settings()
+    TransformGizmo::Settings& TransformGizmo::settings()
     {
         return settings_;
     }
 
-    const ManipulatorGizmo::Settings& ManipulatorGizmo::settings() const
+    const TransformGizmo::Settings& TransformGizmo::settings() const
     {
         return settings_;
     }
 
-    void ManipulatorGizmo::update(
+    void TransformGizmo::update(
         EngineContext& ctx,
         const glm::mat4& view,
         const glm::mat4& proj,
@@ -1277,7 +1277,7 @@ namespace eeng::editor
         }
     }
 
-    void ManipulatorGizmo::render(
+    void TransformGizmo::render(
         EngineContext& ctx,
         ShapeRendering::ShapeRenderer& renderer,
         const glm::mat4& view,

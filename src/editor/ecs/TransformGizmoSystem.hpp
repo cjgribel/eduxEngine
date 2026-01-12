@@ -17,7 +17,7 @@ namespace eeng
 
 namespace eeng::editor
 {
-    class ManipulatorGizmoSystem
+    class TransformGizmoSystem
     {
     public:
         void update(

@@ -4,7 +4,7 @@
 #pragma once
 
 #include "editor/ecs/EditorBootstrapSystem.hpp"
-#include "editor/ecs/ManipulatorGizmoSystem.hpp"
+#include "editor/ecs/TransformGizmoSystem.hpp"
 
 #include <glm/glm.hpp>
 
@@ -42,6 +42,6 @@ namespace eeng::editor
 
     private:
         EditorBootstrapSystem bootstrap_;
-        ManipulatorGizmoSystem gizmo_system_;
+        TransformGizmoSystem transform_gizmo_system_;
     };
 } // namespace eeng::editor

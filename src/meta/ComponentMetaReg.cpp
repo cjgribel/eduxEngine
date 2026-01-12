@@ -17,7 +17,7 @@
 #include "ecs/systems/TransformSystem.hpp"
 #include "mock/MockTypes.hpp"
 #include "mock/CopySignaller.hpp"
-#include "editor/ecs/ManipulatorGizmoComponent.hpp"
+#include "editor/ecs/TransformGizmoComponent.hpp"
 
 #include "editor/EntityRefInspect.hpp"
 #include "editor/GuidInspect.hpp"
@@ -304,17 +304,17 @@ namespace eeng
         register_component<ecs::TransformComponent>();
 
 
-        // --- ManipulatorGizmoComponent --------------------------------------
+        // --- TransformGizmoComponent --------------------------------------
 
-        using GizmoMode = eeng::editor::ManipulatorGizmo::Mode;
-        using GizmoSpace = eeng::editor::ManipulatorGizmo::Space;
-        using GizmoSettings = eeng::editor::ManipulatorGizmo::Settings;
-        using GizmoComponent = eeng::editor::ManipulatorGizmoComponent;
+        using GizmoMode = eeng::editor::TransformGizmo::Mode;
+        using GizmoSpace = eeng::editor::TransformGizmo::Space;
+        using GizmoSettings = eeng::editor::TransformGizmo::Settings;
+        using GizmoComponent = eeng::editor::TransformGizmoComponent;
 
         auto gizmo_mode_info = TypeMetaInfo
         {
-            .id = "eeng.editor.ManipulatorGizmoMode",
-            .name = "ManipulatorGizmoMode",
+            .id = "eeng.editor.TransformGizmoMode",
+            .name = "TransformGizmoMode",
             .tooltip = "Gizmo operation mode (translate/rotate/scale).",
             .underlying_type = entt::resolve<std::underlying_type_t<GizmoMode>>()
         };
@@ -339,8 +339,8 @@ namespace eeng
 
         auto gizmo_space_info = TypeMetaInfo
         {
-            .id = "eeng.editor.ManipulatorGizmoSpace",
-            .name = "ManipulatorGizmoSpace",
+            .id = "eeng.editor.TransformGizmoSpace",
+            .name = "TransformGizmoSpace",
             .tooltip = "Gizmo orientation space (local/world).",
             .underlying_type = entt::resolve<std::underlying_type_t<GizmoSpace>>()
         };
@@ -360,7 +360,7 @@ namespace eeng
         warm_start_meta_type<GizmoSpace>();
 
         entt::meta_factory<GizmoSettings>()
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.editor.ManipulatorGizmoSettings", .name = "ManipulatorGizmoSettings", .tooltip = "Gizmo visual and snapping settings." })
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.editor.TransformGizmoSettings", .name = "TransformGizmoSettings", .tooltip = "Gizmo visual and snapping settings." })
             .traits(MetaFlags::none)
 
             .data<&GizmoSettings::screen_size>("screen_size"_hs)
@@ -427,7 +427,7 @@ namespace eeng
         warm_start_meta_type<GizmoSettings>();
 
         entt::meta_factory<GizmoComponent>()
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.editor.ManipulatorGizmoComponent", .name = "ManipulatorGizmoComponent", .tooltip = "Editor gizmo settings and runtime state." })
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.editor.TransformGizmoComponent", .name = "TransformGizmoComponent", .tooltip = "Editor gizmo settings and runtime state." })
             .traits(MetaFlags::none)
 
             .data<&GizmoComponent::enabled>("enabled"_hs)
