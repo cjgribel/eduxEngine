@@ -178,10 +178,16 @@ namespace ShapeRendering {
     struct LineStyle
     {
         float thickness = 1.0f;
+        float dash_period_px = 0.0f;
+        float dash_ratio = 0.5f;
+        float dash_offset_px = 0.0f;
 
         bool operator == (const LineStyle& other) const
         {
-            return thickness == other.thickness;
+            return thickness == other.thickness &&
+                dash_period_px == other.dash_period_px &&
+                dash_ratio == other.dash_ratio &&
+                dash_offset_px == other.dash_offset_px;
         }
     };
 
@@ -295,7 +301,11 @@ namespace ShapeRendering {
         {
             std::size_t operator () (const LineBatch& lb) const
             {
-                return hash_combine(lb.depth_test, lb.style.thickness);
+                return hash_combine(lb.depth_test,
+                    lb.style.thickness,
+                    lb.style.dash_period_px,
+                    lb.style.dash_ratio,
+                    lb.style.dash_offset_px);
             }
         };
 

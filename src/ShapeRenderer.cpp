@@ -616,25 +616,35 @@ namespace ShapeRendering {
             "   vec4 clip1 = PROJ_VIEW * vec4(attr_End, 1.0);"
             "   vec2 ndc0 = clip0.xy / clip0.w;"
             "   vec2 ndc1 = clip1.xy / clip1.w;"
-            "   vec2 dir = ndc1 - ndc0;"
-            "   float len = length(dir);"
-            "   if (len > 0.00001) dir /= len;"
+            "   vec2 delta = ndc1 - ndc0;"
+            "   float len = length(delta);"
+            "   vec2 dir = (len > 0.00001) ? (delta / len) : vec2(0.0, 0.0);"
             "   vec2 normal = vec2(-dir.y, dir.x);"
             "   float half_thickness = line_thickness * 0.5;"
             "   vec2 offset = normal * attr_Expand.x * half_thickness * (vec2(2.0) / viewport);"
+            "   float len_px = length(delta * viewport * 0.5);"
             "   vec4 clip = mix(clip0, clip1, attr_Expand.y);"
             "   vec2 ndc = (clip.xy / clip.w) + offset;"
             "   gl_Position = vec4(ndc * clip.w, clip.z, clip.w);"
             "   color = attr_Color;"
-            "   line_u = attr_Expand.y;"
+            "   line_u = attr_Expand.y * len_px;"
             "}";
 
         const GLchar* thick_line_fshader =
             "#version 410 core\n"
+            "uniform float dash_period;"
+            "uniform float dash_ratio;"
+            "uniform float dash_offset;"
             "in vec4 color;"
+            "in float line_u;"
             "out vec4 fragcolor;"
             "void main()"
             "{"
+            "   if (dash_period > 0.0)"
+            "   {"
+            "       float t = (line_u + dash_offset) / dash_period;"
+            "       if (fract(t) > dash_ratio) discard;"
+            "   }"
             "   fragcolor = color;"
             "}";
 
@@ -1890,6 +1900,15 @@ namespace ShapeRendering {
                 glUniform1f(
                     glGetUniformLocation(thick_line_shader, "line_thickness"),
                     batch.style.thickness);
+                glUniform1f(
+                    glGetUniformLocation(thick_line_shader, "dash_period"),
+                    batch.style.dash_period_px);
+                glUniform1f(
+                    glGetUniformLocation(thick_line_shader, "dash_ratio"),
+                    batch.style.dash_ratio);
+                glUniform1f(
+                    glGetUniformLocation(thick_line_shader, "dash_offset"),
+                    batch.style.dash_offset_px);
 
                 glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned) * size, &it.second[0], GL_STREAM_DRAW);
                 glDrawElements(GL_TRIANGLES, size, GL_UNSIGNED_INT, BUFOFS(0));
@@ -2166,6 +2185,12 @@ namespace ShapeRendering {
             renderer->push_line(glm::vec3(-0.35f, -0.35f, 0.0f), glm::vec3(0.35f, 0.35f, 0.0f));
             renderer->push_line(glm::vec3(-0.35f, 0.35f, 0.0f), glm::vec3(0.35f, -0.35f, 0.0f));
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::LineStyle{ 3.0f, 10.0f, 0.5f, 0.0f });
+            renderer->push_states(ShapeRendering::Color4u::Yellow, glm_aux::T(glm::vec3(col_lines, row_thick_y + 0.6f, 0.0f)));
+            renderer->push_line(glm::vec3(-0.45f, 0.0f, 0.0f), glm::vec3(0.45f, 0.0f, 0.0f));
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+            renderer->pop_states<ShapeRendering::LineStyle>();
 
             renderer->push_states(ShapeRendering::Color4u::Yellow);
             renderer->push_states(glm_aux::TS(glm::vec3(col_quad, row_thick_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
