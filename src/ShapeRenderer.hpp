@@ -7,6 +7,7 @@
 #include <vector>
 #include <unordered_map>
 #include <stack>
+#include <cstdint>
 
 #include <glm/glm.hpp>
 
@@ -174,6 +175,30 @@ namespace ShapeRendering {
         uint color;
     };
 
+    struct LineStyle
+    {
+        float thickness = 1.0f;
+
+        bool operator == (const LineStyle& other) const
+        {
+            return thickness == other.thickness;
+        }
+    };
+
+    enum class LineType : uint8_t
+    {
+        Simple,
+        Thick
+    };
+
+    struct ThickLineVertex
+    {
+        glm::vec3 start;
+        glm::vec3 end;
+        glm::vec2 expand;
+        uint color;
+    };
+
     struct PointVertex
     {
         glm::vec3 p;
@@ -204,7 +229,8 @@ namespace ShapeRendering {
         long framenbr = 0;
 
         GLuint lambert_shader;
-        GLuint line_shader;
+        GLuint simple_line_shader;
+        GLuint thick_line_shader;
         GLuint point_shader;
 
         // Pre-initialized primitives
@@ -215,12 +241,22 @@ namespace ShapeRendering {
         }
         unitcone_buffers, unitcylinder_buffers, unitsphere_buffers, unitspherewireframe_buffers;
 
-        struct LineBatch
+        struct LineBuffer
+        {
+            std::vector<glm::vec3> vertices;
+            std::vector<unsigned> indices;
+        };
+
+        LineBuffer unitcone_line_buffers;
+        LineBuffer unitcylinder_line_buffers;
+        LineBuffer unitsphere_line_buffers;
+
+        struct SimpleLineBatch
         {
             GLenum topology = GL_LINES;
             DepthTest depth_test = DepthTest::True;
 
-            bool operator == (const LineBatch& dc) const
+            bool operator == (const SimpleLineBatch& dc) const
             {
                 return
                     topology == dc.topology &&
@@ -228,15 +264,42 @@ namespace ShapeRendering {
             }
         };
 
-        struct LineBatchHashFunction
+        struct SimpleLineBatchHashFunction
         {
-            std::size_t operator () (const LineBatch& ldc) const
+            std::size_t operator () (const SimpleLineBatch& ldc) const
             {
                 return hash_combine(ldc.topology, ldc.depth_test);
             }
         };
 
-        std::vector<LineVertex> line_vertices;
+        std::vector<LineVertex> simple_line_vertices;
+        std::unordered_map<SimpleLineBatch, std::vector<unsigned>, SimpleLineBatchHashFunction> simple_line_hash;
+
+        GLuint simple_lines_VBO = 0;
+        GLuint simple_lines_IBO = 0;
+        GLuint simple_lines_VAO = 0;
+
+        struct LineBatch
+        {
+            DepthTest depth_test = DepthTest::True;
+            LineStyle style;
+
+            bool operator == (const LineBatch& other) const
+            {
+                return depth_test == other.depth_test &&
+                    style == other.style;
+            }
+        };
+
+        struct LineBatchHashFunction
+        {
+            std::size_t operator () (const LineBatch& lb) const
+            {
+                return hash_combine(lb.depth_test, lb.style.thickness);
+            }
+        };
+
+        std::vector<ThickLineVertex> line_vertices;
         std::unordered_map<LineBatch, std::vector<unsigned>, LineBatchHashFunction> line_hash;
 
         GLuint lines_VBO = 0;
@@ -305,7 +368,7 @@ namespace ShapeRendering {
         GLuint point_vbo = 0;
         GLuint point_vao = 0;
 
-        StateStack<DepthTest, BackfaceCull, glm::mat4, Color4u> state_stack;
+        StateStack<DepthTest, BackfaceCull, LineType, LineStyle, glm::mat4, Color4u> state_stack;
 
         bool initialized = false;
 
@@ -353,38 +416,26 @@ namespace ShapeRendering {
         template<unsigned N>
         void push_circle_ring()
         {
-            const auto [transform, color, depth_test] = get_states<glm::mat4, Color4u, DepthTest>();
-
             auto vertex_generator =
                 []()
                 {
-                    std::vector<glm::vec4> vertices;
+                    std::vector<glm::vec3> vertices;
                     for (int i = 0; i < N; i++)
                     {
                         const float theta = i * 2.0f * 3.14159f / (N - 1);
-                        vertices.emplace_back(std::cos(theta), std::sin(theta), 0.0f, 1.0f);
+                        vertices.emplace_back(std::cos(theta), std::sin(theta), 0.0f);
                     }
                     return vertices;
                 };
             static const auto vertices = vertex_generator();
-
-            auto& index_batch = line_hash[LineBatch{ GL_LINES, depth_test }];
-            unsigned vertex_ofs = (unsigned)line_vertices.size();
-
-            for (int i = 0; i < N; i++)
-            {
-                line_vertices.push_back(LineVertex{
-                    glm::vec3(transform * vertices[i]),
-                    color
-                    });
-                if (i < N - 1) {
-                    index_batch.push_back(vertex_ofs + i);
-                    index_batch.push_back(vertex_ofs + i + 1);
-                }
-            }
+            push_lines(vertices.data(), vertices.size());
         }
 
         void push_line(
+            const glm::vec3& pos0,
+            const glm::vec3& pos1);
+
+        void push_simple_line(
             const glm::vec3& pos0,
             const glm::vec3& pos1);
 
@@ -394,7 +445,17 @@ namespace ShapeRendering {
             int nbr_vertices,
             int max_vertices);
 
+        void push_simple_lines_from_cyclic_source(
+            const LineVertex* vertices,
+            int start_index,
+            int nbr_vertices,
+            int max_vertices);
+
         void push_lines(
+            const std::vector<glm::vec3>& vertices,
+            const std::vector<unsigned>& indices);
+
+        void push_simple_lines(
             const std::vector<glm::vec3>& vertices,
             const std::vector<unsigned>& indices);
 
@@ -404,7 +465,17 @@ namespace ShapeRendering {
             const unsigned* indices,
             size_t nbr_indices);
 
+        void push_simple_lines(
+            const glm::vec3* vertices,
+            size_t nbr_vertices,
+            const unsigned* indices,
+            size_t nbr_indices);
+
         void push_lines(
+            const glm::vec3* vertices,
+            size_t nbr_vertices);
+
+        void push_simple_lines(
             const glm::vec3* vertices,
             size_t nbr_vertices);
 
@@ -418,12 +489,25 @@ namespace ShapeRendering {
             const glm::vec3 to,
             float r);
 
+        void push_cone_wireframe(
+            const glm::vec3& from,
+            const glm::vec3& to,
+            float r);
+
         void push_cone(
             float h,
             float r,
             bool flip_normals = false);
 
+        void push_cone_wireframe(
+            float h,
+            float r);
+
         void push_cylinder(
+            float height,
+            float radius);
+
+        void push_cylinder_wireframe(
             float height,
             float radius);
 
@@ -432,24 +516,43 @@ namespace ShapeRendering {
             const glm::vec3& to,
             ArrowDescriptor arrow_desc);
 
+        void push_arrow_wireframe(
+            const glm::vec3& from,
+            const glm::vec3& to,
+            ArrowDescriptor arrow_desc);
+
         void push_sphere(float h, float r);
 
         void push_sphere_wireframe(float h, float r);
 
-#if 0
-        void push_helix(const vec3f& from,
-            const vec3f& to,
+        void push_helix(
+            const glm::vec3& from,
+            const glm::vec3& to,
             float r_outer,
             float r_inner,
             float revs);
 
-        void push_helix(float length,
+        void push_helix(
+            float length,
             float r_outer,
             float r_inner,
             float revs);
 
-        void push_frustum(const mat4f& invProjView);
-#endif
+        void push_helix_solid(
+            const glm::vec3& from,
+            const glm::vec3& to,
+            float r_outer,
+            float r_inner,
+            float revs);
+
+        void push_helix_solid(
+            float length,
+            float r_outer,
+            float r_inner,
+            float revs);
+
+        void push_frustum(
+            const glm::mat4& inv_proj_view);
 
         void push_basis_basic(
             const glm::mat4& basis,

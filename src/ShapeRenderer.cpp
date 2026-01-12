@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <cstddef>
 #include <array>
+#include <cmath>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -61,6 +62,32 @@ namespace ShapeRendering {
             return glm::transpose(glm::inverse(glm::mat3(mat)));
         }
 
+        inline void append_thick_line_segment(
+            std::vector<ThickLineVertex>& vertices,
+            std::vector<unsigned>& indices,
+            const glm::vec3& start,
+            const glm::vec3& end,
+            uint color_start,
+            uint color_end)
+        {
+            const glm::vec3 delta = end - start;
+            if (glm::dot(delta, delta) < 1.0e-10f)
+                return;
+
+            unsigned base = (unsigned)vertices.size();
+            vertices.push_back(ThickLineVertex{ start, end, glm::vec2(-1.0f, 0.0f), color_start });
+            vertices.push_back(ThickLineVertex{ start, end, glm::vec2(1.0f, 0.0f), color_start });
+            vertices.push_back(ThickLineVertex{ start, end, glm::vec2(-1.0f, 1.0f), color_end });
+            vertices.push_back(ThickLineVertex{ start, end, glm::vec2(1.0f, 1.0f), color_end });
+
+            indices.push_back(base + 0);
+            indices.push_back(base + 1);
+            indices.push_back(base + 2);
+            indices.push_back(base + 1);
+            indices.push_back(base + 3);
+            indices.push_back(base + 2);
+        }
+
         glm::mat3 create_basis_from_vector(const glm::vec3& direction)
         {
             // Ensure the direction is normalized
@@ -81,6 +108,32 @@ namespace ShapeRendering {
             glm::mat3 basis(right, up, forward);
 
             return basis;
+        }
+
+        void create_grid_wireframe_indices(
+            unsigned hres,
+            unsigned rres,
+            std::vector<unsigned>& indices)
+        {
+            if (hres < 2 || rres < 2)
+                return;
+
+            const unsigned rmax = rres - 1;
+            for (unsigned hi = 0; hi < hres; ++hi)
+            {
+                for (unsigned ri = 0; ri < rmax; ++ri)
+                {
+                    unsigned i = hi * rres + ri;
+                    indices.push_back(i);
+                    indices.push_back(i + 1);
+
+                    if (hi + 1 < hres)
+                    {
+                        indices.push_back(i);
+                        indices.push_back(i + rres);
+                    }
+                }
+            }
         }
 
         struct unitcube_t
@@ -462,13 +515,35 @@ namespace ShapeRendering {
     void ShapeRenderer::init()
     {
         // Create default primitives
-        create_cone(1, 1, 2, 8, unitcone_buffers.vertices, unitcone_buffers.indices);
-        create_cylinder(1, 1, 2, 8, unitcylinder_buffers.vertices, unitcylinder_buffers.indices);
-        create_sphere(1, 12, 8, unitsphere_buffers.vertices, unitsphere_buffers.indices, false);
-        create_sphere(1, 12, 8, unitspherewireframe_buffers.vertices, unitspherewireframe_buffers.indices, true);
+        const unsigned cone_hres = 2;
+        const unsigned cone_rres = 8;
+        const unsigned cylinder_hres = 2;
+        const unsigned cylinder_rres = 8;
+        const unsigned sphere_thetares = 12;
+        const unsigned sphere_phires = 8;
+
+        create_cone(1, 1, cone_hres, cone_rres, unitcone_buffers.vertices, unitcone_buffers.indices);
+        create_cylinder(1, 1, cylinder_hres, cylinder_rres, unitcylinder_buffers.vertices, unitcylinder_buffers.indices);
+        create_sphere(1, sphere_thetares, sphere_phires, unitsphere_buffers.vertices, unitsphere_buffers.indices, false);
+        create_sphere(1, sphere_thetares, sphere_phires, unitspherewireframe_buffers.vertices, unitspherewireframe_buffers.indices, true);
+
+        unitcone_line_buffers.vertices.reserve(unitcone_buffers.vertices.size());
+        for (const auto& v : unitcone_buffers.vertices)
+            unitcone_line_buffers.vertices.push_back(v.p);
+        create_grid_wireframe_indices(cone_hres, cone_rres, unitcone_line_buffers.indices);
+
+        unitcylinder_line_buffers.vertices.reserve(unitcylinder_buffers.vertices.size());
+        for (const auto& v : unitcylinder_buffers.vertices)
+            unitcylinder_line_buffers.vertices.push_back(v.p);
+        create_grid_wireframe_indices(cylinder_hres, cylinder_rres, unitcylinder_line_buffers.indices);
+
+        unitsphere_line_buffers.vertices.reserve(unitspherewireframe_buffers.vertices.size());
+        for (const auto& v : unitspherewireframe_buffers.vertices)
+            unitsphere_line_buffers.vertices.push_back(v.p);
+        unitsphere_line_buffers.indices = unitspherewireframe_buffers.indices;
 
         // Default state
-        push_states(BackfaceCull::True, DepthTest::True, Color4u::White, glm::mat4{ 1.0f });
+        push_states(BackfaceCull::True, DepthTest::True, LineType::Simple, LineStyle{ 1.0f }, Color4u::White, glm::mat4{ 1.0f });
 
         const GLchar* poly_vshader =
             "#version 410 core\n"
@@ -501,7 +576,7 @@ namespace ShapeRendering {
             "   fragcolor = vec4(color.xyz*lambert, color.w);"
             "}";
 
-        const GLchar* line_vshader =
+        const GLchar* simple_line_vshader =
             "#version 410 core\n"
             "layout (location = 0) in vec3 attr_Pos;"
             "layout (location = 1) in vec4 attr_Color;"
@@ -514,7 +589,47 @@ namespace ShapeRendering {
             "   gl_Position = PROJ_VIEW * vec4(attr_Pos, 1);"
             "}";
 
-        const GLchar* line_fshader =
+        const GLchar* simple_line_fshader =
+            "#version 410 core\n"
+            "in vec4 color;"
+            "out vec4 fragcolor;"
+            "void main()"
+            "{"
+            "   fragcolor = color;"
+            "}";
+
+        const GLchar* thick_line_vshader =
+            "#version 410 core\n"
+            "layout (location = 0) in vec3 attr_Start;"
+            "layout (location = 1) in vec3 attr_End;"
+            "layout (location = 2) in vec2 attr_Expand;"
+            "layout (location = 3) in vec4 attr_Color;"
+            "uniform mat4 PROJ_VIEW;"
+            "uniform vec2 viewport;"
+            "uniform float line_thickness;"
+            "out vec4 color;"
+            "out float line_u;"
+            ""
+            "void main()"
+            "{"
+            "   vec4 clip0 = PROJ_VIEW * vec4(attr_Start, 1.0);"
+            "   vec4 clip1 = PROJ_VIEW * vec4(attr_End, 1.0);"
+            "   vec2 ndc0 = clip0.xy / clip0.w;"
+            "   vec2 ndc1 = clip1.xy / clip1.w;"
+            "   vec2 dir = ndc1 - ndc0;"
+            "   float len = length(dir);"
+            "   if (len > 0.00001) dir /= len;"
+            "   vec2 normal = vec2(-dir.y, dir.x);"
+            "   float half_thickness = line_thickness * 0.5;"
+            "   vec2 offset = normal * attr_Expand.x * half_thickness * (vec2(2.0) / viewport);"
+            "   vec4 clip = mix(clip0, clip1, attr_Expand.y);"
+            "   vec2 ndc = (clip.xy / clip.w) + offset;"
+            "   gl_Position = vec4(ndc * clip.w, clip.z, clip.w);"
+            "   color = attr_Color;"
+            "   line_u = attr_Expand.y;"
+            "}";
+
+        const GLchar* thick_line_fshader =
             "#version 410 core\n"
             "in vec4 color;"
             "out vec4 fragcolor;"
@@ -550,14 +665,20 @@ namespace ShapeRendering {
         const GLuint poly_normal_location = 1;
         const GLuint poly_color_location = 2;
 
-        const GLuint line_pos_location = 0;
-        const GLuint line_color_location = 1;
+        const GLuint simple_line_pos_location = 0;
+        const GLuint simple_line_color_location = 1;
+
+        const GLuint thick_line_start_location = 0;
+        const GLuint thick_line_end_location = 1;
+        const GLuint thick_line_expand_location = 2;
+        const GLuint thick_line_color_location = 3;
 
         const GLuint point_pos_location = 0;
         const GLuint point_color_location = 1;
 
         lambert_shader = createShaderProgram(poly_vshader, poly_fshader);
-        line_shader = createShaderProgram(line_vshader, line_fshader);
+        simple_line_shader = createShaderProgram(simple_line_vshader, simple_line_fshader);
+        thick_line_shader = createShaderProgram(thick_line_vshader, thick_line_fshader);
         point_shader = createShaderProgram(point_vshader, point_fshader);
 
         //
@@ -598,7 +719,37 @@ namespace ShapeRendering {
         glBindVertexArray(0);
 
         //
-        // Init line buffers
+        // Init simple line buffers
+        //
+
+        glGenVertexArrays(1, &simple_lines_VAO);
+        glGenBuffers(1, &simple_lines_VBO);
+        glGenBuffers(1, &simple_lines_IBO);
+
+        glBindVertexArray(simple_lines_VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, simple_lines_VBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, simple_lines_IBO);
+
+        assert(std::is_trivial_v<LineVertex> || std::is_standard_layout_v<LineVertex>);
+        glEnableVertexAttribArray(simple_line_pos_location);
+        glEnableVertexAttribArray(simple_line_color_location);
+        glVertexAttribPointer(simple_line_pos_location,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(LineVertex),
+            (GLvoid*)offsetof(LineVertex, p));
+        glVertexAttribPointer(simple_line_color_location,
+            4,
+            GL_UNSIGNED_BYTE,
+            GL_TRUE,
+            sizeof(LineVertex),
+            (GLvoid*)offsetof(LineVertex, color));
+
+        glBindVertexArray(0);
+
+        //
+        // Init thick line buffers
         //
 
         glGenVertexArrays(1, &lines_VAO);
@@ -609,21 +760,35 @@ namespace ShapeRendering {
         glBindBuffer(GL_ARRAY_BUFFER, lines_VBO);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lines_IBO);
 
-        assert(std::is_trivial_v<LineVertex> || std::is_standard_layout_v<LineVertex>);
-        glEnableVertexAttribArray(line_pos_location);
-        glEnableVertexAttribArray(line_color_location);
-        glVertexAttribPointer(line_pos_location,
+        assert(std::is_trivial_v<ThickLineVertex> || std::is_standard_layout_v<ThickLineVertex>);
+        glEnableVertexAttribArray(thick_line_start_location);
+        glEnableVertexAttribArray(thick_line_end_location);
+        glEnableVertexAttribArray(thick_line_expand_location);
+        glEnableVertexAttribArray(thick_line_color_location);
+        glVertexAttribPointer(thick_line_start_location,
             3,
             GL_FLOAT,
             GL_FALSE,
-            sizeof(LineVertex),
-            (GLvoid*)offsetof(LineVertex, p));
-        glVertexAttribPointer(line_color_location,
+            sizeof(ThickLineVertex),
+            (GLvoid*)offsetof(ThickLineVertex, start));
+        glVertexAttribPointer(thick_line_end_location,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(ThickLineVertex),
+            (GLvoid*)offsetof(ThickLineVertex, end));
+        glVertexAttribPointer(thick_line_expand_location,
+            2,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(ThickLineVertex),
+            (GLvoid*)offsetof(ThickLineVertex, expand));
+        glVertexAttribPointer(thick_line_color_location,
             4,
             GL_UNSIGNED_BYTE,
             GL_TRUE,
-            sizeof(LineVertex),
-            (GLvoid*)offsetof(LineVertex, color));
+            sizeof(ThickLineVertex),
+            (GLvoid*)offsetof(ThickLineVertex, color));
 
         glBindVertexArray(0);
 
@@ -752,16 +917,37 @@ namespace ShapeRendering {
 
     void ShapeRenderer::push_line(const glm::vec3& pos0, const glm::vec3& pos1)
     {
+        const auto& line_type = get_states<LineType>();
+        if (line_type == LineType::Thick)
+        {
+            const auto [color, depth_test, M, style] = get_states<Color4u, DepthTest, glm::mat4, LineStyle>();
+            const LineBatch batch{ depth_test, style };
+            auto& index_batch = line_hash[batch];
+            append_thick_line_segment(line_vertices,
+                index_batch,
+                transform_pos(M, pos0),
+                transform_pos(M, pos1),
+                color,
+                color);
+        }
+        else
+        {
+            push_simple_line(pos0, pos1);
+        }
+    }
+
+    void ShapeRenderer::push_simple_line(const glm::vec3& pos0, const glm::vec3& pos1)
+    {
         const auto [color, depth_test, M] = get_states<Color4u, DepthTest, glm::mat4>();
 
-        const LineBatch ldc{ GL_LINES, depth_test };
-        unsigned vertex_ofs = (unsigned)line_vertices.size();
+        const SimpleLineBatch ldc{ GL_LINES, depth_test };
+        unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
 
-        line_vertices.emplace_back(transform_pos(M, pos0), color);
-        line_vertices.emplace_back(transform_pos(M, pos1), color);
+        simple_line_vertices.emplace_back(transform_pos(M, pos0), color);
+        simple_line_vertices.emplace_back(transform_pos(M, pos1), color);
 
-        line_hash[ldc].push_back(vertex_ofs + 0);
-        line_hash[ldc].push_back(vertex_ofs + 1);
+        simple_line_hash[ldc].push_back(vertex_ofs + 0);
+        simple_line_hash[ldc].push_back(vertex_ofs + 1);
     }
 
     void ShapeRenderer::push_lines_from_cyclic_source(const LineVertex* vertices,
@@ -769,31 +955,80 @@ namespace ShapeRendering {
         int nbr_vertices,
         int max_vertices)
     {
+        const auto& line_type = get_states<LineType>();
+        if (line_type == LineType::Thick)
+        {
+            const auto [depth_test, style] = get_states<DepthTest, LineStyle>();
+            const LineBatch batch{ depth_test, style };
+            auto& index_batch = line_hash[batch];
+
+            for (int i = 0; i < nbr_vertices - 1; i++)
+            {
+                unsigned idx0 = (start_index + i) % max_vertices;
+                unsigned idx1 = (start_index + i + 1) % max_vertices;
+                const LineVertex& v0 = vertices[idx0];
+                const LineVertex& v1 = vertices[idx1];
+                append_thick_line_segment(line_vertices,
+                    index_batch,
+                    v0.p,
+                    v1.p,
+                    v0.color,
+                    v1.color);
+            }
+        }
+        else
+        {
+            push_simple_lines_from_cyclic_source(vertices, start_index, nbr_vertices, max_vertices);
+        }
+    }
+
+    void ShapeRenderer::push_simple_lines_from_cyclic_source(const LineVertex* vertices,
+        int start_index,
+        int nbr_vertices,
+        int max_vertices)
+    {
         const auto& depth_test = get_states<DepthTest>();
 
-        const LineBatch ldc{ GL_LINES, depth_test };
-        unsigned vertex_ofs = (unsigned)line_vertices.size();
+        const SimpleLineBatch ldc{ GL_LINES, depth_test };
+        unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
 
         for (int i = 0; i < nbr_vertices; i++)
         {
             unsigned index = (start_index + i) % max_vertices;
-            line_vertices.push_back(vertices[index]);
+            simple_line_vertices.push_back(vertices[index]);
         }
 
         for (int i = 0; i < nbr_vertices - 1; i++)
         {
-            line_hash[ldc].push_back(vertex_ofs + i);
-            line_hash[ldc].push_back(vertex_ofs + i + 1);
+            simple_line_hash[ldc].push_back(vertex_ofs + i);
+            simple_line_hash[ldc].push_back(vertex_ofs + i + 1);
         }
         // TODO: Wrapping should be optional
-    //    line_hash[0].push_back(vertex_ofs + (unsigned)nbr_vertices - 1);
-    //    line_hash[0].push_back(vertex_ofs);
+    //    simple_line_hash[0].push_back(vertex_ofs + (unsigned)nbr_vertices - 1);
+    //    simple_line_hash[0].push_back(vertex_ofs);
     }
 
     void ShapeRenderer::push_lines(const std::vector<glm::vec3>& vertices,
         const std::vector<unsigned>& indices)
     {
-        push_lines(vertices.data(),
+        const auto& line_type = get_states<LineType>();
+        if (line_type == LineType::Thick)
+        {
+            push_lines(vertices.data(),
+                vertices.size(),
+                indices.data(),
+                indices.size());
+        }
+        else
+        {
+            push_simple_lines(vertices, indices);
+        }
+    }
+
+    void ShapeRenderer::push_simple_lines(const std::vector<glm::vec3>& vertices,
+        const std::vector<unsigned>& indices)
+    {
+        push_simple_lines(vertices.data(),
             vertices.size(),
             indices.data(),
             indices.size());
@@ -804,39 +1039,95 @@ namespace ShapeRendering {
         const unsigned* indices,
         size_t nbr_indices)
     {
+        const auto& line_type = get_states<LineType>();
+        if (line_type == LineType::Thick)
+        {
+            const auto [color, depth_test, M, style] = get_states<Color4u, DepthTest, glm::mat4, LineStyle>();
+            const LineBatch batch{ depth_test, style };
+            auto& index_batch = line_hash[batch];
+
+            for (int i = 0; i + 1 < nbr_indices; i += 2)
+            {
+                const glm::vec3 p0 = transform_pos(M, vertices[indices[i]]);
+                const glm::vec3 p1 = transform_pos(M, vertices[indices[i + 1]]);
+                append_thick_line_segment(line_vertices, index_batch, p0, p1, color, color);
+            }
+        }
+        else
+        {
+            push_simple_lines(vertices, nbr_vertices, indices, nbr_indices);
+        }
+    }
+
+    void ShapeRenderer::push_simple_lines(const glm::vec3* vertices,
+        size_t nbr_vertices,
+        const unsigned* indices,
+        size_t nbr_indices)
+    {
         const auto [color, depth_test, M] = get_states<Color4u, DepthTest, glm::mat4>();
 
-        const LineBatch ldc{ GL_LINES, depth_test };
-        unsigned vertex_ofs = (unsigned)line_vertices.size();
+        const SimpleLineBatch ldc{ GL_LINES, depth_test };
+        unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
 
         for (int i = 0; i < nbr_vertices; i++)
-            line_vertices.emplace_back(transform_pos(M, vertices[i]), color);
+            simple_line_vertices.emplace_back(transform_pos(M, vertices[i]), color);
 
         for (int i = 0; i < nbr_indices; i++)
-            line_hash[ldc].push_back(vertex_ofs + indices[i]);
+            simple_line_hash[ldc].push_back(vertex_ofs + indices[i]);
     }
 
     void ShapeRenderer::push_lines(const glm::vec3* vertices,
+        size_t nbr_vertices)
+    {
+        const auto& line_type = get_states<LineType>();
+        if (line_type == LineType::Thick)
+        {
+            const auto [transform, color, depth_test, style] = get_states<glm::mat4, Color4u, DepthTest, LineStyle>();
+            const LineBatch batch{ depth_test, style };
+            auto& index_batch = line_hash[batch];
+
+            assert(vertices);
+            assert(nbr_vertices > 0);
+
+            for (int i = 0; i < nbr_vertices - 1; i++)
+            {
+                const glm::vec3 p0 = glm::vec3(transform * glm::vec4(vertices[i], 1.0f));
+                const glm::vec3 p1 = glm::vec3(transform * glm::vec4(vertices[i + 1], 1.0f));
+                append_thick_line_segment(line_vertices, index_batch, p0, p1, color, color);
+            }
+
+            // TODO: Wrapping should be optional
+            const glm::vec3 p0 = glm::vec3(transform * glm::vec4(vertices[nbr_vertices - 1], 1.0f));
+            const glm::vec3 p1 = glm::vec3(transform * glm::vec4(vertices[0], 1.0f));
+            append_thick_line_segment(line_vertices, index_batch, p0, p1, color, color);
+        }
+        else
+        {
+            push_simple_lines(vertices, nbr_vertices);
+        }
+    }
+
+    void ShapeRenderer::push_simple_lines(const glm::vec3* vertices,
         size_t nbr_vertices)
     {
         const auto [transform, color, depth_test] = get_states<glm::mat4, Color4u, DepthTest>();
 
         assert(vertices);
         assert(nbr_vertices > 0);
-        const LineBatch ldc{ GL_LINES, depth_test };
-        unsigned vertex_ofs = (unsigned)line_vertices.size();
+        const SimpleLineBatch ldc{ GL_LINES, depth_test };
+        unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
 
         for (int i = 0; i < nbr_vertices; i++)
-            line_vertices.emplace_back(glm::vec3(transform * glm::vec4(vertices[i], 1.0f)), color);
+            simple_line_vertices.emplace_back(glm::vec3(transform * glm::vec4(vertices[i], 1.0f)), color);
 
         for (int i = 0; i < nbr_vertices - 1; i++)
         {
-            line_hash[ldc].push_back(vertex_ofs + i);
-            line_hash[ldc].push_back(vertex_ofs + i + 1);
+            simple_line_hash[ldc].push_back(vertex_ofs + i);
+            simple_line_hash[ldc].push_back(vertex_ofs + i + 1);
         }
         // TODO: Wrapping should be optional
-        line_hash[ldc].push_back(vertex_ofs + (unsigned)nbr_vertices - 1);
-        line_hash[ldc].push_back(vertex_ofs);
+        simple_line_hash[ldc].push_back(vertex_ofs + (unsigned)nbr_vertices - 1);
+        simple_line_hash[ldc].push_back(vertex_ofs);
     }
 
     void ShapeRenderer::push_grid(const glm::vec3& pos,
@@ -870,6 +1161,22 @@ namespace ShapeRendering {
 
         push_states(M);
         push_cone(conel, r);
+        pop_states<glm::mat4>();
+    }
+
+    void ShapeRenderer::push_cone_wireframe(const glm::vec3& from,
+        const glm::vec3& to,
+        float r)
+    {
+        const glm::vec3 conev = (to - from);
+        const float conel = glm::length(conev);
+
+        const glm::mat4 R = glm::mat4(create_basis_from_vector(conev));
+        const glm::mat4 T = glm::translate(glm::mat4(1.0f), from);
+        const glm::mat4 M = T * R;
+
+        push_states(M);
+        push_cone_wireframe(conel, r);
         pop_states<glm::mat4>();
     }
 
@@ -915,6 +1222,20 @@ namespace ShapeRendering {
 #endif
     }
 
+    void ShapeRenderer::push_cone_wireframe(float h,
+        float r)
+    {
+        if (unitcone_line_buffers.vertices.empty() || unitcone_line_buffers.indices.empty())
+            return;
+
+        push_states(glm_aux::S(glm::vec3(r, r, h)));
+        push_lines(unitcone_line_buffers.vertices.data(),
+            unitcone_line_buffers.vertices.size(),
+            unitcone_line_buffers.indices.data(),
+            unitcone_line_buffers.indices.size());
+        pop_states<glm::mat4>();
+    }
+
     void ShapeRenderer::push_cylinder(float h,
         float r)
     {
@@ -957,6 +1278,20 @@ namespace ShapeRendering {
 #endif
     }
 
+    void ShapeRenderer::push_cylinder_wireframe(float h,
+        float r)
+    {
+        if (unitcylinder_line_buffers.vertices.empty() || unitcylinder_line_buffers.indices.empty())
+            return;
+
+        push_states(glm_aux::S(glm::vec3(r, r, h)));
+        push_lines(unitcylinder_line_buffers.vertices.data(),
+            unitcylinder_line_buffers.vertices.size(),
+            unitcylinder_line_buffers.indices.data(),
+            unitcylinder_line_buffers.indices.size());
+        pop_states<glm::mat4>();
+    }
+
     void ShapeRenderer::push_arrow(
         const glm::vec3& from,
         const glm::vec3& to,
@@ -986,6 +1321,33 @@ namespace ShapeRendering {
 
         push_states(M);
         push_cylinder(cyll, arrow_desc.cylinder_radius);
+        pop_states<glm::mat4>();
+    }
+
+    void ShapeRenderer::push_arrow_wireframe(
+        const glm::vec3& from,
+        const glm::vec3& to,
+        ArrowDescriptor arrow_desc)
+    {
+        glm::vec3 arrowv = (to - from);
+        float arrowl = glm::length(arrowv);
+
+        const glm::mat4 R = glm::mat4(create_basis_from_vector(arrowv));
+        const glm::mat4 T = glm::translate(glm::mat4(1.0f), from);
+        const glm::mat4 M = T * R;
+
+        float conel = arrowl * arrow_desc.cone_fraction;
+        if (conel > 0.0f)
+        {
+            const glm::mat4 Mcone = M * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, arrowl - conel));
+            push_states(Mcone);
+            push_cone_wireframe(conel, arrow_desc.cone_radius);
+            pop_states<glm::mat4>();
+        }
+
+        float cyll = arrowl - conel;
+        push_states(M);
+        push_cylinder_wireframe(cyll, arrow_desc.cylinder_radius);
         pop_states<glm::mat4>();
     }
 
@@ -1028,164 +1390,187 @@ namespace ShapeRendering {
 
     void ShapeRenderer::push_sphere_wireframe(float h, float r)
     {
-        const auto [color, depth_test, cull_face, M] = get_states<Color4u, DepthTest, BackfaceCull, glm::mat4>();
-        const auto vertex_ofs = polygon_vertices.size();
-        const auto index_ofs = polygon_indices.size();
+        if (unitsphere_line_buffers.vertices.empty() || unitsphere_line_buffers.indices.empty())
+            return;
 
-        auto N = M * glm_aux::S(glm::vec3{ r, h, r });
-        //auto Nit = N; // N.inverse(); Nit.transpose(); // ugly, only inv-transpose when needed
-
-        for (auto& v : unitspherewireframe_buffers.vertices)
-        {
-            glm::vec3 vw = glm::vec3(N * glm::vec4(v.p, 1.0f));
-            glm::vec3 nw = glm::vec3(N * glm::vec4(v.normal, 0.0f));
-            polygon_vertices.push_back({ vw, glm::normalize(nw), color });
-        }
-
-        polygon_indices.insert(polygon_indices.end(),
-            unitspherewireframe_buffers.indices.begin(),
-            unitspherewireframe_buffers.indices.end());
-
-        polygon_hash.insert({
-            PolygonBatch {GL_LINES, depth_test, cull_face},
-            IndexRange {(GLsizei)index_ofs, (GLsizei)unitspherewireframe_buffers.indices.size(), (GLint)vertex_ofs}
-            });
-
-#if 0
-        // Add normals (last [vertex_ofs] added normals)
-        for (auto it = std::next(varray.begin(), vertex_ofs); it < varray.end(); it++)
-        {
-            add_line2(it->p, it->p + it->normal * 0.2f, { 0,1,0 });
-        }
-#endif
+        push_states(glm_aux::S(glm::vec3{ r, h, r }));
+        push_lines(unitsphere_line_buffers.vertices.data(),
+            unitsphere_line_buffers.vertices.size(),
+            unitsphere_line_buffers.indices.data(),
+            unitsphere_line_buffers.indices.size());
+        pop_states<glm::mat4>();
     }
 
-#if 0
-    void ShapeRenderer::push_helix(const vec3f& from,
-        const vec3f& to,
+    void ShapeRenderer::push_helix(
+        const glm::vec3& from,
+        const glm::vec3& to,
         float r_outer,
         float r_inner,
         float revs)
     {
-        vec3f helixv = (to - from);
-        float helixl = helixv.norm2();
+        glm::vec3 helixv = (to - from);
+        float helixl = glm::length(helixv);
+        if (helixl <= 0.0f || revs <= 0.0f)
+            return;
 
-        // Main helix transform
-        mat4f R = mat4f(mat3f::base(helixv, { 1,0,0 }));
-        mat4f M = mat4f::translation(from) * R;
+        const glm::mat4 R = glm::mat4(create_basis_from_vector(helixv));
+        const glm::mat4 T = glm::translate(glm::mat4(1.0f), from);
+        const glm::mat4 M = T * R;
 
         push_states(M);
-        push_helix(helixl,
-            r_outer,
-            r_inner,
-            revs);
-        pop_states<m4f>();
+        push_helix(helixl, r_outer, r_inner, revs);
+        pop_states<glm::mat4>();
     }
 
-    void ShapeRenderer::push_helix(float length,
+    void ShapeRenderer::push_helix(
+        float length,
         float r_outer,
         float r_inner,
         float revs)
     {
-        const auto [color, depth_test, cull_face, Mpos] = get_states<Color4u, DepthTest, BackfaceCull, m4f>();
-        std::vector<PolyVertex> hvert;
-        std::vector<unsigned> hind;
+        (void)r_inner;
+        if (length <= 0.0f || revs <= 0.0f)
+            return;
 
-        // Base cylinder along +z
-        const int res_per_rev = 12;
-        create_cylinder(1,
-            r_inner,
-            res_per_rev * revs + 1,
-            8,
-            hvert,
-            hind);
+        const int res_per_rev = 24;
+        int segments = (int)std::ceil(revs * res_per_rev);
+        if (segments < 4)
+            segments = 4;
 
-        // Re-aligns cylinder from +z to -x at y=r_outer.
-        // From here, the cylinder is rotated and displaced wrt z.
-        mat4f Minit = mat4f::translation(0, r_outer, 0) * mat4f::rotation(-fPI / 2, 0, 1, 0);
+        std::vector<glm::vec3> points;
+        std::vector<unsigned> indices;
+        points.reserve(segments + 1);
+        indices.reserve(segments * 2);
 
-        // For each vertex: extract z as a parameter (for angle and
-        // final z-position), re-align and then rotate into a helix
-        for (int i = 0; i < hvert.size(); i++)
+        for (int i = 0; i <= segments; i++)
         {
-            PolyVertex* v = &(hvert[i]);
-            float zparam = v->p.z;
-            // Collapse position back to z=0
-            v->p.z = 0;
-
-            float theta = linalg::lerp(0.0f, 2.0f * fPI * revs, zparam);
-            mat4f Mspin = mat4f::translation(0, 0, length * zparam) * mat4f::rotation(theta, 0, 0, 1);
-            mat4f M = Mpos * Mspin * Minit;
-
-            v->p = (M * v->p.xyz1()).xyz();
-            v->normal = normalize((M * v->normal.xyz0()).xyz());
-            v->color = color;
+            float t = (float)i / (float)segments;
+            float theta = t * 2.0f * 3.14159f * revs;
+            points.emplace_back(std::cos(theta) * r_outer,
+                std::sin(theta) * r_outer,
+                t * length);
         }
 
-        // Now push the helix:ified vertex & index arrays to the main batch
+        for (int i = 0; i < segments; i++)
+        {
+            indices.push_back(i);
+            indices.push_back(i + 1);
+        }
+
+        push_lines(points.data(), points.size(), indices.data(), indices.size());
+    }
+
+    void ShapeRenderer::push_helix_solid(
+        const glm::vec3& from,
+        const glm::vec3& to,
+        float r_outer,
+        float r_inner,
+        float revs)
+    {
+        glm::vec3 helixv = (to - from);
+        float helixl = glm::length(helixv);
+        if (helixl <= 0.0f || revs <= 0.0f || r_inner <= 0.0f)
+            return;
+
+        const glm::mat4 R = glm::mat4(create_basis_from_vector(helixv));
+        const glm::mat4 T = glm::translate(glm::mat4(1.0f), from);
+        const glm::mat4 M = T * R;
+
+        push_states(M);
+        push_helix_solid(helixl, r_outer, r_inner, revs);
+        pop_states<glm::mat4>();
+    }
+
+    void ShapeRenderer::push_helix_solid(
+        float length,
+        float r_outer,
+        float r_inner,
+        float revs)
+    {
+        if (length <= 0.0f || revs <= 0.0f || r_inner <= 0.0f)
+            return;
+
+        const auto [color, depth_test, cull_face, Mpos] = get_states<Color4u, DepthTest, BackfaceCull, glm::mat4>();
+        std::vector<PolyVertex> vertices;
+        std::vector<unsigned> indices;
+
+        const int res_per_rev = 12;
+        int hres = (int)std::ceil(revs * res_per_rev) + 1;
+        if (hres < 2)
+            hres = 2;
+        const int rres = 8;
+
+        create_cylinder(1.0f, r_inner, hres, rres, vertices, indices);
+
+        const glm::mat4 Minit =
+            glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, r_outer, 0.0f)) *
+            glm::rotate(glm::mat4(1.0f), -0.5f * 3.14159f, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        for (auto& v : vertices)
+        {
+            float zparam = v.p.z;
+            v.p.z = 0.0f;
+
+            float theta = zparam * 2.0f * 3.14159f * revs;
+            glm::mat4 Mspin =
+                glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, length * zparam)) *
+                glm::rotate(glm::mat4(1.0f), theta, glm::vec3(0.0f, 0.0f, 1.0f));
+            glm::mat4 M = Mpos * Mspin * Minit;
+
+            v.p = glm::vec3(M * glm::vec4(v.p, 1.0f));
+            glm::mat3 N = glm::transpose(glm::inverse(glm::mat3(M)));
+            v.normal = glm::normalize(N * v.normal);
+            v.color = color;
+        }
 
         unsigned vertex_ofs = (unsigned)polygon_vertices.size();
         GLsizei index_ofs = (GLsizei)polygon_indices.size();
 
-        polygon_vertices.insert(polygon_vertices.end(),
-            hvert.begin(),
-            hvert.end());
-        polygon_indices.insert(polygon_indices.end(),
-            hind.begin(),
-            hind.end());
+        polygon_vertices.insert(polygon_vertices.end(), vertices.begin(), vertices.end());
+        polygon_indices.insert(polygon_indices.end(), indices.begin(), indices.end());
 
         polygon_hash.insert({
             PolygonBatch {GL_TRIANGLES, depth_test, cull_face},
-            IndexRange {index_ofs, (GLsizei)hind.size(), (GLint)vertex_ofs}
+            IndexRange {index_ofs, (GLsizei)indices.size(), (GLint)vertex_ofs}
             });
-
-#if 0
-        // Add normals (last [vertex_ofs] added normals)
-        for (auto it = std::next(varray.begin(), vertex_ofs); it < varray.end(); it++)
-        {
-            push_line(it->p, it->p + it->normal * 0.2f, { 0,1,0 });
-        }
-#endif
     }
 
-    void ShapeRenderer::push_frustum(const mat4f& invProjView)
+    void ShapeRenderer::push_frustum(
+        const glm::mat4& inv_proj_view)
     {
         // Frustum corners in 3D Clip space
-        const vec4f f_points_clip[8] =
+        const glm::vec4 points_clip[8] =
         {
             // near
-            { -1, -1, -1, 1 },  // bottom-left
-            { 1, -1, -1, 1 },   // bottom-right
-            { 1, 1, -1, 1 },    // top-right
-            { -1, 1, -1, 1 },   // top-left
+            { -1.0f, -1.0f, -1.0f, 1.0f },
+            { 1.0f, -1.0f, -1.0f, 1.0f },
+            { 1.0f, 1.0f, -1.0f, 1.0f },
+            { -1.0f, 1.0f, -1.0f, 1.0f },
             // far
-            { -1, -1, 1, 1 },  // bottom-left
-            { 1, -1, 1, 1 },   // bottom-right
-            { 1, 1, 1, 1 },    // top-right
-            { -1, 1, 1, 1 }   // top-left
+            { -1.0f, -1.0f, 1.0f, 1.0f },
+            { 1.0f, -1.0f, 1.0f, 1.0f },
+            { 1.0f, 1.0f, 1.0f, 1.0f },
+            { -1.0f, 1.0f, 1.0f, 1.0f }
         };
-        vec4f f_points_world[8];
 
+        glm::vec3 points_world[8];
         for (int i = 0; i < 8; i++)
         {
-            // 3D Clip -> 3DH World
-            f_points_world[i] = invProjView * f_points_clip[i];
-
-            // Project from 3DH World to 3D World. Needed for perspective
-            // projection since the w-component is not submitted (otherwise
-            // this step would be performed in vertex post-processing on GPU).
-            const float winv = (1.0f / f_points_world[i].w);
-            f_points_world[i] = f_points_world[i] * winv;
+            // Unproject from clip space (NDC in [-1,1]) back to homogeneous world space.
+            glm::vec4 p = inv_proj_view * points_clip[i];
+            float winv = (std::abs(p.w) > 1.0e-6f) ? (1.0f / p.w) : 1.0f;
+            // Perspective divide: convert homogeneous world (x,y,z,w) to 3D world (x/w,y/w,z/w).
+            // This mirrors what the GPU does after the vertex shader.
+            points_world[i] = glm::vec3(p) * winv;
         }
 
         for (int i = 0; i < 4; i++)
         {
-            push_line(f_points_world[i].xyz(), f_points_world[(i + 1) % 4].xyz());
-            push_line(f_points_world[4 + i].xyz(), f_points_world[4 + (i + 1) % 4].xyz());
-            push_line(f_points_world[i].xyz(), f_points_world[i + 4].xyz());
+            push_line(points_world[i], points_world[(i + 1) % 4]);
+            push_line(points_world[4 + i], points_world[4 + (i + 1) % 4]);
+            push_line(points_world[i], points_world[i + 4]);
         }
     }
-#endif
 
     void ShapeRenderer::push_basis_basic(const glm::mat4& basis, float arrlen)
     {
@@ -1463,37 +1848,90 @@ namespace ShapeRendering {
 #endif
 
 #if 1
-        // Render lines batches
+        // Render thick line batches
 
         if (line_hash.size())
         {
-            glUseProgram(line_shader);
+            glUseProgram(thick_line_shader);
             glBindVertexArray(lines_VAO);
-
-            glLineWidth(1);
+            glDisable(GL_CULL_FACE);
 
             glBindBuffer(GL_ARRAY_BUFFER, lines_VBO);
             glBufferData(GL_ARRAY_BUFFER,
-                sizeof(LineVertex) * (int)line_vertices.size(),
-                &line_vertices[0],
+                sizeof(ThickLineVertex) * (int)line_vertices.size(),
+                line_vertices.data(),
                 GL_STREAM_DRAW);
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lines_IBO);
 
             glUniformMatrix4fv(
-                glGetUniformLocation(line_shader, "PROJ_VIEW"),
+                glGetUniformLocation(thick_line_shader, "PROJ_VIEW"),
                 1,
                 0,
                 glm::value_ptr(PROJ_VIEW));
 
-            // lines v3 (unorderded_map with vectors)
+            GLint viewport[4] = {};
+            glGetIntegerv(GL_VIEWPORT, viewport);
+            glUniform2f(
+                glGetUniformLocation(thick_line_shader, "viewport"),
+                (float)viewport[2],
+                (float)viewport[3]);
 
             for (auto& it : line_hash)
             {
                 int size = (int)it.second.size();
                 if (!size) continue;
 
-                const LineBatch& dc = it.first;
+                const LineBatch& batch = it.first;
+
+                if (to_integral(batch.depth_test)) glEnable(GL_DEPTH_TEST);
+                else                               glDisable(GL_DEPTH_TEST);
+
+                glUniform1f(
+                    glGetUniformLocation(thick_line_shader, "line_thickness"),
+                    batch.style.thickness);
+
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned) * size, &it.second[0], GL_STREAM_DRAW);
+                glDrawElements(GL_TRIANGLES, size, GL_UNSIGNED_INT, BUFOFS(0));
+            }
+            glBindVertexArray(0);
+            glUseProgram(0);
+            CheckAndThrowGLErrors();
+        }
+#endif
+
+#if 1
+        // Render simple line batches
+
+        if (simple_line_hash.size())
+        {
+            glUseProgram(simple_line_shader);
+            glBindVertexArray(simple_lines_VAO);
+
+            glLineWidth(1);
+
+            glBindBuffer(GL_ARRAY_BUFFER, simple_lines_VBO);
+            glBufferData(GL_ARRAY_BUFFER,
+                sizeof(LineVertex) * (int)simple_line_vertices.size(),
+                simple_line_vertices.data(),
+                GL_STREAM_DRAW);
+
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, simple_lines_IBO);
+
+            glUniformMatrix4fv(
+                glGetUniformLocation(simple_line_shader, "PROJ_VIEW"),
+                1,
+                0,
+                glm::value_ptr(PROJ_VIEW));
+
+            // lines v3 (unorderded_map with vectors)
+
+            for (auto& it : simple_line_hash)
+            {
+                int size = (int)it.second.size();
+                if (!size) continue;
+
+                const SimpleLineBatch& dc = it.first;
 
                 if (to_integral(dc.depth_test)) glEnable(GL_DEPTH_TEST);
                 else                            glDisable(GL_DEPTH_TEST);
@@ -1565,6 +2003,10 @@ namespace ShapeRendering {
         polygon_indices.clear();
         polygon_hash.clear();
 
+        simple_line_vertices.clear();
+        for (auto& it : simple_line_hash)
+            it.second.clear();
+
         line_vertices.clear();
         for (auto& it : line_hash)
             it.second.clear();
@@ -1575,116 +2017,211 @@ namespace ShapeRendering {
 
     void DemoDraw(ShapeRendererPtr renderer)
     {
-        float xpos = 0.0f;
+        const float row_base_y = 1.0f;
+        const float row_tri_y = row_base_y + 0.0f;
+        const float row_simple_y = row_base_y + 2.5f;
+        const float row_thick_y = row_base_y + 5.0f;
+        const float col_step = 2.5f;
 
-        // AABB
+        float x = 0.0f;
+        const float col_aabb = x; x += col_step;
+        const float col_lines = x; x += col_step;
+        const float col_quad = x; x += col_step;
+        const float col_cube = x; x += col_step;
+        const float col_cone = x; x += col_step;
+        const float col_cylinder = x; x += col_step;
+        const float col_arrow = x; x += col_step;
+        const float col_sphere = x; x += col_step;
+        const float col_circle = x; x += col_step;
+        const float col_helix = x; x += col_step;
+        const float col_frustum = x; x += col_step;
+        const float col_grid = x; x += col_step;
+
+        const auto arrowdesc = ShapeRendering::ArrowDescriptor
         {
-            renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(xpos, 1.0f, 0.0f)));
-            renderer->push_AABB(glm::vec3(xpos, 0.0f, 0.0f), glm::vec3(xpos + 1.0f, 1.0f, 1.0f));
-            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
-        }
+            .cone_fraction = 0.25f,
+            .cone_radius = 0.2f,
+            .cylinder_radius = 0.08f
+        };
+        const glm::mat4 frustum_view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::mat4 frustum_proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.3f, 3.0f);
+        const glm::mat4 frustum_inv_proj_view = glm::inverse(frustum_proj * frustum_view);
 
-        // Lines
-        {
-            xpos += 1.25f;
-            renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(xpos, 1.0f, 0.0f)));
-            renderer->push_line(glm::vec3(xpos, 0.25f, 0.0f), glm::vec3(xpos + 0.25f, 0.75f, 0.0f));
-            renderer->push_line(glm::vec3(xpos, 0.75f, 0.0f), glm::vec3(xpos + 0.25f, 0.25f, 0.0f));
-            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
-        }
-
-        // Push quads
+        // Bottom row: triangulated
         {
             glm::vec3 points[4]{ {-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {0.5f, 0.5f, 0.0f}, {-0.5f, 0.5f, 0.0f} };
-            renderer->push_states(ShapeRendering::Color4u{ 0x8000ffff });
 
-            renderer->push_states(glm_aux::TS(glm::vec3(xpos += 2.5f, 1.0f, 0.0f), glm::vec3(1.0f, 2.0f, 1.0f)));
+            renderer->push_states(ShapeRendering::Color4u{ 0x8000ffff });
+            renderer->push_states(glm_aux::TS(glm::vec3(col_quad, row_tri_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
             renderer->push_quad(points, glm_aux::vec3_001);
             renderer->pop_states<glm::mat4>();
-
-            renderer->push_states(glm_aux::TS(glm::vec3(xpos += 2.0f, 1.0f, 0.0f), glm::vec3(1.0f, 2.0f, 1.0f)));
-            renderer->push_quad_wireframe();
-            renderer->pop_states<glm::mat4>();
-
             renderer->pop_states<ShapeRendering::Color4u>();
-        }
 
-        // Push cube
-        {
             renderer->push_states(ShapeRendering::Color4u{ 0x800000ff });
-
-            renderer->push_states(glm_aux::TS(glm::vec3(xpos += 2.0f, 1.0f, 0.0f), glm::vec3(1.0f, 2.0f, 1.0f)));
+            renderer->push_states(glm_aux::TS(glm::vec3(col_cube, row_tri_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
             renderer->push_cube();
             renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
 
-            renderer->push_states(glm_aux::TS(glm::vec3(xpos += 2.0f, 1.0f, 0.0f), glm::vec3(1.0f, 2.0f, 1.0f)));
-            renderer->push_cube_wireframe();
+            renderer->push_states(ShapeRendering::Color4u::Orange);
+            renderer->push_states(glm_aux::T(glm::vec3(col_cone, row_tri_y, 0.0f)));
+            renderer->push_cone(1.5f, 0.5f);
             renderer->pop_states<glm::mat4>();
-
-            renderer->pop_states<ShapeRendering::Color4u>();
-        }
-
-        // Push grid
-        {
-            renderer->push_states(ShapeRendering::Color4u{ 0xff808080 });
-            renderer->push_grid(glm::vec3(0.0f, 1.0e-6f, 0.0f), 20.0f, 21);
-            renderer->pop_states<ShapeRendering::Color4u>();
-        }
-
-        // Cones, Cylinders
-        {
-            const auto arrowdesc = ShapeRendering::ArrowDescriptor
-            {
-                .cone_fraction = 0.2,
-                .cone_radius = 0.15f,
-                .cylinder_radius = 0.075f
-            };
-            renderer->push_states(glm_aux::T(glm::vec3(xpos += 2.0f, 0.0f, 0.0f)));
-            renderer->push_basis(arrowdesc, glm::vec3(1.0f, 2.0f, 3.0f));
+            renderer->push_states(glm_aux::T(glm::vec3(col_cylinder, row_tri_y, 0.0f)));
+            renderer->push_cylinder(1.5f, 0.5f);
             renderer->pop_states<glm::mat4>();
-        }
-
-        // Points
-        {
-            renderer->push_states(ShapeRendering::Color4u::Red);
-            renderer->push_point(glm::vec3(xpos += 2.0f, 1.0f, 0.0f), 1);
             renderer->pop_states<ShapeRendering::Color4u>();
 
-            renderer->push_states(ShapeRendering::Color4u::Green);
-            renderer->push_point(glm::vec3(xpos, 2.0f, 0.0f), 2);
+            renderer->push_states(ShapeRendering::Color4u::Yellow);
+            renderer->push_states(glm_aux::T(glm::vec3(col_arrow, row_tri_y, 0.0f)));
+            renderer->push_arrow(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc);
+            renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
-            renderer->push_states(ShapeRendering::Color4u::Blue);
-            renderer->push_point(glm::vec3(xpos, 3.0f, 0.0f), 4);
-            renderer->pop_states<ShapeRendering::Color4u>();
-
-            renderer->push_states(ShapeRendering::Color4u::White);
-            renderer->push_point(glm::vec3(xpos, 4.0f, 0.0f), 8);
-            renderer->pop_states<ShapeRendering::Color4u>();
-        }
-
-        // Circle ring
-        {
-            renderer->push_states(ShapeRendering::Color4u::Cyan);
-            renderer->push_states(glm_aux::TS(glm::vec3(xpos += 2, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)));
-            renderer->push_circle_ring<8>();
-            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
-        }
-
-        // Sphere
-        {
             renderer->push_states(ShapeRendering::Color4u::Purple);
-            renderer->push_states(glm_aux::TS(glm::vec3(xpos += 2, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)));
+            renderer->push_states(glm_aux::TS(glm::vec3(col_sphere, row_tri_y, 0.0f), glm::vec3(1.0f)));
             renderer->push_sphere(1.0f, 1.0f);
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
-        }
-        // Sphere wireframe
-        {
-            renderer->push_states(ShapeRendering::Color4u::Purple);
-            renderer->push_states(glm_aux::TS(glm::vec3(xpos += 2, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)));
-            renderer->push_sphere_wireframe(1.0f, 1.0f);
+
+            renderer->push_states(ShapeRendering::Color4u::Turquoise);
+            renderer->push_states(glm_aux::T(glm::vec3(col_helix, row_tri_y, 0.0f)));
+            renderer->push_helix_solid(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.12f, 3.0f);
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
         }
+
+        // Middle row: simple lines
+        {
+            renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(col_aabb, row_simple_y, 0.0f)));
+            renderer->push_AABB(glm::vec3(-0.5f), glm::vec3(0.5f));
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(col_lines, row_simple_y, 0.0f)));
+            renderer->push_line(glm::vec3(-0.35f, -0.35f, 0.0f), glm::vec3(0.35f, 0.35f, 0.0f));
+            renderer->push_line(glm::vec3(-0.35f, 0.35f, 0.0f), glm::vec3(0.35f, -0.35f, 0.0f));
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Yellow);
+            renderer->push_states(glm_aux::TS(glm::vec3(col_quad, row_simple_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
+            renderer->push_quad_wireframe();
+            renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
+
+            renderer->push_states(ShapeRendering::Color4u::Yellow);
+            renderer->push_states(glm_aux::TS(glm::vec3(col_cube, row_simple_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
+            renderer->push_cube_wireframe();
+            renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
+
+            renderer->push_states(ShapeRendering::Color4u::Orange);
+            renderer->push_states(glm_aux::T(glm::vec3(col_cone, row_simple_y, 0.0f)));
+            renderer->push_cone_wireframe(1.5f, 0.5f);
+            renderer->pop_states<glm::mat4>();
+            renderer->push_states(glm_aux::T(glm::vec3(col_cylinder, row_simple_y, 0.0f)));
+            renderer->push_cylinder_wireframe(1.5f, 0.5f);
+            renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
+
+            renderer->push_states(ShapeRendering::Color4u::Yellow);
+            renderer->push_states(glm_aux::T(glm::vec3(col_arrow, row_simple_y, 0.0f)));
+            renderer->push_arrow_wireframe(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc);
+            renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
+
+            renderer->push_states(ShapeRendering::Color4u::Purple);
+            renderer->push_states(glm_aux::TS(glm::vec3(col_sphere, row_simple_y, 0.0f), glm::vec3(1.0f)));
+            renderer->push_sphere_wireframe(1.0f, 1.0f);
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Cyan);
+            renderer->push_states(glm_aux::T(glm::vec3(col_circle, row_simple_y, 0.0f)));
+            renderer->push_circle_ring<16>();
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Turquoise);
+            renderer->push_states(glm_aux::T(glm::vec3(col_helix, row_simple_y, 0.0f)));
+            renderer->push_helix(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.1f, 3.0f);
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Silver);
+            renderer->push_states(glm_aux::TS(glm::vec3(col_frustum, row_simple_y, 0.0f), glm::vec3(0.6f)));
+            renderer->push_frustum(frustum_inv_proj_view);
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u{ 0xff808080 });
+            renderer->push_states(glm_aux::T(glm::vec3(col_grid, row_simple_y, 0.0f)));
+            renderer->push_grid(glm::vec3(0.0f), 2.0f, 5);
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+        }
+
+        // Top row: thick lines
+        renderer->push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 3.0f });
+        {
+            renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(col_aabb, row_thick_y, 0.0f)));
+            renderer->push_AABB(glm::vec3(-0.5f), glm::vec3(0.5f));
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(col_lines, row_thick_y, 0.0f)));
+            renderer->push_line(glm::vec3(-0.35f, -0.35f, 0.0f), glm::vec3(0.35f, 0.35f, 0.0f));
+            renderer->push_line(glm::vec3(-0.35f, 0.35f, 0.0f), glm::vec3(0.35f, -0.35f, 0.0f));
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Yellow);
+            renderer->push_states(glm_aux::TS(glm::vec3(col_quad, row_thick_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
+            renderer->push_quad_wireframe();
+            renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
+
+            renderer->push_states(ShapeRendering::Color4u::Yellow);
+            renderer->push_states(glm_aux::TS(glm::vec3(col_cube, row_thick_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
+            renderer->push_cube_wireframe();
+            renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
+
+            renderer->push_states(ShapeRendering::Color4u::Orange);
+            renderer->push_states(glm_aux::T(glm::vec3(col_cone, row_thick_y, 0.0f)));
+            renderer->push_cone_wireframe(1.5f, 0.5f);
+            renderer->pop_states<glm::mat4>();
+            renderer->push_states(glm_aux::T(glm::vec3(col_cylinder, row_thick_y, 0.0f)));
+            renderer->push_cylinder_wireframe(1.5f, 0.5f);
+            renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
+
+            renderer->push_states(ShapeRendering::Color4u::Yellow);
+            renderer->push_states(glm_aux::T(glm::vec3(col_arrow, row_thick_y, 0.0f)));
+            renderer->push_arrow_wireframe(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc);
+            renderer->pop_states<glm::mat4>();
+            renderer->pop_states<ShapeRendering::Color4u>();
+
+            renderer->push_states(ShapeRendering::Color4u::Purple);
+            renderer->push_states(glm_aux::TS(glm::vec3(col_sphere, row_thick_y, 0.0f), glm::vec3(1.0f)));
+            renderer->push_sphere_wireframe(1.0f, 1.0f);
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Cyan);
+            renderer->push_states(glm_aux::T(glm::vec3(col_circle, row_thick_y, 0.0f)));
+            renderer->push_circle_ring<16>();
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Turquoise);
+            renderer->push_states(glm_aux::T(glm::vec3(col_helix, row_thick_y, 0.0f)));
+            renderer->push_helix(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.1f, 3.0f);
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::Color4u::Silver);
+            renderer->push_states(glm_aux::TS(glm::vec3(col_frustum, row_thick_y, 0.0f), glm::vec3(0.6f)));
+            renderer->push_frustum(frustum_inv_proj_view);
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+
+            renderer->push_states(ShapeRendering::LineStyle{ 2.0f });
+            renderer->push_states(ShapeRendering::Color4u{ 0xffa0a0a0 });
+            renderer->push_states(glm_aux::T(glm::vec3(col_grid, row_thick_y, 0.0f)));
+            renderer->push_grid(glm::vec3(0.0f), 2.0f, 5);
+            renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
+            renderer->pop_states<ShapeRendering::LineStyle>();
+        }
+        renderer->pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
     }
 
 } // namespace ShapeRendering
