@@ -4,14 +4,15 @@
 #include <future>
 #include <functional>
 #include <atomic>
+#include <memory>
 #include <stdexcept>
 
 class MainThreadQueue
 {
 public:
-    explicit MainThreadQueue(std::atomic<bool>* shutdown_flag = nullptr)
+    explicit MainThreadQueue(std::shared_ptr<std::atomic<bool>> shutdown_flag = {})
         : owner_(std::this_thread::get_id())
-        , shutdown_flag_(shutdown_flag) {
+        , shutdown_flag_(std::move(shutdown_flag)) {
     }
 
     // Enqueue a task (non-blocking). Callable must be noexcept or handle its own exceptions.
@@ -101,5 +102,5 @@ private:
     mutable std::mutex      mtx_;
     std::condition_variable  cv_;
     std::queue<std::function<void()>> q_;
-    std::atomic<bool>*      shutdown_flag_ = nullptr;
+    std::shared_ptr<std::atomic<bool>> shutdown_flag_;
 };

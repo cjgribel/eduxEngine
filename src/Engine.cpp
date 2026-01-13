@@ -24,29 +24,96 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_opengl.h>
+#include <chrono>
 #include <memory>
 
 namespace
 {
+    void log_shutdown(eeng::EngineContext* ctx, const char* message)
+    {
+        std::cout << "[Shutdown] " << message << std::endl;
+        if (ctx && ctx->log_manager)
+            EENG_LOG_INFO(ctx, "%s", message);
+    }
+
+    void log_shutdown_warn(eeng::EngineContext* ctx, const char* message)
+    {
+        std::cerr << "[Shutdown] " << message << std::endl;
+        if (ctx && ctx->log_manager)
+            EENG_LOG_WARN(ctx, "%s", message);
+    }
+
     void drain_shutdown_queues(eeng::EngineContext& ctx)
     {
+        // Bounded drain: handle already-queued main-thread work and any events it
+        // triggers, without risking an infinite loop during shutdown.
         constexpr int kMaxCycles = 8;
         for (int i = 0; i < kMaxCycles; ++i)
         {
             bool did_work = false;
+            // 1) Run all currently queued main-thread tasks.
             if (ctx.main_thread_queue && !ctx.main_thread_queue->empty())
             {
                 ctx.main_thread_queue->execute_all();
                 did_work = true;
             }
+            // 2) Dispatch any pending events. Handlers may enqueue more main-thread work.
             if (ctx.event_queue && ctx.event_queue->has_pending_events())
             {
                 ctx.event_queue->dispatch_all_events();
                 did_work = true;
             }
+            // 3) Stop early if nothing was processed this cycle.
             if (!did_work)
                 break;
         }
+    }
+
+    template<typename FutureType>
+    bool pump_until_ready(
+        eeng::EngineContext& ctx,
+        FutureType& future,
+        const char* label,
+        Uint32 timeout_ms)
+    {
+        using namespace std::chrono_literals;
+        const Uint32 start_ms = SDL_GetTicks();
+        while (future.valid() &&
+            future.wait_for(0ms) != std::future_status::ready)
+        {
+            // While waiting, keep main-thread work moving to avoid deadlocks
+            // from tasks that call push_and_wait().
+            drain_shutdown_queues(ctx);
+            SDL_Delay(1);
+
+            if (timeout_ms > 0 && SDL_GetTicks() - start_ms > timeout_ms)
+            {
+                log_shutdown_warn(&ctx, label);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool pump_until_resource_idle(
+        eeng::EngineContext& ctx,
+        eeng::IResourceManager& rm,
+        Uint32 timeout_ms)
+    {
+        const Uint32 start_ms = SDL_GetTicks();
+        while (rm.is_busy())
+        {
+            // ResourceManager async work may block on main-thread operations.
+            drain_shutdown_queues(ctx);
+            SDL_Delay(1);
+
+            if (timeout_ms > 0 && SDL_GetTicks() - start_ms > timeout_ms)
+            {
+                log_shutdown_warn(&ctx, "Shutdown: resource manager wait timed out");
+                return false;
+            }
+        }
+        return true;
     }
 }
 
@@ -287,16 +354,48 @@ namespace eeng
 
         if (ctx)
         {
-            ctx->shutdown_requested.store(true, std::memory_order_relaxed);
+            log_shutdown(ctx.get(), "Shutdown: begin");
+            std::shared_future<TaskResult> unload_future;
+            if (ctx->batch_registry)
+            {
+                log_shutdown(ctx.get(), "Shutdown: request batch unloads");
+                auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
+                unload_future = br.queue_unload_all_async(*ctx);
+            }
+            if (unload_future.valid())
+            {
+                pump_until_ready(
+                    *ctx,
+                    unload_future,
+                    "Shutdown: batch unload wait timed out",
+                    5000);
+            }
+
+            if (ctx->resource_manager)
+            {
+                log_shutdown(ctx.get(), "Shutdown: waiting for resource tasks");
+                pump_until_resource_idle(*ctx, *ctx->resource_manager, 5000);
+            }
+
+            // Set the shutdown flag after drain operations so internal async
+            // scheduling isn't blocked while we unwind outstanding work.
+            if (ctx->shutdown_requested)
+                ctx->shutdown_requested->store(true, std::memory_order_relaxed);
             // Drain a few cycles to flush any already-queued main thread work and
             // dependent events before tearing down GUI/GL resources.
+            log_shutdown(ctx.get(), "Shutdown: draining main-thread tasks and events");
             drain_shutdown_queues(*ctx);
         }
 
         // Todo: release all context managers etc here?
         if (ctx && ctx->gui_manager)
+        {
+            log_shutdown(ctx.get(), "Shutdown: releasing GUI");
             ctx->gui_manager->release();
+        }
 
+        if (ctx)
+            log_shutdown(ctx.get(), "Shutdown: stopping ImGui backend");
         imgui_backend::shutdown();
 
         if (gl_context_)
@@ -304,6 +403,8 @@ namespace eeng
         if (window_)
             SDL_DestroyWindow(window_);
 
+        if (ctx)
+            log_shutdown(ctx.get(), "Shutdown: SDL_Quit");
         SDL_Quit();
     }
 

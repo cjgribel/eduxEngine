@@ -42,9 +42,6 @@ namespace eeng
 
             uint64_t value = (high << 32) | (mid << 16) | low;
 
-            // Debug output
-            std::cout << "Parsed GUID string: " << str << " to value: " << value << std::endl;
-
             return Guid(value);
         }
 

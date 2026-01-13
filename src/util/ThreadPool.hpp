@@ -14,12 +14,13 @@
 #include <type_traits>
 #include <utility>
 #include <stdexcept>
+#include <memory>
 
 class ThreadPool : public IExecutor
 {
 public:
     explicit ThreadPool(size_t thread_count = std::thread::hardware_concurrency(),
-        std::atomic<bool>* shutdown_flag = nullptr);
+        std::shared_ptr<std::atomic<bool>> shutdown_flag = {});
     ~ThreadPool();
 
     // IExecutor
@@ -50,7 +51,7 @@ private:
     std::atomic<size_t> working_count{ 0 };
 
     const size_t thread_count;
-    std::atomic<bool>* shutdown_flag_ = nullptr;
+    std::shared_ptr<std::atomic<bool>> shutdown_flag_;
 };
 
 // Template definition remains in the header

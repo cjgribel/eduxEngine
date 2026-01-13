@@ -13,6 +13,7 @@
 #include <vector>
 #include <iostream>
 #include <atomic>
+#include <memory>
 
 namespace internal
 {
@@ -56,8 +57,8 @@ class EventQueue
     }
 
 public:
-    explicit EventQueue(std::atomic<bool>* shutdown_flag = nullptr)
-        : shutdown_flag_(shutdown_flag)
+    explicit EventQueue(std::shared_ptr<std::atomic<bool>> shutdown_flag = {})
+        : shutdown_flag_(std::move(shutdown_flag))
     {
     }
 
@@ -171,7 +172,7 @@ private:
         return shutdown_flag_ && shutdown_flag_->load(std::memory_order_relaxed);
     }
 
-    std::atomic<bool>* shutdown_flag_ = nullptr;
+    std::shared_ptr<std::atomic<bool>> shutdown_flag_;
 };
 
 #endif

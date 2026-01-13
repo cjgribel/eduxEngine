@@ -141,7 +141,7 @@ namespace eeng
         std::unique_ptr<IGuiManager>            gui_manager;
         std::unique_ptr<IInputManager>          input_manager;
         std::shared_ptr<ILogManager>            log_manager;
-        std::atomic<bool>                       shutdown_requested{ false };
+        std::shared_ptr<std::atomic<bool>>      shutdown_requested;
         std::unique_ptr<MainThreadQueue>        main_thread_queue;
         std::unique_ptr<ThreadPool>             thread_pool;
         std::unique_ptr<EventQueue>             event_queue;
