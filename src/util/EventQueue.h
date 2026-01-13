@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <vector>
 #include <iostream>
+#include <atomic>
 
 namespace internal
 {
@@ -55,11 +56,17 @@ class EventQueue
     }
 
 public:
+    explicit EventQueue(std::atomic<bool>* shutdown_flag = nullptr)
+        : shutdown_flag_(shutdown_flag)
+    {
+    }
 
     /// Enqueue an event (thread-safe)
     template<typename EventType>
     bool enqueue_event(EventType&& event) noexcept
     {
+        if (shutdown_requested())
+            return false;
         try {
             std::lock_guard lk(events_mutex);
             events.emplace_back(
@@ -157,6 +164,14 @@ public:
 
         callback_map[typeid(EventType)].push_back(wrapped_callback);
     }
+
+private:
+    bool shutdown_requested() const noexcept
+    {
+        return shutdown_flag_ && shutdown_flag_->load(std::memory_order_relaxed);
+    }
+
+    std::atomic<bool>* shutdown_flag_ = nullptr;
 };
 
 #endif

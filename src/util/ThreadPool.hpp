@@ -13,11 +13,13 @@
 #include <iostream>
 #include <type_traits>
 #include <utility>
+#include <stdexcept>
 
 class ThreadPool : public IExecutor
 {
 public:
-    explicit ThreadPool(size_t thread_count = std::thread::hardware_concurrency());
+    explicit ThreadPool(size_t thread_count = std::thread::hardware_concurrency(),
+        std::atomic<bool>* shutdown_flag = nullptr);
     ~ThreadPool();
 
     // IExecutor
@@ -33,6 +35,10 @@ public:
     bool is_task_queue_empty() const;
 
 private:
+    bool shutdown_requested() const noexcept
+    {
+        return shutdown_flag_ && shutdown_flag_->load(std::memory_order_relaxed);
+    }
 
     std::vector<std::thread> workers;
     std::condition_variable cv;
@@ -44,6 +50,7 @@ private:
     std::atomic<size_t> working_count{ 0 };
 
     const size_t thread_count;
+    std::atomic<bool>* shutdown_flag_ = nullptr;
 };
 
 // Template definition remains in the header
@@ -51,6 +58,14 @@ template <typename Func>
 auto ThreadPool::queue_task(Func task) -> std::future<std::invoke_result_t<Func>>
 {
     using ResultType = std::invoke_result_t<Func>;
+
+    if (shutdown_requested() || stop.load(std::memory_order_relaxed))
+    {
+        std::promise<ResultType> prom;
+        prom.set_exception(std::make_exception_ptr(
+            std::runtime_error("ThreadPool is shutting down")));
+        return prom.get_future();
+    }
 
     auto packaged_task = std::make_shared<std::packaged_task<ResultType()>>(std::move(task));
     auto future = packaged_task->get_future();

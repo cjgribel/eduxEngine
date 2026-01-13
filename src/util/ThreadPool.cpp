@@ -1,7 +1,8 @@
 #include "ThreadPool.hpp"
 
-ThreadPool::ThreadPool(size_t thread_count)
+ThreadPool::ThreadPool(size_t thread_count, std::atomic<bool>* shutdown_flag)
     : thread_count(thread_count)
+    , shutdown_flag_(shutdown_flag)
 {
     for (size_t i = 0; i < thread_count; ++i)
     {

@@ -26,6 +26,30 @@
 #include <SDL_opengl.h>
 #include <memory>
 
+namespace
+{
+    void drain_shutdown_queues(eeng::EngineContext& ctx)
+    {
+        constexpr int kMaxCycles = 8;
+        for (int i = 0; i < kMaxCycles; ++i)
+        {
+            bool did_work = false;
+            if (ctx.main_thread_queue && !ctx.main_thread_queue->empty())
+            {
+                ctx.main_thread_queue->execute_all();
+                did_work = true;
+            }
+            if (ctx.event_queue && ctx.event_queue->has_pending_events())
+            {
+                ctx.event_queue->dispatch_all_events();
+                did_work = true;
+            }
+            if (!did_work)
+                break;
+        }
+    }
+}
+
 namespace eeng
 {
     Engine::Engine(std::shared_ptr<EngineContext> ctx)
@@ -263,14 +287,10 @@ namespace eeng
 
         if (ctx)
         {
-            // Flush once before tearing down GUI/GL to reduce stale work and avoid
-            // leaving queued main-thread actions orphaned during shutdown.
-            if (ctx->main_thread_queue)
-                ctx->main_thread_queue->execute_all();
-            // Dispatch any pending completion events so subsystems can observe
-            // shutdown-related results before resources are released.
-            if (ctx->event_queue)
-                ctx->event_queue->dispatch_all_events();
+            ctx->shutdown_requested.store(true, std::memory_order_relaxed);
+            // Drain a few cycles to flush any already-queued main thread work and
+            // dependent events before tearing down GUI/GL resources.
+            drain_shutdown_queues(*ctx);
         }
 
         // Todo: release all context managers etc here?

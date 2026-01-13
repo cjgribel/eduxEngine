@@ -81,9 +81,9 @@ namespace eeng
         , gui_manager(std::move(gui_manager))
         , input_manager(std::move(input_manager))
         , log_manager(log_manager)
-        , main_thread_queue(std::make_unique<MainThreadQueue>())
-        , thread_pool(std::make_unique<ThreadPool>()) // 2+, reload async deadlocks for < 2 threads
-        , event_queue(std::make_unique<EventQueue>())
+        , main_thread_queue(std::make_unique<MainThreadQueue>(&shutdown_requested))
+        , thread_pool(std::make_unique<ThreadPool>(std::thread::hardware_concurrency(), &shutdown_requested)) // 2+, reload async deadlocks for < 2 threads
+        , event_queue(std::make_unique<EventQueue>(&shutdown_requested))
         , command_queue(std::make_unique<editor::CommandQueue>())
         , asset_selection(std::make_unique<editor::SelectionManager<Guid>>())
         , entity_selection(std::make_unique<editor::SelectionManager<ecs::Entity>>())

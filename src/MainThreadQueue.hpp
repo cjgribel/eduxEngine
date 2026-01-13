@@ -3,17 +3,22 @@
 #include <condition_variable>
 #include <future>
 #include <functional>
+#include <atomic>
+#include <stdexcept>
 
 class MainThreadQueue
 {
 public:
-    explicit MainThreadQueue()
-        : owner_(std::this_thread::get_id()) {
+    explicit MainThreadQueue(std::atomic<bool>* shutdown_flag = nullptr)
+        : owner_(std::this_thread::get_id())
+        , shutdown_flag_(shutdown_flag) {
     }
 
     // Enqueue a task (non-blocking). Callable must be noexcept or handle its own exceptions.
     void push(std::function<void()> fn)
     {
+        if (shutdown_requested())
+            return;
         {
             std::lock_guard<std::mutex> lk(mtx_);
             q_.push(std::move(fn));
@@ -32,6 +37,8 @@ public:
             if constexpr (std::is_void_v<R>) { fn(); return; }
             else { return fn(); }
         }
+        if (shutdown_requested())
+            throw std::runtime_error("MainThreadQueue is shutting down");
 
         // otherwise enqueue + wait (Fix 1 or Fix 2 here)
         auto prom = std::make_shared<std::promise<R>>();
@@ -85,8 +92,14 @@ public:
     }
 
 private:
+    bool shutdown_requested() const noexcept
+    {
+        return shutdown_flag_ && shutdown_flag_->load(std::memory_order_relaxed);
+    }
+
     std::thread::id         owner_;
     mutable std::mutex      mtx_;
     std::condition_variable  cv_;
     std::queue<std::function<void()>> q_;
+    std::atomic<bool>*      shutdown_flag_ = nullptr;
 };
