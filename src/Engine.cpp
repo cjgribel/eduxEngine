@@ -258,8 +258,24 @@ namespace eeng
 
     void Engine::shutdown()
     {
+        if (shutdown_started_.exchange(true))
+            return;
+
+        if (ctx)
+        {
+            // Flush once before tearing down GUI/GL to reduce stale work and avoid
+            // leaving queued main-thread actions orphaned during shutdown.
+            if (ctx->main_thread_queue)
+                ctx->main_thread_queue->execute_all();
+            // Dispatch any pending completion events so subsystems can observe
+            // shutdown-related results before resources are released.
+            if (ctx->event_queue)
+                ctx->event_queue->dispatch_all_events();
+        }
+
         // Todo: release all context managers etc here?
-        ctx->gui_manager->release();
+        if (ctx && ctx->gui_manager)
+            ctx->gui_manager->release();
 
         imgui_backend::shutdown();
 

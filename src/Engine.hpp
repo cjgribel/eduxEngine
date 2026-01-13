@@ -8,6 +8,7 @@
 #include "GameBase.h"
 #include "EngineContext.hpp"
 #include <iostream>
+#include <atomic>
 #include <memory>
 
 struct SDL_Window;              // Forward declaration
@@ -69,6 +70,7 @@ namespace eeng
         bool wireframe_mode = false; ///< Wireframe rendering state
         bool debug_logging = false; ///< Debug logging enabled state
         float min_frametime_ms = 0.0f; ///< Minimum frame duration in milliseconds (default 60 FPS)
+        std::atomic<bool> shutdown_started_{ false };
 
         // EngineContext ctx;
         std::shared_ptr<EngineContext> ctx;
