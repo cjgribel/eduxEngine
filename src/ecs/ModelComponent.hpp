@@ -18,10 +18,17 @@ namespace eeng::ecs
         // std::string chunk_tag; // PROBABLY SKIP
         // Guid guid;
         AssetRef<eeng::assets::GpuModelAsset> model_ref;
+
+        // TODO: animation FSM
         int clip_index = -1;
         float clip_time = 0.0f; // runtime
         float clip_speed = 1.0f;
         bool loop = true;
+        int blend_clip_index = -1;
+        float blend_clip_time = 0.0f; // runtime
+        float blend_clip_speed = 1.0f;
+        bool blend_loop = true;
+        float blend_factor = 0.0f;
 
         std::vector<glm::mat4> bone_matrices; // runtime
         std::vector<glm::mat4> node_global_matrices; // runtime

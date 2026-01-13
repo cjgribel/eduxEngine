@@ -17,9 +17,9 @@ namespace eeng::ecs::systems
     public:
         /// @brief Update animation state for all ModelComponent instances.
         /// @note Current implementation assumes uniform key spacing and does not
-        ///       interpolate by key timestamps. Future improvements can add
-        ///       time-based key lookup, clip blending, additive layers, and FSM-driven
-        ///       parameterized blends.
+        ///       interpolate by key timestamps. It supports single-clip playback
+        ///       and basic two-clip blends; future improvements can add time-based
+        ///       key lookup, additive layers, and FSM-driven parameterized blends.
         void update(entt::registry& registry, EngineContext& ctx, float delta_time);
     };
 }

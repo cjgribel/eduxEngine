@@ -544,6 +544,11 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "clip_index", "Clip Index", "Clip Index." })
                 .traits(MetaFlags::none)
 
+                // Blend clip index
+                .data<&eeng::ecs::ModelComponent::blend_clip_index>("blend_clip_index"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "blend_clip_index", "Blend Clip Index", "Blend clip index." })
+                .traits(MetaFlags::none)
+
                 // Anim clip time
                 // .data<&eeng::ecs::ModelComponent::clip_time>("clip_time"_hs)
                 // .custom<DataMetaInfo>(DataMetaInfo{ "clip_time", "Clip Time", "Clip Time." })
@@ -554,9 +559,24 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "clip_speed", "Clip Speed", "Clip Speed." })
                 .traits(MetaFlags::none)
 
+                // Blend clip speed
+                .data<&eeng::ecs::ModelComponent::blend_clip_speed>("blend_clip_speed"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "blend_clip_speed", "Blend Clip Speed", "Blend clip speed." })
+                .traits(MetaFlags::none)
+
                 // Anim clip loop
                 .data<&eeng::ecs::ModelComponent::loop>("loop"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "loop", "Loop", "Loop clip." })
+                .traits(MetaFlags::none)
+
+                // Blend clip loop
+                .data<&eeng::ecs::ModelComponent::blend_loop>("blend_loop"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "blend_loop", "Blend Loop", "Loop blend clip." })
+                .traits(MetaFlags::none)
+
+                // Blend factor
+                .data<&eeng::ecs::ModelComponent::blend_factor>("blend_factor"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "blend_factor", "Blend Factor", "Blend factor between clips." })
                 .traits(MetaFlags::none)
                 ;
             register_component<ecs::ModelComponent>();
