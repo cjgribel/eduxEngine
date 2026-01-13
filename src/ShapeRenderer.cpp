@@ -2074,103 +2074,103 @@ namespace ShapeRendering {
 
             renderer->push_states(ShapeRendering::Color4u{ 0x8000ffff });
             renderer->push_states(glm_aux::TS(glm::vec3(col_quad, row_tri_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
-            renderer->push_quad(points, glm_aux::vec3_001);
+            renderer->push_quad(points, glm_aux::vec3_001); // Quad (solid)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u{ 0x800000ff });
             renderer->push_states(glm_aux::TS(glm::vec3(col_cube, row_tri_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
-            renderer->push_cube();
+            renderer->push_cube(); // Cube (solid)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Orange);
             renderer->push_states(glm_aux::T(glm::vec3(col_cone, row_tri_y, 0.0f)));
-            renderer->push_cone(1.5f, 0.5f);
+            renderer->push_cone(1.5f, 0.5f); // Cone (solid)
             renderer->pop_states<glm::mat4>();
             renderer->push_states(glm_aux::T(glm::vec3(col_cylinder, row_tri_y, 0.0f)));
-            renderer->push_cylinder(1.5f, 0.5f);
+            renderer->push_cylinder(1.5f, 0.5f); // Cylinder (solid)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Yellow);
             renderer->push_states(glm_aux::T(glm::vec3(col_arrow, row_tri_y, 0.0f)));
-            renderer->push_arrow(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc);
+            renderer->push_arrow(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc); // Arrow (solid)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Purple);
             renderer->push_states(glm_aux::TS(glm::vec3(col_sphere, row_tri_y, 0.0f), glm::vec3(1.0f)));
-            renderer->push_sphere(1.0f, 1.0f);
+            renderer->push_sphere(1.0f, 1.0f); // Sphere (solid)
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Turquoise);
             renderer->push_states(glm_aux::T(glm::vec3(col_helix, row_tri_y, 0.0f)));
-            renderer->push_helix_solid(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.12f, 3.0f);
+            renderer->push_helix_solid(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.12f, 3.0f); // Helix (solid)
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
         }
 
         // Middle row: simple lines
         {
             renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(col_aabb, row_simple_y, 0.0f)));
-            renderer->push_AABB(glm::vec3(-0.5f), glm::vec3(0.5f));
+            renderer->push_AABB(glm::vec3(-0.5f), glm::vec3(0.5f)); // AABB (wireframe)
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(col_lines, row_simple_y, 0.0f)));
-            renderer->push_line(glm::vec3(-0.35f, -0.35f, 0.0f), glm::vec3(0.35f, 0.35f, 0.0f));
-            renderer->push_line(glm::vec3(-0.35f, 0.35f, 0.0f), glm::vec3(0.35f, -0.35f, 0.0f));
+            renderer->push_line(glm::vec3(-0.35f, -0.35f, 0.0f), glm::vec3(0.35f, 0.35f, 0.0f)); // Line segment
+            renderer->push_line(glm::vec3(-0.35f, 0.35f, 0.0f), glm::vec3(0.35f, -0.35f, 0.0f)); // Line segment
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Yellow);
             renderer->push_states(glm_aux::TS(glm::vec3(col_quad, row_simple_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
-            renderer->push_quad_wireframe();
+            renderer->push_quad_wireframe(); // Quad (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Yellow);
             renderer->push_states(glm_aux::TS(glm::vec3(col_cube, row_simple_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
-            renderer->push_cube_wireframe();
+            renderer->push_cube_wireframe(); // Cube (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Orange);
             renderer->push_states(glm_aux::T(glm::vec3(col_cone, row_simple_y, 0.0f)));
-            renderer->push_cone_wireframe(1.5f, 0.5f);
+            renderer->push_cone_wireframe(1.5f, 0.5f); // Cone (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->push_states(glm_aux::T(glm::vec3(col_cylinder, row_simple_y, 0.0f)));
-            renderer->push_cylinder_wireframe(1.5f, 0.5f);
+            renderer->push_cylinder_wireframe(1.5f, 0.5f); // Cylinder (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Yellow);
             renderer->push_states(glm_aux::T(glm::vec3(col_arrow, row_simple_y, 0.0f)));
-            renderer->push_arrow_wireframe(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc);
+            renderer->push_arrow_wireframe(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc); // Arrow (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Purple);
             renderer->push_states(glm_aux::TS(glm::vec3(col_sphere, row_simple_y, 0.0f), glm::vec3(1.0f)));
-            renderer->push_sphere_wireframe(1.0f, 1.0f);
+            renderer->push_sphere_wireframe(1.0f, 1.0f); // Sphere (wireframe)
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Cyan);
             renderer->push_states(glm_aux::T(glm::vec3(col_circle, row_simple_y, 0.0f)));
-            renderer->push_circle_ring<16>();
+            renderer->push_circle_ring<16>(); // Circle ring
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Turquoise);
             renderer->push_states(glm_aux::T(glm::vec3(col_helix, row_simple_y, 0.0f)));
-            renderer->push_helix(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.1f, 3.0f);
+            renderer->push_helix(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.1f, 3.0f); // Helix (line)
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Silver);
             renderer->push_states(glm_aux::TS(glm::vec3(col_frustum, row_simple_y, 0.0f), glm::vec3(0.6f)));
-            renderer->push_frustum(frustum_inv_proj_view);
+            renderer->push_frustum(frustum_inv_proj_view); // Frustum
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u{ 0xff808080 });
             renderer->push_states(glm_aux::T(glm::vec3(col_grid, row_simple_y, 0.0f)));
-            renderer->push_grid(glm::vec3(0.0f), 2.0f, 5);
+            renderer->push_grid(glm::vec3(0.0f), 2.0f, 5); // Grid
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
         }
 
@@ -2178,71 +2178,71 @@ namespace ShapeRendering {
         renderer->push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 3.0f });
         {
             renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(col_aabb, row_thick_y, 0.0f)));
-            renderer->push_AABB(glm::vec3(-0.5f), glm::vec3(0.5f));
+            renderer->push_AABB(glm::vec3(-0.5f), glm::vec3(0.5f)); // AABB (wireframe)
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Cyan, glm_aux::T(glm::vec3(col_lines, row_thick_y, 0.0f)));
-            renderer->push_line(glm::vec3(-0.35f, -0.35f, 0.0f), glm::vec3(0.35f, 0.35f, 0.0f));
-            renderer->push_line(glm::vec3(-0.35f, 0.35f, 0.0f), glm::vec3(0.35f, -0.35f, 0.0f));
+            renderer->push_line(glm::vec3(-0.35f, -0.35f, 0.0f), glm::vec3(0.35f, 0.35f, 0.0f)); // Line segment
+            renderer->push_line(glm::vec3(-0.35f, 0.35f, 0.0f), glm::vec3(0.35f, -0.35f, 0.0f)); // Line segment
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::LineStyle{ 3.0f, 10.0f, 0.5f, 0.0f });
             renderer->push_states(ShapeRendering::Color4u::Yellow, glm_aux::T(glm::vec3(col_lines, row_thick_y + 0.6f, 0.0f)));
-            renderer->push_line(glm::vec3(-0.45f, 0.0f, 0.0f), glm::vec3(0.45f, 0.0f, 0.0f));
+            renderer->push_line(glm::vec3(-0.45f, 0.0f, 0.0f), glm::vec3(0.45f, 0.0f, 0.0f)); // Dashed line segment
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
             renderer->pop_states<ShapeRendering::LineStyle>();
 
             renderer->push_states(ShapeRendering::Color4u::Yellow);
             renderer->push_states(glm_aux::TS(glm::vec3(col_quad, row_thick_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
-            renderer->push_quad_wireframe();
+            renderer->push_quad_wireframe(); // Quad (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Yellow);
             renderer->push_states(glm_aux::TS(glm::vec3(col_cube, row_thick_y, 0.0f), glm::vec3(1.0f, 1.5f, 1.0f)));
-            renderer->push_cube_wireframe();
+            renderer->push_cube_wireframe(); // Cube (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Orange);
             renderer->push_states(glm_aux::T(glm::vec3(col_cone, row_thick_y, 0.0f)));
-            renderer->push_cone_wireframe(1.5f, 0.5f);
+            renderer->push_cone_wireframe(1.5f, 0.5f); // Cone (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->push_states(glm_aux::T(glm::vec3(col_cylinder, row_thick_y, 0.0f)));
-            renderer->push_cylinder_wireframe(1.5f, 0.5f);
+            renderer->push_cylinder_wireframe(1.5f, 0.5f); // Cylinder (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Yellow);
             renderer->push_states(glm_aux::T(glm::vec3(col_arrow, row_thick_y, 0.0f)));
-            renderer->push_arrow_wireframe(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc);
+            renderer->push_arrow_wireframe(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 1.5f), arrowdesc); // Arrow (wireframe)
             renderer->pop_states<glm::mat4>();
             renderer->pop_states<ShapeRendering::Color4u>();
 
             renderer->push_states(ShapeRendering::Color4u::Purple);
             renderer->push_states(glm_aux::TS(glm::vec3(col_sphere, row_thick_y, 0.0f), glm::vec3(1.0f)));
-            renderer->push_sphere_wireframe(1.0f, 1.0f);
+            renderer->push_sphere_wireframe(1.0f, 1.0f); // Sphere (wireframe)
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Cyan);
             renderer->push_states(glm_aux::T(glm::vec3(col_circle, row_thick_y, 0.0f)));
-            renderer->push_circle_ring<16>();
+            renderer->push_circle_ring<16>(); // Circle ring
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Turquoise);
             renderer->push_states(glm_aux::T(glm::vec3(col_helix, row_thick_y, 0.0f)));
-            renderer->push_helix(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.1f, 3.0f);
+            renderer->push_helix(glm_aux::vec3_000, glm::vec3(0.0f, 0.0f, 2.0f), 0.4f, 0.1f, 3.0f); // Helix (line)
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::Color4u::Silver);
             renderer->push_states(glm_aux::TS(glm::vec3(col_frustum, row_thick_y, 0.0f), glm::vec3(0.6f)));
-            renderer->push_frustum(frustum_inv_proj_view);
+            renderer->push_frustum(frustum_inv_proj_view); // Frustum
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
 
             renderer->push_states(ShapeRendering::LineStyle{ 2.0f });
             renderer->push_states(ShapeRendering::Color4u{ 0xffa0a0a0 });
             renderer->push_states(glm_aux::T(glm::vec3(col_grid, row_thick_y, 0.0f)));
-            renderer->push_grid(glm::vec3(0.0f), 2.0f, 5);
+            renderer->push_grid(glm::vec3(0.0f), 2.0f, 5); // Grid
             renderer->pop_states<ShapeRendering::Color4u, glm::mat4>();
             renderer->pop_states<ShapeRendering::LineStyle>();
         }
