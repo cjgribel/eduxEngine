@@ -1,4 +1,6 @@
-# eduEngine
+# edu(x)Engine
+
+_async resource system spinoff_
 
 ![logo](logo.png)
 
