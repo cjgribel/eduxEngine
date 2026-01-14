@@ -126,6 +126,8 @@ namespace eeng
 
     Engine::~Engine()
     {
+        // Fallback cleanup: prefer running shutdown via the main loop so GL/SDL
+        // are torn down on the main thread while the context is still valid.
         shutdown();
     }
 
@@ -240,6 +242,7 @@ namespace eeng
         }
 
         bool running = true;
+        shutdown_state_ = ShutdownState::Running;
         float time_s = 0.0f, time_ms, deltaTime_s = 0.016f;
 
         EENG_LOG(ctx, "Entering main loop...");
@@ -252,6 +255,25 @@ namespace eeng
             time_s = now_s;
 
             process_events(running); // input etc
+            if (shutdown_state_ == ShutdownState::Draining)
+            {
+                // Shutdown is in-progress; keep the loop alive to pump queues,
+                // render the GUI, and avoid deadlocks while we drain async work.
+                if (advance_shutdown_drain())
+                {
+                    shutdown_state_ = ShutdownState::Teardown;
+                    running = false;
+                    continue;
+                }
+
+                // Keep GUI responsive during draining so the log window and
+                // shutdown progress remain visible.
+                begin_frame();
+                end_frame();
+                SDL_GL_SwapWindow(window_);
+                SDL_Delay(1);
+                continue;
+            }
             begin_frame(); // imgui_backend::show_demo_window(); ctx->gui_manager->draw(*ctx); GL setup
             // =================================================================
 
@@ -345,6 +367,7 @@ namespace eeng
             }
 
         game->destroy();
+        shutdown();
         }
 
     void Engine::shutdown()
@@ -354,29 +377,39 @@ namespace eeng
 
         if (ctx)
         {
-            log_shutdown(ctx.get(), "Shutdown: begin");
-            std::shared_future<TaskResult> unload_future;
-            if (ctx->batch_registry)
+            // If the main loop already drained, skip expensive waits here and
+            // proceed directly to teardown.
+            if (!shutdown_drained_)
             {
-                log_shutdown(ctx.get(), "Shutdown: request batch unloads");
-                unload_future = ctx->batch_registry->queue_unload_all_async(*ctx);
-            }
-            if (unload_future.valid())
-            {
-                pump_until_ready(
-                    *ctx,
-                    unload_future,
-                    "Shutdown: batch unload wait timed out",
-                    5000);
-            }
+                log_shutdown(ctx.get(), "Shutdown: begin");
+                std::shared_future<TaskResult> unload_future;
+                if (ctx->batch_registry)
+                {
+                    log_shutdown(ctx.get(), "Shutdown: request batch unloads");
+                    unload_future = ctx->batch_registry->queue_unload_all_async(*ctx);
+                }
+                if (unload_future.valid())
+                {
+                    pump_until_ready(
+                        *ctx,
+                        unload_future,
+                        "Shutdown: batch unload wait timed out",
+                        5000);
+                }
 
-            if (ctx->resource_manager)
-            {
-                log_shutdown(ctx.get(), "Shutdown: waiting for resource tasks");
-                pump_until_resource_idle(*ctx, *ctx->resource_manager, 5000);
+                if (ctx->resource_manager)
+                {
+                    log_shutdown(ctx.get(), "Shutdown: waiting for resource tasks");
+                    pump_until_resource_idle(*ctx, *ctx->resource_manager, 5000);
+                }
+
+                shutdown_drained_ = true;
             }
 
             // Shutdown policy:
+            // - Draining completes any async unloads while the main loop keeps running.
+            // - Teardown happens after we gate new work, so no new tasks are enqueued
+            //   while GUI/GL/SDL resources are being released.
             // We set the shutdown flag *after* draining batch/resource work so internal
             // unload tasks can still enqueue main-thread work (push_and_wait).
             // Alternative (stricter gating): set the flag before drains to block all new work.
@@ -392,14 +425,17 @@ namespace eeng
             drain_shutdown_queues(*ctx);
         }
 
-        // Todo: release all context managers etc here?
+        // Todo: release any future subsystem managers (audio/physics/etc) before ImGui/GL teardown.
+
         if (ctx && ctx->gui_manager)
         {
+            // GUI must be released before ImGui/GL teardown.
             log_shutdown(ctx.get(), "Shutdown: releasing GUI");
             ctx->gui_manager->release();
         }
 
         if (ctx)
+            // ImGui shutdown requires a live GL context.
             log_shutdown(ctx.get(), "Shutdown: stopping ImGui backend");
         imgui_backend::shutdown();
 
@@ -409,6 +445,7 @@ namespace eeng
             SDL_DestroyWindow(window_);
 
         if (ctx)
+            // SDL is the final platform shutdown step.
             log_shutdown(ctx.get(), "Shutdown: SDL_Quit");
         SDL_Quit();
     }
@@ -508,8 +545,57 @@ namespace eeng
             static_cast<InputManager&>(*ctx->input_manager).HandleEvent(&event);
 
             if (event.type == SDL_QUIT)
-                running = false;
+                shutdown_state_ = ShutdownState::Draining;
         }
+    }
+
+    bool Engine::advance_shutdown_drain()
+    {
+        // Drives the non-blocking shutdown phase inside the main loop so we can
+        // keep rendering and processing main-thread work while waiting.
+        if (!ctx)
+            return true;
+
+        if (!shutdown_drain_started_)
+        {
+            // Kick off unloads once; subsequent frames only pump and poll.
+            log_shutdown(ctx.get(), "Shutdown: begin draining in main loop");
+            if (ctx->batch_registry)
+            {
+                log_shutdown(ctx.get(), "Shutdown: request batch unloads");
+                shutdown_unload_future_ = ctx->batch_registry->queue_unload_all_async(*ctx);
+            }
+            shutdown_drain_start_ms_ = SDL_GetTicks();
+            shutdown_drain_started_ = true;
+        }
+
+        // Pump queued work every frame so background tasks that call
+        // push_and_wait() can make forward progress without deadlocking.
+        drain_shutdown_queues(*ctx);
+
+        // Check completion without blocking; if either queue is still active,
+        // keep draining on subsequent frames.
+        const bool unload_done = !shutdown_unload_future_.valid()
+            || shutdown_unload_future_.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+        const bool rm_done = !ctx->resource_manager || !ctx->resource_manager->is_busy();
+
+        if (!shutdown_drain_warned_
+            && shutdown_drain_start_ms_ > 0
+            && SDL_GetTicks() - shutdown_drain_start_ms_ > 5000)
+        {
+            log_shutdown_warn(ctx.get(), "Shutdown: drain still in progress");
+            shutdown_drain_warned_ = true;
+        }
+
+        if (!unload_done || !rm_done)
+            return false;
+
+        // Mark drained and gate any new work before teardown.
+        shutdown_drained_ = true;
+        if (ctx->shutdown_requested)
+            ctx->shutdown_requested->store(true, std::memory_order_relaxed);
+        drain_shutdown_queues(*ctx);
+        return true;
     }
 
     void Engine::begin_frame()

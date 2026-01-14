@@ -7,6 +7,8 @@
 #include "config.h"
 #include "GameBase.h"
 #include "EngineContext.hpp"
+#include <cstdint>
+#include <future>
 #include <iostream>
 #include <atomic>
 #include <memory>
@@ -21,6 +23,13 @@ namespace eeng
      */
     class Engine
     {
+        enum class ShutdownState : std::uint8_t
+        {
+            Running,
+            Draining,
+            Teardown
+        };
+
     public:
         /** Constructor */
         explicit Engine(std::shared_ptr<EngineContext> ctx);
@@ -72,8 +81,14 @@ namespace eeng
         float min_frametime_ms = 0.0f; ///< Minimum frame duration in milliseconds (default 60 FPS)
         std::atomic<bool> shutdown_started_{ false };
 
-        // EngineContext ctx;
         std::shared_ptr<EngineContext> ctx;
+        
+        ShutdownState shutdown_state_{ ShutdownState::Running };
+        bool shutdown_drain_started_ = false;
+        bool shutdown_drained_ = false;
+        bool shutdown_drain_warned_ = false;
+        std::uint32_t shutdown_drain_start_ms_ = 0;
+        std::shared_future<TaskResult> shutdown_unload_future_;
 
         /**
          * @brief Start the main loop.
@@ -98,6 +113,10 @@ namespace eeng
 
         /** Finish frame rendering. */
         void end_frame();
+
+        // Advances the shutdown draining phase while the main loop is still running.
+        // Returns true when all async unloads are finished and it is safe to tear down.
+        bool advance_shutdown_drain();
 
         void on_set_vsync(const SetVsyncEvent& e);
         void on_set_wireframe(const SetWireFrameRenderingEvent& e);
