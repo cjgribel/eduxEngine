@@ -127,7 +127,7 @@ namespace eeng {
          */
         std::shared_future<TaskResult> queue_load_all_async(EngineContext& ctx);
 
-        std::shared_future<TaskResult> queue_unload_all_async(EngineContext& ctx);
+        std::shared_future<TaskResult> queue_unload_all_async(EngineContext& ctx) override;
 
         /**
          * @brief Enqueue saving of all currently loaded batches.

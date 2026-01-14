@@ -359,8 +359,7 @@ namespace eeng
             if (ctx->batch_registry)
             {
                 log_shutdown(ctx.get(), "Shutdown: request batch unloads");
-                auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
-                unload_future = br.queue_unload_all_async(*ctx);
+                unload_future = ctx->batch_registry->queue_unload_all_async(*ctx);
             }
             if (unload_future.valid())
             {
@@ -377,8 +376,14 @@ namespace eeng
                 pump_until_resource_idle(*ctx, *ctx->resource_manager, 5000);
             }
 
-            // Set the shutdown flag after drain operations so internal async
-            // scheduling isn't blocked while we unwind outstanding work.
+            // Shutdown policy:
+            // We set the shutdown flag *after* draining batch/resource work so internal
+            // unload tasks can still enqueue main-thread work (push_and_wait).
+            // Alternative (stricter gating): set the flag before drains to block all new work.
+            // Tradeoff: this can prevent unloads from completing or cause deadlocks.
+            // For stricter gating with safe drains, add a separate "shutdown_draining"
+            // flag or a main-loop state machine to allow internal shutdown tasks while
+            // blocking external work.
             if (ctx->shutdown_requested)
                 ctx->shutdown_requested->store(true, std::memory_order_relaxed);
             // Drain a few cycles to flush any already-queued main thread work and

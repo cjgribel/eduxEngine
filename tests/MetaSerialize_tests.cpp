@@ -103,16 +103,11 @@ namespace
 
     struct MockResourceManager : eeng::IResourceManager
     {
-#if 1
         AssetStatus get_status(const Guid& guid) const override { return AssetStatus{}; }
         std::shared_future<TaskResult> scan_assets_async(const std::filesystem::path& root, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
         std::shared_future<TaskResult> load_and_bind_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
         std::shared_future<TaskResult> unbind_and_unload_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
         std::shared_future<TaskResult> reload_and_rebind_async(std::deque<Guid> branch_guids, const BatchId& batch, EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
-
-        // void retain_guid(const Guid& guid) override {}
-        // void release_guid(const Guid& guid, eeng::EngineContext& ctx) override {}
-#endif
 
         bool is_busy() const override { return false; }
         void wait_until_idle() override {}
@@ -125,7 +120,8 @@ namespace
 
     class MockBatchRegistry : public eeng::IBatchRegistry
     {
-
+    public:
+        std::shared_future<TaskResult> queue_unload_all_async(EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
     };
 
     struct MockGuiManager : eeng::IGuiManager
