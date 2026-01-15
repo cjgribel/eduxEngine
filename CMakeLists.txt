@@ -250,6 +250,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Storage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AssetIndex.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ResourceManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AnimationGraphRuntime.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AnimationGraphValidation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/AssimpImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/MockImporter.cpp
@@ -258,6 +259,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/EntityManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/EntityBatchPolicy.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/SceneGraph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/AnimationGraphComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/TransformComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/HeaderComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/StickyNoteComponent.cpp

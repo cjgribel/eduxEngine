@@ -246,6 +246,14 @@ namespace eeng::meta
                         // entt::forward_as_meta(rm),
                         entt::forward_as_meta(ctx));
                 }
+
+                if (auto mf = mt.func(literals::post_bind_hs); mf)
+                {
+                    mf.invoke(
+                        {},
+                        entt::forward_as_meta(any),
+                        entt::forward_as_meta(ctx));
+                }
             });
     }
 }

@@ -14,6 +14,7 @@
 
 #include "editor/AssetRefInspect.hpp"
 #include "assets/types/AnimationGraphAsset.hpp"
+#include "assets/AnimationGraphRuntime.hpp"
 #include "assets/types/ModelAssets.hpp"
 #include "gpu/GpuAssetOps.hpp"
 #include "mock/MockAssetTypes.hpp"
@@ -192,6 +193,20 @@ namespace eeng {
             if (!can_destroy) return;
 
             gl::destroy_gpu_texture(*handle_opt, ctx);
+        }
+
+        void on_create_animation_graph(const Guid& guid, EngineContext& ctx)
+        {
+            auto rm = eeng::try_get_resource_manager(ctx, "AssetMetaReg");
+            if (!rm) return;
+
+            auto handle_opt = rm->handle_for_guid<assets::AnimationGraphAsset>(guid);
+            if (!handle_opt) return;
+
+            rm->storage().modify(*handle_opt, [&](assets::AnimationGraphAsset& graph)
+                {
+                    assets::build_animation_graph_cache(graph);
+                });
         }
     }
 
@@ -603,6 +618,7 @@ namespace eeng {
                 .data<&assets::AnimationGraphAsset::version>("version"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "version", "Version", "Graph schema version." })
                 .traits(MetaFlags::readonly_inspection)
+                .func<&on_create_animation_graph>(literals::on_create_hs)
                 ;
             register_asset<assets::AnimationGraphAsset>();
             serializers::register_animationgraphasset_serialization();

@@ -9,6 +9,21 @@
 #include "ecs/AnimationGraphInstance.hpp"
 #include "assets/types/AnimationGraphAsset.hpp"
 
+namespace entt
+{
+    class meta_any;
+}
+
+namespace eeng
+{
+    struct EngineContext;
+}
+
+namespace eeng::editor
+{
+    struct MetaFieldPath;
+}
+
 namespace eeng::ecs
 {
     struct AnimationGraphComponent
@@ -23,6 +38,13 @@ namespace eeng::ecs
             : graph_ref(graph_ref)
         {
         }
+
+        static void on_component_post_bind(entt::meta_any& any, EngineContext& ctx);
+        static void on_component_post_assign(
+            EngineContext& ctx,
+            const ecs::Entity& entity,
+            const editor::MetaFieldPath& meta_path,
+            bool is_undo);
     };
 
     inline std::string to_string(const AnimationGraphComponent& t)

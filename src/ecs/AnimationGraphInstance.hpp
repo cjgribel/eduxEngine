@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "Guid.h"
+
 namespace eeng::ecs
 {
     struct AnimGraphTransitionRuntime
@@ -27,6 +29,7 @@ namespace eeng::ecs
 
     struct AnimGraphInstance
     {
+        Guid graph_guid = Guid::invalid();
         std::vector<float> float_params;
         std::vector<int> int_params;
         std::vector<std::uint8_t> bool_params;

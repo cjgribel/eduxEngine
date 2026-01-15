@@ -600,6 +600,12 @@ namespace eeng
                 .data<&eeng::ecs::AnimationGraphComponent::enabled>("enabled"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable animation graph evaluation." })
                 .traits(MetaFlags::none)
+
+                .func<&eeng::ecs::AnimationGraphComponent::on_component_post_bind>(eeng::literals::post_bind_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_bind", "Post-bind hook for graph initialization." })
+
+                .func<&eeng::ecs::AnimationGraphComponent::on_component_post_assign>(eeng::literals::post_assign_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_assign", "Post-assign hook for graph edits." })
                 ;
             register_component<ecs::AnimationGraphComponent>();
         }

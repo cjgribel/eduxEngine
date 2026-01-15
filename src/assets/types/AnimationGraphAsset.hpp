@@ -4,7 +4,9 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -182,6 +184,18 @@ namespace eeng::assets
         std::vector<AnimGraphParamDef> params;
         std::vector<AnimGraphMask> masks;
         std::vector<AnimGraphLayer> layers;
+        struct RuntimeCache
+        {
+            struct LayerCache
+            {
+                std::unordered_map<std::string, std::size_t> state_index;
+            };
+
+            std::unordered_map<std::string, std::size_t> param_index;
+            std::unordered_map<std::string, std::size_t> mask_index;
+            std::vector<LayerCache> layers;
+            bool built = false;
+        } runtime;
     };
 
     template<typename Visitor>
