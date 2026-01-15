@@ -22,6 +22,7 @@ FetchContent_MakeAvailable(googletest)
 
 # Single executable for all tests
 add_executable(tests 
+    AnimationGraph_tests.cpp ../src/assets/AnimationGraphValidation.cpp
     VecTree_tests.cpp 
     PoolAllocatorFH_tests.cpp
     PoolAllocatorTFH_tests.cpp

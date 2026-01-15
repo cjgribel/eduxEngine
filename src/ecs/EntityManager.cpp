@@ -285,6 +285,7 @@ namespace eeng
                 get_entity_debug_name(*this, entity).c_str());
         }
 
+        // Add to pending destruction queue if not already present; log if already queued.
         if (entities_pending_destruction_set_.insert(entity).second)
         {
             entities_pending_destruction_.push_back(entity);
@@ -306,6 +307,7 @@ namespace eeng
             entities_pending_destruction_.pop_front();
             entities_pending_destruction_set_.erase(entity);
 
+            // Destroy entity
             destroy_entity_now(entity);
 
             cycles++;
@@ -315,6 +317,7 @@ namespace eeng
     }
 
     ecs::SceneGraph& EntityManager::scene_graph() { return *scene_graph_; }
+    
     const ecs::SceneGraph& EntityManager::scene_graph() const { return *scene_graph_; }
 
     ecs::EntityRef EntityManager::get_entity_ref(const ecs::Entity& entity) const

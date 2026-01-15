@@ -13,6 +13,7 @@
 #include "meta/GLMMetaReg.hpp"
 
 #include "editor/AssetRefInspect.hpp"
+#include "assets/types/AnimationGraphAsset.hpp"
 #include "assets/types/ModelAssets.hpp"
 #include "gpu/GpuAssetOps.hpp"
 #include "mock/MockAssetTypes.hpp"
@@ -27,6 +28,7 @@
 namespace eeng::serializers
 {
     void register_modeldataasset_serialization();
+    void register_animationgraphasset_serialization();
 }
 
 namespace eeng {
@@ -586,6 +588,24 @@ namespace eeng {
                 ;
             register_asset<assets::ModelDataAsset>();
             serializers::register_modeldataasset_serialization();
+        }
+
+        // AnimationGraphAsset
+        {
+            entt::meta_factory<assets::AnimationGraphAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.AnimationGraphAsset", .name = "AnimationGraphAsset", .tooltip = "Animation graph definition asset." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::AnimationGraphAsset::name>("name"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Graph name." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::AnimationGraphAsset::version>("version"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "version", "Version", "Graph schema version." })
+                .traits(MetaFlags::readonly_inspection)
+                ;
+            register_asset<assets::AnimationGraphAsset>();
+            serializers::register_animationgraphasset_serialization();
         }
 
         // === MOCK RESOURCES ===

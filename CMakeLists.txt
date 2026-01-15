@@ -250,6 +250,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Storage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AssetIndex.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ResourceManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AnimationGraphValidation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/AssimpImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/MockImporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/GpuAssetOps.cpp
@@ -297,6 +298,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/GuidSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/GLMSerialize.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/ModelDataAssetSerialization.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/AnimationGraphSerialization.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogGlobals.cpp
