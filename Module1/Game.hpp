@@ -6,6 +6,7 @@
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
 #include "ecs/systems/AnimationSystem.hpp"
+#include "ecs/systems/AnimationGraphSystem.hpp"
 #include "ecs/systems/DebugRenderSystem.hpp"
 #include "ecs/systems/RenderSystem.hpp"
 #include "ecs/systems/StickyNoteSystem.hpp"
@@ -88,6 +89,7 @@ private:
     // TODO: Core systems to Engine
     std::unique_ptr<eeng::ecs::systems::RenderSystem> renderSystem;
     std::unique_ptr<eeng::ecs::systems::AnimationSystem> animationSystem;
+    std::unique_ptr<eeng::ecs::systems::AnimationGraphSystem> animationGraphSystem;
     std::unique_ptr<eeng::ecs::systems::TransformSystem> transformSystem;
     std::unique_ptr<eeng::ecs::systems::DebugRenderSystem> debugRenderSystem;
     std::unique_ptr<eeng::ecs::systems::StickyNoteSystem> stickyNoteSystem;

@@ -581,6 +581,26 @@ namespace eeng::gui
                 ImGui::Text("Leases: %u", resource_manager.total_leases(entry.meta.guid));
                 ImGui::Text("GUID: %s", entry.meta.guid.to_string().c_str());
                 ImGui::Text("Path: %s", entry.relative_path.string().c_str());
+
+                const bool can_save = guid_status.state == LoadState::Loaded;
+                if (!can_save) ImGui::BeginDisabled();
+                if (ImGui::Button("Save Asset"))
+                {
+                    try
+                    {
+                        resource_manager.save_asset(entry.meta.guid, ctx);
+                    }
+                    catch (const std::exception& ex)
+                    {
+                        EENG_LOG_WARN(&ctx, "Save asset failed: %s", ex.what());
+                    }
+                }
+                if (!can_save)
+                {
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Asset must be loaded to save.");
+                }
             }
             ImGui::EndChild();
         }

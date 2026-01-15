@@ -42,21 +42,94 @@ namespace eeng::ecs
         {
             reset_instance(instance);
 
-            for (const auto& param : graph.params)
+            std::vector<assets::AnimationGraphAsset::RuntimeCache::ParamSlot> slots;
+            const auto& runtime_slots = graph.runtime.param_slots;
+            if (graph.runtime.built && runtime_slots.size() == graph.params.size())
             {
+                slots = runtime_slots;
+            }
+            else
+            {
+                slots.resize(graph.params.size());
+                std::size_t float_index = 0;
+                std::size_t int_index = 0;
+                std::size_t bool_index = 0;
+                std::size_t trigger_index = 0;
+                for (std::size_t i = 0; i < graph.params.size(); i++)
+                {
+                    slots[i].type = graph.params[i].type;
+                    switch (graph.params[i].type)
+                    {
+                    case assets::AnimGraphParamType::Float:
+                        slots[i].index = float_index++;
+                        break;
+                    case assets::AnimGraphParamType::Int:
+                        slots[i].index = int_index++;
+                        break;
+                    case assets::AnimGraphParamType::Bool:
+                        slots[i].index = bool_index++;
+                        break;
+                    case assets::AnimGraphParamType::Trigger:
+                        slots[i].index = trigger_index++;
+                        break;
+                    default:
+                        slots[i].index = 0;
+                        break;
+                    }
+                }
+            }
+
+            std::size_t float_count = 0;
+            std::size_t int_count = 0;
+            std::size_t bool_count = 0;
+            std::size_t trigger_count = 0;
+            for (const auto& slot : slots)
+            {
+                switch (slot.type)
+                {
+                case assets::AnimGraphParamType::Float:
+                    float_count = std::max(float_count, slot.index + 1);
+                    break;
+                case assets::AnimGraphParamType::Int:
+                    int_count = std::max(int_count, slot.index + 1);
+                    break;
+                case assets::AnimGraphParamType::Bool:
+                    bool_count = std::max(bool_count, slot.index + 1);
+                    break;
+                case assets::AnimGraphParamType::Trigger:
+                    trigger_count = std::max(trigger_count, slot.index + 1);
+                    break;
+                default:
+                    break;
+                }
+            }
+
+            instance.float_params.assign(float_count, 0.0f);
+            instance.int_params.assign(int_count, 0);
+            instance.bool_params.assign(bool_count, 0u);
+            instance.trigger_params.assign(trigger_count, 0u);
+
+            for (std::size_t i = 0; i < graph.params.size(); i++)
+            {
+                const auto& param = graph.params[i];
+                const auto& slot = slots[i];
                 switch (param.type)
                 {
                 case assets::AnimGraphParamType::Float:
-                    instance.float_params.push_back(param.default_float);
+                    if (slot.index < instance.float_params.size())
+                        instance.float_params[slot.index] = param.default_float;
                     break;
                 case assets::AnimGraphParamType::Int:
-                    instance.int_params.push_back(param.default_int);
+                    if (slot.index < instance.int_params.size())
+                        instance.int_params[slot.index] = param.default_int;
                     break;
                 case assets::AnimGraphParamType::Bool:
-                    instance.bool_params.push_back(param.default_bool ? 1u : 0u);
+                    if (slot.index < instance.bool_params.size())
+                        instance.bool_params[slot.index] = param.default_bool ? 1u : 0u;
                     break;
                 case assets::AnimGraphParamType::Trigger:
-                    instance.trigger_params.push_back(param.default_bool ? 1u : 0u);
+                    if (slot.index < instance.trigger_params.size())
+                        instance.trigger_params[slot.index] = param.default_bool ? 1u : 0u;
                     break;
                 default:
                     break;

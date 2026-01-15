@@ -286,6 +286,9 @@ namespace eeng
                 });
         }
 
+        /// @brief Save a loaded asset via its registered meta save hook.
+        void save_asset(const Guid& guid, EngineContext& ctx);
+
     private:
 
         void load_asset(const Guid& guid, EngineContext& ctx);

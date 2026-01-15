@@ -16,6 +16,7 @@ namespace eeng::ecs
         int to = -1;
         float time = 0.0f;
         float duration = 0.0f;
+        float dest_time = 0.0f;
         bool active = false;
     };
 

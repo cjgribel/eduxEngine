@@ -795,6 +795,11 @@ namespace eeng
         invoke_meta_function(guid, ctx, literals::unload_asset_hs, "unload_asset");
     }
 
+    void ResourceManager::save_asset(const Guid& guid, EngineContext& ctx)
+    {
+        invoke_meta_function(guid, ctx, literals::save_asset_hs, "save_asset");
+    }
+
     void ResourceManager::bind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
     {
         invoke_meta_function(guid, batch_id, ctx, literals::bind_asset_hs, "resolve_asset");

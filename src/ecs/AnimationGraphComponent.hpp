@@ -26,6 +26,8 @@ namespace eeng::editor
 
 namespace eeng::ecs
 {
+    class Entity;
+
     struct AnimationGraphComponent
     {
         std::string name;

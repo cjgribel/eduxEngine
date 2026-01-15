@@ -293,6 +293,7 @@ bool Game::init()
     renderSystem = std::make_unique<eeng::ecs::systems::RenderSystem>();
     renderSystem->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
     animationSystem = std::make_unique<eeng::ecs::systems::AnimationSystem>();
+    animationGraphSystem = std::make_unique<eeng::ecs::systems::AnimationGraphSystem>();
     transformSystem = std::make_unique<eeng::ecs::systems::TransformSystem>();
     transformSystem->init(*ctx);
     debugRenderSystem = std::make_unique<eeng::ecs::systems::DebugRenderSystem>();
@@ -972,6 +973,12 @@ void Game::update(
         { 0.03f, 0.03f, 0.03f });
 
     // TODO: consider scheduling animation updates as a dedicated system phase.
+    if (animationGraphSystem)
+    {
+        auto& registry = ctx->entity_manager->registry();
+        animationGraphSystem->update(registry, *ctx, deltaTime);
+    }
+
     if (animationSystem)
     {
         auto& registry = ctx->entity_manager->registry();

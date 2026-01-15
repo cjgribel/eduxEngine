@@ -186,12 +186,19 @@ namespace eeng::assets
         std::vector<AnimGraphLayer> layers;
         struct RuntimeCache
         {
+            struct ParamSlot
+            {
+                AnimGraphParamType type = AnimGraphParamType::Invalid;
+                std::size_t index = 0;
+            };
+
             struct LayerCache
             {
                 std::unordered_map<std::string, std::size_t> state_index;
             };
 
             std::unordered_map<std::string, std::size_t> param_index;
+            std::vector<ParamSlot> param_slots;
             std::unordered_map<std::string, std::size_t> mask_index;
             std::vector<LayerCache> layers;
             bool built = false;

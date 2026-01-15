@@ -70,6 +70,13 @@ namespace eeng {
             rm.unload_asset<T>(guid, ctx);
         }
 
+        template<class T>
+        void save_asset(const Guid& guid, EngineContext& ctx)
+        {
+            auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+            rm.save_loaded_asset<T>(guid);
+        }
+
         // -> META HELPER, or MERGE WITH GENERAL BIND CODE
         template<class T>
         BindResult bind_asset(const Guid& guid, const Guid& batch_id, EngineContext& ctx)
@@ -244,6 +251,7 @@ namespace eeng {
                 // Type-safe loading
                 .template func<&load_asset<T>, entt::as_void_t>(eeng::literals::load_asset_hs)
                 .template func<&unload_asset<T>, entt::as_void_t>(eeng::literals::unload_asset_hs)
+                .template func<&save_asset<T>, entt::as_void_t>(eeng::literals::save_asset_hs)
                 // .template func<&reload_asset<T>>(eeng::literals::reload_asset_hs)
                 // Type-safe binding
                 // .template func<&bind_asset<T>, entt::as_void_t>(eeng::literals::bind_asset_hs)
@@ -587,19 +595,19 @@ namespace eeng {
 
                 .data<&assets::ModelDataAsset::submeshes>("submeshes"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "submeshes", "Submeshes", "Submeshes." })
-                .traits(MetaFlags::readonly_inspection)
+                .traits(MetaFlags::no_inspection) // subtypes not registered
 
                 .data<&assets::ModelDataAsset::nodetree>("nodetree"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "nodetree", "Node Tree", "Node Tree." })
-                .traits(MetaFlags::no_inspection)
+                .traits(MetaFlags::no_inspection) // subtypes not registered
 
                 .data<&assets::ModelDataAsset::bones>("bones"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "bones", "Bones", "Bones." })
-                .traits(MetaFlags::no_inspection)
+                .traits(MetaFlags::no_inspection) // subtypes not registered
 
                 .data<&assets::ModelDataAsset::animations>("animations"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "animations", "Animations", "Animations." })
-                .traits(MetaFlags::no_inspection)
+                .traits(MetaFlags::no_inspection) // subtypes not registered
                 ;
             register_asset<assets::ModelDataAsset>();
             serializers::register_modeldataasset_serialization();

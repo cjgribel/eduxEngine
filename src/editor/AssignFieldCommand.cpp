@@ -267,7 +267,13 @@ namespace eeng::editor
             if (asset_guids_before != asset_guids_after)
             {
                 if (auto ctx_sp = lock_context(edit.target.ctx))
+                {
+                    // Policy: compare per-entity AssetRef GUIDs (not batch closure).
+                    // Immediate rebind keeps AssetRef changes responsive.
+                    eeng::meta::bind_asset_refs_for_entity(component_ctx->entity, *ctx_sp);
+                    // We always mark the batch dirty on an entity diff, even if the closure won't change.
                     mark_batch_dirty_for_entity(*ctx_sp, component_ctx->entity);
+                }
             }
         }
 
@@ -298,7 +304,13 @@ namespace eeng::editor
             if (asset_guids_before != asset_guids_after)
             {
                 if (auto ctx_sp = lock_context(edit.target.ctx))
+                {
+                    // Policy: compare per-entity AssetRef GUIDs (not batch closure).
+                    // We always mark the batch dirty on an entity diff, even if the closure won't change.
+                    // Immediate rebind keeps AssetRef changes responsive.
+                    eeng::meta::bind_asset_refs_for_entity(component_ctx->entity, *ctx_sp);
                     mark_batch_dirty_for_entity(*ctx_sp, component_ctx->entity);
+                }
             }
         }
 
