@@ -11,6 +11,7 @@
 #include "ecs/TransformComponent.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/ModelComponent.hpp"
+#include "ecs/AnimationGraphComponent.hpp"
 #include "ecs/StickyNoteComponent.hpp"
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
@@ -580,6 +581,27 @@ namespace eeng
                 .traits(MetaFlags::none)
                 ;
             register_component<ecs::ModelComponent>();
+        }
+
+        // --- AnimationGraphComponent ----------------------------------------
+        {
+            entt::meta_factory<eeng::ecs::AnimationGraphComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.AnimationGraphComponent", .name = "AnimationGraphComponent", .tooltip = "Animation graph runtime component." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::AnimationGraphComponent::name>("name"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Component name." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::AnimationGraphComponent::graph_ref>("graph_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "graph_ref", "Graph Reference", "Animation graph asset reference." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::AnimationGraphComponent::enabled>("enabled"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable animation graph evaluation." })
+                .traits(MetaFlags::none)
+                ;
+            register_component<ecs::AnimationGraphComponent>();
         }
 
         // --- MockMixComponent + nested types ---------------------------------

@@ -13,6 +13,7 @@
 #include "EngineContext.hpp"
 #include "EngineContextHelpers.hpp"
 #include "ecs/ModelComponent.hpp"
+#include "ecs/AnimationGraphComponent.hpp"
 #include "assets/types/ModelAssets.hpp"
 
 namespace
@@ -218,6 +219,11 @@ namespace eeng::ecs::systems
         auto view = registry.view<ecs::ModelComponent>();
         for (auto&& [entity, model_component] : view.each())
         {
+            if (auto* graph = registry.try_get<ecs::AnimationGraphComponent>(entity))
+            {
+                if (graph->enabled)
+                    continue;
+            }
             if (!model_component.model_ref.is_bound())
                 continue;
 

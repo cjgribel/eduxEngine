@@ -6,9 +6,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "AssetRef.hpp"
-#include "assets/types/AnimationGraphAsset.hpp"
-
 namespace eeng::ecs
 {
     struct AnimGraphTransitionRuntime
@@ -30,8 +27,6 @@ namespace eeng::ecs
 
     struct AnimGraphInstance
     {
-        AssetRef<assets::AnimationGraphAsset> graph_ref;
-
         std::vector<float> float_params;
         std::vector<int> int_params;
         std::vector<std::uint8_t> bool_params;
