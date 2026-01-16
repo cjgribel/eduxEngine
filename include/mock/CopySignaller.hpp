@@ -1,5 +1,5 @@
 #pragma once
-#include "LogGlobals.hpp"
+#include <iostream>
 
 namespace eeng
 {
@@ -10,19 +10,19 @@ namespace eeng
 
         CopySignaller()
         {
-            eeng::LogGlobals::log("CopySignaller::CopySignaller() [default]");
+            std::cout << "CopySignaller::CopySignaller() [default]" << std::endl;
         }
 
         CopySignaller(const CopySignaller& other)
             : data(other.data)
         {
-            eeng::LogGlobals::log("CopySignaller::CopySignaller(const CopySignaller&) [copy]");
+            std::cout << "CopySignaller::CopySignaller(const CopySignaller&) [copy]" << std::endl;
         }
 
         CopySignaller(CopySignaller&& other) noexcept
             : data(other.data)
         {
-            eeng::LogGlobals::log("CopySignaller::CopySignaller(CopySignaller&&) [move]");
+            std::cout << "CopySignaller::CopySignaller(CopySignaller&&) [move]" << std::endl;
             other.data = 0;
         }
 
@@ -33,7 +33,7 @@ namespace eeng
                 data = other.data;
             }
 
-            eeng::LogGlobals::log("CopySignaller::operator=(const CopySignaller&) [copy assign]");
+            std::cout << "CopySignaller::operator=(const CopySignaller&) [copy assign]" << std::endl;
             return *this;
         }
 
@@ -45,13 +45,13 @@ namespace eeng
                 other.data = 0;
             }
 
-            eeng::LogGlobals::log("CopySignaller::operator=(CopySignaller&&) [move assign]");
+            std::cout << "CopySignaller::operator=(CopySignaller&&) [move assign]" << std::endl;
             return *this;
         }
 
         ~CopySignaller()
         {
-            eeng::LogGlobals::log("CopySignaller::~CopySignaller() [destructor]");
+            std::cout << "CopySignaller::~CopySignaller() [destructor]" << std::endl;
         }
     };
 }

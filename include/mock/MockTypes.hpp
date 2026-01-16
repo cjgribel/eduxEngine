@@ -5,6 +5,7 @@
 #define MockTypes_hpp
 
 #include "LogGlobals.hpp" // DEBUG
+#include "mock/CopySignaller.hpp"
 #include <string>
 #include <vector>
 #include <array>
@@ -95,6 +96,7 @@ namespace eeng::ecs::mock
 {
     struct MockMixComponent
     {
+        CopySignaller copy_signaller;
         float float_scalar = 1.0f;
         int int_scalar = 2;
         int int_scalar_2 = 3;
