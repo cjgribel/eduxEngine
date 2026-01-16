@@ -4,8 +4,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
+#include <unordered_map>
 
 #include "EngineContext.hpp"
+#include "engineapi/SelectionManager.hpp"
 #include "engineapi/EngineContextHelpers.hpp"
 #include "editor/InspectorState.hpp"
 #include "editor/AssetRefInspect.hpp"
@@ -27,6 +30,15 @@ namespace eeng::editor
             return false;
 
         bool modified = false;
+        constexpr float kParamCommitEpsilon = 0.1f;
+
+        eeng::ecs::AnimationGraphComponent* live_comp = nullptr;
+        if (ctx.entity_selection && !ctx.entity_selection->empty())
+        {
+            auto registry_sp = eeng::try_get_registry(ctx, "AnimationGraphComponentInspect");
+            if (registry_sp && registry_sp->valid(ctx.entity_selection->first()))
+                live_comp = registry_sp->try_get<eeng::ecs::AnimationGraphComponent>(ctx.entity_selection->first());
+        }
 
         inspector.begin_leaf("name");
         modified |= inspect_type(comp->name, inspector);
@@ -96,16 +108,40 @@ namespace eeng::editor
                         continue;
 
                     float value = comp->instance.float_params[slot_index];
+                    float new_value = value;
                     float min_value = param.has_min ? param.min_value : 0.0f;
                     float max_value = param.has_max ? param.max_value : 1.0f;
                     if (max_value < min_value)
                         std::swap(min_value, max_value);
 
                     inspector.begin_leaf(param.name.c_str());
-                    if (ImGui::SliderFloat("##label", &value, min_value, max_value))
+                    const float before_value = value;
+                    const bool slider_changed = ImGui::SliderFloat("##label", &new_value, min_value, max_value);
+                    // Policy: Commit an undoable edit only when the drag completes and moved enough.
+                    static std::unordered_map<ImGuiID, float> start_values;
+                    const ImGuiID item_id = ImGui::GetItemID();
+                    if (ImGui::IsItemActivated())
+                        start_values[item_id] = before_value;
+                    if (slider_changed)
                     {
-                        comp->instance.float_params[slot_index] = value;
-                        modified = true;
+                        comp->instance.float_params[slot_index] = new_value;
+                        if (live_comp && live_comp != comp
+                            && slot_index < live_comp->instance.float_params.size())
+                        {
+                            live_comp->instance.float_params[slot_index] = new_value;
+                        }
+                    }
+                    if (ImGui::IsItemDeactivatedAfterEdit())
+                    {
+                        float start_value = before_value;
+                        auto it = start_values.find(item_id);
+                        if (it != start_values.end())
+                        {
+                            start_value = it->second;
+                            start_values.erase(it);
+                        }
+                        if (std::fabs(new_value - start_value) >= kParamCommitEpsilon)
+                            modified = true;
                     }
                     inspector.end_leaf();
                 }
