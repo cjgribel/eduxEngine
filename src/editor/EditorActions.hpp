@@ -58,7 +58,7 @@ namespace eeng::editor
         static void import_animation_graph_mock(
             EngineContext& ctx,
             std::string graph_name = "Amy_Minimal",
-            std::string clip_name = "Idle");
+            std::string clip_name = "idle");
 
         /// @brief Queue an undoable unimport by GUID (serialized on RM strand).
         static void unimport_assets(

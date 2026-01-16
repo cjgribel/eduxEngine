@@ -216,14 +216,6 @@ namespace
         return out;
     }
 
-    std::string to_lower_ascii(std::string_view value)
-    {
-        std::string out(value);
-        for (char& c : out)
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return out;
-    }
-
     bool clip_has_tracks(const AnimClip& clip)
     {
         for (const auto& track : clip.node_animations)
@@ -239,11 +231,10 @@ namespace
         if (clip_name.empty())
             return nullptr;
 
-        const std::string clip_name_lower = to_lower_ascii(clip_name);
         const AnimClip* fallback = nullptr;
         for (const auto& clip : model.animations)
         {
-            if (to_lower_ascii(clip.name) != clip_name_lower)
+            if (clip.name != clip_name)
                 continue;
             if (!fallback)
                 fallback = &clip;
