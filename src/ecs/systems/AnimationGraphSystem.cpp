@@ -285,6 +285,42 @@ namespace
         return std::min(std::max(ntime, 0.0f), 1.0f);
     }
 
+    float normalized_time_from_duration(float time_sec, float duration_sec, AnimGraphPlaybackMode mode)
+    {
+        if (duration_sec <= 0.0f)
+            return 0.0f;
+
+        float animtime_sec = time_sec;
+        switch (mode)
+        {
+        case AnimGraphPlaybackMode::Loop:
+            animtime_sec = std::fmod(time_sec, duration_sec);
+            if (animtime_sec < 0.0f)
+                animtime_sec += duration_sec;
+            break;
+        case AnimGraphPlaybackMode::Mirror:
+        {
+            const float cycle = duration_sec * 2.0f;
+            animtime_sec = std::fmod(time_sec, cycle);
+            if (animtime_sec < 0.0f)
+                animtime_sec += cycle;
+            if (animtime_sec > duration_sec)
+                animtime_sec = cycle - animtime_sec;
+            break;
+        }
+        case AnimGraphPlaybackMode::Clamp:
+            animtime_sec = std::min(std::max(time_sec, 0.0f), duration_sec);
+            break;
+        case AnimGraphPlaybackMode::Pose:
+        default:
+            animtime_sec = 0.0f;
+            break;
+        }
+
+        const float ntime = animtime_sec / duration_sec;
+        return std::min(std::max(ntime, 0.0f), 1.0f);
+    }
+
     float trimmed_time(const AnimGraphState& state, const AnimClip* clip, float time_sec)
     {
         if (state.playback == AnimGraphPlaybackMode::Pose)
@@ -293,6 +329,18 @@ namespace
         }
 
         float ntime = normalized_time(clip, time_sec, state.playback);
+        ntime = state.trim_left + ntime * (state.trim_right - state.trim_left);
+        return std::min(std::max(ntime, 0.0f), 1.0f);
+    }
+
+    float trimmed_time_from_duration(const AnimGraphState& state, float duration_sec, float time_sec)
+    {
+        if (state.playback == AnimGraphPlaybackMode::Pose)
+        {
+            return std::min(std::max(state.trim_left, 0.0f), 1.0f);
+        }
+
+        float ntime = normalized_time_from_duration(time_sec, duration_sec, state.playback);
         ntime = state.trim_left + ntime * (state.trim_right - state.trim_left);
         return std::min(std::max(ntime, 0.0f), 1.0f);
     }
@@ -621,6 +669,8 @@ namespace
         ctx.state = &state;
 
         const AnimClip* time_clip = nullptr;
+        float override_ntime = 0.0f;
+        bool use_override_time = false;
 
         switch (state.type)
         {
@@ -728,6 +778,29 @@ namespace
                 ctx.weights[0] = 1.0f - t;
                 ctx.weights[1] = t;
                 time_clip = ctx.clips[0] ? ctx.clips[0] : ctx.clips[1];
+
+                const auto duration_sec = [](const AnimClip* clip) -> float
+                {
+                    if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
+                        return 0.0f;
+                    return clip->duration_ticks / clip->ticks_per_second;
+                };
+
+                const float dur0 = duration_sec(ctx.clips[0]);
+                const float dur1 = duration_sec(ctx.clips[1]);
+                const float weight_sum = ctx.weights[0] + ctx.weights[1];
+                if (weight_sum > 0.0f)
+                {
+                    const float w0 = ctx.weights[0] / weight_sum;
+                    const float w1 = ctx.weights[1] / weight_sum;
+                    const float blended_duration = dur0 * w0 + dur1 * w1;
+                    if (blended_duration > 0.0f)
+                    {
+                        // Policy: BlendSpace1D uses a weighted duration to keep time continuous across segments.
+                        override_ntime = trimmed_time_from_duration(state, blended_duration, time_sec);
+                        use_override_time = true;
+                    }
+                }
             }
             break;
         }
@@ -798,7 +871,9 @@ namespace
 
         if (ctx.sample_count > 0)
         {
-            ctx.ntime = trimmed_time(state, time_clip, time_sec);
+            ctx.ntime = use_override_time
+                ? override_ntime
+                : trimmed_time(state, time_clip, time_sec);
             ctx.valid = true;
         }
 
