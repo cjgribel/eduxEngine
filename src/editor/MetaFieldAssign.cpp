@@ -31,6 +31,12 @@ namespace eeng::editor
         {
             switch (entry.type)
             {
+            case Entry::Type::Root:
+            {
+                // Policy: Root-only path assigns the entire object.
+                return obj.assign(leaf_value);
+            }
+
             case Entry::Type::Data:
             {
                 entt::meta_type type = obj.type();
@@ -69,6 +75,12 @@ namespace eeng::editor
         // ---- NON-LEAF CASE ----
         switch (entry.type)
         {
+        case Entry::Type::Root:
+        {
+            // Policy: Root is a traversal sentinel; skip to the next entry.
+            return assign_meta_field_recursive(obj, path, idx + 1, leaf_value);
+        }
+
         case Entry::Type::Data:
         {
             entt::meta_type type = obj.type();
@@ -182,8 +194,23 @@ namespace eeng::editor
         };
         std::stack<Property> prop_stack;
 
+        if (meta_path.entries.empty())
+            return false;
+
+        std::size_t start_index = 0;
+        if (meta_path.entries[0].type == EntryType::Root)
+        {
+            // Policy: Root-only path assigns the entire object.
+            if (meta_path.entries.size() == 1)
+                return meta_any.assign(value_any);
+            start_index = 1;
+        }
+
+        if (meta_path.entries[start_index].type != EntryType::Data)
+            return false;
+
         // Push first data path entry manually (meta_any is the component itself)
-        auto& entry0 = meta_path.entries[0];
+        auto& entry0 = meta_path.entries[start_index];
         const entt::meta_data meta_data0 = meta_type.data(entry0.data_id);
         Property last_prop{ meta_any, meta_data0, entry0 };
         prop_stack.push(last_prop);
@@ -206,7 +233,7 @@ namespace eeng::editor
 #endif
 
         // Push the remaining path entries
-        int i = 1;
+        int i = static_cast<int>(start_index + 1);
         for (;i < meta_path.entries.size(); i++)
         {
             auto& e = meta_path.entries[i];

@@ -150,6 +150,54 @@ namespace eeng::ecs
             instance.graph_guid = graph_guid;
             instance.initialized = true;
         }
+
+        // Policy: Runtime is initialized from the bound asset when needed, never from stale data.
+        bool try_init_from_asset(AnimationGraphComponent& component, EngineContext& ctx)
+        {
+            if (!component.graph_ref.is_bound())
+                return false;
+
+            auto rm = eeng::try_get_resource_manager(ctx, "AnimationGraphComponent");
+            if (!rm)
+                return false;
+
+            eeng::try_read_asset_ref(
+                *rm,
+                component.graph_ref,
+                ctx,
+                "AnimationGraphComponent",
+                "Missing AnimationGraphAsset for AnimationGraphComponent:",
+                [&](const assets::AnimationGraphAsset& graph)
+                {
+                    initialize_instance(component.instance, graph, component.graph_ref.guid);
+                });
+            return true;
+        }
+
+        // Policy: Root entries are ignored; only Data entries name a field.
+        const editor::MetaFieldPath::Entry* find_first_data_entry(const editor::MetaFieldPath& meta_path)
+        {
+            for (const auto& entry : meta_path.entries)
+            {
+                if (entry.type == editor::MetaFieldPath::Entry::Type::Data)
+                    return &entry;
+            }
+            return nullptr;
+        }
+
+        // Policy: If the bound graph changes or is unbound, drop cached runtime to avoid stale data.
+        void reset_if_unbound_or_mismatch(AnimationGraphComponent& component)
+        {
+            if (!component.graph_ref.is_bound())
+            {
+                if (component.instance.initialized)
+                    reset_instance(component.instance);
+                return;
+            }
+
+            if (component.instance.initialized && component.instance.graph_guid != component.graph_ref.guid)
+                reset_instance(component.instance);
+        }
     }
 
     void AnimationGraphComponent::on_component_post_bind(entt::meta_any& any, EngineContext& ctx)
@@ -159,26 +207,9 @@ namespace eeng::ecs
         if (!comp)
             return;
 
-        if (!comp->graph_ref.is_bound())
-            return;
-
-        if (comp->instance.initialized && comp->instance.graph_guid == comp->graph_ref.guid)
-            return;
-
-        auto rm = eeng::try_get_resource_manager(ctx, "AnimationGraphComponent");
-        if (!rm)
-            return;
-
-        eeng::try_read_asset_ref(
-            *rm,
-            comp->graph_ref,
-            ctx,
-            "AnimationGraphComponent",
-            "Missing AnimationGraphAsset for AnimationGraphComponent:",
-            [&](const assets::AnimationGraphAsset& graph)
-            {
-                initialize_instance(comp->instance, graph, comp->graph_ref.guid);
-            });
+        reset_if_unbound_or_mismatch(*comp);
+        if (comp->graph_ref.is_bound() && !comp->instance.initialized)
+            try_init_from_asset(*comp, ctx);
     }
 
     void AnimationGraphComponent::on_component_post_assign(
@@ -198,68 +229,31 @@ namespace eeng::ecs
         if (!comp)
             return;
 
-        const bool has_path = !meta_path.entries.empty();
-        const bool graph_ref_changed = has_path && meta_path.entries.front().name == "graph_ref";
-        const bool enabled_changed = has_path && meta_path.entries.front().name == "enabled";
+        // Policy: Root entries are ignored; we react to the first Data entry if present.
+        const editor::MetaFieldPath::Entry* first_data = find_first_data_entry(meta_path);
+        const bool graph_ref_changed = first_data && first_data->name == "graph_ref";
+        const bool enabled_changed = first_data && first_data->name == "enabled";
 
-        if (!has_path)
+        if (!first_data)
         {
-            if (!comp->graph_ref.is_bound())
-            {
-                if (comp->instance.initialized)
-                    reset_instance(comp->instance);
-                return;
-            }
-
-            const bool graph_mismatch = comp->instance.graph_guid != comp->graph_ref.guid;
-            if (graph_mismatch)
-                reset_instance(comp->instance);
-
+            reset_if_unbound_or_mismatch(*comp);
             if (comp->enabled && !comp->instance.initialized)
-            {
-                auto rm = eeng::try_get_resource_manager(ctx, "AnimationGraphComponent");
-                if (!rm)
-                    return;
-                eeng::try_read_asset_ref(
-                    *rm,
-                    comp->graph_ref,
-                    ctx,
-                    "AnimationGraphComponent",
-                    "Missing AnimationGraphAsset for AnimationGraphComponent:",
-                    [&](const assets::AnimationGraphAsset& graph)
-                    {
-                        initialize_instance(comp->instance, graph, comp->graph_ref.guid);
-                    });
-            }
+                try_init_from_asset(*comp, ctx);
             return;
         }
 
         if (graph_ref_changed)
         {
-            // Graph changed: drop the old runtime so post_bind can rebuild it.
+            // Policy: Graph change invalidates cached runtime; bind hook will rebuild.
             reset_instance(comp->instance);
             return;
         }
 
         if (enabled_changed)
         {
-            // Enabled toggled on: ensure runtime is initialized without needing a closure rebuild.
+            // Policy: Enabling should initialize runtime immediately, without waiting for a closure rebuild.
             if (comp->enabled && comp->graph_ref.is_bound() && !comp->instance.initialized)
-            {
-                auto rm = eeng::try_get_resource_manager(ctx, "AnimationGraphComponent");
-                if (!rm)
-                    return;
-                eeng::try_read_asset_ref(
-                    *rm,
-                    comp->graph_ref,
-                    ctx,
-                    "AnimationGraphComponent",
-                    "Missing AnimationGraphAsset for AnimationGraphComponent:",
-                    [&](const assets::AnimationGraphAsset& graph)
-                    {
-                        initialize_instance(comp->instance, graph, comp->graph_ref.guid);
-                    });
-            }
+                try_init_from_asset(*comp, ctx);
         }
     }
 }

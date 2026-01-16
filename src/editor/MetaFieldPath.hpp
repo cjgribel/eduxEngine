@@ -10,7 +10,8 @@ namespace eeng::editor
     {
         struct Entry
         {
-            enum class Type : int { None, Data, Index, Key } type = Type::None;
+            // Policy: Root is an explicit path entry so custom inspectors always emit a non-empty path.
+            enum class Type : int { None, Root, Data, Index, Key } type = Type::None;
 
             entt::id_type data_id{ 0 };  // data field by type id
             int index{ -1 };             // sequential container by index

@@ -165,60 +165,6 @@ namespace
         const eeng::editor::MetaFieldPath& meta_path,
         entt::meta_any& value_any)
     {
-        if (meta_path.entries.empty())
-        {
-            if (target.kind == eeng::editor::FieldTarget::Kind::Component)
-            {
-                auto ctx_sp = lock_context(target.ctx);
-                if (!ctx_sp)
-                    return false;
-
-                auto registry_sp = eeng::try_get_registry(*ctx_sp, "AssignFieldCommand");
-                if (!registry_sp)
-                    return false;
-
-                const auto entity_opt = resolve_target_entity(target);
-                if (!entity_opt || !registry_sp->valid(*entity_opt))
-                    return false;
-                const auto entity = *entity_opt;
-
-                auto* storage = registry_sp->storage(target.component_id);
-                if (!storage || !storage->contains(entity))
-                    return false;
-
-                entt::meta_type meta_type = entt::resolve(target.component_id);
-                entt::meta_any root = meta_type.from_void(storage->value(entity));
-                if (!root || !is_ref(root))
-                    return false;
-
-                return root.assign(value_any);
-            }
-
-            if (target.kind == eeng::editor::FieldTarget::Kind::Asset)
-            {
-                auto ctx_sp = lock_context(target.ctx);
-                if (!ctx_sp)
-                    return false;
-
-                auto rm = eeng::try_get_resource_manager(*ctx_sp, "AssignFieldCommand");
-                if (!rm)
-                    return false;
-
-                if (auto mh_opt = rm->storage().handle_for_guid(target.asset_guid); mh_opt.has_value())
-                {
-                    return rm->storage().modify(*mh_opt, [&](entt::meta_any& root)
-                        {
-                            if (!is_ref(root))
-                                return false;
-                            return root.assign(value_any);
-                        });
-                }
-                return false;
-            }
-
-            return false;
-        }
-
         if (target.kind == eeng::editor::FieldTarget::Kind::Component)
         {
             auto ctx_sp = lock_context(target.ctx);
@@ -376,6 +322,8 @@ namespace eeng::editor
 
     AssignFieldCommandBuilder& AssignFieldCommandBuilder::target_component(EngineContext& ctx, const ecs::Entity& entity, entt::id_type component_id)
     {
+        // Policy: always start meta paths with a Root entry to avoid empty paths.
+        command.edit.meta_path.entries.clear();
         command.edit.target.kind = FieldTarget::Kind::Component;
         command.edit.target.ctx = ctx.weak_from_this();
         command.edit.target.registry = ctx.entity_manager->registry_wptr();
@@ -386,16 +334,24 @@ namespace eeng::editor
             command.edit.target.entity_guid = em.get_entity_guid(entity);
         }
         command.edit.target.component_id = component_id;
+        command.edit.meta_path.entries.push_back(
+            MetaFieldPath::Entry{ .type = MetaFieldPath::Entry::Type::Root, .name = "root" }
+        );
         return *this;
     }
 
     AssignFieldCommandBuilder& AssignFieldCommandBuilder::target_asset(EngineContext& ctx, std::weak_ptr<IResourceManager> resource_manager, Guid asset_guid, const std::string& asset_type_id_str)
     {
+        // Policy: always start meta paths with a Root entry to avoid empty paths.
+        command.edit.meta_path.entries.clear();
         command.edit.target.kind = FieldTarget::Kind::Asset;
         command.edit.target.ctx = ctx.weak_from_this();
         command.edit.target.resource_manager = resource_manager;
         command.edit.target.asset_guid = asset_guid;
         command.edit.target.asset_type_id_str = asset_type_id_str;
+        command.edit.meta_path.entries.push_back(
+            MetaFieldPath::Entry{ .type = MetaFieldPath::Entry::Type::Root, .name = "root" }
+        );
         return *this;
     }
 
@@ -442,21 +398,25 @@ namespace eeng::editor
 
     bool AssignFieldCommandBuilder::validate_meta_path()
     {
-        // Empty path means "assign the whole root object" (used by custom inspectors).
-        if (!command.edit.meta_path.entries.size())
-            return true;
+        if (!command.edit.meta_path.entries.size()) return false;
 
         bool last_was_index_or_key = false;
         for (int i = 0; i < command.edit.meta_path.entries.size(); i++)
         {
             auto& entry = command.edit.meta_path.entries[i];
 
-            // First entry must be Data (enter data member of a component)
-            if (i == 0 && entry.type != MetaFieldPath::Entry::Type::Data) return false;
+            // Policy: Root is the implicit start for custom inspectors; Data is allowed for legacy callers.
+            if (i == 0 &&
+                entry.type != MetaFieldPath::Entry::Type::Root &&
+                entry.type != MetaFieldPath::Entry::Type::Data)
+                return false;
+            if (i > 0 && entry.type == MetaFieldPath::Entry::Type::Root)
+                return false;
             // assert(i > 0 || entry.type == MetaFieldPath::Entry::Type::Data);
 
             // Check so relevant values are set for each entry type
             if (entry.type == MetaFieldPath::Entry::Type::None) return false;
+            if (entry.type == MetaFieldPath::Entry::Type::Root) continue;
             if (entry.type == MetaFieldPath::Entry::Type::Data && !entry.data_id) return false;
             if (entry.type == MetaFieldPath::Entry::Type::Index && entry.index < 0) return false;
             if (entry.type == MetaFieldPath::Entry::Type::Key && !entry.key_any) return false;
@@ -479,7 +439,11 @@ namespace eeng::editor
         // Gather meta path
         for (auto& entry : command.edit.meta_path.entries)
         {
-            if (entry.type == MetaFieldPath::Entry::Type::Data) {
+            if (entry.type == MetaFieldPath::Entry::Type::Root) {
+                // Policy: Root is not shown in display paths.
+                continue;
+            }
+            else if (entry.type == MetaFieldPath::Entry::Type::Data) {
                 path_str += "::" + entry.name;
             }
             else if (entry.type == MetaFieldPath::Entry::Type::Index) {
