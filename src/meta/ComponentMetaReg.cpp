@@ -22,6 +22,7 @@
 
 #include "editor/EntityRefInspect.hpp"
 #include "editor/GuidInspect.hpp"
+#include "editor/AnimationGraphComponentInspect.hpp"
 
 #include "MetaLiterals.h"
 #include "meta/GLMMetaReg.hpp"
@@ -601,9 +602,14 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable animation graph evaluation." })
                 .traits(MetaFlags::none)
 
+                .func<&eeng::editor::inspect_AnimationGraphComponent>(eeng::literals::inspect_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect", "Inspect animation graph component." })
+
+                // Needed to sync runtime when AssetRef bindings are refreshed after batch rebuilds.
                 .func<&eeng::ecs::AnimationGraphComponent::on_component_post_bind>(eeng::literals::post_bind_hs)
                 .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_bind", "Post-bind hook for graph initialization." })
 
+                // Needed so inspector edits can reset/reinit runtime immediately after field changes.
                 .func<&eeng::ecs::AnimationGraphComponent::on_component_post_assign>(eeng::literals::post_assign_hs)
                 .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_assign", "Post-assign hook for graph edits." })
                 ;

@@ -202,6 +202,38 @@ namespace eeng::ecs
         const bool graph_ref_changed = has_path && meta_path.entries.front().name == "graph_ref";
         const bool enabled_changed = has_path && meta_path.entries.front().name == "enabled";
 
+        if (!has_path)
+        {
+            if (!comp->graph_ref.is_bound())
+            {
+                if (comp->instance.initialized)
+                    reset_instance(comp->instance);
+                return;
+            }
+
+            const bool graph_mismatch = comp->instance.graph_guid != comp->graph_ref.guid;
+            if (graph_mismatch)
+                reset_instance(comp->instance);
+
+            if (comp->enabled && !comp->instance.initialized)
+            {
+                auto rm = eeng::try_get_resource_manager(ctx, "AnimationGraphComponent");
+                if (!rm)
+                    return;
+                eeng::try_read_asset_ref(
+                    *rm,
+                    comp->graph_ref,
+                    ctx,
+                    "AnimationGraphComponent",
+                    "Missing AnimationGraphAsset for AnimationGraphComponent:",
+                    [&](const assets::AnimationGraphAsset& graph)
+                    {
+                        initialize_instance(comp->instance, graph, comp->graph_ref.guid);
+                    });
+            }
+            return;
+        }
+
         if (graph_ref_changed)
         {
             // Graph changed: drop the old runtime so post_bind can rebuild it.

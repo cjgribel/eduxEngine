@@ -165,8 +165,59 @@ namespace
         const eeng::editor::MetaFieldPath& meta_path,
         entt::meta_any& value_any)
     {
-        // entt::meta_any root;
-        assert(!meta_path.entries.empty() && "MetaPath is empty");
+        if (meta_path.entries.empty())
+        {
+            if (target.kind == eeng::editor::FieldTarget::Kind::Component)
+            {
+                auto ctx_sp = lock_context(target.ctx);
+                if (!ctx_sp)
+                    return false;
+
+                auto registry_sp = eeng::try_get_registry(*ctx_sp, "AssignFieldCommand");
+                if (!registry_sp)
+                    return false;
+
+                const auto entity_opt = resolve_target_entity(target);
+                if (!entity_opt || !registry_sp->valid(*entity_opt))
+                    return false;
+                const auto entity = *entity_opt;
+
+                auto* storage = registry_sp->storage(target.component_id);
+                if (!storage || !storage->contains(entity))
+                    return false;
+
+                entt::meta_type meta_type = entt::resolve(target.component_id);
+                entt::meta_any root = meta_type.from_void(storage->value(entity));
+                if (!root || !is_ref(root))
+                    return false;
+
+                return root.assign(value_any);
+            }
+
+            if (target.kind == eeng::editor::FieldTarget::Kind::Asset)
+            {
+                auto ctx_sp = lock_context(target.ctx);
+                if (!ctx_sp)
+                    return false;
+
+                auto rm = eeng::try_get_resource_manager(*ctx_sp, "AssignFieldCommand");
+                if (!rm)
+                    return false;
+
+                if (auto mh_opt = rm->storage().handle_for_guid(target.asset_guid); mh_opt.has_value())
+                {
+                    return rm->storage().modify(*mh_opt, [&](entt::meta_any& root)
+                        {
+                            if (!is_ref(root))
+                                return false;
+                            return root.assign(value_any);
+                        });
+                }
+                return false;
+            }
+
+            return false;
+        }
 
         if (target.kind == eeng::editor::FieldTarget::Kind::Component)
         {
@@ -391,7 +442,9 @@ namespace eeng::editor
 
     bool AssignFieldCommandBuilder::validate_meta_path()
     {
-        if (!command.edit.meta_path.entries.size()) return false;
+        // Empty path means "assign the whole root object" (used by custom inspectors).
+        if (!command.edit.meta_path.entries.size())
+            return true;
 
         bool last_was_index_or_key = false;
         for (int i = 0; i < command.edit.meta_path.entries.size(); i++)

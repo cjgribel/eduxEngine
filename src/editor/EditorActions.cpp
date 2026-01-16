@@ -337,6 +337,8 @@ namespace eeng::editor
         graph.version = 1;
         graph.name = graph_name;
 
+#if 0
+        // Minimal single-clip graph.
         assets::AnimGraphLayer layer{};
         layer.name = "Base";
         layer.weight = 1.0f;
@@ -352,6 +354,40 @@ namespace eeng::editor
         layer.states.push_back(std::move(state));
 
         graph.layers.push_back(std::move(layer));
+#else
+        // Blend1D locomotion test graph (idle -> walk -> run).
+        assets::AnimGraphParamDef speed{};
+        speed.name = "speed";
+        speed.type = assets::AnimGraphParamType::Float;
+        speed.default_float = 0.0f;
+        speed.has_min = true;
+        speed.has_max = true;
+        speed.min_value = 0.0f;
+        speed.max_value = 1.0f;
+        graph.params.push_back(std::move(speed));
+
+        assets::AnimGraphLayer layer{};
+        layer.name = "Base";
+        layer.weight = 1.0f;
+        layer.blend_mode = assets::AnimGraphBlendMode::Override;
+        layer.entry_state = "Locomotion";
+
+        assets::AnimGraphState state{};
+        state.id = "Locomotion";
+        state.type = assets::AnimGraphStateType::BlendSpace1D;
+        state.playback = assets::AnimGraphPlaybackMode::Loop;
+        state.speed = 1.0f;
+        state.param_x = "speed";
+        state.param_min_x = 0.0f;
+        state.param_max_x = 1.0f;
+        state.samples.push_back(assets::AnimGraphBlendSample{ clip_name, 0.0f, 0.0f });
+        state.samples.push_back(assets::AnimGraphBlendSample{ "walking", 0.5f, 0.0f });
+        state.samples.push_back(assets::AnimGraphBlendSample{ "running", 1.0f, 0.0f });
+        state.indices = { 0, 1, 1, 2 };
+        layer.states.push_back(std::move(state));
+
+        graph.layers.push_back(std::move(layer));
+#endif
 
         AssetMetaData meta{};
         meta.guid = Guid::generate();
