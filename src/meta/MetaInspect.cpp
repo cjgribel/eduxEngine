@@ -17,8 +17,6 @@
 #include <sstream>
 #include <cassert>
 
-#define USE_COMMANDS
-
 namespace eeng::meta {
 
     namespace
@@ -140,66 +138,81 @@ namespace eeng::meta {
 
         if (entt::meta_type meta_type = entt::resolve(any.type().id()); meta_type)
         {
+            const bool type_readonly = traits::is_readonly_inspection(meta_type);
             if (entt::meta_func meta_func = meta_type.func(literals::inspect_hs); meta_func)
             {
-                // Inspection meta function signatures:
-                //      bool(void* ptr, Editor::InspectorState& inspector)
-                //      bool(const void* ptr, Editor::InspectorState& inspector) ?
-
-#ifdef USE_COMMANDS
-                // Invoke inspection meta function on a copy of the object
-
-                // TODO -> if readonly, try to avoid copy
-                auto copy_any = meta::clone_any(any, ctx.entity_selection->first());
-                //auto copy_any = any;
-                // auto res_any = meta_func.invoke({}, copy_any.base().data(), entt::forward_as_meta(inspector));
-                
-                auto res_any = meta_func.invoke(
-                    {},
-                    entt::forward_as_meta(copy_any),
-                    entt::forward_as_meta(inspector),
-                    entt::forward_as_meta(ctx)
-                );
-                assert(res_any && "Failed to invoke inspect meta function");
-
-                // Issue command if a change is detected
-                auto res_ptr = res_any.try_cast<bool>();
-                assert(res_ptr && "inspect meta function is expected to return bool");
-                if (*res_ptr)
+                if (type_readonly)
                 {
-                    // Build & issue command
-                    cmdb.prev_value(any).new_value(copy_any);
-                    generate_command(*ctx.command_queue, cmdb, ctx);
-
-                    mod = true;
+                    // Policy: Read-only types skip cloning and command generation.
+                    // Policy: Read-only inspectors receive cref meta_any; treat it as immutable.
+                    auto cref_any = any.as_ref();
+                    inspector.begin_disabled();
+                    auto res_any = meta_func.invoke(
+                        {},
+                        entt::forward_as_meta(cref_any),
+                        entt::forward_as_meta(inspector),
+                        entt::forward_as_meta(ctx)
+                    );
+                    inspector.end_disabled();
+                    assert(res_any && "Failed to invoke inspect meta function");
                 }
-#else
-                // Invoke the inspection meta function on the object
-                auto res_any = meta_func.invoke({}, any.base().data(), entt::forward_as_meta(inspector));
-                assert(res_any && "Failed to invoke inspect meta function");
-                auto res_ptr = res_any.try_cast<bool>();
-                assert(res_ptr && "inspect meta function expected to return bool");
-                mod |= *res_ptr;
-#endif
+                else
+                {
+                    // Invoke inspection meta function on a copy of the object
+                    auto copy_any = meta::clone_any(any, ctx.entity_selection->first());
+                    //auto copy_any = any;
+                    // auto res_any = meta_func.invoke({}, copy_any.base().data(), entt::forward_as_meta(inspector));
+
+                    auto res_any = meta_func.invoke(
+                        {},
+                        entt::forward_as_meta(copy_any),
+                        entt::forward_as_meta(inspector),
+                        entt::forward_as_meta(ctx)
+                    );
+                    assert(res_any && "Failed to invoke inspect meta function");
+
+                    // Issue command if a change is detected
+                    auto res_ptr = res_any.try_cast<bool>();
+                    assert(res_ptr && "inspect meta function is expected to return bool");
+                    if (*res_ptr)
+                    {
+                        // Build & issue command
+                        cmdb.prev_value(any).new_value(copy_any);
+                        generate_command(*ctx.command_queue, cmdb, ctx);
+
+                        mod = true;
+                    }
+                }
+
             }
             else if (meta_type.is_enum())
             {
-#ifdef USE_COMMANDS
-                auto copy_any = any;
-                if (inspect_enum_any(copy_any, inspector))
-                {
-                    // Build & issue command
-                    cmdb.prev_value(any).new_value(copy_any);
-                    generate_command(*ctx.command_queue, cmdb, ctx);
 
-                    mod = true;
+                if (type_readonly)
+                {
+                    // Policy: Read-only enums are displayed but never commit commands.
+                    auto copy_any = any;
+                    inspector.begin_disabled();
+                    inspect_enum_any(copy_any, inspector);
+                    inspector.end_disabled();
                 }
-#else
-                mod |= inspect_enum_any(any, inspector);
-#endif
+                else
+                {
+                    auto copy_any = any;
+                    if (inspect_enum_any(copy_any, inspector))
+                    {
+                        // Build & issue command
+                        cmdb.prev_value(any).new_value(copy_any);
+                        generate_command(*ctx.command_queue, cmdb, ctx);
+
+                        mod = true;
+                    }
+                }
             }
             else
             {
+                if (type_readonly)
+                    inspector.begin_disabled();
                 // inspect() not available: traverse data members
                 for (auto&& [id, meta_data] : meta_type.data())
                 {
@@ -220,10 +233,8 @@ namespace eeng::meta {
 
                     if (inspector.begin_node(key_name.c_str()))
                     {
-#ifdef USE_COMMANDS
                         // Push command meta path
                         cmdb.push_path_data(id, key_name);
-#endif
                         // meta_data.get returns any with entt::meta_any_policy::ref is field was registered with entt::as_ref_t
                         // Obtain copy of data value
                         entt::meta_any data_any = meta_data.get(any); //.as_ref() will yield REF to a TEMP VALUE if entt::as_ref_t is not used
@@ -236,22 +247,18 @@ namespace eeng::meta {
 
                         // Inspect
                         mod |= inspect_any(data_any, inspector, cmdb, ctx);
-#ifndef USE_COMMANDS
-                        // Update data of the current object
-                        meta_data.set(any, data_any);
-#endif
                         // Unset readonly
                         if (readonly) inspector.end_disabled();
-#ifdef USE_COMMANDS
                         // Pop command meta path
                         cmdb.pop_path();
-#endif
                         inspector.end_node();
                     }
 #ifdef INSPECTION_DEBUG_PRINT
                     std::cout << "DONE inspecting data field" << key_name << std::endl;
 #endif
                 }
+                if (type_readonly)
+                    inspector.end_disabled();
             }
             return mod;
         }
@@ -271,7 +278,6 @@ namespace eeng::meta {
                 ImGui::SetNextItemOpen(true);
                 inspector.begin_leaf((std::string("#") + std::to_string(count)).c_str());
                 {
-#ifdef USE_COMMANDS
                     // Push command meta path
                     cmdb.push_path_index(count, std::to_string(count));
 
@@ -280,10 +286,6 @@ namespace eeng::meta {
 
                     // Pop command meta path
                     cmdb.pop_path();
-#else
-                    // ImGui::SetNextItemWidth(-FLT_MIN);
-                    mod |= inspect_any(v, inspector, cmd_builder); // Will change the actual element
-#endif
                 }
                 inspector.end_leaf();
                 count++;
@@ -321,10 +323,8 @@ namespace eeng::meta {
                     }
                     if (view.mapped_type())
                     {
-#ifdef USE_COMMANDS
                         // Push command meta path
                         cmdb.push_path_key(key_any, std::to_string(count));
-#endif
                         // Inspect mapped value
                         ImGui::SetNextItemOpen(true);
                         if (inspector.begin_node("[value]"))
@@ -332,10 +332,8 @@ namespace eeng::meta {
                             mod |= inspect_any(mapped_any, inspector, cmdb, ctx);
                             inspector.end_node();
                         }
-#ifdef USE_COMMANDS
                         // Pop command meta path
                         cmdb.pop_path();
-#endif
                     }
                     inspector.end_node();
                 }
@@ -351,7 +349,6 @@ namespace eeng::meta {
 
             // Try casting the meta_any to a primitive type and perform the inspection
             bool res = try_apply(any, [&](auto& value) {
-#ifdef USE_COMMANDS
                 // Inspect a copy of the value and issue command if a change is detected
                 auto value_copy = value;
 
@@ -368,10 +365,6 @@ namespace eeng::meta {
 
                     mod = true;
                 }
-#else
-                // Inspect the value
-                editor::inspect_type(value, inspector);
-#endif
                 });
             if (!res)
                 throw std::runtime_error(std::string("Unable to cast type ") + get_meta_type_display_name(any.type()));
@@ -409,7 +402,6 @@ namespace eeng::meta {
                 auto type_name = get_meta_type_display_name(meta_type);
                 if (inspector.begin_node(type_name.c_str()))
                 {
-#ifdef USE_COMMANDS
                     // Reset meta command for component type
                     auto cmdb = editor::AssignFieldCommandBuilder{}.target_component(
                         ctx,
@@ -426,7 +418,6 @@ namespace eeng::meta {
                     //     registry(ctx.entity_manager->registry_wptr())
                     //     .entity(entity)
                     //     .component(id);
-#endif
                     auto comp_any = meta_type.from_void(type.value(entity)); // ref
                     mod |= inspect_any(comp_any, inspector, cmdb, ctx);
 

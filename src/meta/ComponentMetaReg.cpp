@@ -706,8 +706,8 @@ namespace eeng
             // With entt::as_cref_t to avoid copies on get()
             // Should be readonly_inspection
             .data<&MockMixComponent::copy_signaller, entt::as_cref_t>("copy_signaller"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "copy_signaller", "Copy Signaller", "A read-only CopySignaller instance." }
-            ).traits(MetaFlags::readonly_inspection)
+            .custom<DataMetaInfo>(DataMetaInfo{ "copy_signaller", "Copy Signaller", "A read-only CopySignaller instance." })
+            .traits(MetaFlags::readonly_inspection)
 
             .data<&MockMixComponent::bool_flag/*, entt::as_ref_t*/>("bool_flag"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "bool_flag", "Bool Flag", "A boolean flag." }).traits(MetaFlags::none)
