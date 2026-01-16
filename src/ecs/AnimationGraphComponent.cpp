@@ -154,6 +154,7 @@ namespace eeng::ecs
 
     void AnimationGraphComponent::on_component_post_bind(entt::meta_any& any, EngineContext& ctx)
     {
+        // Called after AssetRef<> fields are bound; sync runtime to the graph asset if needed.
         auto* comp = any.try_cast<AnimationGraphComponent>();
         if (!comp)
             return;
@@ -186,14 +187,47 @@ namespace eeng::ecs
         const editor::MetaFieldPath& meta_path,
         bool is_undo)
     {
-        (void)meta_path;
+        // Called after an inspector edit; reset or re-init runtime depending on which field changed.
         (void)is_undo;
 
         auto* registry = eeng::try_get_registry_ptr(ctx, "AnimationGraphComponent");
         if (!registry || !registry->valid(entity))
             return;
 
-        if (auto* comp = registry->try_get<AnimationGraphComponent>(entity))
+        auto* comp = registry->try_get<AnimationGraphComponent>(entity);
+        if (!comp)
+            return;
+
+        const bool has_path = !meta_path.entries.empty();
+        const bool graph_ref_changed = has_path && meta_path.entries.front().name == "graph_ref";
+        const bool enabled_changed = has_path && meta_path.entries.front().name == "enabled";
+
+        if (graph_ref_changed)
+        {
+            // Graph changed: drop the old runtime so post_bind can rebuild it.
             reset_instance(comp->instance);
+            return;
+        }
+
+        if (enabled_changed)
+        {
+            // Enabled toggled on: ensure runtime is initialized without needing a closure rebuild.
+            if (comp->enabled && comp->graph_ref.is_bound() && !comp->instance.initialized)
+            {
+                auto rm = eeng::try_get_resource_manager(ctx, "AnimationGraphComponent");
+                if (!rm)
+                    return;
+                eeng::try_read_asset_ref(
+                    *rm,
+                    comp->graph_ref,
+                    ctx,
+                    "AnimationGraphComponent",
+                    "Missing AnimationGraphAsset for AnimationGraphComponent:",
+                    [&](const assets::AnimationGraphAsset& graph)
+                    {
+                        initialize_instance(comp->instance, graph, comp->graph_ref.guid);
+                    });
+            }
+        }
     }
 }

@@ -221,7 +221,7 @@ namespace eeng::ecs::systems
         {
             if (auto* graph = registry.try_get<ecs::AnimationGraphComponent>(entity))
             {
-                if (graph->enabled)
+                if (graph->enabled && graph->graph_ref.guid.valid() && graph->graph_ref.is_bound())
                     continue;
             }
             if (!model_component.model_ref.is_bound())

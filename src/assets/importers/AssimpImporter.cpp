@@ -257,6 +257,29 @@ namespace eeng::assets
             std::vector<std::pair<std::string, AnimTrack>> tracks;
         };
 
+        bool is_default_clip_name(const std::string& name)
+        {
+            return name.empty() || name == "mixamo.com";
+        }
+
+        std::string clip_name_from_source(
+            const std::filesystem::path& source_path,
+            const std::string& raw_name,
+            size_t clip_index,
+            size_t clip_count)
+        {
+            if (!is_default_clip_name(raw_name))
+                return raw_name;
+
+            const std::string stem = source_path.stem().string();
+            if (stem.empty())
+                return raw_name;
+            if (clip_count <= 1)
+                return stem;
+
+            return stem + "_" + std::to_string(clip_index + 1);
+        }
+
         /// @brief Extract animation clips with node-name keyed tracks.
         std::vector<RawAnimClip> extract_animation_clips(const aiScene* scene)
         {
@@ -385,14 +408,16 @@ namespace eeng::assets
             const aiScene* scene,
             const std::filesystem::path& source_path)
         {
-            const auto raw_clips = extract_animation_clips(scene);
+            auto raw_clips = extract_animation_clips(scene);
             if (raw_clips.empty())
                 throw std::runtime_error("Animation source has no clips: " + source_path.string());
 
-            for (const auto& raw : raw_clips)
+            const size_t clip_count = raw_clips.size();
+            for (size_t clip_index = 0; clip_index < raw_clips.size(); clip_index++)
             {
+                auto& raw = raw_clips[clip_index];
                 AnimClip clip{};
-                clip.name = raw.name;
+                clip.name = clip_name_from_source(source_path, raw.name, clip_index, clip_count);
                 clip.duration_ticks = raw.duration_ticks;
                 clip.ticks_per_second = raw.ticks_per_second > 0.0f ? raw.ticks_per_second : 25.0f;
                 clip.node_animations.resize(model.nodetree.size());
@@ -794,7 +819,11 @@ namespace eeng::assets
         {
             aiAnimation* aianim = scene->mAnimations[i];
             AnimClip anim{};
-            anim.name = std::string(aianim->mName.C_Str());
+            anim.name = clip_name_from_source(
+                source_file,
+                std::string(aianim->mName.C_Str()),
+                i,
+                scene->mNumAnimations);
             anim.duration_ticks = static_cast<float>(aianim->mDuration);
             anim.ticks_per_second = static_cast<float>(aianim->mTicksPerSecond);
             anim.node_animations.resize(model.nodetree.size());
@@ -943,7 +972,16 @@ namespace eeng::assets
             if (scene->mNumAnimations == 0)
                 throw std::runtime_error("Assimp append failed: scene has no animations");
 
-            const auto raw_clips = extract_animation_clips(scene);
+            auto raw_clips = extract_animation_clips(scene);
+            const size_t clip_count = raw_clips.size();
+            for (size_t clip_index = 0; clip_index < raw_clips.size(); clip_index++)
+            {
+                raw_clips[clip_index].name = clip_name_from_source(
+                    options.source_file,
+                    raw_clips[clip_index].name,
+                    clip_index,
+                    clip_count);
+            }
 
             auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
             auto handle_opt = resource_manager.handle_for_guid<ModelDataAsset>(options.target_model);

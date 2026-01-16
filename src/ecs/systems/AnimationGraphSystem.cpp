@@ -216,18 +216,41 @@ namespace
         return out;
     }
 
+    std::string to_lower_ascii(std::string_view value)
+    {
+        std::string out(value);
+        for (char& c : out)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return out;
+    }
+
+    bool clip_has_tracks(const AnimClip& clip)
+    {
+        for (const auto& track : clip.node_animations)
+        {
+            if (track.is_used)
+                return true;
+        }
+        return false;
+    }
+
     const AnimClip* resolve_clip_by_name(const ModelDataAsset& model, const std::string& clip_name)
     {
         if (clip_name.empty())
             return nullptr;
 
-        auto it = std::find_if(
-            model.animations.begin(),
-            model.animations.end(),
-            [&](const AnimClip& clip) { return clip.name == clip_name; });
-        if (it == model.animations.end())
-            return nullptr;
-        return &(*it);
+        const std::string clip_name_lower = to_lower_ascii(clip_name);
+        const AnimClip* fallback = nullptr;
+        for (const auto& clip : model.animations)
+        {
+            if (to_lower_ascii(clip.name) != clip_name_lower)
+                continue;
+            if (!fallback)
+                fallback = &clip;
+            if (clip_has_tracks(clip))
+                return &clip;
+        }
+        return fallback;
     }
 
     float normalized_time(const AnimClip* clip, float time_sec, AnimGraphPlaybackMode mode)

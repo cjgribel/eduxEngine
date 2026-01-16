@@ -6,6 +6,8 @@
 #include "editor/GuiCommands.hpp"
 #include "editor/BatchCommands.hpp"
 #include "ResourceManager.hpp"
+#include "AssetMetaData.hpp"
+#include "assets/types/AnimationGraphAsset.hpp"
 #include "ecs/EntityManager.hpp"
 #include "LogMacros.h"
 #include <memory>
@@ -303,6 +305,91 @@ namespace eeng::editor
             if (in_flight)
                 in_flight->store(false, std::memory_order_relaxed);
         }
+    }
+
+    void AssetActions::import_animation_graph_mock(
+        EngineContext& ctx,
+        std::string graph_name,
+        std::string clip_name)
+    {
+        if (!can_queue_action(ctx, "ImportAnimationGraphMock"))
+            return;
+
+        if (graph_name.empty() || clip_name.empty())
+        {
+            EENG_LOG_WARN(&ctx, "Animation graph import skipped: missing name or clip.");
+            return;
+        }
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+            return;
+
+        auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+        const auto& assets_root = rm.assets_root();
+        if (assets_root.empty())
+        {
+            EENG_LOG_WARN(&ctx, "Animation graph import skipped: assets root not set.");
+            return;
+        }
+
+        assets::AnimationGraphAsset graph{};
+        graph.version = 1;
+        graph.name = graph_name;
+
+        assets::AnimGraphLayer layer{};
+        layer.name = "Base";
+        layer.weight = 1.0f;
+        layer.blend_mode = assets::AnimGraphBlendMode::Override;
+        layer.entry_state = "Idle";
+
+        assets::AnimGraphState state{};
+        state.id = "Idle";
+        state.type = assets::AnimGraphStateType::Clip;
+        state.clip = clip_name;
+        state.playback = assets::AnimGraphPlaybackMode::Loop;
+        state.speed = 1.0f;
+        layer.states.push_back(std::move(state));
+
+        graph.layers.push_back(std::move(layer));
+
+        AssetMetaData meta{};
+        meta.guid = Guid::generate();
+        meta.guid_parent = Guid::invalid();
+        meta.name = graph_name;
+        meta.type_id = "assets.AnimationGraphAsset";
+
+        const auto graph_dir = assets_root / "graphs";
+        const auto asset_path = graph_dir / (graph_name + ".json");
+        const auto meta_path = graph_dir / (graph_name + ".meta.json");
+
+        rm.queue_import_job(
+            [graph = std::move(graph), meta = std::move(meta), asset_path, meta_path, assets_root]
+            (ResourceManager& rm, EngineContext& ctx) mutable -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Import;
+                try
+                {
+                    std::filesystem::create_directories(asset_path.parent_path());
+                    if (std::filesystem::exists(asset_path) || std::filesystem::exists(meta_path))
+                        throw std::runtime_error("Animation graph already exists: " + asset_path.string());
+
+                    rm.import(graph, asset_path.string(), meta, meta_path.string());
+                    rm.scan_assets_async(assets_root, ctx);
+                    res.add_result(meta.guid, true, "Import ok");
+                }
+                catch (const std::exception& ex)
+                {
+                    res.add_result(meta.guid, false, ex.what());
+                }
+                catch (...)
+                {
+                    res.add_result(meta.guid, false, "unknown exception in import job");
+                }
+                return res;
+            },
+            ctx);
     }
 
     void AssetActions::unimport_assets(EngineContext& ctx, std::vector<Guid> roots)

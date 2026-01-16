@@ -407,6 +407,11 @@ namespace eeng::gui
                     config);
             }
             ImGui::SameLine();
+            if (ImGui::Button("Import Graph (Mock)"))
+            {
+                editor::AssetActions::import_animation_graph_mock(ctx);
+            }
+            ImGui::SameLine();
             if (!unimport_enabled) ImGui::BeginDisabled();
             if (ImGui::Button("Unimport"))
             {
@@ -553,7 +558,7 @@ namespace eeng::gui
         void draw_info_box(const AssetEntry& entry, const AssetStatus& guid_status)
         {
             const float line_h = ImGui::GetTextLineHeightWithSpacing();
-            const float info_height = line_h * 5.0f;
+            const float info_height = line_h * 6.0f;
 
             if (ImGui::BeginChild("AssetInfoBox", ImVec2(0.0f, info_height), true))
             {
