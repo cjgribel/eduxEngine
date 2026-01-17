@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <iostream>
 #include <limits>
 #include <string_view>
 #include <unordered_set>
@@ -269,9 +268,6 @@ namespace
                 {
                     EENG_LOG_WARN(&ctx, "AnimationGraph: clip '%s' not found in model %s.",
                         clip_name.c_str(), model_guid.to_string().c_str());
-                    std::cerr << "AnimationGraph: clip '" << clip_name
-                              << "' not found in model " << model_guid.to_string()
-                              << "." << std::endl;
                 }
                 return;
             }
@@ -283,9 +279,6 @@ namespace
                 {
                     EENG_LOG_WARN(&ctx, "AnimationGraph: clip '%s' has no tracks in model %s.",
                         clip_name.c_str(), model_guid.to_string().c_str());
-                    std::cerr << "AnimationGraph: clip '" << clip_name
-                              << "' has no tracks in model " << model_guid.to_string()
-                              << "." << std::endl;
                 }
             }
         };
@@ -546,6 +539,19 @@ namespace
         return false;
     }
 
+    float blend2_weight(
+        const AnimGraphState& state,
+        const AnimationGraphAsset& graph,
+        const eeng::ecs::AnimGraphInstance& instance)
+    {
+        float value = 0.0f;
+        if (!state.param_x.empty())
+            get_param_float(graph, instance, state.param_x, value);
+        const float span = state.param_max_x - state.param_min_x;
+        float t = span > 0.0f ? (value - state.param_min_x) / span : 0.0f;
+        return std::min(std::max(t, 0.0f), 1.0f);
+    }
+
     bool get_param_bool(
         const AnimationGraphAsset& graph,
         const eeng::ecs::AnimGraphInstance& instance,
@@ -771,6 +777,7 @@ namespace
     {
         StateEvalContext ctx{};
         ctx.state = &state;
+        ctx.phase_rate = state.speed;
 
         const AnimClip* time_clip = nullptr;
         std::array<const AnimGraphBlendSample*, 4> sample_refs{};
@@ -788,14 +795,31 @@ namespace
             ctx.sample_count = 2;
             time_clip = ctx.clips[0] ? ctx.clips[0] : ctx.clips[1];
             {
-                float value = 0.0f;
-                if (!state.param_x.empty())
-                    get_param_float(graph, instance, state.param_x, value);
-                const float span = state.param_max_x - state.param_min_x;
-                float t = span > 0.0f ? (value - state.param_min_x) / span : 0.0f;
-                t = std::min(std::max(t, 0.0f), 1.0f);
+                const float t = blend2_weight(state, graph, instance);
                 ctx.weights[0] = 1.0f - t;
                 ctx.weights[1] = t;
+
+                const auto duration_sec = [](const AnimClip* clip) -> float
+                {
+                    if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
+                        return 0.0f;
+                    return clip->duration_ticks / clip->ticks_per_second;
+                };
+
+                const float dur0 = duration_sec(ctx.clips[0]);
+                const float dur1 = duration_sec(ctx.clips[1]);
+                float blended_duration = 0.0f;
+                if (dur0 > 0.0f && dur1 > 0.0f)
+                {
+                    blended_duration = dur0 * ctx.weights[0] + dur1 * ctx.weights[1];
+                }
+                else
+                {
+                    blended_duration = std::max(dur0, dur1);
+                }
+
+                if (blended_duration > 0.0f)
+                    ctx.phase_rate = state.speed / blended_duration;
             }
             break;
         case AnimGraphStateType::BlendSpace1D:
@@ -1009,9 +1033,10 @@ namespace
 
         if (ctx.sample_count > 0)
         {
-            const bool is_blendspace = (state.type == AnimGraphStateType::BlendSpace1D
+            const bool is_phase_space = (state.type == AnimGraphStateType::Blend2
+                || state.type == AnimGraphStateType::BlendSpace1D
                 || state.type == AnimGraphStateType::BlendSpace2D);
-            ctx.ntime = is_blendspace
+            ctx.ntime = is_phase_space
                 ? trimmed_time_from_duration(state, 1.0f, time_sec)
                 : trimmed_time(state, time_clip, time_sec);
             for (int i = 0; i < ctx.sample_count; i++)
@@ -1150,7 +1175,8 @@ namespace
     {
         if (state.playback == AnimGraphPlaybackMode::Pose)
             return;
-        if (state.type == AnimGraphStateType::BlendSpace1D
+        if (state.type == AnimGraphStateType::Blend2
+            || state.type == AnimGraphStateType::BlendSpace1D
             || state.type == AnimGraphStateType::BlendSpace2D)
         {
             // Policy: Blend spaces advance in normalized phase space to avoid jumps when weights change.
@@ -1174,14 +1200,68 @@ namespace
             clip = resolve_clip_by_name(model, state.clip);
             break;
         case AnimGraphStateType::Blend2:
-            clip = resolve_clip_by_name(model, state.clip0);
-            break;
+            return trimmed_time_from_duration(state, 1.0f, time_sec);
         case AnimGraphStateType::BlendSpace1D:
         case AnimGraphStateType::BlendSpace2D:
             return trimmed_time_from_duration(state, 1.0f, time_sec);
         default:
             break;
         }
+        return trimmed_time(state, clip, time_sec);
+    }
+
+    float phase_to_state_time(
+        const AnimGraphState& state,
+        const AnimationGraphAsset& graph,
+        const eeng::ecs::AnimGraphInstance& instance,
+        const ModelDataAsset& model,
+        float phase)
+    {
+        (void)graph;
+        (void)instance;
+
+        if (state.playback == AnimGraphPlaybackMode::Pose)
+            return 0.0f;
+
+        if (state.type == AnimGraphStateType::Blend2
+            || state.type == AnimGraphStateType::BlendSpace1D
+            || state.type == AnimGraphStateType::BlendSpace2D)
+        {
+            return std::min(std::max(phase, 0.0f), 1.0f);
+        }
+
+        const AnimClip* clip = resolve_clip_by_name(model, state.clip);
+        if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
+            return 0.0f;
+
+        const float duration_sec = clip->duration_ticks / clip->ticks_per_second;
+        const float trim_span = state.trim_right - state.trim_left;
+        if (trim_span <= 0.0f)
+            return 0.0f;
+
+        float normalized = (phase - state.trim_left) / trim_span;
+        normalized = std::min(std::max(normalized, 0.0f), 1.0f);
+        return normalized * duration_sec;
+    }
+
+    float state_phase(
+        const AnimGraphState& state,
+        const AnimationGraphAsset& graph,
+        const eeng::ecs::AnimGraphInstance& instance,
+        const ModelDataAsset& model,
+        float time_sec)
+    {
+        (void)graph;
+        (void)instance;
+
+        if (state.type == AnimGraphStateType::Blend2
+            || state.type == AnimGraphStateType::BlendSpace1D
+            || state.type == AnimGraphStateType::BlendSpace2D)
+        {
+            return trimmed_time_from_duration(state, 1.0f, time_sec);
+        }
+
+        const AnimClip* clip = resolve_clip_by_name(model, state.clip);
         return trimmed_time(state, clip, time_sec);
     }
 }
@@ -1358,10 +1438,14 @@ namespace eeng::ecs::systems
                                     if (dest < 0)
                                         continue;
                                     const auto& dest_state = layer.states[static_cast<std::size_t>(dest)];
+                                    const float phase = state_phase(state, graph, instance, model, runtime.state_time);
+                                    const float dest_time = dest_state.rewind_on_enter
+                                        ? 0.0f
+                                        : phase_to_state_time(dest_state, graph, instance, model, phase);
                                     if (trans.duration <= 0.0f)
                                     {
                                         runtime.state = dest;
-                                        runtime.state_time = dest_state.rewind_on_enter ? 0.0f : runtime.state_time;
+                                        runtime.state_time = dest_time;
                                     }
                                     else
                                     {
@@ -1370,7 +1454,7 @@ namespace eeng::ecs::systems
                                         runtime.transition.to = dest;
                                         runtime.transition.time = 0.0f;
                                         runtime.transition.duration = trans.duration;
-                                        runtime.transition.dest_time = dest_state.rewind_on_enter ? 0.0f : runtime.state_time;
+                                        runtime.transition.dest_time = dest_time;
                                     }
                                 }
                             }

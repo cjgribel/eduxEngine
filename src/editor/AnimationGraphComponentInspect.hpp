@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <unordered_map>
 
 #include "EngineContext.hpp"
@@ -102,46 +103,129 @@ namespace eeng::editor
                         continue;
                     }
 
-                    if (param.type != assets::AnimGraphParamType::Float)
-                        continue;
-                    if (slot_index >= comp->instance.float_params.size())
-                        continue;
-
-                    float value = comp->instance.float_params[slot_index];
-                    float new_value = value;
-                    float min_value = param.has_min ? param.min_value : 0.0f;
-                    float max_value = param.has_max ? param.max_value : 1.0f;
-                    if (max_value < min_value)
-                        std::swap(min_value, max_value);
-
                     inspector.begin_leaf(param.name.c_str());
-                    const float before_value = value;
-                    const bool slider_changed = ImGui::SliderFloat("##label", &new_value, min_value, max_value);
-                    // Policy: Commit an undoable edit only when the drag completes and moved enough.
-                    static std::unordered_map<ImGuiID, float> start_values;
-                    const ImGuiID item_id = ImGui::GetItemID();
-                    if (ImGui::IsItemActivated())
-                        start_values[item_id] = before_value;
-                    if (slider_changed)
+                    switch (param.type)
                     {
-                        comp->instance.float_params[slot_index] = new_value;
-                        if (live_comp && live_comp != comp
-                            && slot_index < live_comp->instance.float_params.size())
+                    case assets::AnimGraphParamType::Float:
+                    {
+                        if (slot_index >= comp->instance.float_params.size())
+                            break;
+
+                        float value = comp->instance.float_params[slot_index];
+                        float new_value = value;
+                        float min_value = param.has_min ? param.min_value : 0.0f;
+                        float max_value = param.has_max ? param.max_value : 1.0f;
+                        if (max_value < min_value)
+                            std::swap(min_value, max_value);
+
+                        const float before_value = value;
+                        const bool slider_changed = ImGui::SliderFloat("##label", &new_value, min_value, max_value);
+                        // Policy: Commit an undoable edit only when the drag completes and moved enough.
+                        static std::unordered_map<ImGuiID, float> start_values;
+                        const ImGuiID item_id = ImGui::GetItemID();
+                        if (ImGui::IsItemActivated())
+                            start_values[item_id] = before_value;
+                        if (slider_changed)
                         {
-                            live_comp->instance.float_params[slot_index] = new_value;
+                            comp->instance.float_params[slot_index] = new_value;
+                            if (live_comp && live_comp != comp
+                                && slot_index < live_comp->instance.float_params.size())
+                            {
+                                live_comp->instance.float_params[slot_index] = new_value;
+                            }
                         }
+                        if (ImGui::IsItemDeactivatedAfterEdit())
+                        {
+                            float start_value = before_value;
+                            auto it = start_values.find(item_id);
+                            if (it != start_values.end())
+                            {
+                                start_value = it->second;
+                                start_values.erase(it);
+                            }
+                            if (std::fabs(new_value - start_value) >= kParamCommitEpsilon)
+                                modified = true;
+                        }
+                        break;
                     }
-                    if (ImGui::IsItemDeactivatedAfterEdit())
+                    case assets::AnimGraphParamType::Int:
                     {
-                        float start_value = before_value;
-                        auto it = start_values.find(item_id);
-                        if (it != start_values.end())
+                        if (slot_index >= comp->instance.int_params.size())
+                            break;
+
+                        int value = comp->instance.int_params[slot_index];
+                        int new_value = value;
+                        bool changed = false;
+
+                        if (param.has_min || param.has_max)
                         {
-                            start_value = it->second;
-                            start_values.erase(it);
+                            int min_value = param.has_min ? static_cast<int>(std::floor(param.min_value))
+                                                          : std::numeric_limits<int>::min();
+                            int max_value = param.has_max ? static_cast<int>(std::ceil(param.max_value))
+                                                          : std::numeric_limits<int>::max();
+                            if (max_value < min_value)
+                                std::swap(min_value, max_value);
+                            changed = ImGui::SliderInt("##label", &new_value, min_value, max_value);
                         }
-                        if (std::fabs(new_value - start_value) >= kParamCommitEpsilon)
+                        else
+                        {
+                            changed = ImGui::InputInt("##label", &new_value);
+                        }
+
+                        if (changed)
+                        {
+                            comp->instance.int_params[slot_index] = new_value;
+                            if (live_comp && live_comp != comp
+                                && slot_index < live_comp->instance.int_params.size())
+                            {
+                                live_comp->instance.int_params[slot_index] = new_value;
+                            }
+                        }
+
+                        if (ImGui::IsItemDeactivatedAfterEdit() && new_value != value)
                             modified = true;
+                        break;
+                    }
+                    case assets::AnimGraphParamType::Bool:
+                    {
+                        if (slot_index >= comp->instance.bool_params.size())
+                            break;
+
+                        bool value = comp->instance.bool_params[slot_index] != 0;
+                        bool new_value = value;
+                        if (ImGui::Checkbox("##label", &new_value))
+                        {
+                            comp->instance.bool_params[slot_index] = new_value ? 1u : 0u;
+                            if (live_comp && live_comp != comp
+                                && slot_index < live_comp->instance.bool_params.size())
+                            {
+                                live_comp->instance.bool_params[slot_index] = new_value ? 1u : 0u;
+                            }
+                            modified = true;
+                        }
+                        break;
+                    }
+                    case assets::AnimGraphParamType::Trigger:
+                    {
+                        if (slot_index >= comp->instance.trigger_params.size())
+                            break;
+
+                        bool value = comp->instance.trigger_params[slot_index] != 0;
+                        bool new_value = value;
+                        if (ImGui::Checkbox("##label", &new_value))
+                        {
+                            comp->instance.trigger_params[slot_index] = new_value ? 1u : 0u;
+                            if (live_comp && live_comp != comp
+                                && slot_index < live_comp->instance.trigger_params.size())
+                            {
+                                live_comp->instance.trigger_params[slot_index] = new_value ? 1u : 0u;
+                            }
+                            modified = true;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
                     }
                     inspector.end_leaf();
                 }
