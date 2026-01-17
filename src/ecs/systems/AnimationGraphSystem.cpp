@@ -27,8 +27,14 @@
 
 namespace
 {
+    // Animation graph evaluation helpers:
+    // - Resolve clip references for the active state(s).
+    // - Compute blend weights and sample times.
+    // - Blend layered results into node and bone transforms.
     using namespace eeng::assets;
 
+    // Single-node TRS sample for a given clip and time.
+    // track_used flags if the source clip has a track for this node.
     struct NodeSample
     {
         glm::vec3 pos{ 0.0f };
@@ -37,6 +43,8 @@ namespace
         bool track_used = false;
     };
 
+    // Cache for the resolved clip pointers, weights, and times for a state evaluation.
+    // phase_rate is used by blend spaces to advance a normalized phase (0..1).
     struct StateEvalContext
     {
         const AnimGraphState* state = nullptr;
@@ -49,6 +57,9 @@ namespace
         bool valid = false;
     };
 
+    // Cache for evaluating one layer in the current frame.
+    // from_ctx/to_ctx are state samples during transitions.
+    // *_ref_ctx are reference samples for additive layers (time 0).
     struct LayerEvalContext
     {
         const AnimGraphLayer* layer = nullptr;
@@ -60,6 +71,7 @@ namespace
         bool in_transition = false;
     };
 
+    // Convert dual quaternion to 4x4 matrix (TRS, no scale).
     inline glm::mat4 dualquat_to_mat4(const glm::dualquat& dq)
     {
         const glm::quat real_part = dq.real;
@@ -73,6 +85,7 @@ namespace
         return transform;
     }
 
+    // Extract TRS from the bind pose of a skeleton node.
     NodeSample bind_pose_sample(const SkeletonNode& node)
     {
         const glm::vec3 bind_pos = glm::vec3(node.local_bind_tfm[3]);
@@ -98,6 +111,8 @@ namespace
         return sample;
     }
 
+    // Sample a node's TRS at normalized time in [0,1].
+    // Note: key indices are interpolated by index, not by timestamp.
     NodeSample sample_node_trs(
         size_t node_index,
         const AnimClip* clip,
@@ -158,6 +173,7 @@ namespace
         return sample;
     }
 
+    // Compose a TRS matrix from a NodeSample.
     glm::mat4 compose_trs(const NodeSample& sample)
     {
         const glm::mat4 translation_matrix = glm::translate(glm::mat4(1.0f), sample.pos);
@@ -166,6 +182,8 @@ namespace
         return translation_matrix * rotation_matrix * scale_matrix;
     }
 
+    // Blend two TRS samples using dual-quaternion lerp for rotation+translation,
+    // and linear interpolation for scale.
     NodeSample blend_samples(const NodeSample& a, const NodeSample& b, float weight)
     {
         const float blend = std::min(std::max(weight, 0.0f), 1.0f);
@@ -182,6 +200,8 @@ namespace
         return out;
     }
 
+    // Blend four TRS samples with dual-quaternion weights.
+    // We normalize weights and use sign correction for consistent quaternion hemisphere.
     NodeSample blend_samples4(
         const std::array<NodeSample, 4>& samples,
         const std::array<float, 4>& weights)
@@ -222,6 +242,7 @@ namespace
         return out;
     }
 
+    // True if any track in the clip is used (non-empty).
     bool clip_has_tracks(const AnimClip& clip)
     {
         for (const auto& track : clip.node_animations)
@@ -232,6 +253,7 @@ namespace
         return false;
     }
 
+    // Diagnostics: log missing or trackless clips once per model+clip.
     void warn_missing_clips(
         eeng::EngineContext& ctx,
         const ModelDataAsset& model,
@@ -308,6 +330,8 @@ namespace
         }
     }
 
+    // Resolve a clip name to a clip in the model.
+    // If multiple share a name, prefer one that has tracks, otherwise return the first match.
     const AnimClip* resolve_clip_by_name(const ModelDataAsset& model, const std::string& clip_name)
     {
         if (clip_name.empty())
@@ -326,6 +350,7 @@ namespace
         return fallback;
     }
 
+    // Convert elapsed seconds to normalized [0,1] time for a clip, with playback mode.
     float normalized_time(const AnimClip* clip, float time_sec, AnimGraphPlaybackMode mode)
     {
         if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
@@ -367,6 +392,8 @@ namespace
         return std::min(std::max(ntime, 0.0f), 1.0f);
     }
 
+    // Convert elapsed seconds to normalized [0,1] time for a synthetic duration.
+    // Used for blend spaces (phase-based playback).
     float normalized_time_from_duration(float time_sec, float duration_sec, AnimGraphPlaybackMode mode)
     {
         if (duration_sec <= 0.0f)
@@ -403,6 +430,7 @@ namespace
         return std::min(std::max(ntime, 0.0f), 1.0f);
     }
 
+    // Apply trim range to the normalized time for a state.
     float trimmed_time(const AnimGraphState& state, const AnimClip* clip, float time_sec)
     {
         if (state.playback == AnimGraphPlaybackMode::Pose)
@@ -415,6 +443,7 @@ namespace
         return std::min(std::max(ntime, 0.0f), 1.0f);
     }
 
+    // Apply trim range to the normalized time for a synthetic duration.
     float trimmed_time_from_duration(const AnimGraphState& state, float duration_sec, float time_sec)
     {
         if (state.playback == AnimGraphPlaybackMode::Pose)
@@ -427,6 +456,7 @@ namespace
         return std::min(std::max(ntime, 0.0f), 1.0f);
     }
 
+    // Compute the sample time for a blend-space sample that optionally overrides pose time.
     float sample_pose_time(
         const AnimGraphState& state,
         const AnimGraphBlendSample& sample,
@@ -441,6 +471,7 @@ namespace
         return std::min(std::max(ntime, 0.0f), 1.0f);
     }
 
+    // Resolve a param name to its runtime slot type+index.
     bool get_param_slot(
         const AnimationGraphAsset& graph,
         std::string_view name,
@@ -492,6 +523,7 @@ namespace
         return false;
     }
 
+    // Fetch a param as float (handles float/int/bool/trigger conversions).
     bool get_param_float(
         const AnimationGraphAsset& graph,
         const eeng::ecs::AnimGraphInstance& instance,
@@ -539,6 +571,7 @@ namespace
         return false;
     }
 
+    // Compute Blend2 weight in [0,1] from the param value and min/max.
     float blend2_weight(
         const AnimGraphState& state,
         const AnimationGraphAsset& graph,
@@ -552,6 +585,7 @@ namespace
         return std::min(std::max(t, 0.0f), 1.0f);
     }
 
+    // Fetch a param as bool (handles bool/trigger).
     bool get_param_bool(
         const AnimationGraphAsset& graph,
         const eeng::ecs::AnimGraphInstance& instance,
@@ -585,6 +619,7 @@ namespace
         return false;
     }
 
+    // Evaluate a single transition condition.
     bool evaluate_condition(
         const AnimGraphCondition& cond,
         const AnimationGraphAsset& graph,
@@ -655,6 +690,7 @@ namespace
         }
     }
 
+    // Evaluate a condition group (all/any).
     bool evaluate_conditions(
         const AnimGraphConditionGroup& group,
         const AnimationGraphAsset& graph,
@@ -681,6 +717,7 @@ namespace
         return true;
     }
 
+    // Solve quadratic/linear roots for bilinear coordinates.
     void find_roots(float a, float b, float c, int& nbr_roots, float& root1, float& root2)
     {
         constexpr float tol = 0.00001f;
@@ -722,6 +759,8 @@ namespace
         }
     }
 
+    // Compute bilinear weights for a point in a convex quad.
+    // Based on Floater/Ramsey bilinear coordinate methods.
     bool compute_bilinear_weights(
         const glm::vec2& x,
         const glm::vec2& v0,
@@ -767,6 +806,8 @@ namespace
         return true;
     }
 
+    // Resolve a state into clip pointers, weights, and sampling times.
+    // For blend spaces, we also compute phase_rate (normalized playback speed).
     StateEvalContext build_state_context(
         const AnimGraphState& state,
         const AnimationGraphAsset& graph,
@@ -795,10 +836,12 @@ namespace
             ctx.sample_count = 2;
             time_clip = ctx.clips[0] ? ctx.clips[0] : ctx.clips[1];
             {
+                // Blend2 weight is a normalized value derived from a single parameter.
                 const float t = blend2_weight(state, graph, instance);
                 ctx.weights[0] = 1.0f - t;
                 ctx.weights[1] = t;
 
+                // Compute a blended duration to keep phase continuous as weights change.
                 const auto duration_sec = [](const AnimClip* clip) -> float
                 {
                     if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
@@ -836,6 +879,7 @@ namespace
 
             if (!state.indices.empty())
             {
+                // Prefer explicit segment indices if provided (authoring order).
                 for (std::size_t i = 0; i + 1 < state.indices.size(); i += 2)
                 {
                     const int i0 = state.indices[i];
@@ -861,6 +905,7 @@ namespace
 
             if (!found && state.samples.size() >= 2)
             {
+                // Fallback: sort by X and find the bracket segment.
                 std::vector<int> order(state.samples.size());
                 for (std::size_t i = 0; i < order.size(); i++)
                     order[i] = static_cast<int>(i);
@@ -927,6 +972,7 @@ namespace
                     const float blended_duration = dur0 * w0 + dur1 * w1;
                     if (blended_duration > 0.0f)
                     {
+                        // Policy: BlendSpace1D uses a weighted duration to keep time continuous across segments.
                         ctx.phase_rate = state.speed / blended_duration;
                     }
                 }
@@ -949,6 +995,7 @@ namespace
 
             if (!state.indices.empty())
             {
+                // Search explicit quads first (authoring order).
                 for (std::size_t i = 0; i + 3 < state.indices.size(); i += 4)
                 {
                     indices = { state.indices[i], state.indices[i + 1], state.indices[i + 2], state.indices[i + 3] };
@@ -978,6 +1025,7 @@ namespace
 
             if (!found && state.samples.size() >= 4)
             {
+                // Fallback: first quad only.
                 indices = { 0, 1, 2, 3 };
                 w = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
                 found = true;
@@ -1021,6 +1069,7 @@ namespace
                     const float blended_duration = dur0 * w0 + dur1 * w1 + dur2 * w2 + dur3 * w3;
                     if (blended_duration > 0.0f)
                     {
+                        // Policy: BlendSpace2D uses a weighted duration to keep time continuous across quads.
                         ctx.phase_rate = state.speed / blended_duration;
                     }
                 }
@@ -1033,6 +1082,7 @@ namespace
 
         if (ctx.sample_count > 0)
         {
+            // Blend2 and blend spaces use normalized phase time; clips use clip time.
             const bool is_phase_space = (state.type == AnimGraphStateType::Blend2
                 || state.type == AnimGraphStateType::BlendSpace1D
                 || state.type == AnimGraphStateType::BlendSpace2D);
@@ -1060,6 +1110,7 @@ namespace
         return ctx;
     }
 
+    // Sample a single node using the resolved state context.
     NodeSample sample_state_node(
         size_t node_index,
         const StateEvalContext& ctx,
@@ -1071,16 +1122,19 @@ namespace
 
         if (ctx.sample_count == 1)
         {
+            // Single clip sample.
             return sample_node_trs(node_index, ctx.clips[0], ctx.sample_times[0], nodetree);
         }
         if (ctx.sample_count == 2)
         {
+            // Two-sample blend (Blend2 or BlendSpace1D).
             NodeSample a = sample_node_trs(node_index, ctx.clips[0], ctx.sample_times[0], nodetree);
             NodeSample b = sample_node_trs(node_index, ctx.clips[1], ctx.sample_times[1], nodetree);
             return blend_samples(a, b, ctx.weights[1]);
         }
         if (ctx.sample_count == 4)
         {
+            // Four-sample blend (BlendSpace2D).
             std::array<NodeSample, 4> samples = {
                 sample_node_trs(node_index, ctx.clips[0], ctx.sample_times[0], nodetree),
                 sample_node_trs(node_index, ctx.clips[1], ctx.sample_times[1], nodetree),
@@ -1092,6 +1146,7 @@ namespace
         return bind_pose_sample(node);
     }
 
+    // Fetch per-node mask weight for a layer.
     float layer_mask_weight(
         const AnimationGraphAsset& graph,
         const AnimGraphLayer& layer,
@@ -1133,6 +1188,7 @@ namespace
         return default_weight;
     }
 
+    // Blend two transforms by decomposing to TRS and applying blend_samples.
     glm::mat4 blend_matrices(const glm::mat4& a, const glm::mat4& b, float weight)
     {
         NodeSample sa{};
@@ -1163,10 +1219,12 @@ namespace
         extract_sample(a, sa);
         extract_sample(b, sb);
 
+        // Blend in TRS space to avoid shearing artifacts.
         NodeSample blended = blend_samples(sa, sb, weight);
         return compose_trs(blended);
     }
 
+    // Advance state time. Blend2/BlendSpace use normalized phase, others use seconds.
     void advance_state_time(
         const AnimGraphState& state,
         float delta_time,
@@ -1188,6 +1246,7 @@ namespace
         }
     }
 
+    // Compute the normalized time used for exit-time checks.
     float state_exit_time(
         const AnimGraphState& state,
         const ModelDataAsset& model,
@@ -1210,6 +1269,8 @@ namespace
         return trimmed_time(state, clip, time_sec);
     }
 
+    // Convert a normalized phase to a destination state's time basis.
+    // Used to preserve phase across transitions.
     float phase_to_state_time(
         const AnimGraphState& state,
         const AnimationGraphAsset& graph,
@@ -1244,6 +1305,7 @@ namespace
         return normalized * duration_sec;
     }
 
+    // Compute normalized phase for the current state, regardless of time basis.
     float state_phase(
         const AnimGraphState& state,
         const AnimationGraphAsset& graph,
@@ -1270,6 +1332,12 @@ namespace eeng::ecs::systems
 {
     void AnimationGraphSystem::update(entt::registry& registry, EngineContext& ctx, float delta_time)
     {
+        // High-level flow:
+        // 1) Resolve model + graph assets.
+        // 2) Build per-layer state contexts (including transitions).
+        // 3) Advance state times.
+        // 4) Traverse skeleton, apply layered blending to each node.
+        // 5) Write final bone matrices.
         auto rm = eeng::try_get_resource_manager(ctx, "AnimationGraphSystem");
         if (!rm) return;
 
@@ -1320,11 +1388,13 @@ namespace eeng::ecs::systems
                             if (!instance.initialized)
                                 return;
 
+                            // Diagnostics help detect clip-name mismatch between graph and model.
                             warn_missing_clips(ctx, model, graph, model_guid);
 
                             std::vector<LayerEvalContext> layer_contexts;
                             layer_contexts.reserve(graph.layers.size());
 
+                            // Build evaluation contexts for all layers before advancing time.
                             for (std::size_t i = 0; i < graph.layers.size(); i++)
                             {
                                 const auto& layer = graph.layers[i];
@@ -1335,6 +1405,7 @@ namespace eeng::ecs::systems
                                 if (runtime.transition.active && runtime.transition.to >= 0
                                     && runtime.transition.to < static_cast<int>(layer.states.size()))
                                 {
+                                    // Transition: blend from current state to destination state.
                                     const auto& from_state = layer.states[static_cast<std::size_t>(runtime.transition.from)];
                                     const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
                                     lctx.from_ctx = build_state_context(from_state, graph, instance, model, runtime.state_time);
@@ -1352,6 +1423,7 @@ namespace eeng::ecs::systems
                                 }
                                 else if (runtime.state >= 0 && runtime.state < static_cast<int>(layer.states.size()))
                                 {
+                                    // No transition: use active state only.
                                     const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
                                     lctx.from_ctx = build_state_context(state, graph, instance, model, runtime.state_time);
                                     if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
@@ -1362,6 +1434,7 @@ namespace eeng::ecs::systems
                                 layer_contexts.push_back(std::move(lctx));
                             }
 
+                            // Advance runtime times and resolve transitions.
                             for (std::size_t i = 0; i < graph.layers.size(); i++)
                             {
                                 if (i >= instance.layers.size())
@@ -1373,6 +1446,7 @@ namespace eeng::ecs::systems
 
                                 if (runtime.transition.active)
                                 {
+                                    // Transition in progress: advance destination time and end if complete.
                                     runtime.transition.time += delta_time;
                                     const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
                                     const float phase_rate = lctx.to_ctx.phase_rate;
@@ -1393,6 +1467,7 @@ namespace eeng::ecs::systems
                                 const float phase_rate = lctx.from_ctx.phase_rate;
                                 advance_state_time(state, delta_time, phase_rate, runtime.state_time);
 
+                                // Resolve the highest-priority valid transition.
                                 int best_transition = -1;
                                 int best_priority = std::numeric_limits<int>::min();
                                 float state_ntime = state_exit_time(state, model, runtime.state_time);
@@ -1438,6 +1513,7 @@ namespace eeng::ecs::systems
                                     if (dest < 0)
                                         continue;
                                     const auto& dest_state = layer.states[static_cast<std::size_t>(dest)];
+                                    // Map current phase to destination time when not rewinding.
                                     const float phase = state_phase(state, graph, instance, model, runtime.state_time);
                                     const float dest_time = dest_state.rewind_on_enter
                                         ? 0.0f
@@ -1467,6 +1543,7 @@ namespace eeng::ecs::systems
                             if (model_component.bone_matrices.size() != bone_count)
                                 model_component.bone_matrices.assign(bone_count, glm::mat4(1.0f));
 
+                            // Traverse skeleton depth-first so parent transforms are ready for children.
                             model.nodetree.traverse_depthfirst(
                                 [&](const assets::SkeletonNode* node,
                                     const assets::SkeletonNode* parent,
@@ -1475,6 +1552,7 @@ namespace eeng::ecs::systems
                                 {
                                     glm::mat4 local = node->local_bind_tfm;
 
+                                    // Apply all layers in order, blending into local space.
                                     for (const auto& lctx : layer_contexts)
                                     {
                                         if (!lctx.layer)
@@ -1501,6 +1579,7 @@ namespace eeng::ecs::systems
 
                                         if (lctx.layer->blend_mode == AnimGraphBlendMode::Additive)
                                         {
+                                            // Additive: apply delta against a reference pose from the same layer.
                                             NodeSample ref_sample = lctx.in_transition
                                                 ? blend_samples(
                                                     sample_state_node(node_index, lctx.from_ref_ctx, model.nodetree),
@@ -1514,15 +1593,18 @@ namespace eeng::ecs::systems
                                         }
                                         else
                                         {
+                                            // Override/Blend: interpolate local toward layer result.
                                             local = blend_matrices(local, layer_local, layer_weight);
                                         }
                                     }
 
+                                    // Convert local to global using parent transform.
                                     if (parent)
                                         local = model_component.node_global_matrices[parent_index] * local;
                                     model_component.node_global_matrices[node_index] = local;
                                 });
 
+                            // Compute bone matrices from node globals.
                             for (std::size_t i = 0; i < bone_count; i++)
                             {
                                 const auto& bone = model.bones[i];
