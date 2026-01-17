@@ -23,6 +23,7 @@ namespace eeng
     private:
 
         // GUI windows
+        void draw_profiler(EngineContext& ctx) const;
         void draw_log(EngineContext& ctx) const;
         void draw_storage(EngineContext& ctx) const;
 

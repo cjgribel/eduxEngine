@@ -304,6 +304,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/ModelDataAssetSerialization.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/AnimationGraphSerialization.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ProfilerWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogGlobals.cpp
     )

@@ -11,6 +11,35 @@ namespace util
 std::mutex Profiler::mtx_;
 std::unordered_map<std::string, Profiler::CategoryData> Profiler::data_;
 std::unordered_map<std::string, Profiler::TimePoint>    Profiler::active_;
+std::unordered_map<std::string, Profiler::CategorySnapshot> Profiler::last_snapshots_;
+uint64_t Profiler::snapshot_seq_ = 0;
+
+Profiler::CategorySnapshot Profiler::build_snapshot_locked(
+    const std::string& category,
+    const CategoryData& data)
+{
+    CategorySnapshot snapshot{};
+    snapshot.subtasks.reserve(data.accum.size());
+
+    for (const auto& [name, acc] : data.accum)
+    {
+        snapshot.subtasks.push_back(SubtaskStats{ name, acc.totalMs, acc.count });
+        if (name == category)
+        {
+            snapshot.has_total_subtask = true;
+            snapshot.total_ms = acc.totalMs;
+            snapshot.total_count = acc.count;
+        }
+    }
+
+    if (!snapshot.has_total_subtask)
+    {
+        for (const auto& p : data.accum)
+            snapshot.total_ms += p.second.totalMs;
+    }
+
+    return snapshot;
+}
 
 void Profiler::start(const std::string& category,
                      const std::string& subtask)
@@ -105,6 +134,57 @@ void Profiler::reset(const std::string& category)
             ++it;
         }
     }
+}
+
+bool Profiler::get_snapshot(const std::string& category,
+                            CategorySnapshot& out)
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = data_.find(category);
+    if (it == data_.end())
+        return false;
+
+    out = build_snapshot_locked(category, it->second);
+    return true;
+}
+
+bool Profiler::snapshot_and_reset(const std::string& category)
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = data_.find(category);
+    if (it == data_.end())
+        return false;
+
+    auto snapshot = build_snapshot_locked(category, it->second);
+    snapshot.sequence = ++snapshot_seq_;
+    last_snapshots_[category] = snapshot;
+    data_.erase(it);
+
+    for (auto active_it = active_.begin(); active_it != active_.end(); )
+    {
+        if (active_it->first.rfind(category + "#", 0) == 0)
+        {
+            active_it = active_.erase(active_it);
+        }
+        else
+        {
+            ++active_it;
+        }
+    }
+
+    return true;
+}
+
+bool Profiler::get_last_snapshot(const std::string& category,
+                                 CategorySnapshot& out)
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = last_snapshots_.find(category);
+    if (it == last_snapshots_.end())
+        return false;
+
+    out = it->second;
+    return true;
 }
 
 } // namespace util

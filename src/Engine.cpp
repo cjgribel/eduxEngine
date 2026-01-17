@@ -17,6 +17,7 @@
 #include "LogGlobals.hpp"
 #include "AssetMetaReg.hpp"
 #include "ComponentMetaReg.hpp"
+#include "util/Profiler.hpp"
 
 #include "ImGuiBackendSDL.hpp"
 #include "EventQueue.h"
@@ -213,6 +214,7 @@ namespace eeng
 
         // Gui flags
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowProfiler, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowLogWindow, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowStorageWindow, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowResourceBrowser, true);
@@ -255,9 +257,14 @@ namespace eeng
             time_ms = now_ms;
             time_s = now_s;
 
+            START_TIMER("Frame");
+
+            START_TIMER("Frame", "Input Events");
             process_events(running); // input etc
+            STOP_TIMER("Frame", "Input Events");
             if (shutdown_state_ == ShutdownState::Draining)
             {
+                RESET_TIMER("Frame");
                 // Shutdown is in-progress; keep the loop alive to pump queues,
                 // render the GUI, and avoid deadlocks while we drain async work.
                 if (advance_shutdown_drain())
@@ -275,7 +282,10 @@ namespace eeng
                 SDL_Delay(1);
                 continue;
             }
+
+            START_TIMER("Frame", "Frame Begin");
             begin_frame(); // imgui_backend::show_demo_window(); ctx->gui_manager->draw(*ctx); GL setup
+            STOP_TIMER("Frame", "Frame Begin");
             // =================================================================
 
             // update_input_lua(lua, SceneBase::axes, SceneBase::buttons);
@@ -299,21 +309,30 @@ namespace eeng
             // ctx->command_queue->execute_all(*registry, deltaTime_s);
 
             // --- Game systems ---
+            START_TIMER("Frame", "Game Update");
             game->update(time_s, deltaTime_s);
+            STOP_TIMER("Frame", "Game Update");
 
             // --- Main thread tasks ---
             // entt::storage mutations etc
+            START_TIMER("Frame", "Main Thread Tasks");
             ctx->main_thread_queue->execute_all();
+            STOP_TIMER("Frame", "Main Thread Tasks");
 
+            START_TIMER("Frame", "Destroy Entities");
             int nbr_destroyed = ctx->entity_manager->destroy_pending_entities();
+            STOP_TIMER("Frame", "Destroy Entities");
             // Log nbr of destroyed entities
             if (nbr_destroyed > 0) { EENG_LOG_DEBUG(ctx, "Destroyed %d pending entities", nbr_destroyed); }
 
             // --- Event dispatch ---
+            START_TIMER("Frame", "Event Dispatch");
             ctx->event_queue->dispatch_all_events();
+            STOP_TIMER("Frame", "Event Dispatch");
 
             // --- Event dispatch / Command execution / Entity destruction ---
 #if 1
+            START_TIMER("Frame", "Commands & Batches");
             if (ctx->command_queue->has_in_flight()
                 || ctx->command_queue->has_ready_commands())
             {
@@ -325,6 +344,7 @@ namespace eeng
                 auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
                 br.process_dirty_batches(*ctx);
             }
+            STOP_TIMER("Frame", "Commands & Batches");
 #else
             //void Scene::event_loop()
             {
@@ -354,22 +374,35 @@ namespace eeng
 #endif
 
             // --- Render ---
+            START_TIMER("Frame", "Render");
             game->render(time_s, window_width, window_height);
+            STOP_TIMER("Frame", "Render");
 
             // =================================================================
+            START_TIMER("Frame", "Frame End");
             end_frame(); // ImGui::Render(); ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            STOP_TIMER("Frame", "Frame End");
 
+            START_TIMER("Frame", "Swap");
             SDL_GL_SwapWindow(window_);
+            STOP_TIMER("Frame", "Swap");
 
             // Add a delay if frame time was shorter than the target frame time
             const Uint32 elapsed_ms = SDL_GetTicks() - time_ms;
             if (elapsed_ms < min_frametime_ms)
+            {
+                START_TIMER("Frame", "Frame Cap");
                 SDL_Delay(min_frametime_ms - elapsed_ms);
+                STOP_TIMER("Frame", "Frame Cap");
             }
+
+            STOP_TIMER("Frame");
+            util::Profiler::snapshot_and_reset("Frame");
+        }
 
         game->destroy();
         shutdown();
-        }
+    }
 
     void Engine::shutdown()
     {

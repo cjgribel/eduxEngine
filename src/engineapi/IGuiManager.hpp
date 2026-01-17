@@ -11,6 +11,7 @@ namespace eeng
     enum class GuiFlags : uint8_t
     {
         ShowEngineInfo,
+        ShowProfiler,
         ShowLogWindow,
         ShowStorageWindow,
         ShowResourceBrowser,

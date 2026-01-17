@@ -13,6 +13,7 @@
 #include "gui/EntityInspectorWidget.hpp"
 #include "gui/CommandQueueWidget.hpp"
 #include "gui/ResourceBrowserWidget.hpp"
+#include "gui/ProfilerWidget.hpp"
 
 #include "EngineContextHelpers.hpp"
 #include "editor/AnimationGraphComponentInspect.hpp"
@@ -25,6 +26,7 @@
 #include "imgui_impl_opengl3.h"
 
 #include <algorithm>
+#include <string>
 //#include <future>
 
 namespace eeng
@@ -52,6 +54,9 @@ namespace eeng
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEngineInfo))
             draw_engine_info(ctx);
 
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowProfiler))
+            draw_profiler(ctx);
+
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowResourceBrowser))
             draw_resource_browser(ctx);
 
@@ -69,6 +74,14 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowAnimationGraphVisualizer))
             draw_animation_graph_visualizer(ctx);
+    }
+
+    void GuiManager::draw_profiler(EngineContext& ctx) const
+    {
+        ImGui::Begin("Profiler");
+        gui::ProfilerWidget widget{ ctx };
+        widget.draw();
+        ImGui::End();
     }
 
     void GuiManager::draw_log(EngineContext& ctx) const
