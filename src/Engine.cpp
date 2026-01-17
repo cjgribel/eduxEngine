@@ -221,6 +221,7 @@ namespace eeng
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowBatchRegistry, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowTaskMonitor, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowCommandQueue, true);
+        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowAnimationGraphVisualizer, true);
 
         // Post command hook with sanity checks
 #ifdef EENG_DEBUG

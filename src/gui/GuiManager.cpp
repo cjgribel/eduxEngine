@@ -14,6 +14,9 @@
 #include "gui/CommandQueueWidget.hpp"
 #include "gui/ResourceBrowserWidget.hpp"
 
+#include "EngineContextHelpers.hpp"
+#include "editor/AnimationGraphComponentInspect.hpp"
+
 #include "ThreadPool.hpp" // remove?
 #include "MainThreadQueue.hpp"
 
@@ -63,6 +66,9 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowSceneGraph))
             draw_scene_graph(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowAnimationGraphVisualizer))
+            draw_animation_graph_visualizer(ctx);
     }
 
     void GuiManager::draw_log(EngineContext& ctx) const
@@ -740,6 +746,78 @@ namespace eeng
         // Inspector::inspect_command_queue(inspector);
 
 // End window
+        ImGui::End();
+    }
+
+    void GuiManager::draw_animation_graph_visualizer(EngineContext& ctx) const
+    {
+        ImGui::Begin("Animation Graph Visualizer");
+
+        if (!ctx.entity_selection || ctx.entity_selection->empty())
+        {
+            ImGui::TextDisabled("No entity selected.");
+            ImGui::End();
+            return;
+        }
+
+        auto registry = eeng::try_get_registry_ptr(ctx, "AnimationGraphVisualizer");
+        if (!registry)
+        {
+            ImGui::TextDisabled("Registry unavailable.");
+            ImGui::End();
+            return;
+        }
+
+        const auto entity = ctx.entity_selection->first();
+        if (!registry->valid(entity))
+        {
+            ImGui::TextDisabled("Selected entity is not valid.");
+            ImGui::End();
+            return;
+        }
+
+        auto* graph_comp = registry->try_get<ecs::AnimationGraphComponent>(entity);
+        if (!graph_comp)
+        {
+            ImGui::TextDisabled("Selected entity has no AnimationGraphComponent.");
+            ImGui::End();
+            return;
+        }
+
+        if (!graph_comp->enabled)
+        {
+            ImGui::TextDisabled("AnimationGraphComponent is disabled.");
+            ImGui::End();
+            return;
+        }
+
+        if (!graph_comp->graph_ref.is_bound() || !graph_comp->instance.initialized)
+        {
+            ImGui::TextDisabled("Animation graph is not bound or initialized.");
+            ImGui::End();
+            return;
+        }
+
+        auto rm = eeng::try_get_resource_manager(ctx, "AnimationGraphVisualizer");
+        if (!rm)
+        {
+            ImGui::TextDisabled("Resource manager unavailable.");
+            ImGui::End();
+            return;
+        }
+
+        eeng::try_read_asset_ref(
+            *rm,
+            graph_comp->graph_ref,
+            ctx,
+            "AnimationGraphVisualizer",
+            "Missing AnimationGraphAsset for AnimationGraphVisualizer:",
+            [&](const assets::AnimationGraphAsset& graph)
+            {
+                const auto param_values = editor::detail::snapshot_param_values(graph, graph_comp->instance);
+                editor::detail::draw_graph_visualizer(graph, *graph_comp, param_values, true);
+            });
+
         ImGui::End();
     }
 
