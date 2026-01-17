@@ -563,11 +563,11 @@ namespace eeng {
         {
             entt::meta_factory<assets::ModelDataAsset>{}
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.ModelDataAsset", .name = "ModelDataAsset", .tooltip = "ModelDataAsset." })
-                .traits(MetaFlags::none)
+                .traits(MetaFlags::readonly_inspection) // avoid copying during inspection
 
-                .data<&assets::ModelDataAsset::positions>("positions"_hs)
+                .data<&assets::ModelDataAsset::positions, entt::as_cref_t>("positions"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "positions", "Positions", "Positions." })
-                .traits(MetaFlags::no_inspection)
+                .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::ModelDataAsset::normals>("normals"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "normals", "Normals", "Normals." })
