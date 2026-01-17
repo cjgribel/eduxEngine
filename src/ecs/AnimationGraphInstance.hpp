@@ -25,6 +25,8 @@ namespace eeng::ecs
         int state = -1;
         float state_time = 0.0f;
         AnimGraphTransitionRuntime transition{};
+        AnimGraphTransitionRuntime last_transition{};
+        float last_transition_ttl = 0.0f;
         float weight = 1.0f;
     };
 

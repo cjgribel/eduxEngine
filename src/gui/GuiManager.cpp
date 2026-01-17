@@ -753,6 +753,7 @@ namespace eeng
     {
         ImGui::Begin("Animation Graph Visualizer");
 
+        // Guard rails: only draw when a valid entity and graph are available.
         if (!ctx.entity_selection || ctx.entity_selection->empty())
         {
             ImGui::TextDisabled("No entity selected.");
@@ -814,6 +815,7 @@ namespace eeng
             "Missing AnimationGraphAsset for AnimationGraphVisualizer:",
             [&](const assets::AnimationGraphAsset& graph)
             {
+                // Live param snapshot feeds the visualizer HUD and stick dots.
                 const auto param_values = editor::detail::snapshot_param_values(graph, graph_comp->instance);
                 editor::detail::draw_graph_visualizer(graph, *graph_comp, param_values, true);
             });

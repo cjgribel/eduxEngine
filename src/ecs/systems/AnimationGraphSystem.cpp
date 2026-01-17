@@ -1444,6 +1444,10 @@ namespace eeng::ecs::systems
                                 const auto& layer = graph.layers[i];
                                 const auto& lctx = layer_contexts[i];
 
+                                // Policy: Short-lived transition history for visualization of instant transitions.
+                                if (runtime.last_transition_ttl > 0.0f)
+                                    runtime.last_transition_ttl = std::max(0.0f, runtime.last_transition_ttl - delta_time);
+
                                 if (runtime.transition.active)
                                 {
                                     // Transition in progress: advance destination time and end if complete.
@@ -1453,6 +1457,8 @@ namespace eeng::ecs::systems
                                     advance_state_time(to_state, delta_time, phase_rate, runtime.transition.dest_time);
                                     if (runtime.transition.time >= runtime.transition.duration)
                                     {
+                                        runtime.last_transition = runtime.transition;
+                                        runtime.last_transition_ttl = 0.2f;
                                         runtime.state = runtime.transition.to;
                                         runtime.state_time = runtime.transition.dest_time;
                                         runtime.transition = {};
@@ -1520,6 +1526,14 @@ namespace eeng::ecs::systems
                                         : phase_to_state_time(dest_state, graph, instance, model, phase);
                                     if (trans.duration <= 0.0f)
                                     {
+                                        runtime.last_transition = {};
+                                        runtime.last_transition.active = true;
+                                        runtime.last_transition.from = runtime.state;
+                                        runtime.last_transition.to = dest;
+                                        runtime.last_transition.time = 0.0f;
+                                        runtime.last_transition.duration = 0.0f;
+                                        runtime.last_transition.dest_time = dest_time;
+                                        runtime.last_transition_ttl = 0.2f;
                                         runtime.state = dest;
                                         runtime.state_time = dest_time;
                                     }

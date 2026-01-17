@@ -7,6 +7,7 @@
 #include <cmath>
 #include <iomanip>
 #include <limits>
+#include <queue>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
@@ -45,6 +46,7 @@ namespace eeng::editor
             const assets::AnimationGraphAsset& graph,
             const eeng::ecs::AnimGraphInstance& instance)
         {
+            // Snapshot runtime params by name so the visualizer can show live values.
             std::unordered_map<std::string, GraphParamValue> values;
             values.reserve(graph.params.size());
 
@@ -142,6 +144,112 @@ namespace eeng::editor
             return out;
         }
 
+        struct LayerLayout
+        {
+            std::vector<int> order;
+            std::vector<int> depth;
+            int max_depth = 0;
+            std::vector<std::vector<int>> groups;
+        };
+
+        // Policy: Use a simple BFS depth ordering (entry -> outgoing) to reduce arrow overlap.
+        inline LayerLayout build_layer_layout(const assets::AnimGraphLayer& layer)
+        {
+            LayerLayout layout{};
+            const int state_count = static_cast<int>(layer.states.size());
+            if (state_count <= 0)
+                return layout;
+
+            layout.depth.assign(state_count, -1);
+
+            // Build a name->index map for transitions.
+            std::unordered_map<std::string, int> name_to_index;
+            name_to_index.reserve(layer.states.size());
+            for (int i = 0; i < state_count; i++)
+                name_to_index[layer.states[i].id] = i;
+
+            // Build adjacency list from transitions (ignore invalid references).
+            std::vector<std::vector<int>> adjacency(state_count);
+            for (const auto& transition : layer.transitions)
+            {
+                auto from_it = name_to_index.find(transition.from);
+                auto to_it = name_to_index.find(transition.to);
+                if (from_it == name_to_index.end() || to_it == name_to_index.end())
+                    continue;
+                adjacency[from_it->second].push_back(to_it->second);
+            }
+
+            int root = -1;
+            if (!layer.entry_state.empty())
+            {
+                auto root_it = name_to_index.find(layer.entry_state);
+                if (root_it != name_to_index.end())
+                    root = root_it->second;
+            }
+
+            if (root >= 0)
+            {
+                // BFS to assign depth per state (cycles are ignored once visited).
+                std::queue<int> bfs;
+                layout.depth[root] = 0;
+                bfs.push(root);
+                while (!bfs.empty())
+                {
+                    const int current = bfs.front();
+                    bfs.pop();
+                    const int next_depth = layout.depth[current] + 1;
+                    for (int neighbor : adjacency[current])
+                    {
+                        if (neighbor < 0 || neighbor >= state_count)
+                            continue;
+                        if (layout.depth[neighbor] >= 0)
+                            continue;
+                        layout.depth[neighbor] = next_depth;
+                        bfs.push(neighbor);
+                    }
+                }
+            }
+
+            int max_depth = -1;
+            for (int d : layout.depth)
+                if (d >= 0)
+                    max_depth = std::max(max_depth, d);
+
+            if (max_depth < 0)
+            {
+                // No valid root: keep original order in a single depth row.
+                max_depth = 0;
+                for (int i = 0; i < state_count; i++)
+                    layout.depth[i] = 0;
+            }
+            else
+            {
+                // Place unreachable states at the far right.
+                const int misc_depth = max_depth + 1;
+                for (int i = 0; i < state_count; i++)
+                {
+                    if (layout.depth[i] < 0)
+                        layout.depth[i] = misc_depth;
+                }
+                max_depth = misc_depth;
+            }
+
+            layout.max_depth = max_depth;
+
+            // Preserve original ordering within each depth bucket.
+            std::vector<std::vector<int>> buckets(static_cast<std::size_t>(max_depth + 1));
+            for (int i = 0; i < state_count; i++)
+                buckets[static_cast<std::size_t>(layout.depth[i])].push_back(i);
+
+            layout.order.reserve(layer.states.size());
+            for (const auto& bucket : buckets)
+                for (int idx : bucket)
+                    layout.order.push_back(idx);
+
+            layout.groups = std::move(buckets);
+            return layout;
+        }
+
         inline ImU32 param_color(const GraphParamValue& value)
         {
             switch (value.type)
@@ -188,6 +296,7 @@ namespace eeng::editor
 
         inline void draw_arrow(ImDrawList* draw, const ImVec2& from, const ImVec2& to, ImU32 color, float thickness)
         {
+            // Draw a simple line + triangle arrowhead between two points.
             const ImVec2 dir = ImVec2(to.x - from.x, to.y - from.y);
             const float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
             if (len <= 0.0001f)
@@ -217,6 +326,7 @@ namespace eeng::editor
             ImU32 dot_color,
             ImU32 text_color)
         {
+            // Compact 2D grid with axes and a live dot in [-1,1] space.
             draw->AddRectFilled(min, max, ImGui::GetColorU32(ImVec4(0.08f, 0.08f, 0.1f, 1.0f)));
             draw->AddRect(min, max, frame_color);
 
@@ -242,6 +352,7 @@ namespace eeng::editor
             ImU32 sample_color,
             ImU32 param_color)
         {
+            // Draw the blend-space sample locations and current param in normalized space.
             draw->AddRect(min, max, frame_color);
 
             const float span_x = state.param_max_x - state.param_min_x;
@@ -305,15 +416,24 @@ namespace eeng::editor
                 ImVec2 center;
             };
 
+            // Layout and sizing constants for the node grid.
             const float node_w = 170.0f;
             const float node_h = 86.0f;
             const float node_gap = 24.0f;
             const float layer_gap = 30.0f;
             const float pad = 12.0f;
+            const float group_gap_base = node_gap * 1.8f;
+
+            // Precompute a lightweight BFS layout per layer (order only).
+            std::vector<LayerLayout> layouts;
+            layouts.reserve(graph.layers.size());
 
             std::size_t max_states = 0;
             for (const auto& layer : graph.layers)
+            {
+                layouts.push_back(build_layer_layout(layer));
                 max_states = std::max(max_states, layer.states.size());
+            }
 
             const float font_size = ImGui::GetFontSize();
             const float line_height = font_size + 2.0f;
@@ -321,8 +441,30 @@ namespace eeng::editor
             const float layer_label_pad = font_size + 4.0f;
             const float layer_stride = node_h + layer_gap + layer_label_pad;
 
-            const float base_content_w = pad * 2.0f + max_states * node_w
-                + (max_states > 0 ? (max_states - 1) * node_gap : 0.0f);
+            // Base content width: sum per-layer group widths (depth columns) + gaps.
+            float base_content_w = 0.0f;
+            int max_group_gaps = 0;
+            for (const auto& layout : layouts)
+            {
+                if (layout.groups.empty())
+                    continue;
+                int group_gaps = static_cast<int>(layout.groups.size()) - 1;
+                max_group_gaps = std::max(max_group_gaps, group_gaps);
+
+                float layer_width = 0.0f;
+                for (std::size_t g = 0; g < layout.groups.size(); g++)
+                {
+                    const float group_w = layout.groups[g].empty()
+                        ? 0.0f
+                        : layout.groups[g].size() * node_w + (layout.groups[g].size() - 1) * node_gap;
+                    if (g > 0)
+                        layer_width += group_gap_base;
+                    layer_width += group_w;
+                }
+                base_content_w = std::max(base_content_w, layer_width);
+            }
+            base_content_w = std::max(base_content_w, max_states * node_w
+                + (max_states > 0 ? (max_states - 1) * node_gap : 0.0f));
             const float content_h = pad * 2.0f + header_height
                 + static_cast<float>(graph.layers.size()) * layer_stride;
 
@@ -331,32 +473,38 @@ namespace eeng::editor
             float desired_height = 0.0f;
             if (fill_parent)
             {
+                // Fill available height in the standalone visualizer window.
                 const float avail_h = ImGui::GetContentRegionAvail().y;
                 desired_height = std::max(avail_h, min_height);
             }
             else
             {
+                // Keep a compact height when embedded in the inspector.
                 desired_height = std::min(std::max(content_h, min_height), max_height);
             }
 
             const ImGuiWindowFlags child_flags = ImGuiWindowFlags_HorizontalScrollbar;
             ImGui::BeginChild("##anim_graph_viz", ImVec2(0.0f, desired_height), true, child_flags);
 
+            // Reserve a canvas for the full graph layout.
             ImVec2 canvas_size = ImGui::GetContentRegionAvail();
             canvas_size.x = std::max(canvas_size.x, base_content_w);
             canvas_size.y = std::max(canvas_size.y, content_h);
 
-            float layout_w = base_content_w;
-            float dynamic_gap = node_gap;
-            if (max_states > 1)
+            float group_gap = group_gap_base;
+            float layout_w = base_content_w + pad * 2.0f;
+            if (max_group_gaps > 0)
             {
-                const float usable = canvas_size.x - pad * 2.0f - max_states * node_w;
-                const float spread_gap = usable / static_cast<float>(max_states - 1);
-                dynamic_gap = std::max(node_gap, spread_gap);
-                layout_w = pad * 2.0f + max_states * node_w
-                    + (max_states > 0 ? (max_states - 1) * dynamic_gap : 0.0f);
-                canvas_size.x = std::max(canvas_size.x, layout_w);
+                // Stretch gaps between depth groups when the window is wider.
+                const float usable = canvas_size.x - pad * 2.0f;
+                if (usable > base_content_w)
+                {
+                    const float extra = usable - base_content_w;
+                    group_gap = group_gap_base + extra / static_cast<float>(max_group_gaps);
+                    layout_w = base_content_w + pad * 2.0f + extra;
+                }
             }
+            canvas_size.x = std::max(canvas_size.x, layout_w);
 
             ImGui::InvisibleButton("##graph_canvas", canvas_size);
 
@@ -430,73 +578,48 @@ namespace eeng::editor
                     ? comp.instance.layers[layer_index].state
                     : -1;
 
-                for (std::size_t state_index = 0; state_index < layer.states.size(); state_index++)
+                // BFS ordering ensures entry and its direct transitions appear first.
+                const auto& layout = layouts[layer_index];
+                // First pass: compute node rectangles for all states (used by arrows).
+                float group_x = canvas_min.x + pad;
+                for (std::size_t group_index = 0; group_index < layout.groups.size(); group_index++)
                 {
-                    const auto& state = layer.states[state_index];
-                    const float node_x = canvas_min.x + pad + state_index * (node_w + dynamic_gap);
-                    const ImVec2 node_min(node_x, row_y);
-                    const ImVec2 node_max(node_x + node_w, row_y + node_h);
-                    const ImVec2 node_center((node_min.x + node_max.x) * 0.5f, (node_min.y + node_max.y) * 0.5f);
-                    state_rects[layer_index][state_index] = NodeRect{ node_min, node_max, node_center };
-
-                    const bool is_active = static_cast<int>(state_index) == active_state;
-                    ImVec4 base_col;
-                    switch (state.type)
+                    const auto& group = layout.groups[group_index];
+                    for (std::size_t within_group = 0; within_group < group.size(); within_group++)
                     {
-                    case assets::AnimGraphStateType::Clip: base_col = ImVec4(0.18f, 0.18f, 0.22f, 1.0f); break;
-                    case assets::AnimGraphStateType::Blend2: base_col = ImVec4(0.18f, 0.24f, 0.28f, 1.0f); break;
-                    case assets::AnimGraphStateType::BlendSpace1D: base_col = ImVec4(0.22f, 0.2f, 0.16f, 1.0f); break;
-                    case assets::AnimGraphStateType::BlendSpace2D: base_col = ImVec4(0.22f, 0.18f, 0.24f, 1.0f); break;
-                    default: base_col = ImVec4(0.2f, 0.2f, 0.2f, 1.0f); break;
+                        const int state_index = group[within_group];
+                        const float node_x = group_x + within_group * (node_w + node_gap);
+                        const ImVec2 node_min(node_x, row_y);
+                        const ImVec2 node_max(node_x + node_w, row_y + node_h);
+                        const ImVec2 node_center((node_min.x + node_max.x) * 0.5f, (node_min.y + node_max.y) * 0.5f);
+                        state_rects[layer_index][static_cast<std::size_t>(state_index)] = NodeRect{ node_min, node_max, node_center };
                     }
 
-                    ImVec4 active_col = base_col;
-                    active_col.x = std::min(active_col.x + 0.1f, 0.9f);
-                    active_col.y = std::min(active_col.y + 0.1f, 0.9f);
-                    active_col.z = std::min(active_col.z + 0.1f, 0.9f);
-
-                    const ImU32 fill_col = ImGui::GetColorU32(is_active ? active_col : base_col);
-                    const ImU32 border_col = ImGui::GetColorU32(is_active
-                        ? ImVec4(0.9f, 0.85f, 0.35f, 1.0f)
-                        : ImVec4(0.4f, 0.4f, 0.5f, 1.0f));
-
-                    draw->AddRectFilled(node_min, node_max, fill_col, 6.0f);
-                    draw->AddRect(node_min, node_max, border_col, 6.0f, 0, 2.0f);
-
-                    std::string header = short_label(state.id, 18);
-                    draw->AddText(ImVec2(node_min.x + 6.0f, node_min.y + 4.0f), text_col, header.c_str());
-                    draw->AddText(ImVec2(node_min.x + 6.0f, node_min.y + 4.0f + line_height), text_dim, state_type_label(state.type));
-
-                    std::string detail;
-                    if (state.type == assets::AnimGraphStateType::Clip)
-                        detail = short_label(state.clip, 20);
-                    else if (state.type == assets::AnimGraphStateType::Blend2)
-                        detail = short_label(state.clip0 + " | " + state.clip1, 20);
-                    else if (state.type == assets::AnimGraphStateType::BlendSpace1D)
-                        detail = state.param_x + " (" + std::to_string(state.samples.size()) + ")";
-                    else if (state.type == assets::AnimGraphStateType::BlendSpace2D)
-                        detail = state.param_x + "," + state.param_y + " (" + std::to_string(state.samples.size()) + ")";
-
-                    if (!detail.empty())
-                        draw->AddText(ImVec2(node_min.x + 6.0f, node_min.y + 4.0f + line_height * 2.0f), text_dim, detail.c_str());
-
-                    if (state.type == assets::AnimGraphStateType::BlendSpace1D
-                        || state.type == assets::AnimGraphStateType::BlendSpace2D)
-                    {
-                        const float grid_top = node_min.y + 4.0f + line_height * 3.0f;
-                        const ImVec2 grid_min(node_min.x + 6.0f, grid_top);
-                        const ImVec2 grid_max(node_max.x - 6.0f, node_max.y - 6.0f);
-                        draw_blend_space_preview(draw, state, params, grid_min, grid_max,
-                            frame_col,
-                            ImGui::GetColorU32(ImVec4(0.65f, 0.65f, 0.75f, 1.0f)),
-                            ImGui::GetColorU32(ImVec4(0.9f, 0.85f, 0.35f, 1.0f)));
-                    }
+                    // Advance to the next depth group column.
+                    if (!group.empty())
+                        group_x += group.size() * node_w + (group.size() - 1) * node_gap;
+                    if (group_index + 1 < layout.groups.size())
+                        group_x += group_gap;
                 }
 
-                // Draw transitions after nodes so lines appear on top of layer tiles.
+                // Draw transitions first so lines appear behind node boxes.
                 const auto& runtime = layer_index < comp.instance.layers.size()
                     ? comp.instance.layers[layer_index]
                     : eeng::ecs::AnimGraphLayerRuntime{};
+
+                struct ActiveLine
+                {
+                    ImVec2 start;
+                    ImVec2 end;
+                    ImU32 color;
+                    float thickness;
+                    std::string label;
+                };
+                std::vector<ActiveLine> active_lines;
+
+                const bool has_last_transition = runtime.last_transition_ttl > 0.0f;
+                const bool has_any_transition = runtime.transition.active || has_last_transition;
+                const auto& active_transition = runtime.transition.active ? runtime.transition : runtime.last_transition;
 
                 for (const auto& transition : layer.transitions)
                 {
@@ -512,10 +635,11 @@ namespace eeng::editor
                     const NodeRect& to_rect = state_rects[layer_index][to_index];
                     const ImVec2 from = from_rect.center;
                     const ImVec2 to = to_rect.center;
-                    const bool is_active = runtime.transition.active
-                        && runtime.transition.from == from_index
-                        && runtime.transition.to == to_index;
+                    const bool is_active = has_any_transition
+                        && active_transition.from == from_index
+                        && active_transition.to == to_index;
 
+                    // Offset arrow endpoints outside node rectangles to avoid covering labels.
                     const ImVec2 dir = ImVec2(to.x - from.x, to.y - from.y);
                     const float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
                     ImVec2 start = from;
@@ -542,7 +666,118 @@ namespace eeng::editor
                         ? ImGui::GetColorU32(ImVec4(0.95f, 0.8f, 0.3f, 1.0f))
                         : ImGui::GetColorU32(ImVec4(0.55f, 0.55f, 0.65f, 1.0f));
                     const float thickness = is_active ? 2.0f : 1.2f;
-                    draw_arrow(draw, start, end, line_col, thickness);
+                    if (is_active)
+                    {
+                        std::string label;
+                        if (active_transition.duration > 0.0f)
+                        {
+                            label = format_float(active_transition.time, 2);
+                            label += "/";
+                            label += format_float(active_transition.duration, 2);
+                        }
+                        active_lines.push_back({ start, end, line_col, thickness, std::move(label) });
+                    }
+                    else if (!has_any_transition)
+                    {
+                        draw_arrow(draw, start, end, line_col, thickness);
+                    }
+                }
+
+                // Second pass: draw nodes on top, with fade for non-participating states.
+                const bool transition_active = runtime.transition.active || has_last_transition;
+                group_x = canvas_min.x + pad;
+                for (std::size_t group_index = 0; group_index < layout.groups.size(); group_index++)
+                {
+                    const auto& group = layout.groups[group_index];
+                    for (std::size_t within_group = 0; within_group < group.size(); within_group++)
+                    {
+                        const int state_index = group[within_group];
+                        const auto& state = layer.states[static_cast<std::size_t>(state_index)];
+                        const NodeRect& rect = state_rects[layer_index][static_cast<std::size_t>(state_index)];
+
+                        const bool is_active = state_index == active_state;
+                        const bool is_transition_state = transition_active
+                            && (state_index == active_transition.from || state_index == active_transition.to);
+                        const float fade = 1.0f;
+
+                        ImVec4 base_col;
+                        switch (state.type)
+                        {
+                        case assets::AnimGraphStateType::Clip: base_col = ImVec4(0.18f, 0.18f, 0.22f, 1.0f); break;
+                        case assets::AnimGraphStateType::Blend2: base_col = ImVec4(0.18f, 0.24f, 0.28f, 1.0f); break;
+                        case assets::AnimGraphStateType::BlendSpace1D: base_col = ImVec4(0.22f, 0.2f, 0.16f, 1.0f); break;
+                        case assets::AnimGraphStateType::BlendSpace2D: base_col = ImVec4(0.22f, 0.18f, 0.24f, 1.0f); break;
+                        default: base_col = ImVec4(0.2f, 0.2f, 0.2f, 1.0f); break;
+                        }
+
+                        ImVec4 active_col = base_col;
+                        active_col.x = std::min(active_col.x + 0.1f, 0.9f);
+                        active_col.y = std::min(active_col.y + 0.1f, 0.9f);
+                        active_col.z = std::min(active_col.z + 0.1f, 0.9f);
+
+                        ImVec4 border_color = is_active || is_transition_state
+                            ? ImVec4(0.9f, 0.85f, 0.35f, 1.0f)
+                            : ImVec4(0.4f, 0.4f, 0.5f, 1.0f);
+
+                        const ImU32 fill_col = ImGui::GetColorU32(is_active ? active_col : base_col);
+                        const ImU32 border_col = ImGui::GetColorU32(border_color);
+
+                        draw->AddRectFilled(rect.min, rect.max, fill_col, 6.0f);
+                        draw->AddRect(rect.min, rect.max, border_col, 6.0f, 0, 2.0f);
+
+                        const ImVec4 text_main = ImVec4(0.9f, 0.9f, 0.92f, 1.0f);
+                        const ImVec4 text_dim_local = ImVec4(0.65f, 0.65f, 0.7f, 1.0f);
+
+                        std::string header = short_label(state.id, 18);
+                        draw->AddText(ImVec2(rect.min.x + 6.0f, rect.min.y + 4.0f), ImGui::GetColorU32(text_main), header.c_str());
+                        draw->AddText(ImVec2(rect.min.x + 6.0f, rect.min.y + 4.0f + line_height), ImGui::GetColorU32(text_dim_local), state_type_label(state.type));
+
+                        std::string detail;
+                        if (state.type == assets::AnimGraphStateType::Clip)
+                            detail = short_label(state.clip, 20);
+                        else if (state.type == assets::AnimGraphStateType::Blend2)
+                            detail = short_label(state.clip0 + " | " + state.clip1, 20);
+                        else if (state.type == assets::AnimGraphStateType::BlendSpace1D)
+                            detail = state.param_x + " (" + std::to_string(state.samples.size()) + ")";
+                        else if (state.type == assets::AnimGraphStateType::BlendSpace2D)
+                            detail = state.param_x + "," + state.param_y + " (" + std::to_string(state.samples.size()) + ")";
+
+                        if (!detail.empty())
+                            draw->AddText(ImVec2(rect.min.x + 6.0f, rect.min.y + 4.0f + line_height * 2.0f),
+                                          ImGui::GetColorU32(text_dim_local), detail.c_str());
+
+                        if (state.type == assets::AnimGraphStateType::BlendSpace1D
+                            || state.type == assets::AnimGraphStateType::BlendSpace2D)
+                        {
+                            // Mini preview of blend samples and the current parameter dot.
+                            const float grid_top = rect.min.y + 4.0f + line_height * 3.0f;
+                            const ImVec2 grid_min(rect.min.x + 6.0f, grid_top);
+                            const ImVec2 grid_max(rect.max.x - 6.0f, rect.max.y - 6.0f);
+                            const ImU32 preview_frame = ImGui::GetColorU32(ImVec4(0.25f, 0.25f, 0.3f, 1.0f));
+                            const ImU32 preview_sample = ImGui::GetColorU32(ImVec4(0.65f, 0.65f, 0.75f, 1.0f));
+                            const ImU32 preview_param = ImGui::GetColorU32(ImVec4(0.9f, 0.85f, 0.35f, 1.0f));
+                            draw_blend_space_preview(draw, state, params, grid_min, grid_max,
+                                preview_frame,
+                                preview_sample,
+                                preview_param);
+                        }
+                    }
+
+                    if (!group.empty())
+                        group_x += group.size() * node_w + (group.size() - 1) * node_gap;
+                    if (group_index + 1 < layout.groups.size())
+                        group_x += group_gap;
+                }
+
+                // Draw active transitions on top so they remain visible.
+                for (const auto& line : active_lines)
+                {
+                    draw_arrow(draw, line.start, line.end, line.color, line.thickness);
+                    if (!line.label.empty())
+                    {
+                        const ImVec2 mid((line.start.x + line.end.x) * 0.5f, (line.start.y + line.end.y) * 0.5f);
+                        draw->AddText(ImVec2(mid.x + 4.0f, mid.y - 14.0f), line.color, line.label.c_str());
+                    }
                 }
             }
 
