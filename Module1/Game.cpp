@@ -32,14 +32,14 @@
 
 #if 0
     // Log all registered resource types
-    void logRegisteredResourceTypes(eeng::ResourceRegistry& registry)
-    {
-        EENG_LOG("Registered resource types");
-        EENG_LOG("Meshes:");
-        registry.for_all<eeng::Mesh>([](eeng::Mesh& m) {
-            EENG_LOG("Mesh value %zu", m.x);
-            });
-    }
+void logRegisteredResourceTypes(eeng::ResourceRegistry& registry)
+{
+    EENG_LOG("Registered resource types");
+    EENG_LOG("Meshes:");
+    registry.for_all<eeng::Mesh>([](eeng::Mesh& m) {
+        EENG_LOG("Mesh value %zu", m.x);
+        });
+}
 #endif
 
 namespace eeng::dev
@@ -64,7 +64,7 @@ namespace eeng::dev
             ctx->thread_pool->queue_task([source_assets_root, imported_assets_root, batches_root, ctx]() {
                 try
                 {
-#if 1
+#if 0
                     // Just scan & load existing batch index
 
                     // Scan assets
@@ -106,32 +106,67 @@ namespace eeng::dev
 
                     // 2.3 ASSIMP IMPORT TEST (this thread)
                     eeng::assets::AssimpImporter importer;
-                    eeng::assets::AssimpImportOptions opts{};
-                    opts.assets_root = imported_assets_root;
-                    opts.source_file = source_assets_root / "Amy/Ch46_nonPBR.fbx";
-                    opts.model_name = "Amy";
-                    // opts.source_file = source_assets_root / "crytek-sponza_hansen/sponza.obj";
-                    // opts.model_name = "Sponza";
-                    opts.flags = static_cast<eeng::assets::ImportFlags>(
-                        static_cast<unsigned>(eeng::assets::ImportFlags::GenerateTangents) |
-                        static_cast<unsigned>(eeng::assets::ImportFlags::GenerateNormals) |
-                        static_cast<unsigned>(eeng::assets::ImportFlags::GenerateUVs) |
-                        static_cast<unsigned>(eeng::assets::ImportFlags::SortByPType) |
-                        static_cast<unsigned>(eeng::assets::ImportFlags::FlipUVs) |
-                        static_cast<unsigned>(eeng::assets::ImportFlags::OptimizeGraph));
-                    // plus for cache locality maybe ImportFlags::OptimizeMesh
-                    //auto import_result = importer.import_model(opts, *ctx);
-                    auto import_result = importer.import_model_with_animations(
-                        opts,
-                        {
-                            source_assets_root/"Amy/Locomotion Pack" // folder (.DS Store...)
-                            //source_assets_root/"Amy/idle.fbx", // file
-                            //source_assets_root/"Amy/jump.fbx" // file
-                        },
-                        *ctx);
-                    assert(import_result.success);
-                    assert(import_result.gpu_model.guid.valid());
+                    eeng::assets::AssimpImportResult amy_result;
+                    eeng::assets::AssimpImportResult ue4_result;
+                    // AMY MODEL
+                    {
+                        eeng::assets::AssimpImportOptions opts{};
+                        opts.assets_root = imported_assets_root;
+                        opts.source_file = source_assets_root / "Amy/Ch46_nonPBR.fbx";
+                        opts.model_name = "Amy";
+                        // opts.source_file = source_assets_root / "crytek-sponza_hansen/sponza.obj";
+                        // opts.model_name = "Sponza";
+                        opts.flags = static_cast<eeng::assets::ImportFlags>(
+                            static_cast<unsigned>(eeng::assets::ImportFlags::GenerateTangents) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::GenerateNormals) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::GenerateUVs) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::SortByPType) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::FlipUVs) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::OptimizeGraph));
+                        // plus for cache locality maybe ImportFlags::OptimizeMesh
+                        //auto import_result = importer.import_model(opts, *ctx);
+                        amy_result = importer.import_model_with_animations(
+                            opts,
+                            {
+                                source_assets_root / "Amy/Locomotion Pack" // folder (.DS Store...)
+                                //source_assets_root/"Amy/idle.fbx", // file
+                                //source_assets_root/"Amy/jump.fbx" // file
+                            },
+                            *ctx);
+                        assert(amy_result.success);
+                        assert(amy_result.gpu_model.guid.valid());
+                    }
                     //
+                                        // UE4 MODEL
+                    {
+                        eeng::assets::AssimpImportOptions opts{};
+                        opts.assets_root = imported_assets_root;
+                        opts.source_file = source_assets_root / "UE4/SK_Mannequin_tex.FBX";
+                        opts.model_name = "UE4_Mannequin";
+                        // opts.source_file = source_assets_root / "crytek-sponza_hansen/sponza.obj";
+                        // opts.model_name = "Sponza";
+                        opts.flags = static_cast<eeng::assets::ImportFlags>(
+                            static_cast<unsigned>(eeng::assets::ImportFlags::GenerateTangents) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::GenerateNormals) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::GenerateUVs) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::SortByPType) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::FlipUVs) |
+                            static_cast<unsigned>(eeng::assets::ImportFlags::OptimizeGraph));
+                        // plus for cache locality maybe ImportFlags::OptimizeMesh
+                        //auto import_result = importer.import_model(opts, *ctx);
+                        ue4_result = importer.import_model_with_animations(
+                            opts,
+                            {
+                                source_assets_root / "UE4/clips_animpack", // folder
+                                source_assets_root / "UE4/clips_animpack_aux/WalkFwdRtIronsight.fbx", // files
+                                source_assets_root / "UE4/clips_animpack_aux/WalkFwdLtIronsight.fbx",
+                                source_assets_root / "UE4/clips_animpack_aux/WalkBwdRtIronsight.fbx",
+                                source_assets_root / "UE4/clips_animpack_aux/WalkBwdLtIronsight.fbx",
+                            },
+                            *ctx);
+                        assert(ue4_result.success);
+                        assert(ue4_result.gpu_model.guid.valid());
+                    }
 
                     // 3) Run scan (don't wait)
                     auto nbr_assets = refs.size();
@@ -226,7 +261,7 @@ namespace eeng::dev
                                 //reg.emplace<eeng::CopySignaller>(er_root.entity);
 
                                 // reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, "Model", quadmodel_ref);
-                                auto aimodel = eeng::ecs::ModelComponent("Amy", import_result.gpu_model);
+                                auto aimodel = eeng::ecs::ModelComponent("Amy", amy_result.gpu_model);
                                 aimodel.clip_index = 1;
                                 reg.emplace<eeng::ecs::ModelComponent>(er_player.entity, aimodel);
                                 reg.emplace<eeng::ecs::ModelComponent>(er_camera.entity, "Model", quadmodel_ref);
@@ -437,7 +472,7 @@ bool Game::init()
             });
         ctx->main_thread_queue->push([&]() {
             EENG_LOG(ctx, "[MainThreadQueue] another task executed on main thread.");
-        });
+            });
         // Enqueue dummy tasks to main thread - BLOCKING
         ctx->main_thread_queue->push_and_wait([&]() -> void {
             EENG_LOG(ctx, "[MainThreadQueue] blocking task executed on main thread.");
@@ -529,8 +564,8 @@ bool Game::init()
                     assert(mesh.vertices[0] == 1.0f && mesh.vertices[1] == 2.0f && mesh.vertices[2] == 3.0f);
                     for (const auto& v : mesh.vertices)
                         EENG_LOG(ctx, "    - Vertex: %f", v);
-    }
-}
+                }
+            }
 #endif
         }
 #endif
@@ -1180,7 +1215,7 @@ void Game::render(
     // Draw shape batches
     shapeRenderer->render(matrices.P * matrices.V);
     shapeRenderer->post_render();
-    }
+}
 
 void Game::renderUI()
 {

@@ -121,6 +121,7 @@ namespace eeng::assets
         std::string clip;
         float x = 0.0f;
         float y = 0.0f;
+        float pose_time = -1.0f; // < 0 means use the state's sampled time.
     };
 
     struct AnimGraphState

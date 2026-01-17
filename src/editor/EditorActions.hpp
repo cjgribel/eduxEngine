@@ -54,10 +54,10 @@ namespace eeng::editor
             std::string model_name = {},
             std::shared_ptr<std::atomic<bool>> in_flight = {});
 
-        /// @brief Create a minimal animation graph asset for quick testing.
+        /// @brief Create a mock animation graph asset for quick testing.
         static void import_animation_graph_mock(
             EngineContext& ctx,
-            std::string graph_name = "Amy_Minimal",
+            std::string graph_name = "UE_Mannequin",
             std::string clip_name = "idle");
 
         /// @brief Queue an undoable unimport by GUID (serialized on RM strand).

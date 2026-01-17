@@ -6,8 +6,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iostream>
 #include <limits>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include <entt/entt.hpp>
@@ -22,6 +24,7 @@
 #include "ecs/ModelComponent.hpp"
 #include "assets/AnimationGraphRuntime.hpp"
 #include "assets/types/ModelAssets.hpp"
+#include "LogMacros.h"
 
 namespace
 {
@@ -40,7 +43,9 @@ namespace
         const AnimGraphState* state = nullptr;
         std::array<const AnimClip*, 4> clips{};
         std::array<float, 4> weights{};
+        std::array<float, 4> sample_times{};
         float ntime = 0.0f;
+        float phase_rate = 0.0f;
         int sample_count = 0;
         bool valid = false;
     };
@@ -50,6 +55,8 @@ namespace
         const AnimGraphLayer* layer = nullptr;
         StateEvalContext from_ctx{};
         StateEvalContext to_ctx{};
+        StateEvalContext from_ref_ctx{};
+        StateEvalContext to_ref_ctx{};
         float transition_alpha = 0.0f;
         bool in_transition = false;
     };
@@ -226,6 +233,88 @@ namespace
         return false;
     }
 
+    void warn_missing_clips(
+        eeng::EngineContext& ctx,
+        const ModelDataAsset& model,
+        const AnimationGraphAsset& graph,
+        const eeng::Guid& model_guid)
+    {
+        static std::unordered_set<std::string> warned_missing;
+        static std::unordered_set<std::string> warned_trackless;
+
+        auto make_key = [&](const std::string& clip_name) -> std::string
+        {
+            return model_guid.to_string() + ":" + clip_name;
+        };
+
+        auto check_clip = [&](const std::string& clip_name)
+        {
+            if (clip_name.empty())
+                return;
+
+            const AnimClip* found = nullptr;
+            for (const auto& clip : model.animations)
+            {
+                if (clip.name == clip_name)
+                {
+                    found = &clip;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                const std::string key = make_key(clip_name);
+                if (warned_missing.insert(key).second)
+                {
+                    EENG_LOG_WARN(&ctx, "AnimationGraph: clip '%s' not found in model %s.",
+                        clip_name.c_str(), model_guid.to_string().c_str());
+                    std::cerr << "AnimationGraph: clip '" << clip_name
+                              << "' not found in model " << model_guid.to_string()
+                              << "." << std::endl;
+                }
+                return;
+            }
+
+            if (!clip_has_tracks(*found))
+            {
+                const std::string key = make_key(clip_name);
+                if (warned_trackless.insert(key).second)
+                {
+                    EENG_LOG_WARN(&ctx, "AnimationGraph: clip '%s' has no tracks in model %s.",
+                        clip_name.c_str(), model_guid.to_string().c_str());
+                    std::cerr << "AnimationGraph: clip '" << clip_name
+                              << "' has no tracks in model " << model_guid.to_string()
+                              << "." << std::endl;
+                }
+            }
+        };
+
+        for (const auto& layer : graph.layers)
+        {
+            for (const auto& state : layer.states)
+            {
+                switch (state.type)
+                {
+                case AnimGraphStateType::Clip:
+                    check_clip(state.clip);
+                    break;
+                case AnimGraphStateType::Blend2:
+                    check_clip(state.clip0);
+                    check_clip(state.clip1);
+                    break;
+                case AnimGraphStateType::BlendSpace1D:
+                case AnimGraphStateType::BlendSpace2D:
+                    for (const auto& sample : state.samples)
+                        check_clip(sample.clip);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
     const AnimClip* resolve_clip_by_name(const ModelDataAsset& model, const std::string& clip_name)
     {
         if (clip_name.empty())
@@ -341,6 +430,20 @@ namespace
         }
 
         float ntime = normalized_time_from_duration(time_sec, duration_sec, state.playback);
+        ntime = state.trim_left + ntime * (state.trim_right - state.trim_left);
+        return std::min(std::max(ntime, 0.0f), 1.0f);
+    }
+
+    float sample_pose_time(
+        const AnimGraphState& state,
+        const AnimGraphBlendSample& sample,
+        float fallback_time,
+        bool use_pose_times)
+    {
+        if (!use_pose_times || sample.pose_time < 0.0f)
+            return fallback_time;
+
+        float ntime = std::min(std::max(sample.pose_time, 0.0f), 1.0f);
         ntime = state.trim_left + ntime * (state.trim_right - state.trim_left);
         return std::min(std::max(ntime, 0.0f), 1.0f);
     }
@@ -663,14 +766,14 @@ namespace
         const AnimationGraphAsset& graph,
         const eeng::ecs::AnimGraphInstance& instance,
         const ModelDataAsset& model,
-        float time_sec)
+        float time_sec,
+        bool use_pose_times = true)
     {
         StateEvalContext ctx{};
         ctx.state = &state;
 
         const AnimClip* time_clip = nullptr;
-        float override_ntime = 0.0f;
-        bool use_override_time = false;
+        std::array<const AnimGraphBlendSample*, 4> sample_refs{};
 
         switch (state.type)
         {
@@ -773,8 +876,12 @@ namespace
 
             if (a >= 0 && b >= 0)
             {
-                ctx.clips[0] = resolve_clip_by_name(model, state.samples[static_cast<std::size_t>(a)].clip);
-                ctx.clips[1] = resolve_clip_by_name(model, state.samples[static_cast<std::size_t>(b)].clip);
+                const auto& sample_a = state.samples[static_cast<std::size_t>(a)];
+                const auto& sample_b = state.samples[static_cast<std::size_t>(b)];
+                ctx.clips[0] = resolve_clip_by_name(model, sample_a.clip);
+                ctx.clips[1] = resolve_clip_by_name(model, sample_b.clip);
+                sample_refs[0] = &sample_a;
+                sample_refs[1] = &sample_b;
                 ctx.weights[0] = 1.0f - t;
                 ctx.weights[1] = t;
                 time_clip = ctx.clips[0] ? ctx.clips[0] : ctx.clips[1];
@@ -796,9 +903,7 @@ namespace
                     const float blended_duration = dur0 * w0 + dur1 * w1;
                     if (blended_duration > 0.0f)
                     {
-                        // Policy: BlendSpace1D uses a weighted duration to keep time continuous across segments.
-                        override_ntime = trimmed_time_from_duration(state, blended_duration, time_sec);
-                        use_override_time = true;
+                        ctx.phase_rate = state.speed / blended_duration;
                     }
                 }
             }
@@ -856,12 +961,45 @@ namespace
 
             if (found)
             {
-                ctx.clips[0] = resolve_clip_by_name(model, state.samples[static_cast<std::size_t>(indices[0])].clip);
-                ctx.clips[1] = resolve_clip_by_name(model, state.samples[static_cast<std::size_t>(indices[1])].clip);
-                ctx.clips[2] = resolve_clip_by_name(model, state.samples[static_cast<std::size_t>(indices[2])].clip);
-                ctx.clips[3] = resolve_clip_by_name(model, state.samples[static_cast<std::size_t>(indices[3])].clip);
+                const auto& sample0 = state.samples[static_cast<std::size_t>(indices[0])];
+                const auto& sample1 = state.samples[static_cast<std::size_t>(indices[1])];
+                const auto& sample2 = state.samples[static_cast<std::size_t>(indices[2])];
+                const auto& sample3 = state.samples[static_cast<std::size_t>(indices[3])];
+                ctx.clips[0] = resolve_clip_by_name(model, sample0.clip);
+                ctx.clips[1] = resolve_clip_by_name(model, sample1.clip);
+                ctx.clips[2] = resolve_clip_by_name(model, sample2.clip);
+                ctx.clips[3] = resolve_clip_by_name(model, sample3.clip);
+                sample_refs[0] = &sample0;
+                sample_refs[1] = &sample1;
+                sample_refs[2] = &sample2;
+                sample_refs[3] = &sample3;
                 ctx.weights = { w.x, w.y, w.z, w.w };
                 time_clip = ctx.clips[0] ? ctx.clips[0] : ctx.clips[1];
+
+                const auto duration_sec = [](const AnimClip* clip) -> float
+                {
+                    if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
+                        return 0.0f;
+                    return clip->duration_ticks / clip->ticks_per_second;
+                };
+
+                const float dur0 = duration_sec(ctx.clips[0]);
+                const float dur1 = duration_sec(ctx.clips[1]);
+                const float dur2 = duration_sec(ctx.clips[2]);
+                const float dur3 = duration_sec(ctx.clips[3]);
+                const float weight_sum = ctx.weights[0] + ctx.weights[1] + ctx.weights[2] + ctx.weights[3];
+                if (weight_sum > 0.0f)
+                {
+                    const float w0 = ctx.weights[0] / weight_sum;
+                    const float w1 = ctx.weights[1] / weight_sum;
+                    const float w2 = ctx.weights[2] / weight_sum;
+                    const float w3 = ctx.weights[3] / weight_sum;
+                    const float blended_duration = dur0 * w0 + dur1 * w1 + dur2 * w2 + dur3 * w3;
+                    if (blended_duration > 0.0f)
+                    {
+                        ctx.phase_rate = state.speed / blended_duration;
+                    }
+                }
             }
             break;
         }
@@ -871,9 +1009,26 @@ namespace
 
         if (ctx.sample_count > 0)
         {
-            ctx.ntime = use_override_time
-                ? override_ntime
+            const bool is_blendspace = (state.type == AnimGraphStateType::BlendSpace1D
+                || state.type == AnimGraphStateType::BlendSpace2D);
+            ctx.ntime = is_blendspace
+                ? trimmed_time_from_duration(state, 1.0f, time_sec)
                 : trimmed_time(state, time_clip, time_sec);
+            for (int i = 0; i < ctx.sample_count; i++)
+            {
+                if (sample_refs[static_cast<std::size_t>(i)])
+                {
+                    ctx.sample_times[static_cast<std::size_t>(i)] = sample_pose_time(
+                        state,
+                        *sample_refs[static_cast<std::size_t>(i)],
+                        ctx.ntime,
+                        use_pose_times);
+                }
+                else
+                {
+                    ctx.sample_times[static_cast<std::size_t>(i)] = ctx.ntime;
+                }
+            }
             ctx.valid = true;
         }
 
@@ -891,21 +1046,21 @@ namespace
 
         if (ctx.sample_count == 1)
         {
-            return sample_node_trs(node_index, ctx.clips[0], ctx.ntime, nodetree);
+            return sample_node_trs(node_index, ctx.clips[0], ctx.sample_times[0], nodetree);
         }
         if (ctx.sample_count == 2)
         {
-            NodeSample a = sample_node_trs(node_index, ctx.clips[0], ctx.ntime, nodetree);
-            NodeSample b = sample_node_trs(node_index, ctx.clips[1], ctx.ntime, nodetree);
+            NodeSample a = sample_node_trs(node_index, ctx.clips[0], ctx.sample_times[0], nodetree);
+            NodeSample b = sample_node_trs(node_index, ctx.clips[1], ctx.sample_times[1], nodetree);
             return blend_samples(a, b, ctx.weights[1]);
         }
         if (ctx.sample_count == 4)
         {
             std::array<NodeSample, 4> samples = {
-                sample_node_trs(node_index, ctx.clips[0], ctx.ntime, nodetree),
-                sample_node_trs(node_index, ctx.clips[1], ctx.ntime, nodetree),
-                sample_node_trs(node_index, ctx.clips[2], ctx.ntime, nodetree),
-                sample_node_trs(node_index, ctx.clips[3], ctx.ntime, nodetree)
+                sample_node_trs(node_index, ctx.clips[0], ctx.sample_times[0], nodetree),
+                sample_node_trs(node_index, ctx.clips[1], ctx.sample_times[1], nodetree),
+                sample_node_trs(node_index, ctx.clips[2], ctx.sample_times[2], nodetree),
+                sample_node_trs(node_index, ctx.clips[3], ctx.sample_times[3], nodetree)
             };
             return blend_samples4(samples, ctx.weights);
         }
@@ -990,11 +1145,21 @@ namespace
     void advance_state_time(
         const AnimGraphState& state,
         float delta_time,
+        float phase_rate,
         float& time_sec)
     {
         if (state.playback == AnimGraphPlaybackMode::Pose)
             return;
-        time_sec += delta_time * state.speed;
+        if (state.type == AnimGraphStateType::BlendSpace1D
+            || state.type == AnimGraphStateType::BlendSpace2D)
+        {
+            // Policy: Blend spaces advance in normalized phase space to avoid jumps when weights change.
+            time_sec += delta_time * phase_rate;
+        }
+        else
+        {
+            time_sec += delta_time * state.speed;
+        }
     }
 
     float state_exit_time(
@@ -1013,9 +1178,7 @@ namespace
             break;
         case AnimGraphStateType::BlendSpace1D:
         case AnimGraphStateType::BlendSpace2D:
-            if (!state.samples.empty())
-                clip = resolve_clip_by_name(model, state.samples.front().clip);
-            break;
+            return trimmed_time_from_duration(state, 1.0f, time_sec);
         default:
             break;
         }
@@ -1077,6 +1240,8 @@ namespace eeng::ecs::systems
                             if (!instance.initialized)
                                 return;
 
+                            warn_missing_clips(ctx, model, graph, model_guid);
+
                             std::vector<LayerEvalContext> layer_contexts;
                             layer_contexts.reserve(graph.layers.size());
 
@@ -1094,6 +1259,12 @@ namespace eeng::ecs::systems
                                     const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
                                     lctx.from_ctx = build_state_context(from_state, graph, instance, model, runtime.state_time);
                                     lctx.to_ctx = build_state_context(to_state, graph, instance, model, runtime.transition.dest_time);
+                                    if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
+                                    {
+                                        // Policy: Additive layers use the same weights but sample reference poses at time 0.
+                                        lctx.from_ref_ctx = build_state_context(from_state, graph, instance, model, 0.0f, false);
+                                        lctx.to_ref_ctx = build_state_context(to_state, graph, instance, model, 0.0f, false);
+                                    }
                                     lctx.transition_alpha = runtime.transition.duration > 0.0f
                                         ? std::min(runtime.transition.time / runtime.transition.duration, 1.0f)
                                         : 1.0f;
@@ -1103,6 +1274,8 @@ namespace eeng::ecs::systems
                                 {
                                     const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
                                     lctx.from_ctx = build_state_context(state, graph, instance, model, runtime.state_time);
+                                    if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
+                                        lctx.from_ref_ctx = build_state_context(state, graph, instance, model, 0.0f, false);
                                     lctx.in_transition = false;
                                 }
 
@@ -1116,12 +1289,14 @@ namespace eeng::ecs::systems
 
                                 auto& runtime = instance.layers[i];
                                 const auto& layer = graph.layers[i];
+                                const auto& lctx = layer_contexts[i];
 
                                 if (runtime.transition.active)
                                 {
                                     runtime.transition.time += delta_time;
                                     const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
-                                    advance_state_time(to_state, delta_time, runtime.transition.dest_time);
+                                    const float phase_rate = lctx.to_ctx.phase_rate;
+                                    advance_state_time(to_state, delta_time, phase_rate, runtime.transition.dest_time);
                                     if (runtime.transition.time >= runtime.transition.duration)
                                     {
                                         runtime.state = runtime.transition.to;
@@ -1135,7 +1310,8 @@ namespace eeng::ecs::systems
                                     continue;
 
                                 const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
-                                advance_state_time(state, delta_time, runtime.state_time);
+                                const float phase_rate = lctx.from_ctx.phase_rate;
+                                advance_state_time(state, delta_time, phase_rate, runtime.state_time);
 
                                 int best_transition = -1;
                                 int best_priority = std::numeric_limits<int>::min();
@@ -1241,7 +1417,14 @@ namespace eeng::ecs::systems
 
                                         if (lctx.layer->blend_mode == AnimGraphBlendMode::Additive)
                                         {
-                                            const glm::mat4 delta = layer_local * glm::inverse(node->local_bind_tfm);
+                                            NodeSample ref_sample = lctx.in_transition
+                                                ? blend_samples(
+                                                    sample_state_node(node_index, lctx.from_ref_ctx, model.nodetree),
+                                                    sample_state_node(node_index, lctx.to_ref_ctx, model.nodetree),
+                                                    lctx.transition_alpha)
+                                                : sample_state_node(node_index, lctx.from_ref_ctx, model.nodetree);
+                                            const glm::mat4 ref_local = compose_trs(ref_sample);
+                                            const glm::mat4 delta = layer_local * glm::inverse(ref_local);
                                             const glm::mat4 delta_blend = blend_matrices(glm::mat4(1.0f), delta, layer_weight);
                                             local = delta_blend * local;
                                         }

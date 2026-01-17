@@ -337,6 +337,8 @@ namespace eeng::serializers
                     nlohmann::json elem;
                     elem["clip"] = sample.clip;
                     elem["pos"] = { sample.x };
+                    if (sample.pose_time >= 0.0f)
+                        elem["pose_time"] = sample.pose_time;
                     samples.emplace_back(std::move(elem));
                 }
                 j["samples"] = std::move(samples);
@@ -357,6 +359,8 @@ namespace eeng::serializers
                     nlohmann::json elem;
                     elem["clip"] = sample.clip;
                     elem["pos"] = { sample.x, sample.y };
+                    if (sample.pose_time >= 0.0f)
+                        elem["pose_time"] = sample.pose_time;
                     samples.emplace_back(std::move(elem));
                 }
                 j["samples"] = std::move(samples);
@@ -467,6 +471,7 @@ namespace eeng::serializers
                         sample.x = elem.value("x", sample.x);
                         sample.y = elem.value("y", sample.y);
                     }
+                    sample.pose_time = elem.value("pose_time", sample.pose_time);
                     state.samples.push_back(std::move(sample));
                 }
             }

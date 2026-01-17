@@ -259,7 +259,12 @@ namespace eeng::assets
 
         bool is_default_clip_name(const std::string& name)
         {
-            return name.empty() || name == "mixamo.com";
+            // Policy: Treat generic DCC "take" labels as placeholders and use the filename stem instead.
+            return name.empty()
+                || name == "mixamo.com"
+                || name == "Unreal Take"
+                || name == "Default Take"
+                || name == "Take 001";
         }
 
         std::string clip_name_from_source(

@@ -245,6 +245,8 @@ namespace eeng::assets
                     {
                         if (state.samples[b].clip.empty())
                             push_error(errors, sprefix + "samples[" + std::to_string(b) + "].clip: empty clip name");
+                        if (state.samples[b].pose_time > 1.0f)
+                            push_error(errors, sprefix + "samples[" + std::to_string(b) + "].pose_time: expected [0,1]");
                     }
 
                     if (!state.indices.empty())
@@ -284,6 +286,8 @@ namespace eeng::assets
                     {
                         if (state.samples[b].clip.empty())
                             push_error(errors, sprefix + "samples[" + std::to_string(b) + "].clip: empty clip name");
+                        if (state.samples[b].pose_time > 1.0f)
+                            push_error(errors, sprefix + "samples[" + std::to_string(b) + "].pose_time: expected [0,1]");
                     }
 
                     if (!state.indices.empty())
