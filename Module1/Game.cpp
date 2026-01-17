@@ -64,7 +64,7 @@ namespace eeng::dev
             ctx->thread_pool->queue_task([source_assets_root, imported_assets_root, batches_root, ctx]() {
                 try
                 {
-#if 0
+#if 1
                     // Just scan & load existing batch index
 
                     // Scan assets
@@ -327,6 +327,7 @@ bool Game::init()
 
     renderSystem = std::make_unique<eeng::ecs::systems::RenderSystem>();
     renderSystem->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
+    playerControllerSystem = std::make_unique<eeng::ecs::systems::PlayerControllerSystem>();
     animationSystem = std::make_unique<eeng::ecs::systems::AnimationSystem>();
     animationGraphSystem = std::make_unique<eeng::ecs::systems::AnimationGraphSystem>();
     transformSystem = std::make_unique<eeng::ecs::systems::TransformSystem>();
@@ -1008,6 +1009,12 @@ void Game::update(
         { 0.03f, 0.03f, 0.03f });
 
     // TODO: consider scheduling animation updates as a dedicated system phase.
+    if (playerControllerSystem)
+    {
+        auto& registry = ctx->entity_manager->registry();
+        playerControllerSystem->update(registry, *ctx, deltaTime);
+    }
+
     if (animationGraphSystem)
     {
         auto& registry = ctx->entity_manager->registry();
