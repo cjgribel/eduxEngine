@@ -11,24 +11,30 @@
 
 #include <entt/entt.hpp>
 
+namespace eeng {
+    struct EngineContext;
+}
+
 namespace eeng::meta {
 
-    /// @brief Clone a meta object by value or, if available, using a meta function
-    /// @param any 
-    /// @param dst_entity 
-    /// @return 
+    /// @brief Clone a meta object by value or, if available, using a meta function.
+    /// @param any
+    /// @param ctx
+    /// @return
     entt::meta_any clone_any(
-        const entt::meta_any& any, 
-        entt::entity dst_entity);
+        const entt::meta_any& any,
+        EngineContext& ctx);
 
     /// @brief 
-    /// @param registry 
-    /// @param src_entity 
-    /// @param dst_entity 
+    /// @param registry
+    /// @param src_entity
+    /// @param dst_entity
+    /// @param ctx
     void clone_entity(
         std::shared_ptr<entt::registry>& registry,
         entt::entity src_entity,
-        entt::entity dst_entity);
+        entt::entity dst_entity,
+        EngineContext& ctx);
 
 }
 

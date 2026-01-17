@@ -11,6 +11,7 @@
 #include <cassert>
 #include "imgui.h"
 #include "MetaInspect.hpp"
+#include "EngineContext.hpp"
 // #include "InspectorState.hpp"
 #include "MetaLiterals.h"
 #include "MetaAux.h"
@@ -23,30 +24,29 @@ namespace eeng::meta
     */
     // src_any can be a component or a non-component
     // if type is meta & has clone_hs: use it; else value-copy src_any
-    entt::meta_any clone_any(const entt::meta_any& any, entt::entity dst_entity)
+    entt::meta_any clone_any(const entt::meta_any& any, EngineContext& ctx)
     {
         if (entt::meta_type meta_type = entt::resolve(any.type().id()); meta_type)
         {
             if (entt::meta_func meta_func = meta_type.func(literals::clone_hs); meta_func)
             {
-                // std::cout << "clone_any: invoking clone() for " << meta::get_meta_type_display_name(any.type()) << std::endl;
-
-                auto copy_any = meta_func.invoke({}, any.base().data() /*src_ptr*/, dst_entity);
-                assert(copy_any && "Failed to invoke clone() for type ");
-
-                //type.push(dst_entity, copy_any.data());
-                //continue;
-                return copy_any;
+                // Policy: Context-aware clone hooks decide how to resolve selection.
+                auto copy_any = meta_func.invoke(
+                    {},
+                    entt::forward_as_meta(any),
+                    entt::forward_as_meta(ctx));
+                if (copy_any)
+                    return copy_any;
             }
         }
 
-        // std::cout << "clone_any: copying by value: " << meta::get_meta_type_display_name(any.type()) << std::endl;
+        // Policy: No clone hook matched; fall back to value copy semantics.
         return any;
     }
 
     // If a component is a meta type: use clone_hs if available; else use direct copy
 
-    void clone_entity(std::shared_ptr<entt::registry>& registry, entt::entity src_entity, entt::entity dst_entity)
+    void clone_entity(std::shared_ptr<entt::registry>& registry, entt::entity src_entity, entt::entity dst_entity, EngineContext& ctx)
     {
         for (auto&& [id, type] : registry->storage())
         {
@@ -57,7 +57,8 @@ namespace eeng::meta
             {
                 auto comp_any = meta_type.from_void(type.value(src_entity)); // ref
                 // mod |= inspect_any(comp_any, inspector, cmd_builder);
-                auto copy_any = clone_any(comp_any, dst_entity); assert(copy_any);
+                auto copy_any = clone_any(comp_any, ctx);
+                assert(copy_any);
 
                 type.push(dst_entity, copy_any.base().data());
             }

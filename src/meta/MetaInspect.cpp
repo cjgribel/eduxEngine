@@ -159,7 +159,8 @@ namespace eeng::meta {
                 else
                 {
                     // Invoke inspection meta function on a copy of the object
-                    auto copy_any = meta::clone_any(any, ctx.entity_selection->first());
+                    // Policy: Clone via context so hooks decide how to resolve selection.
+                    auto copy_any = meta::clone_any(any, ctx);
                     //auto copy_any = any;
                     // auto res_any = meta_func.invoke({}, copy_any.base().data(), entt::forward_as_meta(inspector));
 
