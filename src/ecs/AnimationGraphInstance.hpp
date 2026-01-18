@@ -10,6 +10,30 @@
 
 namespace eeng::ecs
 {
+    struct AnimGraphStateClipCache
+    {
+        // Policy: Store model-resolved clip indices to avoid per-frame string lookups.
+        int clip = -1;
+        int clip0 = -1;
+        int clip1 = -1;
+        std::vector<int> samples;
+        std::vector<int> blend1d_order;
+    };
+
+    struct AnimGraphLayerClipCache
+    {
+        std::vector<AnimGraphStateClipCache> states;
+    };
+
+    struct AnimGraphClipCache
+    {
+        // Policy: Rebuild when either the model or graph asset changes.
+        Guid model_guid = Guid::invalid();
+        Guid graph_guid = Guid::invalid();
+        std::vector<AnimGraphLayerClipCache> layers;
+        bool built = false;
+    };
+
     struct AnimGraphTransitionRuntime
     {
         int from = -1;
@@ -39,6 +63,7 @@ namespace eeng::ecs
         std::vector<std::uint8_t> trigger_params;
 
         std::vector<AnimGraphLayerRuntime> layers;
+        AnimGraphClipCache clip_cache;
         bool initialized = false;
     };
 }

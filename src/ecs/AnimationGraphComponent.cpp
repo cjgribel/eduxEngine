@@ -22,6 +22,7 @@ namespace eeng::ecs
             instance.bool_params.clear();
             instance.trigger_params.clear();
             instance.layers.clear();
+            instance.clip_cache = {};
             instance.initialized = false;
         }
 

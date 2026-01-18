@@ -8,6 +8,7 @@
 #include <cmath>
 #include <limits>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -253,11 +254,22 @@ namespace
         return false;
     }
 
+    const AnimClip* clip_from_index(const ModelDataAsset& model, int index)
+    {
+        if (index < 0)
+            return nullptr;
+        const std::size_t idx = static_cast<std::size_t>(index);
+        if (idx >= model.animations.size())
+            return nullptr;
+        return &model.animations[idx];
+    }
+
     // Diagnostics: log missing or trackless clips once per model+clip.
-    void warn_missing_clips(
+    void warn_missing_clips_cached(
         eeng::EngineContext& ctx,
-        const ModelDataAsset& model,
         const AnimationGraphAsset& graph,
+        const std::unordered_map<std::string, int>& clip_lookup,
+        const ModelDataAsset& model,
         const eeng::Guid& model_guid)
     {
         static std::unordered_set<std::string> warned_missing;
@@ -274,14 +286,9 @@ namespace
                 return;
 
             const AnimClip* found = nullptr;
-            for (const auto& clip : model.animations)
-            {
-                if (clip.name == clip_name)
-                {
-                    found = &clip;
-                    break;
-                }
-            }
+            auto it = clip_lookup.find(clip_name);
+            if (it != clip_lookup.end())
+                found = clip_from_index(model, it->second);
 
             if (!found)
             {
@@ -348,6 +355,138 @@ namespace
                 return &clip;
         }
         return fallback;
+    }
+
+    // Build per-instance clip indices so state evaluation avoids string lookups.
+    void build_clip_cache(
+        eeng::ecs::AnimGraphInstance& instance,
+        const AnimationGraphAsset& graph,
+        const ModelDataAsset& model,
+        const eeng::Guid& model_guid,
+        eeng::EngineContext& ctx)
+    {
+        auto& cache = instance.clip_cache;
+        cache = {};
+        cache.model_guid = model_guid;
+        cache.graph_guid = instance.graph_guid;
+
+        std::unordered_map<std::string, int> clip_lookup;
+        clip_lookup.reserve(model.animations.size());
+        for (std::size_t i = 0; i < model.animations.size(); i++)
+        {
+            const auto& clip = model.animations[i];
+            if (clip.name.empty())
+                continue;
+
+            auto it = clip_lookup.find(clip.name);
+            if (it == clip_lookup.end())
+            {
+                clip_lookup.emplace(clip.name, static_cast<int>(i));
+                continue;
+            }
+
+            // Policy: Prefer a matching clip that actually has tracks.
+            const AnimClip& existing = model.animations[static_cast<std::size_t>(it->second)];
+            if (!clip_has_tracks(existing) && clip_has_tracks(clip))
+                it->second = static_cast<int>(i);
+        }
+
+        // Diagnostics: warn once per model+clip when resolving references.
+        warn_missing_clips_cached(ctx, graph, clip_lookup, model, model_guid);
+
+        // Cache layout mirrors graph layers/states for fast direct access by index.
+        cache.layers.resize(graph.layers.size());
+        for (std::size_t li = 0; li < graph.layers.size(); li++)
+        {
+            const auto& layer = graph.layers[li];
+            auto& layer_cache = cache.layers[li];
+            layer_cache.states.resize(layer.states.size());
+            for (std::size_t si = 0; si < layer.states.size(); si++)
+            {
+                const auto& state = layer.states[si];
+                auto& state_cache = layer_cache.states[si];
+
+                auto lookup_index = [&](const std::string& name) -> int
+                {
+                    if (name.empty())
+                        return -1;
+                    auto it = clip_lookup.find(name);
+                    return (it != clip_lookup.end()) ? it->second : -1;
+                };
+
+                switch (state.type)
+                {
+                case AnimGraphStateType::Clip:
+                    state_cache.clip = lookup_index(state.clip);
+                    break;
+                case AnimGraphStateType::Blend2:
+                    state_cache.clip0 = lookup_index(state.clip0);
+                    state_cache.clip1 = lookup_index(state.clip1);
+                    break;
+                case AnimGraphStateType::BlendSpace1D:
+                case AnimGraphStateType::BlendSpace2D:
+                    state_cache.samples.resize(state.samples.size(), -1);
+                    for (std::size_t i = 0; i < state.samples.size(); i++)
+                        state_cache.samples[i] = lookup_index(state.samples[i].clip);
+                    break;
+                default:
+                    break;
+                }
+
+                // Policy: Precompute BlendSpace1D ordering once to avoid per-frame sorting.
+                if (state.type == AnimGraphStateType::BlendSpace1D && !state.samples.empty())
+                {
+                    state_cache.blend1d_order.resize(state.samples.size());
+                    for (std::size_t i = 0; i < state_cache.blend1d_order.size(); i++)
+                        state_cache.blend1d_order[i] = static_cast<int>(i);
+                    std::sort(state_cache.blend1d_order.begin(), state_cache.blend1d_order.end(),
+                        [&](int lhs, int rhs)
+                        {
+                            return state.samples[static_cast<std::size_t>(lhs)].x
+                                < state.samples[static_cast<std::size_t>(rhs)].x;
+                        });
+                }
+            }
+        }
+
+        cache.built = true;
+    }
+
+    bool ensure_clip_cache(
+        eeng::ecs::AnimGraphInstance& instance,
+        const AnimationGraphAsset& graph,
+        const ModelDataAsset& model,
+        const eeng::Guid& model_guid,
+        eeng::EngineContext& ctx)
+    {
+        auto& cache = instance.clip_cache;
+        const bool needs_rebuild = !cache.built
+            || cache.model_guid != model_guid
+            || cache.graph_guid != instance.graph_guid
+            || cache.layers.size() != graph.layers.size();
+        // Policy: Rebuild only when model or graph identity changes.
+        if (needs_rebuild)
+            build_clip_cache(instance, graph, model, model_guid, ctx);
+        return cache.built;
+    }
+
+    const eeng::ecs::AnimGraphStateClipCache* get_state_cache(
+        const eeng::ecs::AnimGraphInstance& instance,
+        std::size_t layer_index,
+        int state_index)
+    {
+        // Policy: Treat missing caches as a soft failure and fall back to name resolution.
+        if (!instance.clip_cache.built)
+            return nullptr;
+        if (layer_index >= instance.clip_cache.layers.size())
+            return nullptr;
+        if (state_index < 0)
+            return nullptr;
+        const auto& layer_cache = instance.clip_cache.layers[layer_index];
+        const std::size_t idx = static_cast<std::size_t>(state_index);
+        if (idx >= layer_cache.states.size())
+            return nullptr;
+        return &layer_cache.states[idx];
     }
 
     // Convert elapsed seconds to normalized [0,1] time for a clip, with playback mode.
@@ -813,6 +952,7 @@ namespace
         const AnimationGraphAsset& graph,
         const eeng::ecs::AnimGraphInstance& instance,
         const ModelDataAsset& model,
+        const eeng::ecs::AnimGraphStateClipCache* clip_cache,
         float time_sec,
         bool use_pose_times = true)
     {
@@ -820,19 +960,29 @@ namespace
         ctx.state = &state;
         ctx.phase_rate = state.speed;
 
+        auto resolve_cached = [&](int index, const std::string& name) -> const AnimClip*
+        {
+            if (clip_cache)
+            {
+                if (const AnimClip* cached = clip_from_index(model, index))
+                    return cached;
+            }
+            return resolve_clip_by_name(model, name);
+        };
+
         const AnimClip* time_clip = nullptr;
         std::array<const AnimGraphBlendSample*, 4> sample_refs{};
 
         switch (state.type)
         {
         case AnimGraphStateType::Clip:
-            ctx.clips[0] = resolve_clip_by_name(model, state.clip);
+            ctx.clips[0] = resolve_cached(clip_cache ? clip_cache->clip : -1, state.clip);
             ctx.sample_count = 1;
             time_clip = ctx.clips[0];
             break;
         case AnimGraphStateType::Blend2:
-            ctx.clips[0] = resolve_clip_by_name(model, state.clip0);
-            ctx.clips[1] = resolve_clip_by_name(model, state.clip1);
+            ctx.clips[0] = resolve_cached(clip_cache ? clip_cache->clip0 : -1, state.clip0);
+            ctx.clips[1] = resolve_cached(clip_cache ? clip_cache->clip1 : -1, state.clip1);
             ctx.sample_count = 2;
             time_clip = ctx.clips[0] ? ctx.clips[0] : ctx.clips[1];
             {
@@ -905,15 +1055,25 @@ namespace
 
             if (!found && state.samples.size() >= 2)
             {
-                // Fallback: sort by X and find the bracket segment.
-                std::vector<int> order(state.samples.size());
-                for (std::size_t i = 0; i < order.size(); i++)
-                    order[i] = static_cast<int>(i);
-                std::sort(order.begin(), order.end(), [&](int lhs, int rhs)
-                    {
-                        return state.samples[static_cast<std::size_t>(lhs)].x
-                            < state.samples[static_cast<std::size_t>(rhs)].x;
-                    });
+                // Fallback: use cached X-sorted order (built once per model+graph).
+                const std::vector<int>* order_ptr = nullptr;
+                if (clip_cache && clip_cache->blend1d_order.size() == state.samples.size())
+                    order_ptr = &clip_cache->blend1d_order;
+                std::vector<int> order_local;
+                if (!order_ptr)
+                {
+                    // Policy: Keep a defensive fallback if the cache is missing.
+                    order_local.resize(state.samples.size());
+                    for (std::size_t i = 0; i < order_local.size(); i++)
+                        order_local[i] = static_cast<int>(i);
+                    std::sort(order_local.begin(), order_local.end(), [&](int lhs, int rhs)
+                        {
+                            return state.samples[static_cast<std::size_t>(lhs)].x
+                                < state.samples[static_cast<std::size_t>(rhs)].x;
+                        });
+                    order_ptr = &order_local;
+                }
+                const auto& order = *order_ptr;
 
                 for (std::size_t i = 0; i + 1 < order.size(); i++)
                 {
@@ -947,8 +1107,14 @@ namespace
             {
                 const auto& sample_a = state.samples[static_cast<std::size_t>(a)];
                 const auto& sample_b = state.samples[static_cast<std::size_t>(b)];
-                ctx.clips[0] = resolve_clip_by_name(model, sample_a.clip);
-                ctx.clips[1] = resolve_clip_by_name(model, sample_b.clip);
+                const int clip_a = (clip_cache && a < static_cast<int>(clip_cache->samples.size()))
+                    ? clip_cache->samples[static_cast<std::size_t>(a)]
+                    : -1;
+                const int clip_b = (clip_cache && b < static_cast<int>(clip_cache->samples.size()))
+                    ? clip_cache->samples[static_cast<std::size_t>(b)]
+                    : -1;
+                ctx.clips[0] = resolve_cached(clip_a, sample_a.clip);
+                ctx.clips[1] = resolve_cached(clip_b, sample_b.clip);
                 sample_refs[0] = &sample_a;
                 sample_refs[1] = &sample_b;
                 ctx.weights[0] = 1.0f - t;
@@ -1037,10 +1203,26 @@ namespace
                 const auto& sample1 = state.samples[static_cast<std::size_t>(indices[1])];
                 const auto& sample2 = state.samples[static_cast<std::size_t>(indices[2])];
                 const auto& sample3 = state.samples[static_cast<std::size_t>(indices[3])];
-                ctx.clips[0] = resolve_clip_by_name(model, sample0.clip);
-                ctx.clips[1] = resolve_clip_by_name(model, sample1.clip);
-                ctx.clips[2] = resolve_clip_by_name(model, sample2.clip);
-                ctx.clips[3] = resolve_clip_by_name(model, sample3.clip);
+                const int clip0 = (clip_cache && indices[0] >= 0
+                    && static_cast<std::size_t>(indices[0]) < clip_cache->samples.size())
+                    ? clip_cache->samples[static_cast<std::size_t>(indices[0])]
+                    : -1;
+                const int clip1 = (clip_cache && indices[1] >= 0
+                    && static_cast<std::size_t>(indices[1]) < clip_cache->samples.size())
+                    ? clip_cache->samples[static_cast<std::size_t>(indices[1])]
+                    : -1;
+                const int clip2 = (clip_cache && indices[2] >= 0
+                    && static_cast<std::size_t>(indices[2]) < clip_cache->samples.size())
+                    ? clip_cache->samples[static_cast<std::size_t>(indices[2])]
+                    : -1;
+                const int clip3 = (clip_cache && indices[3] >= 0
+                    && static_cast<std::size_t>(indices[3]) < clip_cache->samples.size())
+                    ? clip_cache->samples[static_cast<std::size_t>(indices[3])]
+                    : -1;
+                ctx.clips[0] = resolve_cached(clip0, sample0.clip);
+                ctx.clips[1] = resolve_cached(clip1, sample1.clip);
+                ctx.clips[2] = resolve_cached(clip2, sample2.clip);
+                ctx.clips[3] = resolve_cached(clip3, sample3.clip);
                 sample_refs[0] = &sample0;
                 sample_refs[1] = &sample1;
                 sample_refs[2] = &sample2;
@@ -1250,13 +1432,16 @@ namespace
     float state_exit_time(
         const AnimGraphState& state,
         const ModelDataAsset& model,
+        const eeng::ecs::AnimGraphStateClipCache* clip_cache,
         float time_sec)
     {
         const AnimClip* clip = nullptr;
         switch (state.type)
         {
         case AnimGraphStateType::Clip:
-            clip = resolve_clip_by_name(model, state.clip);
+            clip = clip_cache
+                ? clip_from_index(model, clip_cache->clip)
+                : resolve_clip_by_name(model, state.clip);
             break;
         case AnimGraphStateType::Blend2:
             return trimmed_time_from_duration(state, 1.0f, time_sec);
@@ -1276,6 +1461,7 @@ namespace
         const AnimationGraphAsset& graph,
         const eeng::ecs::AnimGraphInstance& instance,
         const ModelDataAsset& model,
+        const eeng::ecs::AnimGraphStateClipCache* clip_cache,
         float phase)
     {
         (void)graph;
@@ -1291,7 +1477,9 @@ namespace
             return std::min(std::max(phase, 0.0f), 1.0f);
         }
 
-        const AnimClip* clip = resolve_clip_by_name(model, state.clip);
+        const AnimClip* clip = clip_cache
+            ? clip_from_index(model, clip_cache->clip)
+            : resolve_clip_by_name(model, state.clip);
         if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
             return 0.0f;
 
@@ -1311,6 +1499,7 @@ namespace
         const AnimationGraphAsset& graph,
         const eeng::ecs::AnimGraphInstance& instance,
         const ModelDataAsset& model,
+        const eeng::ecs::AnimGraphStateClipCache* clip_cache,
         float time_sec)
     {
         (void)graph;
@@ -1323,7 +1512,9 @@ namespace
             return trimmed_time_from_duration(state, 1.0f, time_sec);
         }
 
-        const AnimClip* clip = resolve_clip_by_name(model, state.clip);
+        const AnimClip* clip = clip_cache
+            ? clip_from_index(model, clip_cache->clip)
+            : resolve_clip_by_name(model, state.clip);
         return trimmed_time(state, clip, time_sec);
     }
 }
@@ -1388,8 +1579,8 @@ namespace eeng::ecs::systems
                             if (!instance.initialized)
                                 return;
 
-                            // Diagnostics help detect clip-name mismatch between graph and model.
-                            warn_missing_clips(ctx, model, graph, model_guid);
+                            // Policy: Build clip cache once per model+graph to avoid per-frame string lookups.
+                            ensure_clip_cache(instance, graph, model, model_guid, ctx);
 
                             std::vector<LayerEvalContext> layer_contexts;
                             layer_contexts.reserve(graph.layers.size());
@@ -1408,13 +1599,19 @@ namespace eeng::ecs::systems
                                     // Transition: blend from current state to destination state.
                                     const auto& from_state = layer.states[static_cast<std::size_t>(runtime.transition.from)];
                                     const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
-                                    lctx.from_ctx = build_state_context(from_state, graph, instance, model, runtime.state_time);
-                                    lctx.to_ctx = build_state_context(to_state, graph, instance, model, runtime.transition.dest_time);
+                                    const auto* from_cache = get_state_cache(instance, i, runtime.transition.from);
+                                    const auto* to_cache = get_state_cache(instance, i, runtime.transition.to);
+                                    lctx.from_ctx = build_state_context(
+                                        from_state, graph, instance, model, from_cache, runtime.state_time);
+                                    lctx.to_ctx = build_state_context(
+                                        to_state, graph, instance, model, to_cache, runtime.transition.dest_time);
                                     if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
                                     {
                                         // Policy: Additive layers use the same weights but sample reference poses at time 0.
-                                        lctx.from_ref_ctx = build_state_context(from_state, graph, instance, model, 0.0f, false);
-                                        lctx.to_ref_ctx = build_state_context(to_state, graph, instance, model, 0.0f, false);
+                                        lctx.from_ref_ctx = build_state_context(
+                                            from_state, graph, instance, model, from_cache, 0.0f, false);
+                                        lctx.to_ref_ctx = build_state_context(
+                                            to_state, graph, instance, model, to_cache, 0.0f, false);
                                     }
                                     lctx.transition_alpha = runtime.transition.duration > 0.0f
                                         ? std::min(runtime.transition.time / runtime.transition.duration, 1.0f)
@@ -1425,9 +1622,12 @@ namespace eeng::ecs::systems
                                 {
                                     // No transition: use active state only.
                                     const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
-                                    lctx.from_ctx = build_state_context(state, graph, instance, model, runtime.state_time);
+                                    const auto* state_cache = get_state_cache(instance, i, runtime.state);
+                                    lctx.from_ctx = build_state_context(
+                                        state, graph, instance, model, state_cache, runtime.state_time);
                                     if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
-                                        lctx.from_ref_ctx = build_state_context(state, graph, instance, model, 0.0f, false);
+                                        lctx.from_ref_ctx = build_state_context(
+                                            state, graph, instance, model, state_cache, 0.0f, false);
                                     lctx.in_transition = false;
                                 }
 
@@ -1470,13 +1670,14 @@ namespace eeng::ecs::systems
                                     continue;
 
                                 const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
+                                const auto* state_cache = get_state_cache(instance, i, runtime.state);
                                 const float phase_rate = lctx.from_ctx.phase_rate;
                                 advance_state_time(state, delta_time, phase_rate, runtime.state_time);
 
                                 // Resolve the highest-priority valid transition.
                                 int best_transition = -1;
                                 int best_priority = std::numeric_limits<int>::min();
-                                float state_ntime = state_exit_time(state, model, runtime.state_time);
+                                float state_ntime = state_exit_time(state, model, state_cache, runtime.state_time);
 
                                 for (std::size_t t = 0; t < layer.transitions.size(); t++)
                                 {
@@ -1520,10 +1721,11 @@ namespace eeng::ecs::systems
                                         continue;
                                     const auto& dest_state = layer.states[static_cast<std::size_t>(dest)];
                                     // Map current phase to destination time when not rewinding.
-                                    const float phase = state_phase(state, graph, instance, model, runtime.state_time);
+                                    const float phase = state_phase(state, graph, instance, model, state_cache, runtime.state_time);
+                                    const auto* dest_cache = get_state_cache(instance, i, dest);
                                     const float dest_time = dest_state.rewind_on_enter
                                         ? 0.0f
-                                        : phase_to_state_time(dest_state, graph, instance, model, phase);
+                                        : phase_to_state_time(dest_state, graph, instance, model, dest_cache, phase);
                                     if (trans.duration <= 0.0f)
                                     {
                                         runtime.last_transition = {};
