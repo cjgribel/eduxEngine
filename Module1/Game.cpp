@@ -811,24 +811,6 @@ bool Game::init()
         // WHO DOES THIS
         // ...
 
-        /*
-        Retaining & Releasing
-
-        auto h = storage.add(...);
-        // two independent owners grab it:
-        storage.retain(h);
-        storage.retain(h);
-
-        // first release → leaves count==2
-        assert(storage.release(h) == 2);
-
-        // next two releases → will hit zero and automatically destroy
-        assert(storage.release(h) == 1);
-        assert(storage.release(h) == 0);
-        // by now the pool has removed the entry altogether
-
-        */
-
         EENG_LOG(ctx, "Storage test ends");
     }
 #endif

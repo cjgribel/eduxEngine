@@ -133,71 +133,6 @@ namespace eeng
         }
     };
 
-    class RefCountMap
-    {
-        std::vector<size_t> refs;
-
-        template<typename T>
-        size_t& ref_slot(const Handle<T>& handle) {
-            if (!handle)
-                throw std::invalid_argument{ "Null handle in RefCountMap" };
-            auto idx = handle.idx;
-            if (idx >= refs.size())
-                throw std::out_of_range{ "Handle index out of range in RefCountMap" };
-            return refs[idx];
-        }
-
-    public:
-
-        // Increment refcount for this handle (auto-resizing)
-        template<typename T>
-        size_t add_ref(const Handle<T>& handle)
-        {
-            assert(handle);
-            auto idx = handle.idx;
-            if (idx >= refs.size()) refs.resize(idx + 1, 0);
-            return ++refs[idx];
-        }
-
-        // Decrement refcount
-        template<typename T>
-        size_t release(const Handle<T>& handle) {
-            size_t& cnt = ref_slot(handle);
-            if (cnt == 0)
-                throw std::logic_error{ "Reference count underflow in release" };
-            return --cnt;
-        }
-
-        // Reset counter to zero
-        template<typename T>
-        void reset(const Handle<T>& handle) {
-            size_t& cnt = ref_slot(handle);
-            // if (cnt == 0)
-            //     throw std::logic_error{ "Reference count underflow in reset" };
-            cnt = 0;
-        }
-
-        template<typename T>
-        size_t count(const Handle<T>& handle) const
-        {
-            auto idx = handle.idx;
-            if (idx >= refs.size()) return 0;
-            return refs[idx];
-        }
-
-        // Return a comma-separated list of all refcounts
-        std::string to_string() const
-        {
-            std::ostringstream oss;
-            for (auto c : refs)
-                oss << c << ", ";
-            std::string s = oss.str();
-            if (!s.empty())
-                s.resize(s.size() - 2);  // drop trailing ", "
-            return s;
-        }
-    };
-
     struct ValidationError : std::runtime_error {
         using std::runtime_error::runtime_error;
     };
@@ -218,8 +153,6 @@ namespace eeng
             virtual std::optional<entt::meta_any> try_get_meta_ref(const MetaHandle& mh) const noexcept = 0;
 
             virtual void remove_now(const MetaHandle& handle) = 0;
-            virtual size_t retain(const MetaHandle& mh) = 0;
-            virtual size_t release_and_destroy(const MetaHandle& mh) = 0;
 
             virtual size_t element_size() const noexcept = 0;
             virtual size_t count_free() const noexcept = 0;
@@ -243,7 +176,6 @@ namespace eeng
             PoolAllocatorTFH<T> m_pool;
 
             VersionMap m_versions;
-            RefCountMap m_ref_counts;
 
             std::unordered_map<Guid, Handle<T>> m_guid_to_handle;
             std::unordered_map<Handle<T>, Guid> m_handle_to_guid;
@@ -288,7 +220,6 @@ namespace eeng
             {
                 auto handle = m_pool.create(std::forward<T>(object));  // one move
                 m_versions.assign_version(handle);
-                m_ref_counts.add_ref(handle);
                 m_guid_to_handle[guid] = handle;
                 m_handle_to_guid[handle] = guid;
                 return handle;
@@ -313,7 +244,7 @@ namespace eeng
             }
 
             /// @brief Unsafe, no‑lock reference access. Caller must ensure no concurrent
-            ///        add/release on the same slot.
+            ///        add/remove on the same slot.
             T& get_ref_nolock(const Handle<T>& handle)
             {
                 if (!validate_handle_no_lock(handle)) throw ValidationError{ "Invalid or not-ready Handle in get_ref_nolock" };
@@ -409,7 +340,6 @@ namespace eeng
                 m_guid_to_handle.erase(gid);
 
                 m_versions.remove(h);
-                m_ref_counts.reset(h);
                 m_pool.destroy(h);
             }
 
@@ -426,64 +356,7 @@ namespace eeng
                 m_guid_to_handle.erase(gid);
 
                 m_versions.remove(handle);
-                m_ref_counts.reset(handle);
                 m_pool.destroy(handle);
-            }
-
-            size_t retain(const Handle<T>& h)
-            {
-                std::lock_guard lock{ m_mutex };
-                if (!validate_handle_no_lock(h)) throw ValidationError{ "Bad handle" };
-                return m_ref_counts.add_ref(h);
-            }
-
-            size_t retain(const MetaHandle& mh) override
-            {
-                std::lock_guard lock{ m_mutex };
-                auto opt = validate_handle_no_lock(mh);
-                if (!opt) throw ValidationError{ "Invalid or not-ready MetaHandle" };
-                return m_ref_counts.add_ref(*opt);
-            }
-
-            size_t release_and_destroy(const Handle<T>& h)
-            {
-                std::lock_guard lock{ m_mutex };
-                if (!validate_handle_no_lock(h)) throw ValidationError{ "Bad handle" };
-                auto cnt = m_ref_counts.release(h);
-                if (cnt == 0) {
-                    auto guid = m_handle_to_guid[h];
-                    m_guid_to_handle.erase(guid);
-                    m_handle_to_guid.erase(h);
-                    m_versions.remove(h);
-                    m_ref_counts.reset(h);
-                    m_pool.destroy(h);
-                }
-                return cnt;
-            }
-
-            size_t release_and_destroy(const MetaHandle& mh) override
-            {
-                std::lock_guard lock{ m_mutex };
-
-                auto opt = validate_handle_no_lock(mh);
-                if (!opt) {
-                    throw ValidationError{ "Invalid or not-ready MetaHandle" };
-                }
-
-                auto handle = *opt;
-                auto cnt = m_ref_counts.release(handle);
-
-                // if this was the last reference, tear everything down
-                if (cnt == 0) {
-                    auto gid = m_handle_to_guid[handle];
-                    m_handle_to_guid.erase(handle);
-                    m_guid_to_handle.erase(gid);
-                    m_versions.remove(handle);
-                    m_ref_counts.reset(handle);
-                    m_pool.destroy(handle);
-                }
-
-                return cnt;
             }
 
             size_t element_size() const noexcept override
@@ -525,7 +398,6 @@ namespace eeng
                 m_pool.clear();
 
                 m_versions = VersionMap{};
-                m_ref_counts = RefCountMap{};
 
                 m_guid_to_handle.clear();
                 m_handle_to_guid.clear();
@@ -637,7 +509,6 @@ namespace eeng
                 std::ostringstream oss;
                 oss << "  entries: " << m_guid_to_handle.size() << "\n";
                 oss << "  versions:  " << m_versions.to_string() << "\n";
-                oss << "  ref-counts:" << m_ref_counts.to_string() << "\n";
                 oss << "  allocator:\n" << m_pool.to_string();
                 return oss.str();
             }
@@ -803,7 +674,7 @@ namespace eeng
         }
 
         /// @brief Reference‑returning, statically‑typed get (unsafe if allowing
-        /// concurrent add/release on the same type).
+        /// concurrent add/remove on the same type).
         template<typename T>
         T& get_ref(const Handle<T>& h)
         {
@@ -930,40 +801,6 @@ namespace eeng
         {
             std::lock_guard lock{ storage_mutex };
             get_pool(mh.type.id()).remove_now(mh);
-        }
-
-        /// Increase the ref-count for a resource.
-        /// @returns the new ref-count.
-        template<typename T>
-        size_t retain(const Handle<T>& h)
-        {
-            std::lock_guard lock{ storage_mutex };
-            auto& pool = get_pool<T>();
-            return pool.retain(h);
-        }
-
-        /// Increase the ref-count for a resource.
-        /// @returns the new ref-count.
-        size_t retain(const MetaHandle& mh)
-        {
-            std::lock_guard lock{ storage_mutex };
-            auto& pool = get_pool(mh.type.id());
-            return pool.retain(mh);
-        }
-
-        template<typename T>
-        size_t release(const Handle<T>& h)
-        {
-            std::lock_guard lock{ storage_mutex };
-            auto& pool = get_pool<T>();
-            return pool.release_and_destroy(h);
-        }
-
-        size_t release(const MetaHandle& mh)
-        {
-            std::lock_guard lock{ storage_mutex };
-            auto& pool = get_pool(mh.type.id());
-            return pool.release_and_destroy(mh);
         }
 
         // --- Capacity and free slots -----------------------------------------

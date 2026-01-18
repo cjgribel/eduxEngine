@@ -155,25 +155,6 @@ TEST_F(StorageTest, TryGetInvalid) {
     EXPECT_FALSE(storage.try_get_meta_ref(bad).has_value());
 }
 
-TEST_F(StorageTest, RetainAndReleaseReferenceCount) {
-    // Test that retain and release update ref-count and auto-remove
-    MockResource1 mr;
-    entt::meta_any any = mr;
-    auto guid = eeng::Guid::generate();
-    auto handle = storage.add(any, guid);
-
-    // Initial ref from add -> count 1, retain -> 2
-    EXPECT_EQ(storage.retain(handle), 2u);
-    // Release once -> 1
-    EXPECT_EQ(storage.release(handle), 1u);
-    // Release second -> 0 and resource removed
-    EXPECT_EQ(storage.release(handle), 0u);
-
-    // Now handle should be invalid
-    EXPECT_FALSE(storage.validate(handle));
-    EXPECT_FALSE(storage.try_get_meta_ref(handle).has_value());
-}
-
 TEST_F(StorageTest, TypeMismatchThrows) {
     // Creating a handle for MockResource1 but changing its type
     MockResource1 mr;
@@ -191,14 +172,13 @@ TEST_F(StorageTest, TypeMismatchThrows) {
 
 TEST_F(StorageTest, VersionInvalidAfterRemoval)
 {
-    // Remove via release to zero and confirm version invalid
+    // Remove and confirm version invalid
     MockResource1 mr;
     entt::meta_any any = mr;
     auto guid = eeng::Guid::generate();
     auto handle = storage.add(any, guid);
 
-    // Remove all references
-    storage.release(handle);
+    storage.remove_now(handle);
 
     // Version bump on removal should make handle invalid
     EXPECT_FALSE(storage.validate(handle));
@@ -224,26 +204,16 @@ TEST_F(StorageTest, MultiTypeStorage) {
     EXPECT_EQ(val2.y, 200u);
 }
 
-TEST_F(StorageTest, RetainInvalidThrows) {
-    eeng::MetaHandle bad;
-    EXPECT_THROW(storage.retain(bad), std::runtime_error);
-}
-
-TEST_F(StorageTest, ReleaseInvalidThrows) {
-    eeng::MetaHandle bad;
-    EXPECT_THROW(storage.release(bad), std::runtime_error);
-}
-
 #if 1
 /**
  * ConcurrencySafety (by o4-mini-high)
  *
  * Methodology:
- * Spawn N threads, each performing a full add/get/release cycle on Storage
+ * Spawn N threads, each performing a full add/get/remove cycle on Storage
  * to verify thread-safety under concurrent use. Each worker thread:
  *  1. Creates its own MockResource1 and unique GUID.
- *  2. Calls storage.add(), storage.validate(), storage.get(), and storage.release().
- *  3. Verifies that the handle is valid before and invalid after release.
+ *  2. Calls storage.add(), storage.validate(), storage.get(), and storage.remove_now().
+ *  3. Verifies that the handle is valid before and invalid after removal.
  *
  * Results are reported via GTest assertions inside each thread.
  */
@@ -285,9 +255,6 @@ TEST_F(StorageTest, ConcurrencySafety) {
                     storage.modify(h_, [](MockResource1& t) { t.x = 0; });
                     storage.modify(h_, [i](MockResource1& t) { t.x = size_t(i); });
 
-                    // Retain & release
-                    storage.retain(h);
-                    storage.release(h);
                     if (!storage.validate(h)) return;
 #else
                     // -- Templated workflow --
@@ -315,9 +282,6 @@ TEST_F(StorageTest, ConcurrencySafety) {
                         return;
                     }
 
-                    // Thread-safe retain & release
-                    storage.retain(h);
-                    storage.release(h);
                     if (!storage.validate(h)) return;
 
                     // Can't do this: race can occur as from_ref is assigned
@@ -327,8 +291,7 @@ TEST_F(StorageTest, ConcurrencySafety) {
                     //     return;
                     // }
 
-                    // (We release and validate post-test)
-                    // storage.release(h);
+                    // (We remove and validate post-test)
                     //if (storage.validate(h)) return;
 #endif
                     results[i].store(true, std::memory_order_relaxed);
@@ -372,7 +335,7 @@ TEST_F(StorageTest, ConcurrencySafety) {
 
             auto& h = handles[j];
             EXPECT_EQ(j, storage.get_meta_ref(h).cast<MockResource1&>().x);
-            storage.release(h);
+            storage.remove_now(h);
             EXPECT_FALSE(storage.validate(h));
         }
 #else
@@ -381,7 +344,7 @@ TEST_F(StorageTest, ConcurrencySafety) {
             auto& h = handles[j];
             std::cout << "handle: " << h.idx << ", ver: " << h.ver << std::endl;
             EXPECT_EQ(j, storage.get(h).cast<MockResource1&>().x);
-            storage.release(h);
+            storage.remove_now(h);
             EXPECT_FALSE(storage.validate(h));
         }
         std::cout << "------" << std::endl;
