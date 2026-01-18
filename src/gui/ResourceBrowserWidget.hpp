@@ -225,7 +225,11 @@ namespace eeng::gui
                 if (is_selected)
                     flags |= ImGuiTreeNodeFlags_Selected;
 
+                auto guid_status = resource_manager.get_status(entry.meta.guid);
+                const auto state_color = detail::load_state_color(guid_status.state);
+                ImGui::PushStyleColor(ImGuiCol_Text, state_color);
                 bool opened = ImGui::TreeNodeEx(entry.meta.name.c_str(), flags);
+                ImGui::PopStyleColor();
                 if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
                     detail::update_asset_selection(selection, entry.meta.guid);
 
@@ -679,14 +683,7 @@ namespace eeng::gui
             {
                 if (ImGui::BeginTabBar("ResourceViews"))
                 {
-                    if (ImGui::BeginTabItem("Flat List"))
-                    {
-                        AssetFlatListWidget flat_list{ ctx };
-                        flat_list.draw();
-                        ImGui::EndTabItem();
-                    }
-
-                    if (ImGui::BeginTabItem("(By Dependency)"))
+                    if (ImGui::BeginTabItem("Dependency Tree"))
                     {
                         auto& selection = *ctx.asset_selection;
                         ImGui::TextDisabled("Selected:");
@@ -711,6 +708,14 @@ namespace eeng::gui
                         ImGui::EndTabItem();
                     }
 
+                    if (ImGui::BeginTabItem("Flat List"))
+                    {
+                        AssetFlatListWidget flat_list{ ctx };
+                        flat_list.draw();
+                        ImGui::EndTabItem();
+                    }
+
+                    /*
                     ImGui::BeginDisabled();
 
                     if (ImGui::BeginTabItem("By Type"))
@@ -732,6 +737,7 @@ namespace eeng::gui
                     }
 
                     ImGui::EndDisabled();
+                    */
 
                     ImGui::EndTabBar();
                 }
