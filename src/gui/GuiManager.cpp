@@ -121,17 +121,17 @@ namespace eeng
 
         auto& storage = static_cast<ResourceManager&>(*ctx.resource_manager).storage();
 
-        for (const auto& [type_id, pool_ptr] : storage)
+        for (const auto& row : storage.pool_stats())
         {
-            const auto meta_type = entt::resolve(type_id);
+            const auto meta_type = entt::resolve(row.type_id);
             const auto type_name = meta::get_meta_type_id_string(meta_type);
 
             if (ImGui::TreeNode(type_name.c_str()))
             {
-                const size_t capacity = pool_ptr->capacity();
-                const size_t free = pool_ptr->count_free();
+                const size_t capacity = row.capacity;
+                const size_t free = row.free_count;
                 const size_t used = capacity - free;
-                const size_t elem_size = pool_ptr->element_size();
+                const size_t elem_size = row.element_size;
 
                 const float kb_total = (capacity * elem_size) / 1024.0f;
                 const float kb_used = (used * elem_size) / 1024.0f;
@@ -160,7 +160,8 @@ namespace eeng
 
                 if (ImGui::TreeNode("Details"))
                 {
-                    ImGui::TextUnformatted(pool_ptr->to_string().c_str());
+                    auto details = storage.pool_debug_string(row.type_id);
+                    ImGui::TextUnformatted(details.c_str());
                     ImGui::TreePop();
                 }
 
@@ -183,20 +184,20 @@ namespace eeng
             ImGui::TableSetupColumn("Occupancy");
             ImGui::TableHeadersRow();
 
-            for (auto& [id_type, pool_ptr] : storage)
+            for (const auto& row : storage.pool_stats())
             {
                 ImGui::TableNextRow();
 
                 // Column 1: Type name
                 ImGui::TableSetColumnIndex(0);
-                auto meta_type = entt::resolve(id_type);
+                auto meta_type = entt::resolve(row.type_id);
                 const auto type_name = meta::get_meta_type_id_string(meta_type);
                 ImGui::Text("%s", type_name.c_str());
 
                 // Column 2: Usage summary
                 ImGui::TableSetColumnIndex(1);
-                const size_t capacity = pool_ptr->capacity();
-                const size_t used = capacity - pool_ptr->count_free();
+                const size_t capacity = row.capacity;
+                const size_t used = capacity - row.free_count;
                 ImGui::Text("%zu / %zu", used, capacity);
 
                 // Column 3: Colored cell bar

@@ -629,9 +629,10 @@ namespace eeng::gui
             {
                 if (auto h_opt = metah_opt->cast<mock::Mesh>(); h_opt.has_value())
                 {
-                    auto mesh = resource_manager.storage().get_ref(*h_opt);
-                    ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
-                    ImGui::Separator();
+                    resource_manager.storage().read(*h_opt, [&](const mock::Mesh& mesh) {
+                        ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
+                        ImGui::Separator();
+                    });
                 }
             }
 
@@ -648,15 +649,16 @@ namespace eeng::gui
                 if (metah_opt.has_value())
                 {
                     editor::AssignFieldCommandBuilder cmd_builder;
-                    auto any = resource_manager.storage().get_meta_ref(*metah_opt);
-                    auto type_name = meta::get_meta_type_display_name(any.type());
+                    resource_manager.storage().modify(*metah_opt, [&](entt::meta_any& any) {
+                        auto type_name = meta::get_meta_type_display_name(any.type());
 
-                    if (insp.begin_node(type_name.c_str()))
-                    {
-                        cmd_builder.target_asset(ctx, ctx.resource_manager, entry.meta.guid, entry.meta.type_id);
-                        meta::inspect_any(any, insp, cmd_builder, ctx);
-                        insp.end_node();
-                    }
+                        if (insp.begin_node(type_name.c_str()))
+                        {
+                            cmd_builder.target_asset(ctx, ctx.resource_manager, entry.meta.guid, entry.meta.type_id);
+                            meta::inspect_any(any, insp, cmd_builder, ctx);
+                            insp.end_node();
+                        }
+                    });
                 }
 
                 ImGui::EndTable();

@@ -554,11 +554,11 @@ bool Game::init()
                 EENG_LOG(ctx, "  - Model .. with guid %s",
                     // m.to_string().c_str(),
                     ref.get_guid().to_string().c_str());
-                auto m = resource_manager.storage().get_ref<eeng::mock::Model>(ref.get_handle());
+                auto m = resource_manager.storage().get_val<eeng::mock::Model>(ref.get_handle());
                 for (const auto& mesh_ref : m.meshes)
                 {
                     assert(mesh_ref.is_loaded());
-                    auto mesh = resource_manager.storage().get_ref<eeng::mock::Mesh>(mesh_ref.get_handle());
+                    auto mesh = resource_manager.storage().get_val<eeng::mock::Mesh>(mesh_ref.get_handle());
                     EENG_LOG(ctx, "  - Mesh .. with guid %s",
                         // mesh.get()->to_string().c_str(),
                         mesh_ref.get_guid().to_string().c_str());
@@ -593,7 +593,7 @@ bool Game::init()
 #endif
 
         // 7. UNLOAD assets (concurrently)
-        //      CAN BE MADE TS // storage->get_ref - NOT TS
+        //      CAN BE MADE TS // storage->get_val/read - TS
         //      
 #if 0
         {

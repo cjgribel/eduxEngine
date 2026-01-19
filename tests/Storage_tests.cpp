@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <entt/meta/factory.hpp>
 #include <entt/meta/meta.hpp>
+#include <atomic>
 #include <vector>
 #include <thread>
 #include "Storage.hpp"
@@ -117,18 +118,19 @@ TEST_F(StorageTest, GetAndMutateNonConst) {
     auto guid = eeng::Guid::generate();
     auto handle = storage.add(any, guid);
 
-    auto meta = storage.get_meta_ref(handle);
-    EXPECT_EQ(meta.base().policy(), entt::any_policy::ref);
-    auto& val = meta.cast<MockResource1&>();
-    val.x = 5;
-    val.data.push_back(40);
+    storage.modify(handle, [&](entt::meta_any& meta) {
+        EXPECT_EQ(meta.base().policy(), entt::any_policy::ref);
+        auto& val = meta.cast<MockResource1&>();
+        val.x = 5;
+        val.data.push_back(40);
+    });
 
-    // Confirm internal state updated via try_get
-    auto opt = storage.try_get_meta_ref(handle);
-    ASSERT_TRUE(opt.has_value());
-    auto& val2 = opt->cast<MockResource1&>();
-    EXPECT_EQ(val2.x, 5);
-    EXPECT_EQ(val2.data.back(), 40);
+    // Confirm internal state updated
+    storage.read_meta(handle, [&](const entt::meta_any& meta) {
+        const auto& val2 = meta.cast<const MockResource1&>();
+        EXPECT_EQ(val2.x, 5);
+        EXPECT_EQ(val2.data.back(), 40);
+    });
 }
 
 TEST_F(StorageTest, GetConstPolicyAndValue) {
@@ -139,20 +141,24 @@ TEST_F(StorageTest, GetConstPolicyAndValue) {
     auto handle = storage.add(any, guid);
 
     // Mutate via non-const get
-    storage.get_meta_ref(handle).cast<MockResource1&>().x = 9;
+    storage.modify(handle, [](entt::meta_any& meta) {
+        meta.cast<MockResource1&>().x = 9;
+    });
 
     // Now fetch as const storage
     const auto& cstorage = storage;
-    auto meta = cstorage.get_meta_ref(handle);
-    EXPECT_EQ(meta.base().policy(), entt::any_policy::cref);
-    const auto& cval = meta.cast<const MockResource1&>();
-    EXPECT_EQ(cval.x, 9);
+    cstorage.read_meta(handle, [&](const entt::meta_any& meta) {
+        EXPECT_EQ(meta.base().policy(), entt::any_policy::cref);
+        const auto& cval = meta.cast<const MockResource1&>();
+        EXPECT_EQ(cval.x, 9);
+    });
 }
 
 TEST_F(StorageTest, TryGetInvalid) {
-    // try_get on invalid handle returns nullopt
+    // Invalid handles should fail validation and throw on read.
     eeng::MetaHandle bad;
-    EXPECT_FALSE(storage.try_get_meta_ref(bad).has_value());
+    EXPECT_FALSE(storage.validate(bad));
+    EXPECT_THROW(storage.read_meta(bad, [](const entt::meta_any&) {}), eeng::ValidationError);
 }
 
 TEST_F(StorageTest, TypeMismatchThrows) {
@@ -167,7 +173,7 @@ TEST_F(StorageTest, TypeMismatchThrows) {
     wrong.type = entt::resolve<int>();
 
     // Expect std::runtime_error("Pool not found") when type mismatches
-    EXPECT_THROW(storage.get_meta_ref(wrong), std::runtime_error);
+    EXPECT_THROW(storage.modify(wrong, [](entt::meta_any&) {}), std::runtime_error);
 }
 
 TEST_F(StorageTest, VersionInvalidAfterRemoval)
@@ -198,10 +204,12 @@ TEST_F(StorageTest, MultiTypeStorage) {
     EXPECT_TRUE(storage.validate(h1));
     EXPECT_TRUE(storage.validate(h2));
 
-    auto& val1 = storage.get_meta_ref(h1).cast<MockResource1&>();
-    auto& val2 = storage.get_meta_ref(h2).cast<MockResource2&>();
-    EXPECT_EQ(val1.x, 100u);
-    EXPECT_EQ(val2.y, 200u);
+    storage.read_meta(h1, [&](const entt::meta_any& meta) {
+        EXPECT_EQ(meta.cast<const MockResource1&>().x, 100u);
+    });
+    storage.read_meta(h2, [&](const entt::meta_any& meta) {
+        EXPECT_EQ(meta.cast<const MockResource2&>().y, 200u);
+    });
 }
 
 #if 1
@@ -334,7 +342,9 @@ TEST_F(StorageTest, ConcurrencySafety) {
             // std::cout << j << ", " << storage.get(h).cast<MockResource1&>().x << std::endl;
 
             auto& h = handles[j];
-            EXPECT_EQ(j, storage.get_meta_ref(h).cast<MockResource1&>().x);
+            storage.read_meta(h, [&](const entt::meta_any& meta) {
+                EXPECT_EQ(j, meta.cast<const MockResource1&>().x);
+            });
             storage.remove_now(h);
             EXPECT_FALSE(storage.validate(h));
         }
@@ -352,6 +362,65 @@ TEST_F(StorageTest, ConcurrencySafety) {
     }
 }
 #endif
+
+// Parallelism sanity check: two threads operate on distinct pool types.
+TEST_F(StorageTest, ParallelDifferentTypes) {
+    // Each worker uses a different asset type to avoid pool-level contention.
+    constexpr int kIterations = 200;
+    std::atomic<bool> start{ false };
+    std::atomic<bool> ok1{ true };
+    std::atomic<bool> ok2{ true };
+
+    auto worker1 = [this, &start, &ok1]() {
+        while (!start.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+        for (int i = 0; i < kIterations; ++i) {
+            // Add -> modify -> read -> remove cycle on MockResource1.
+            MockResource1 mr;
+            mr.x = static_cast<size_t>(i);
+            auto guid = eeng::Guid::generate();
+            auto h = storage.add<MockResource1>(mr, guid);
+            storage.modify(h, [i](MockResource1& t) { t.x = static_cast<size_t>(i); });
+            auto val = storage.get_val<MockResource1>(h);
+            if (val.x != static_cast<size_t>(i)) {
+                ok1.store(false, std::memory_order_relaxed);
+                break;
+            }
+            storage.remove_now(h);
+        }
+    };
+
+    auto worker2 = [this, &start, &ok2]() {
+        while (!start.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+        for (int i = 0; i < kIterations; ++i) {
+            // Add -> modify -> read -> remove cycle on MockResource2.
+            MockResource2 mr;
+            mr.y = static_cast<size_t>(i);
+            auto guid = eeng::Guid::generate();
+            auto h = storage.add<MockResource2>(mr, guid);
+            storage.modify(h, [i](MockResource2& t) { t.y = static_cast<size_t>(i); });
+            auto val = storage.get_val<MockResource2>(h);
+            if (val.y != static_cast<size_t>(i)) {
+                ok2.store(false, std::memory_order_relaxed);
+                break;
+            }
+            storage.remove_now(h);
+        }
+    };
+
+    // Run both workers concurrently to verify cross-pool parallelism.
+    std::thread t1(worker1);
+    std::thread t2(worker2);
+    start.store(true, std::memory_order_release);
+    t1.join();
+    t2.join();
+
+    EXPECT_TRUE(ok1.load(std::memory_order_relaxed));
+    EXPECT_TRUE(ok2.load(std::memory_order_relaxed));
+}
 
 TEST_F(StorageTest, HandleForGuid_Valid) {
     // Add a resource and lookup its handle by GUID

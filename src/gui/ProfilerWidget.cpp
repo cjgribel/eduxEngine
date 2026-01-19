@@ -435,14 +435,14 @@ namespace eeng::gui
                 if (ctx.resource_manager)
                 {
                     auto& storage = static_cast<ResourceManager&>(*ctx.resource_manager).storage();
-                    for (const auto& [type_id, pool_ptr] : storage)
+                    for (const auto& pool_stats : storage.pool_stats())
                     {
                         StorageMemoryRow row{};
-                        const auto meta_type = entt::resolve(type_id);
+                        const auto meta_type = entt::resolve(pool_stats.type_id);
                         row.type_name = meta::get_meta_type_id_string(meta_type);
-                        row.capacity = pool_ptr->capacity();
-                        row.used = row.capacity - pool_ptr->count_free();
-                        row.elem_size = pool_ptr->element_size();
+                        row.capacity = pool_stats.capacity;
+                        row.used = row.capacity - pool_stats.free_count;
+                        row.elem_size = pool_stats.element_size;
                         row.bytes_total = row.capacity * row.elem_size;
                         row.bytes_used = row.used * row.elem_size;
 
