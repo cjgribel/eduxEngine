@@ -1069,8 +1069,9 @@ void Game::render(
         const auto VP_P_V = matrices.VP * matrices.P * matrices.V;
         auto& registry = ctx->entity_manager->registry();
 
-        if (debugRenderSystem)
-            debugRenderSystem->render(registry, *ctx, VP_P_V, matrices.windowSize.y);
+        // Debug render uses ShapeRenderer to batch wireframes.
+        if (debugRenderSystem && shapeRenderer)
+            debugRenderSystem->render(registry, *ctx, *shapeRenderer, VP_P_V, matrices.windowSize.y);
         if (stickyNoteSystem)
             stickyNoteSystem->render(registry, *ctx, VP_P_V, matrices.windowSize.y);
     }
