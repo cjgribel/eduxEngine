@@ -170,6 +170,14 @@ namespace eeng::gui
 
                     if (!built)
                     {
+                        // Hide RB companion components to keep the picker lean.
+                        const auto should_hide_component = [](const std::string& type_id)
+                        {
+                            return type_id == "eeng.ecs.PhysicsMaterialComponent"
+                                || type_id == "eeng.ecs.CollisionFilterComponent"
+                                || type_id == "eeng.ecs.PhysicsEventsComponent";
+                        };
+
                         for (auto&& [id, type] : entt::resolve())
                         {
                             if (!type)
@@ -177,6 +185,8 @@ namespace eeng::gui
                             if (!eeng::meta::type_is_registered(type))
                                 continue;
                             if (!type.func(eeng::literals::assure_component_storage_hs))
+                                continue;
+                            if (should_hide_component(eeng::meta::get_meta_type_id_string(type)))
                                 continue;
 
                             items.push_back(ComponentItem{

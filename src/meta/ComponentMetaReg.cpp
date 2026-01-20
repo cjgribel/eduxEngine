@@ -14,6 +14,7 @@
 #include "ecs/AnimationGraphComponent.hpp"
 #include "ecs/PlayerControllerComponent.hpp"
 #include "ecs/StickyNoteComponent.hpp"
+#include "ecs/PhysicsComponents.hpp"
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
 #include "ecs/systems/TransformSystem.hpp"
@@ -24,6 +25,7 @@
 #include "editor/EntityRefInspect.hpp"
 #include "editor/GuidInspect.hpp"
 #include "editor/AnimationGraphComponentInspect.hpp"
+#include "editor/PhysicsComponentsInspect.hpp"
 
 #include "MetaLiterals.h"
 #include "meta/GLMMetaReg.hpp"
@@ -668,6 +670,245 @@ namespace eeng
                 .traits(MetaFlags::none)
                 ;
             register_component<ecs::PlayerControllerComponent>();
+        }
+
+        // --- Physics enums --------------------------------------------------
+        {
+            using PhysicsMotionType = eeng::ecs::PhysicsMotionType;
+            using ColliderType = eeng::ecs::ColliderType;
+            using ContactPhase = eeng::ecs::ContactPhase;
+
+            auto motion_type_info = TypeMetaInfo
+            {
+                .id = "eeng.ecs.PhysicsMotionType",
+                .name = "PhysicsMotionType",
+                .tooltip = "Rigid body motion type (static/dynamic/kinematic).",
+                .underlying_type = entt::resolve<std::underlying_type_t<PhysicsMotionType>>()
+            };
+            entt::meta_factory<PhysicsMotionType>()
+                .custom<TypeMetaInfo>(motion_type_info)
+                .traits(MetaFlags::none)
+                .data<PhysicsMotionType::Static>("Static"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Static", "Static body." })
+                .traits(MetaFlags::none)
+                .data<PhysicsMotionType::Dynamic>("Dynamic"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Dynamic", "Dynamic body." })
+                .traits(MetaFlags::none)
+                .data<PhysicsMotionType::Kinematic>("Kinematic"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Kinematic", "Kinematic body." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<PhysicsMotionType>();
+            warm_start_meta_type<PhysicsMotionType>();
+
+            auto collider_type_info = TypeMetaInfo
+            {
+                .id = "eeng.ecs.ColliderType",
+                .name = "ColliderType",
+                .tooltip = "Collider shape type.",
+                .underlying_type = entt::resolve<std::underlying_type_t<ColliderType>>()
+            };
+            entt::meta_factory<ColliderType>()
+                .custom<TypeMetaInfo>(collider_type_info)
+                .traits(MetaFlags::none)
+                .data<ColliderType::Box>("Box"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Box", "Box collider." })
+                .traits(MetaFlags::none)
+                .data<ColliderType::Sphere>("Sphere"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Sphere", "Sphere collider." })
+                .traits(MetaFlags::none)
+                .data<ColliderType::Capsule>("Capsule"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Capsule", "Capsule collider." })
+                .traits(MetaFlags::none)
+                .data<ColliderType::ConvexHull>("ConvexHull"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Convex Hull", "Convex hull collider." })
+                .traits(MetaFlags::none)
+                .data<ColliderType::TriangleMesh>("TriangleMesh"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Triangle Mesh", "Triangle mesh collider." })
+                .traits(MetaFlags::none)
+                .data<ColliderType::AABB>("AABB"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "AABB", "Axis-aligned bounding box collider." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<ColliderType>();
+            warm_start_meta_type<ColliderType>();
+
+            auto contact_phase_info = TypeMetaInfo
+            {
+                .id = "eeng.ecs.ContactPhase",
+                .name = "ContactPhase",
+                .tooltip = "Collision phase (enter/stay/exit).",
+                .underlying_type = entt::resolve<std::underlying_type_t<ContactPhase>>()
+            };
+            entt::meta_factory<ContactPhase>()
+                .custom<TypeMetaInfo>(contact_phase_info)
+                .traits(MetaFlags::none)
+                .data<ContactPhase::Enter>("Enter"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Enter", "Contact entered this frame." })
+                .traits(MetaFlags::none)
+                .data<ContactPhase::Stay>("Stay"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Stay", "Contact continues this frame." })
+                .traits(MetaFlags::none)
+                .data<ContactPhase::Exit>("Exit"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Exit", "Contact exited this frame." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<ContactPhase>();
+            warm_start_meta_type<ContactPhase>();
+        }
+
+        // --- Physics helper types ------------------------------------------
+        {
+            entt::meta_factory<eeng::ecs::PhysicsMaterial>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.PhysicsMaterial", .name = "PhysicsMaterial", .tooltip = "Physics material settings." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::PhysicsMaterial::friction>("friction"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "friction", "Friction", "Surface friction." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::PhysicsMaterial::restitution>("restitution"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "restitution", "Restitution", "Bounciness." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<eeng::ecs::PhysicsMaterial>();
+            warm_start_meta_type<eeng::ecs::PhysicsMaterial>();
+
+            entt::meta_factory<eeng::ecs::CollisionFilter>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.CollisionFilter", .name = "CollisionFilter", .tooltip = "Collision filtering (layer/mask)." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::CollisionFilter::layer>("layer"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "layer", "Layer", "Collision layer." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::CollisionFilter::mask>("mask"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "mask", "Mask", "Collision mask." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<eeng::ecs::CollisionFilter>();
+            warm_start_meta_type<eeng::ecs::CollisionFilter>();
+
+            entt::meta_factory<eeng::ecs::ColliderDesc>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.ColliderDesc", .name = "ColliderDesc", .tooltip = "Collider descriptor." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::id>("id"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "id", "Id", "Collider identifier." })
+                .traits(MetaFlags::readonly_inspection)
+                .data<&eeng::ecs::ColliderDesc::type>("type"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "type", "Type", "Collider type." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::local_position>("local_position"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "local_position", "Local Position", "Local collider offset." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::local_rotation>("local_rotation"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "local_rotation", "Local Rotation", "Local collider rotation." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::half_extents>("half_extents"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "half_extents", "Half Extents", "Half extents for box/AABB." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::radius>("radius"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "radius", "Radius", "Radius for sphere/capsule." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::height>("height"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "height", "Height", "Height for capsule." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::mesh_ref>("mesh_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "mesh_ref", "Mesh Ref", "Mesh source for mesh colliders." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::submesh_index>("submesh_index"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "submesh_index", "Submesh Index", "Submesh index for mesh colliders." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::is_trigger>("is_trigger"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "is_trigger", "Is Trigger", "Trigger-only collider." })
+                .traits(MetaFlags::none)
+                .func<&eeng::editor::inspect_ColliderDesc>(eeng::literals::inspect_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_ColliderDesc", "Inspect collider descriptor" })
+                ;
+            meta::register_type<eeng::ecs::ColliderDesc>();
+            warm_start_meta_type<eeng::ecs::ColliderDesc>();
+        }
+
+        // --- Physics components --------------------------------------------
+        {
+            entt::meta_factory<eeng::ecs::RigidBodyComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.RigidBodyComponent", .name = "RigidBodyComponent", .tooltip = "Rigid body settings." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::motion>("motion"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "motion", "Motion", "Motion type." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::auto_mass>("auto_mass"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "auto_mass", "Auto Mass", "Compute mass from colliders." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::mass>("mass"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "mass", "Mass", "Mass override." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::auto_inertia>("auto_inertia"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "auto_inertia", "Auto Inertia", "Compute inertia from colliders." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::inertia>("inertia"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "inertia", "Inertia", "Inertia override." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::linear_damping>("linear_damping"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "linear_damping", "Linear Damping", "Linear damping." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::angular_damping>("angular_damping"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "angular_damping", "Angular Damping", "Angular damping." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::gravity_scale>("gravity_scale"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "gravity_scale", "Gravity Scale", "Gravity multiplier." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::allow_sleep>("allow_sleep"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "allow_sleep", "Allow Sleep", "Allow Bullet to sleep body." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::enable_ccd>("enable_ccd"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "enable_ccd", "Enable CCD", "Enable continuous collision detection." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::ccd_swept_sphere_radius>("ccd_swept_sphere_radius"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "ccd_swept_sphere_radius", "CCD Radius", "CCD swept sphere radius." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::ccd_motion_threshold>("ccd_motion_threshold"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "ccd_motion_threshold", "CCD Threshold", "CCD motion threshold." })
+                .traits(MetaFlags::none)
+                ;
+            register_component<ecs::RigidBodyComponent>();
+
+            entt::meta_factory<eeng::ecs::ColliderComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.ColliderComponent", .name = "ColliderComponent", .tooltip = "Collider list." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderComponent::colliders>("colliders"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "colliders", "Colliders", "Collider list." })
+                .traits(MetaFlags::none)
+                .func<&eeng::editor::inspect_ColliderComponent>(eeng::literals::inspect_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_ColliderComponent", "Inspect collider list." })
+                ;
+            register_component<ecs::ColliderComponent>();
+
+            entt::meta_factory<eeng::ecs::PhysicsMaterialComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.PhysicsMaterialComponent", .name = "PhysicsMaterialComponent", .tooltip = "Physics material component." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::PhysicsMaterialComponent::material>("material"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "material", "Material", "Physics material." })
+                .traits(MetaFlags::none)
+                ;
+            register_component<ecs::PhysicsMaterialComponent>();
+
+            entt::meta_factory<eeng::ecs::CollisionFilterComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.CollisionFilterComponent", .name = "CollisionFilterComponent", .tooltip = "Collision filter component." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::CollisionFilterComponent::filter>("filter"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "filter", "Filter", "Collision filter." })
+                .traits(MetaFlags::none)
+                ;
+            register_component<ecs::CollisionFilterComponent>();
+
+            entt::meta_factory<eeng::ecs::PhysicsEventsComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.PhysicsEventsComponent", .name = "PhysicsEventsComponent", .tooltip = "Physics event toggles." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::PhysicsEventsComponent::emit_collisions>("emit_collisions"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "emit_collisions", "Emit Collisions", "Emit collision events." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::PhysicsEventsComponent::emit_triggers>("emit_triggers"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "emit_triggers", "Emit Triggers", "Emit trigger events." })
+                .traits(MetaFlags::none)
+                ;
+            register_component<ecs::PhysicsEventsComponent>();
         }
 
         // --- AnimationGraphComponent ----------------------------------------

@@ -21,8 +21,10 @@ namespace eeng::assets
 
 namespace eeng::ecs
 {
+    // Data-only physics components; runtime Bullet objects live elsewhere.
     using ColliderId = std::uint32_t;
 
+    // Motion types and collider shape categories.
     enum class PhysicsMotionType : std::uint8_t
     {
         Static,
@@ -47,18 +49,21 @@ namespace eeng::ecs
         Exit
     };
 
+    // Material parameters shared across colliders.
     struct PhysicsMaterial
     {
         float friction = 0.5f;
         float restitution = 0.0f;
     };
 
+    // Layer + mask collision filtering.
     struct CollisionFilter
     {
         std::uint32_t layer = 1;
         std::uint32_t mask = 0xFFFFFFFFu;
     };
 
+    // Collider description used by ColliderComponent.
     struct ColliderDesc
     {
         ColliderId id = 0;
@@ -72,17 +77,20 @@ namespace eeng::ecs
         float radius = 0.5f;
         float height = 1.0f;
 
+        // Mesh source (used by ConvexHull/TriangleMesh).
         AssetRef<assets::ModelDataAsset> mesh_ref;
         int submesh_index = -1;
 
         bool is_trigger = false;
     };
 
+    // One entity can have multiple colliders.
     struct ColliderComponent
     {
         std::vector<ColliderDesc> colliders;
     };
 
+    // Rigid body settings (serialized).
     struct RigidBodyComponent
     {
         PhysicsMotionType motion = PhysicsMotionType::Dynamic;
@@ -104,22 +112,26 @@ namespace eeng::ecs
         float ccd_motion_threshold = 0.0f;
     };
 
+    // Optional physics material component.
     struct PhysicsMaterialComponent
     {
         PhysicsMaterial material;
     };
 
+    // Optional collision filter component.
     struct CollisionFilterComponent
     {
         CollisionFilter filter;
     };
 
+    // Optional collision/trigger event toggles.
     struct PhysicsEventsComponent
     {
         bool emit_collisions = true;
         bool emit_triggers = true;
     };
 
+    // Event payload emitted by the physics system.
     struct CollisionEvent
     {
         Entity entity_a;
@@ -160,6 +172,7 @@ namespace eeng::ecs
         return "PhysicsEventsComponent";
     }
 
+    // Asset reference traversal hooks used by the ResourceManager.
     template<typename Visitor>
     void visit_asset_refs(ColliderComponent& c, Visitor&& visitor)
     {

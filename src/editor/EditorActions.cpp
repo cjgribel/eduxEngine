@@ -9,7 +9,9 @@
 #include "AssetMetaData.hpp"
 #include "assets/types/AnimationGraphAsset.hpp"
 #include "ecs/EntityManager.hpp"
+#include "meta/MetaAux.h"
 #include "LogMacros.h"
+#include <array>
 #include <memory>
 #include <unordered_set>
 
@@ -17,6 +19,15 @@ namespace eeng::editor
 {
     namespace
     {
+        // Adds a component id only when the meta type resolves.
+        void append_component_if_valid(
+            std::vector<entt::id_type>& ids,
+            entt::meta_type meta_type)
+        {
+            if (meta_type)
+                ids.push_back(meta_type.id());
+        }
+
         bool can_queue(EngineContext& ctx)
         {
             return ctx.command_queue != nullptr;
@@ -219,6 +230,20 @@ namespace eeng::editor
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
         auto& scenegraph = em.scene_graph();
 
+        // Treat RigidBodyComponent as a bundle (add companions automatically).
+        const auto rb_meta = meta::resolve_by_type_id_string("eeng.ecs.RigidBodyComponent");
+        const bool is_rigidbody = rb_meta && rb_meta.id() == comp_id;
+        std::vector<entt::id_type> bundle_ids;
+        if (is_rigidbody)
+        {
+            bundle_ids.reserve(5);
+            bundle_ids.push_back(rb_meta.id());
+            append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.ColliderComponent"));
+            append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.PhysicsMaterialComponent"));
+            append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.CollisionFilterComponent"));
+            append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.PhysicsEventsComponent"));
+        }
+
         for (const auto& entity : selection)
         {
             if (!entity.has_id())
@@ -228,13 +253,29 @@ namespace eeng::editor
             if (!scenegraph.contains(entity))
                 continue;
 
-            try_add_command(
-                ctx,
-                CommandFactory::Create<AddComponentToEntityCommand>(
-                    entity,
-                    comp_id,
-                    ctx_wptr),
-                "AddComponents");
+            if (is_rigidbody)
+            {
+                for (const auto id : bundle_ids)
+                {
+                    try_add_command(
+                        ctx,
+                        CommandFactory::Create<AddComponentToEntityCommand>(
+                            entity,
+                            id,
+                            ctx_wptr),
+                        "AddComponents");
+                }
+            }
+            else
+            {
+                try_add_command(
+                    ctx,
+                    CommandFactory::Create<AddComponentToEntityCommand>(
+                        entity,
+                        comp_id,
+                        ctx_wptr),
+                    "AddComponents");
+            }
         }
     }
 
@@ -252,6 +293,19 @@ namespace eeng::editor
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
         auto& scenegraph = em.scene_graph();
 
+        // Treat RigidBodyComponent as a bundle (remove companions automatically, keep colliders).
+        const auto rb_meta = meta::resolve_by_type_id_string("eeng.ecs.RigidBodyComponent");
+        const bool is_rigidbody = rb_meta && rb_meta.id() == comp_id;
+        std::vector<entt::id_type> bundle_ids;
+        if (is_rigidbody)
+        {
+            bundle_ids.reserve(4);
+            bundle_ids.push_back(rb_meta.id());
+            append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.PhysicsMaterialComponent"));
+            append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.CollisionFilterComponent"));
+            append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.PhysicsEventsComponent"));
+        }
+
         for (const auto& entity : selection)
         {
             if (!entity.has_id())
@@ -261,13 +315,29 @@ namespace eeng::editor
             if (!scenegraph.contains(entity))
                 continue;
 
-            try_add_command(
-                ctx,
-                CommandFactory::Create<RemoveComponentFromEntityCommand>(
-                    entity,
-                    comp_id,
-                    ctx_wptr),
-                "RemoveComponents");
+            if (is_rigidbody)
+            {
+                for (const auto id : bundle_ids)
+                {
+                    try_add_command(
+                        ctx,
+                        CommandFactory::Create<RemoveComponentFromEntityCommand>(
+                            entity,
+                            id,
+                            ctx_wptr),
+                        "RemoveComponents");
+                }
+            }
+            else
+            {
+                try_add_command(
+                    ctx,
+                    CommandFactory::Create<RemoveComponentFromEntityCommand>(
+                        entity,
+                        comp_id,
+                        ctx_wptr),
+                    "RemoveComponents");
+            }
         }
     }
 

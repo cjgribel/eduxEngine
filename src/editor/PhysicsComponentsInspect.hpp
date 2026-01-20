@@ -1,0 +1,364 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
+#pragma once
+
+#include "EngineContext.hpp"
+#include "editor/AssetRefInspect.hpp"
+#include "editor/GLMInspect.hpp"
+#include "editor/InspectorState.hpp"
+#include "editor/TypeInspect.hpp"
+#include "engineapi/EngineContextHelpers.hpp"
+#include "ecs/ModelComponent.hpp"
+#include "ecs/PhysicsComponents.hpp"
+#include "physics/PhysicsGeometry.hpp"
+#include "assets/types/ModelAssets.hpp"
+
+#include "imgui.h"
+#include <algorithm>
+#include <string>
+
+// Custom inspectors for physics components and collider helpers.
+namespace eeng::editor
+{
+    // Inspector-specific helpers for physics component UI.
+    namespace detail
+    {
+        // Human-readable labels for collider types.
+        inline const char* collider_type_label(ecs::ColliderType type)
+        {
+            switch (type)
+            {
+            case ecs::ColliderType::Box: return "Box";
+            case ecs::ColliderType::Sphere: return "Sphere";
+            case ecs::ColliderType::Capsule: return "Capsule";
+            case ecs::ColliderType::ConvexHull: return "Convex Hull";
+            case ecs::ColliderType::TriangleMesh: return "Triangle Mesh";
+            case ecs::ColliderType::AABB: return "AABB";
+            default: return "Unknown";
+            }
+        }
+
+        // Allocates a stable id above the current max.
+        inline ecs::ColliderId next_collider_id(const ecs::ColliderComponent& comp)
+        {
+            ecs::ColliderId next = 1;
+            for (const auto& desc : comp.colliders)
+            {
+                if (desc.id >= next)
+                    next = desc.id + 1;
+            }
+            if (next == 0)
+                ++next;
+            return next;
+        }
+
+        // Computes an AABB for one submesh using index ranges.
+        inline AABB submesh_aabb(const assets::ModelDataAsset& model, const assets::SubMesh& submesh)
+        {
+            AABB aabb;
+            aabb.reset();
+
+            const auto& positions = model.positions;
+            const auto& indices = model.indices;
+            const std::size_t base_vertex = static_cast<std::size_t>(submesh.base_vertex);
+            const std::size_t base_index = static_cast<std::size_t>(submesh.base_index);
+            const std::size_t nbr_indices = static_cast<std::size_t>(submesh.nbr_indices);
+            const std::size_t nbr_vertices = static_cast<std::size_t>(submesh.nbr_vertices);
+
+            if (!indices.empty() && nbr_indices > 0)
+            {
+                const std::size_t end_index = std::min(indices.size(), base_index + nbr_indices);
+                for (std::size_t i = base_index; i < end_index; ++i)
+                {
+                    const std::size_t local_index = static_cast<std::size_t>(indices[i]);
+                    const std::size_t pos_index = base_vertex + local_index;
+                    if (pos_index < positions.size())
+                        aabb.grow(positions[pos_index]);
+                }
+                return aabb;
+            }
+
+            if (nbr_vertices > 0 && base_vertex < positions.size())
+            {
+                const std::size_t end_vertex = std::min(positions.size(), base_vertex + nbr_vertices);
+                for (std::size_t i = base_vertex; i < end_vertex; ++i)
+                    aabb.grow(positions[i]);
+            }
+            return aabb;
+        }
+
+        // Appends one AABB collider per submesh from the entity's ModelComponent.
+        inline bool append_aabb_colliders_from_model(
+            ecs::ColliderComponent& comp,
+            const ecs::ModelComponent& model_comp,
+            EngineContext& ctx,
+            bool clear_existing)
+        {
+            if (clear_existing)
+                comp.colliders.clear();
+
+            auto rm = eeng::try_get_resource_manager(ctx, "ColliderComponentInspect");
+            if (!rm)
+                return false;
+
+            bool appended = false;
+            eeng::try_read_asset_ref(
+                *rm,
+                model_comp.model_ref,
+                ctx,
+                "ColliderComponentInspect",
+                "Missing GpuModelAsset for ModelComponent:",
+                [&](const assets::GpuModelAsset& gpu_model)
+                {
+                    eeng::try_read_asset_ref(
+                        *rm,
+                        gpu_model.model_ref,
+                        ctx,
+                        "ColliderComponentInspect",
+                        "Missing ModelDataAsset for ModelComponent:",
+                        [&](const assets::ModelDataAsset& model_data)
+                        {
+                            for (std::size_t i = 0; i < model_data.submeshes.size(); ++i)
+                            {
+                                const auto& submesh = model_data.submeshes[i];
+                                const AABB aabb = submesh_aabb(model_data, submesh);
+                                if (!physics::is_valid_aabb(aabb))
+                                    continue;
+
+                                ecs::ColliderDesc desc{};
+                                desc.id = next_collider_id(comp);
+                                desc.type = ecs::ColliderType::AABB;
+                                desc.local_position = physics::aabb_center(aabb);
+                                desc.half_extents = physics::aabb_half_extents(aabb);
+                                desc.submesh_index = static_cast<int>(i);
+                                comp.colliders.push_back(desc);
+                                appended = true;
+                            }
+                        });
+                });
+            return appended;
+        }
+    } // namespace detail
+
+    // Inspector for a single collider descriptor.
+    inline bool inspect_ColliderDesc(
+        entt::meta_any& any,
+        InspectorState& inspector,
+        EngineContext& ctx)
+    {
+        auto* desc = any.try_cast<ecs::ColliderDesc>();
+        if (!desc)
+            return false;
+
+        bool modified = false;
+
+        inspector.begin_leaf("id");
+        inspector.begin_disabled();
+        modified |= inspect_type(desc->id, inspector);
+        inspector.end_disabled();
+        inspector.end_leaf();
+
+        inspector.begin_leaf("type");
+        const char* current_label = detail::collider_type_label(desc->type);
+        if (ImGui::BeginCombo("##collider_type", current_label))
+        {
+            const ecs::ColliderType options[] = {
+                ecs::ColliderType::Box,
+                ecs::ColliderType::Sphere,
+                ecs::ColliderType::Capsule,
+                ecs::ColliderType::ConvexHull,
+                ecs::ColliderType::TriangleMesh,
+                ecs::ColliderType::AABB
+            };
+            for (ecs::ColliderType option : options)
+            {
+                const bool is_selected = (desc->type == option);
+                if (ImGui::Selectable(detail::collider_type_label(option), is_selected))
+                {
+                    desc->type = option;
+                    modified = true;
+                }
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        inspector.end_leaf();
+
+        inspector.begin_leaf("local_position");
+        auto pos_any = entt::forward_as_meta(desc->local_position);
+        modified |= inspect_glmvec3(pos_any, inspector, ctx);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("local_rotation");
+        float rotation_data[4] = { desc->local_rotation.x, desc->local_rotation.y, desc->local_rotation.z, desc->local_rotation.w };
+        if (ImGui::DragFloat4("##local_rotation", rotation_data, 0.01f))
+        {
+            desc->local_rotation = glm::normalize(glm::quat(
+                rotation_data[3], rotation_data[0], rotation_data[1], rotation_data[2]));
+            modified = true;
+        }
+        inspector.end_leaf();
+
+        const bool is_box = desc->type == ecs::ColliderType::Box || desc->type == ecs::ColliderType::AABB;
+        const bool is_sphere = desc->type == ecs::ColliderType::Sphere;
+        const bool is_capsule = desc->type == ecs::ColliderType::Capsule;
+        const bool is_mesh = desc->type == ecs::ColliderType::ConvexHull || desc->type == ecs::ColliderType::TriangleMesh;
+
+        if (is_box)
+        {
+            inspector.begin_leaf("half_extents");
+            auto ext_any = entt::forward_as_meta(desc->half_extents);
+            modified |= inspect_glmvec3(ext_any, inspector, ctx);
+            inspector.end_leaf();
+        }
+
+        if (is_sphere || is_capsule)
+        {
+            inspector.begin_leaf("radius");
+            modified |= inspect_type(desc->radius, inspector);
+            inspector.end_leaf();
+        }
+
+        if (is_capsule)
+        {
+            inspector.begin_leaf("height");
+            modified |= inspect_type(desc->height, inspector);
+            inspector.end_leaf();
+        }
+
+        if (is_mesh)
+        {
+            inspector.begin_leaf("mesh_ref");
+            auto ref_any = entt::forward_as_meta(desc->mesh_ref);
+            modified |= inspect_AssetRef<assets::ModelDataAsset>(ref_any, inspector, ctx);
+            inspector.end_leaf();
+
+            inspector.begin_leaf("submesh_index");
+            modified |= inspect_type(desc->submesh_index, inspector);
+            inspector.end_leaf();
+        }
+
+        inspector.begin_leaf("is_trigger");
+        modified |= inspect_type(desc->is_trigger, inspector);
+        inspector.end_leaf();
+
+        return modified;
+    }
+
+    // Inspector for the collider list (adds/removes + bulk generation).
+    inline bool inspect_ColliderComponent(
+        entt::meta_any& any,
+        InspectorState& inspector,
+        EngineContext& ctx)
+    {
+        auto* comp = any.try_cast<ecs::ColliderComponent>();
+        if (!comp)
+            return false;
+
+        bool modified = false;
+
+        // Manual collider entry.
+        inspector.row();
+        ImGui::TextDisabled("Collider Tools");
+        inspector.next_column();
+
+        static ecs::ColliderType add_type = ecs::ColliderType::Box;
+        if (ImGui::BeginCombo("##collider_add_type", detail::collider_type_label(add_type)))
+        {
+            const ecs::ColliderType options[] = {
+                ecs::ColliderType::Box,
+                ecs::ColliderType::Sphere,
+                ecs::ColliderType::Capsule,
+                ecs::ColliderType::ConvexHull,
+                ecs::ColliderType::TriangleMesh,
+                ecs::ColliderType::AABB
+            };
+            for (ecs::ColliderType option : options)
+            {
+                const bool is_selected = (add_type == option);
+                if (ImGui::Selectable(detail::collider_type_label(option), is_selected))
+                    add_type = option;
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Add Collider"))
+        {
+            ecs::ColliderDesc desc{};
+            desc.id = detail::next_collider_id(*comp);
+            desc.type = add_type;
+            comp->colliders.push_back(desc);
+            modified = true;
+        }
+        // Hover hint for collider creation.
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Add a collider entry with defaults.");
+
+        ecs::Entity selected_entity{};
+        if (ctx.entity_selection && !ctx.entity_selection->empty())
+            selected_entity = ctx.entity_selection->first();
+
+        bool can_append_bounds = false;
+        ecs::ModelComponent* model_comp = nullptr;
+        auto registry_sp = eeng::try_get_registry(ctx, "ColliderComponentInspect");
+        if (registry_sp && selected_entity.has_id() && registry_sp->valid(selected_entity))
+        {
+            model_comp = registry_sp->try_get<ecs::ModelComponent>(selected_entity);
+            if (model_comp && model_comp->model_ref.is_bound())
+                can_append_bounds = true;
+        }
+
+        // Mesh-based AABB generation from the entity's ModelComponent.
+        inspector.row();
+        ImGui::TextDisabled("Mesh Bounds");
+        inspector.next_column();
+
+        static bool clear_then_append = false;
+        ImGui::BeginDisabled(!can_append_bounds);
+        if (ImGui::Button("Append model bounds"))
+        {
+            if (model_comp)
+                modified |= detail::append_aabb_colliders_from_model(*comp, *model_comp, ctx, clear_then_append);
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::Checkbox("Clear then append", &clear_then_append);
+        // Hover hint for the clear/append behavior.
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Clear existing colliders before appending bounds.");
+
+        for (std::size_t i = 0; i < comp->colliders.size();)
+        {
+            bool removed = false;
+            std::string label = "Collider ";
+            label += std::to_string(i);
+
+            if (inspector.begin_node(label.c_str()))
+            {
+                if (ImGui::Button(("Remove##collider_" + std::to_string(i)).c_str()))
+                {
+                    comp->colliders.erase(comp->colliders.begin() + static_cast<std::ptrdiff_t>(i));
+                    modified = true;
+                    removed = true;
+                }
+
+                if (!removed)
+                {
+                    auto desc_any = entt::forward_as_meta(comp->colliders[i]);
+                    modified |= inspect_ColliderDesc(desc_any, inspector, ctx);
+                }
+
+                inspector.end_node();
+            }
+
+            if (!removed)
+                ++i;
+        }
+
+        return modified;
+    }
+} // namespace eeng::editor
