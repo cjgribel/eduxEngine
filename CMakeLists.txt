@@ -180,6 +180,25 @@ include_directories(${entt_SOURCE_DIR}/src)
 message(STATUS "enTT fetched and included")
 
 #
+# Fetch Bullet Physics
+#
+message(STATUS "Fetching Bullet Physics")
+set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "Disable Bullet demos" FORCE)
+set(BUILD_CPU_DEMOS OFF CACHE BOOL "Disable Bullet CPU demos" FORCE)
+set(BUILD_EXTRAS OFF CACHE BOOL "Disable Bullet extras" FORCE)
+set(BUILD_UNIT_TESTS OFF CACHE BOOL "Disable Bullet unit tests" FORCE)
+set(BUILD_OPENGL3_DEMOS OFF CACHE BOOL "Disable Bullet OpenGL demos" FORCE)
+set(USE_DOUBLE_PRECISION OFF CACHE BOOL "Use single-precision Bullet math" FORCE)
+FetchContent_Declare(
+    bullet
+    GIT_REPOSITORY https://github.com/bulletphysics/bullet3.git
+    GIT_TAG        3.25 # Apr 25, 2022
+)
+FetchContent_MakeAvailable(bullet)
+include_directories(${bullet_SOURCE_DIR}/src)
+message(STATUS "Bullet Physics fetched and included")
+
+#
 # Fetch Dear ImGui
 #
 message(STATUS "Fetching Dear ImGui")
@@ -270,6 +289,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/AnimationGraphSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/TransformSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/DebugRenderSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/PhysicsSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/StickyNoteSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands_Entities.cpp
@@ -307,6 +327,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ProfilerWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogGlobals.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/physics/PhysicsWorld.cpp
     )
 
 set_target_properties(Module1 PROPERTIES
@@ -325,11 +346,11 @@ target_include_directories(Module1 PRIVATE
 
 target_link_libraries(Module1 PRIVATE 
     SDL2 
-    assimp 
-    # libglew_static 
-    $<TARGET_FILE:libglew_static> # link to library file directly to avoid AGL framework
+    assimp  
+    $<TARGET_FILE:libglew_static> # link to library file directly to avoid AGL framework # libglew_static
     glm::glm 
     nlohmann_json::nlohmann_json
+    BulletDynamics BulletCollision LinearMath # Bullet Physics libs
     ${OPENGL_LIBRARIES}
     )
 if (TARGET ZLIB::ZLIB)

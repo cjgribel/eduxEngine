@@ -332,6 +332,9 @@ bool Game::init()
     animationGraphSystem = std::make_unique<eeng::ecs::systems::AnimationGraphSystem>();
     transformSystem = std::make_unique<eeng::ecs::systems::TransformSystem>();
     transformSystem->init(*ctx);
+    // Physics system holds the Bullet world and ECS bindings.
+    physicsSystem = std::make_unique<eeng::ecs::systems::PhysicsSystem>();
+    physicsSystem->init(*ctx);
     debugRenderSystem = std::make_unique<eeng::ecs::systems::DebugRenderSystem>();
     stickyNoteSystem = std::make_unique<eeng::ecs::systems::StickyNoteSystem>();
 
@@ -1009,6 +1012,13 @@ void Game::update(
         animationSystem->update(registry, *ctx, deltaTime);
     }
 
+    if (physicsSystem)
+    {
+        // Physics runs before transform cache update so results are reflected in world matrices.
+        auto& registry = ctx->entity_manager->registry();
+        physicsSystem->update(registry, *ctx, deltaTime);
+    }
+
     // TODO: consider scheduling transform cache updates as an Engine-level system phase.
     if (editorRuntime)
     {
@@ -1285,6 +1295,9 @@ void Game::destroy()
 {
     if (renderSystem)
         renderSystem->shutdown();
+    if (physicsSystem)
+        // Ensure Bullet resources are released cleanly.
+        physicsSystem->shutdown();
 }
 
 void Game::updateCamera()
