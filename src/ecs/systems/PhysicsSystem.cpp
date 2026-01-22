@@ -7,15 +7,38 @@
 #include "LogMacros.h"
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/TransformComponent.hpp"
-#include "hash_combine.h"
-
+#include "engineapi/EngineContextHelpers.hpp"
+#include "editor/AssignFieldCommand.hpp"
 #include <btBulletDynamicsCommon.h>
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace
 {
+    // Helper to resolve an event target into a live entity.
+    std::optional<eeng::ecs::Entity> resolve_event_entity(
+        const eeng::editor::FieldTarget& target,
+        eeng::EngineContext& ctx)
+    {
+        eeng::ecs::Entity entity = target.entity;
+        if (target.entity_guid.valid())
+        {
+            if (ctx.entity_manager)
+            {
+                if (auto entity_opt = ctx.entity_manager->get_entity_from_guid(target.entity_guid))
+                    entity = *entity_opt;
+                if (!ctx.entity_manager->entity_valid(entity))
+                    return std::nullopt;
+            }
+        }
+
+        if (!entity.has_id())
+            return std::nullopt;
+        return entity;
+    }
+
     // Convert engine-space vectors to Bullet-space (meters).
     btVector3 to_bt_vec3(const glm::vec3& v, float units_per_meter)
     {
@@ -44,40 +67,6 @@ namespace
     float uniform_scale(const glm::vec3& scale)
     {
         return (scale.x + scale.y + scale.z) / 3.0f;
-    }
-
-    // Hash collider content so we can detect edits and rebuild Bullet bodies.
-    std::size_t hash_collider_desc(const eeng::ecs::ColliderDesc& collider)
-    {
-        std::size_t seed = 0;
-        ::detail::hash_combine(seed, static_cast<int>(collider.type));
-        ::detail::hash_combine(seed, collider.id);
-        ::detail::hash_combine(seed, collider.local_position.x);
-        ::detail::hash_combine(seed, collider.local_position.y);
-        ::detail::hash_combine(seed, collider.local_position.z);
-        ::detail::hash_combine(seed, collider.local_rotation.x);
-        ::detail::hash_combine(seed, collider.local_rotation.y);
-        ::detail::hash_combine(seed, collider.local_rotation.z);
-        ::detail::hash_combine(seed, collider.local_rotation.w);
-        ::detail::hash_combine(seed, collider.half_extents.x);
-        ::detail::hash_combine(seed, collider.half_extents.y);
-        ::detail::hash_combine(seed, collider.half_extents.z);
-        ::detail::hash_combine(seed, collider.radius);
-        ::detail::hash_combine(seed, collider.height);
-        ::detail::hash_combine(seed, collider.submesh_index);
-        ::detail::hash_combine(seed, collider.mesh_ref.guid);
-        ::detail::hash_combine(seed, collider.is_trigger);
-        return seed;
-    }
-
-    // Hash the entire collider list; this is used to detect edits in the inspector.
-    std::size_t hash_colliders(const eeng::ecs::ColliderComponent& colliders)
-    {
-        std::size_t seed = 0;
-        ::detail::hash_combine(seed, colliders.colliders.size());
-        for (const auto& collider : colliders.colliders)
-            ::detail::hash_combine(seed, hash_collider_desc(collider));
-        return seed;
     }
 
     // Build a Bullet shape from a collider description and entity scale.
@@ -134,7 +123,15 @@ namespace eeng::ecs::systems
         if (initialized_)
             return;
 
-        (void)ctx; // Context hook point for future physics settings/asset wiring.
+        // Listen to field edits so we can rebuild on Transform scale changes.
+        auto* event_queue = eeng::try_get_event_queue(ctx, "PhysicsSystem");
+        if (event_queue)
+        {
+            event_queue->register_callback([this](const editor::FieldChangedEvent& event)
+                {
+                    handle_field_changed_event(event);
+                });
+        }
 
         // Configure and spin up the Bullet world.
         settings_ = physics::PhysicsWorldSettings{};
@@ -203,11 +200,13 @@ namespace eeng::ecs::systems
                 const auto& rb = registry.get<ecs::RigidBodyComponent>(entity);
                 const auto& colliders = registry.get<ecs::ColliderComponent>(entity);
 
-                // Rebuild when motion, scale, or collider data changes in-editor.
-                const std::size_t collider_hash = hash_colliders(colliders);
-                if (it->second.motion != rb.motion
-                    || it->second.collider_hash != collider_hash
-                    || it->second.scale != tfm.scale)
+                // Rebuild when marked dirty, when motion changes, when scale changes, or when colliders are cleared.
+                // The extra checks are safety nets for non-editor changes (runtime code, deserialization).
+                const bool dirty = registry.any_of<ecs::PhysicsDirtyComponent>(entity);
+                if (dirty
+                    || it->second.motion != rb.motion
+                    || it->second.scale != tfm.scale
+                    || colliders.colliders.empty())
                 {
                     if (it->second.body)
                         world->removeRigidBody(it->second.body.get());
@@ -241,7 +240,7 @@ namespace eeng::ecs::systems
             BodyRuntime runtime{};
             runtime.compound_shape = std::make_unique<btCompoundShape>();
 
-            // Build child shapes for every collider (rebuilds are handled via hash checks).
+            // Build child shapes for every collider (rebuilds are driven by the dirty marker).
             for (const auto& collider : colliders.colliders)
             {
                 auto shape = build_shape(collider, tfm.scale, settings_.units_per_meter);
@@ -331,9 +330,12 @@ namespace eeng::ecs::systems
             world->addRigidBody(runtime.body.get());
             // Cache state so we can detect edits later.
             runtime.motion = rb.motion;
-            runtime.collider_hash = hash_colliders(colliders);
             runtime.scale = tfm.scale;
             bodies_.emplace(entity, std::move(runtime));
+
+            // Clear dirty marker once we have rebuilt the Bullet body.
+            if (registry.any_of<ecs::PhysicsDirtyComponent>(entity))
+                registry.remove<ecs::PhysicsDirtyComponent>(entity);
         }
     }
 
@@ -392,4 +394,61 @@ namespace eeng::ecs::systems
             tfm->mark_local_dirty();
         }
     }
+
+    void PhysicsSystem::on_component_post_assign(
+        EngineContext& ctx,
+        const ecs::Entity& entity,
+        const editor::MetaFieldPath& meta_path,
+        bool is_undo)
+    {
+        (void)meta_path;
+        (void)is_undo;
+
+        auto* registry = eeng::try_get_registry_ptr(ctx, "PhysicsSystem");
+        if (!registry || !registry->valid(entity))
+            return;
+
+        // Flag this entity for a physics rebuild after inspector edits.
+        registry->emplace_or_replace<ecs::PhysicsDirtyComponent>(entity);
+    }
+
+    void PhysicsSystem::handle_field_changed_event(const editor::FieldChangedEvent& event)
+    {
+        if (event.target.kind != editor::FieldTarget::Kind::Component)
+            return;
+        if (event.target.component_id != entt::type_hash<ecs::TransformComponent>::value())
+            return;
+
+        // Only scale edits require collider rebuilds; position/rotation do not.
+        const editor::MetaFieldPath::Entry* first_data = nullptr;
+        for (const auto& entry : event.meta_path.entries)
+        {
+            if (entry.type == editor::MetaFieldPath::Entry::Type::Data)
+            {
+                first_data = &entry;
+                break;
+            }
+        }
+
+        if (!first_data || first_data->name != "scale")
+            return;
+
+        auto ctx_sp = event.target.ctx.lock();
+        if (!ctx_sp)
+            return;
+
+        auto entity_opt = resolve_event_entity(event.target, *ctx_sp);
+        if (!entity_opt)
+            return;
+
+        auto registry_sp = event.target.registry.lock();
+        entt::registry* registry = registry_sp ? registry_sp.get()
+            : eeng::try_get_registry_ptr(*ctx_sp, "PhysicsSystem");
+
+        if (!registry || !registry->valid(*entity_opt))
+            return;
+
+        registry->emplace_or_replace<ecs::PhysicsDirtyComponent>(*entity_opt);
+    }
+
 } // namespace eeng::ecs::systems

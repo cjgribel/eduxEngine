@@ -17,6 +17,7 @@
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
+#include "ecs/systems/PhysicsSystem.hpp" // Post-assign hook for physics edits.
 #include "ecs/systems/TransformSystem.hpp"
 #include "mock/MockTypes.hpp"
 #include "mock/CopySignaller.hpp"
@@ -866,6 +867,10 @@ namespace eeng
                 .data<&eeng::ecs::RigidBodyComponent::ccd_motion_threshold>("ccd_motion_threshold"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "ccd_motion_threshold", "CCD Threshold", "CCD motion threshold." })
                 .traits(MetaFlags::none)
+
+                // Rebuild Bullet bodies when RigidBody fields are edited.
+                .func<&eeng::ecs::systems::PhysicsSystem::on_component_post_assign>(eeng::literals::post_assign_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_assign", "Post-assign hook for physics edits." })
                 ;
             register_component<ecs::RigidBodyComponent>();
 
@@ -877,6 +882,10 @@ namespace eeng
                 .traits(MetaFlags::none)
                 .func<&eeng::editor::inspect_ColliderComponent>(eeng::literals::inspect_hs)
                 .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_ColliderComponent", "Inspect collider list." })
+                
+                // Rebuild Bullet bodies when collider data is edited.
+                .func<&eeng::ecs::systems::PhysicsSystem::on_component_post_assign>(eeng::literals::post_assign_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "post_assign", "Post-assign hook for physics edits." })
                 ;
             register_component<ecs::ColliderComponent>();
 

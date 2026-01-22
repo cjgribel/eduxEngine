@@ -131,6 +131,12 @@ namespace eeng::ecs
         bool emit_triggers = true;
     };
 
+    // Runtime-only marker for editor-driven physics rebuilds.
+    struct PhysicsDirtyComponent
+    {
+        bool rebuild_body = true;
+    };
+
     // Event payload emitted by the physics system.
     struct CollisionEvent
     {
@@ -172,6 +178,11 @@ namespace eeng::ecs
         return "PhysicsEventsComponent";
     }
 
+    inline std::string to_string(const PhysicsDirtyComponent&)
+    {
+        return "PhysicsDirtyComponent";
+    }
+
     // Asset reference traversal hooks used by the ResourceManager.
     template<typename Visitor>
     void visit_asset_refs(ColliderComponent& c, Visitor&& visitor)
@@ -208,4 +219,10 @@ namespace eeng::ecs
 
     template<typename Visitor>
     void visit_entity_refs(PhysicsEventsComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_asset_refs(PhysicsDirtyComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_entity_refs(PhysicsDirtyComponent&, Visitor&&) {}
 }
