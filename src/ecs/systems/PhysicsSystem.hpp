@@ -5,13 +5,13 @@
 
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "entt/entt.hpp"
 
 #include "physics/PhysicsWorld.hpp"
 #include "ecs/PhysicsComponents.hpp"
-#include "editor/MetaFieldPath.hpp" // for on_component_post_assign hook
 
 // Bullet headers are required here because BodyRuntime owns Bullet objects.
 #include <btBulletDynamicsCommon.h>
@@ -30,7 +30,7 @@ namespace eeng::ecs::systems
 {
     // Physics system that bridges ECS components to a Bullet world.
     // Notes:
-    // - Uses a runtime-only dirty marker component to request rebuilds after editor edits.
+    // - Uses a private dirty set fed by FieldChangedEvent for editor edits.
     // - Keeps a small cache of motion/scale so non-editor changes are also caught safely.
     class PhysicsSystem
     {
@@ -62,22 +62,15 @@ namespace eeng::ecs::systems
         physics::PhysicsWorld world_;
         physics::PhysicsWorldSettings settings_{};
         std::unordered_map<entt::entity, BodyRuntime> bodies_;
+        // Central dirty set populated from editor field edit events.
+        std::unordered_set<entt::entity> dirty_entities_;
         bool initialized_ = false;
 
         void sync_bodies(entt::registry& registry, EngineContext& ctx);
         void sync_transforms_to_bullet(entt::registry& registry);
         void sync_transforms_from_bullet(entt::registry& registry);
-        
-        // For dirtying an entity
-        // Callback for field assign events; will filter for TransformComponent scale changes.
-        void handle_field_changed_event(const editor::FieldChangedEvent& event);
 
-        // For dirtying an entity
-        // Called for edits on RigidBodyComponent and ColliderComponent.
-        static void on_component_post_assign(
-            EngineContext& ctx,
-            const ecs::Entity& entity,
-            const editor::MetaFieldPath& meta_path,
-            bool is_undo);
+        // Callback for field edit events; filters for physics-affecting component changes.
+        void handle_field_changed_event(const editor::FieldChangedEvent& event);
     };
 } // namespace eeng::ecs::systems

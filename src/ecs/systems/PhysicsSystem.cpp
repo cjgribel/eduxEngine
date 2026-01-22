@@ -123,7 +123,8 @@ namespace eeng::ecs::systems
         if (initialized_)
             return;
 
-        // Listen to field edits so we can rebuild on Transform scale changes.
+        // Centralized dirtying: listen to field edits and mark entities for rebuild.
+        // We intentionally avoid per-component post-assign hooks to keep this policy in one place.
         auto* event_queue = eeng::try_get_event_queue(ctx, "PhysicsSystem");
         if (event_queue)
         {
@@ -202,12 +203,23 @@ namespace eeng::ecs::systems
 
                 // Rebuild when marked dirty, when motion changes, when scale changes, or when colliders are cleared.
                 // The extra checks are safety nets for non-editor changes (runtime code, deserialization).
-                const bool dirty = registry.any_of<ecs::PhysicsDirtyComponent>(entity);
-                if (dirty
-                    || it->second.motion != rb.motion
-                    || it->second.scale != tfm.scale
-                    || colliders.colliders.empty())
+                // Consume the dirty request so it does not rebuild every frame.
+                const bool dirty = (dirty_entities_.erase(entity) > 0);
+                const bool motion_changed = (it->second.motion != rb.motion);
+                const bool scale_changed = (it->second.scale != tfm.scale);
+                const bool colliders_cleared = colliders.colliders.empty();
+                if (dirty || motion_changed || scale_changed || colliders_cleared)
                 {
+                    if (!dirty && (motion_changed || scale_changed || colliders_cleared))
+                    {
+                        // Safety-net log: rebuild triggered without an explicit dirty event.
+                        EENG_LOG_WARN(&ctx,
+                            "PhysicsSystem: Rebuilding entity %u via safety check (motion=%d scale=%d colliders=%d).",
+                            static_cast<unsigned>(entt::to_integral(entity)),
+                            motion_changed ? 1 : 0,
+                            scale_changed ? 1 : 0,
+                            colliders_cleared ? 1 : 0);
+                    }
                     if (it->second.body)
                         world->removeRigidBody(it->second.body.get());
                     it = bodies_.erase(it);
@@ -240,7 +252,7 @@ namespace eeng::ecs::systems
             BodyRuntime runtime{};
             runtime.compound_shape = std::make_unique<btCompoundShape>();
 
-            // Build child shapes for every collider (rebuilds are driven by the dirty marker).
+            // Build child shapes for every collider (rebuilds are driven by the dirty set).
             for (const auto& collider : colliders.colliders)
             {
                 auto shape = build_shape(collider, tfm.scale, settings_.units_per_meter);
@@ -333,9 +345,18 @@ namespace eeng::ecs::systems
             runtime.scale = tfm.scale;
             bodies_.emplace(entity, std::move(runtime));
 
-            // Clear dirty marker once we have rebuilt the Bullet body.
-            if (registry.any_of<ecs::PhysicsDirtyComponent>(entity))
-                registry.remove<ecs::PhysicsDirtyComponent>(entity);
+            // Clear any pending dirty request once we have rebuilt the Bullet body.
+            dirty_entities_.erase(entity);
+        }
+
+        // Drop dirty flags for entities that are no longer valid or lack required components.
+        for (auto it = dirty_entities_.begin(); it != dirty_entities_.end();)
+        {
+            if (!registry.valid(*it)
+                || !registry.all_of<ecs::TransformComponent, ecs::RigidBodyComponent, ecs::ColliderComponent>(*it))
+                it = dirty_entities_.erase(it);
+            else
+                ++it;
         }
     }
 
@@ -395,43 +416,38 @@ namespace eeng::ecs::systems
         }
     }
 
-    void PhysicsSystem::on_component_post_assign(
-        EngineContext& ctx,
-        const ecs::Entity& entity,
-        const editor::MetaFieldPath& meta_path,
-        bool is_undo)
-    {
-        (void)meta_path;
-        (void)is_undo;
-
-        auto* registry = eeng::try_get_registry_ptr(ctx, "PhysicsSystem");
-        if (!registry || !registry->valid(entity))
-            return;
-
-        // Flag this entity for a physics rebuild after inspector edits.
-        registry->emplace_or_replace<ecs::PhysicsDirtyComponent>(entity);
-    }
-
     void PhysicsSystem::handle_field_changed_event(const editor::FieldChangedEvent& event)
     {
         if (event.target.kind != editor::FieldTarget::Kind::Component)
             return;
-        if (event.target.component_id != entt::type_hash<ecs::TransformComponent>::value())
+
+        // We only care about physics-affecting component edits.
+        const entt::id_type rb_id = entt::type_hash<ecs::RigidBodyComponent>::value();
+        const entt::id_type collider_id = entt::type_hash<ecs::ColliderComponent>::value();
+        const entt::id_type transform_id = entt::type_hash<ecs::TransformComponent>::value();
+
+        const bool is_rb = (event.target.component_id == rb_id);
+        const bool is_collider = (event.target.component_id == collider_id);
+        const bool is_transform = (event.target.component_id == transform_id);
+        if (!is_rb && !is_collider && !is_transform)
             return;
 
         // Only scale edits require collider rebuilds; position/rotation do not.
-        const editor::MetaFieldPath::Entry* first_data = nullptr;
-        for (const auto& entry : event.meta_path.entries)
+        if (is_transform)
         {
-            if (entry.type == editor::MetaFieldPath::Entry::Type::Data)
+            const editor::MetaFieldPath::Entry* first_data = nullptr;
+            for (const auto& entry : event.meta_path.entries)
             {
-                first_data = &entry;
-                break;
+                if (entry.type == editor::MetaFieldPath::Entry::Type::Data)
+                {
+                    first_data = &entry;
+                    break;
+                }
             }
-        }
 
-        if (!first_data || first_data->name != "scale")
-            return;
+            if (!first_data || first_data->name != "scale")
+                return;
+        }
 
         auto ctx_sp = event.target.ctx.lock();
         if (!ctx_sp)
@@ -448,7 +464,9 @@ namespace eeng::ecs::systems
         if (!registry || !registry->valid(*entity_opt))
             return;
 
-        registry->emplace_or_replace<ecs::PhysicsDirtyComponent>(*entity_opt);
+        // Store in the local dirty set; rebuild happens on the next PhysicsSystem update.
+        // RigidBody/Collider edits always dirty; Transform edits are filtered above.
+        dirty_entities_.insert(*entity_opt);
     }
 
 } // namespace eeng::ecs::systems
