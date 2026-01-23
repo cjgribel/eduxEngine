@@ -265,6 +265,52 @@ namespace eeng
         return true;
     }
 
+    template<typename T, typename U, typename Fn>
+    bool try_read_asset_pair(
+        ResourceManager& rm,
+        const Handle<T>& handle_a,
+        const Guid& guid_a,
+        const Handle<U>& handle_b,
+        const Guid& guid_b,
+        EngineContext& ctx,
+        const char* log_tag,
+        const char* missing_label_a,
+        const char* missing_label_b,
+        Fn&& fn)
+    {
+        if (!handle_a)
+        {
+            detail::log_warn_once(ctx, log_tag, guid_a, missing_label_a);
+            return false;
+        }
+        if (!handle_b)
+        {
+            detail::log_warn_once(ctx, log_tag, guid_b, missing_label_b);
+            return false;
+        }
+        if (!rm.storage().validate(handle_a))
+        {
+            detail::log_warn_once(ctx, log_tag, guid_a, missing_label_a);
+            return false;
+        }
+        if (!rm.storage().validate(handle_b))
+        {
+            detail::log_warn_once(ctx, log_tag, guid_b, missing_label_b);
+            return false;
+        }
+        try
+        {
+            rm.storage().read2(handle_a, handle_b, std::forward<Fn>(fn));
+        }
+        catch (const ValidationError&)
+        {
+            detail::log_warn_once(ctx, log_tag, guid_a, missing_label_a);
+            detail::log_warn_once(ctx, log_tag, guid_b, missing_label_b);
+            return false;
+        }
+        return true;
+    }
+
     template<typename T, typename Fn>
     bool try_read_asset_ref(
         ResourceManager& rm,

@@ -212,6 +212,30 @@ TEST_F(StorageTest, MultiTypeStorage) {
     });
 }
 
+TEST_F(StorageTest, Read2)
+{
+    MockResource1 mr1; mr1.x = 3;
+    MockResource2 mr2; mr2.y = 4;
+
+    auto h1 = storage.add<MockResource1>(mr1, eeng::Guid::generate());
+    auto h2 = storage.add<MockResource2>(mr2, eeng::Guid::generate());
+
+    auto sum = storage.read2(h1, h2, [](const MockResource1& a, const MockResource2& b)
+        {
+            return a.x + b.y;
+        });
+    EXPECT_EQ(sum, 7u);
+
+    MockResource1 mr3; mr3.x = 5;
+    auto h3 = storage.add<MockResource1>(mr3, eeng::Guid::generate());
+
+    auto sum_same = storage.read2(h1, h3, [](const MockResource1& a, const MockResource1& b)
+        {
+            return a.x + b.x;
+        });
+    EXPECT_EQ(sum_same, 8u);
+}
+
 #if 1
 /**
  * ConcurrencySafety (by o4-mini-high)

@@ -276,41 +276,41 @@ namespace
         static std::unordered_set<std::string> warned_trackless;
 
         auto make_key = [&](const std::string& clip_name) -> std::string
-        {
-            return model_guid.to_string() + ":" + clip_name;
-        };
+            {
+                return model_guid.to_string() + ":" + clip_name;
+            };
 
         auto check_clip = [&](const std::string& clip_name)
-        {
-            if (clip_name.empty())
-                return;
-
-            const AnimClip* found = nullptr;
-            auto it = clip_lookup.find(clip_name);
-            if (it != clip_lookup.end())
-                found = clip_from_index(model, it->second);
-
-            if (!found)
             {
-                const std::string key = make_key(clip_name);
-                if (warned_missing.insert(key).second)
-                {
-                    EENG_LOG_WARN(&ctx, "AnimationGraph: clip '%s' not found in model %s.",
-                        clip_name.c_str(), model_guid.to_string().c_str());
-                }
-                return;
-            }
+                if (clip_name.empty())
+                    return;
 
-            if (!clip_has_tracks(*found))
-            {
-                const std::string key = make_key(clip_name);
-                if (warned_trackless.insert(key).second)
+                const AnimClip* found = nullptr;
+                auto it = clip_lookup.find(clip_name);
+                if (it != clip_lookup.end())
+                    found = clip_from_index(model, it->second);
+
+                if (!found)
                 {
-                    EENG_LOG_WARN(&ctx, "AnimationGraph: clip '%s' has no tracks in model %s.",
-                        clip_name.c_str(), model_guid.to_string().c_str());
+                    const std::string key = make_key(clip_name);
+                    if (warned_missing.insert(key).second)
+                    {
+                        EENG_LOG_WARN(&ctx, "AnimationGraph: clip '%s' not found in model %s.",
+                            clip_name.c_str(), model_guid.to_string().c_str());
+                    }
+                    return;
                 }
-            }
-        };
+
+                if (!clip_has_tracks(*found))
+                {
+                    const std::string key = make_key(clip_name);
+                    if (warned_trackless.insert(key).second)
+                    {
+                        EENG_LOG_WARN(&ctx, "AnimationGraph: clip '%s' has no tracks in model %s.",
+                            clip_name.c_str(), model_guid.to_string().c_str());
+                    }
+                }
+            };
 
         for (const auto& layer : graph.layers)
         {
@@ -407,12 +407,12 @@ namespace
                 auto& state_cache = layer_cache.states[si];
 
                 auto lookup_index = [&](const std::string& name) -> int
-                {
-                    if (name.empty())
-                        return -1;
-                    auto it = clip_lookup.find(name);
-                    return (it != clip_lookup.end()) ? it->second : -1;
-                };
+                    {
+                        if (name.empty())
+                            return -1;
+                        auto it = clip_lookup.find(name);
+                        return (it != clip_lookup.end()) ? it->second : -1;
+                    };
 
                 switch (state.type)
                 {
@@ -961,14 +961,14 @@ namespace
         ctx.phase_rate = state.speed;
 
         auto resolve_cached = [&](int index, const std::string& name) -> const AnimClip*
-        {
-            if (clip_cache)
             {
-                if (const AnimClip* cached = clip_from_index(model, index))
-                    return cached;
-            }
-            return resolve_clip_by_name(model, name);
-        };
+                if (clip_cache)
+                {
+                    if (const AnimClip* cached = clip_from_index(model, index))
+                        return cached;
+                }
+                return resolve_clip_by_name(model, name);
+            };
 
         const AnimClip* time_clip = nullptr;
         std::array<const AnimGraphBlendSample*, 4> sample_refs{};
@@ -993,11 +993,11 @@ namespace
 
                 // Compute a blended duration to keep phase continuous as weights change.
                 const auto duration_sec = [](const AnimClip* clip) -> float
-                {
-                    if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
-                        return 0.0f;
-                    return clip->duration_ticks / clip->ticks_per_second;
-                };
+                    {
+                        if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
+                            return 0.0f;
+                        return clip->duration_ticks / clip->ticks_per_second;
+                    };
 
                 const float dur0 = duration_sec(ctx.clips[0]);
                 const float dur1 = duration_sec(ctx.clips[1]);
@@ -1122,11 +1122,11 @@ namespace
                 time_clip = ctx.clips[0] ? ctx.clips[0] : ctx.clips[1];
 
                 const auto duration_sec = [](const AnimClip* clip) -> float
-                {
-                    if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
-                        return 0.0f;
-                    return clip->duration_ticks / clip->ticks_per_second;
-                };
+                    {
+                        if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
+                            return 0.0f;
+                        return clip->duration_ticks / clip->ticks_per_second;
+                    };
 
                 const float dur0 = duration_sec(ctx.clips[0]);
                 const float dur1 = duration_sec(ctx.clips[1]);
@@ -1231,11 +1231,11 @@ namespace
                 time_clip = ctx.clips[0] ? ctx.clips[0] : ctx.clips[1];
 
                 const auto duration_sec = [](const AnimClip* clip) -> float
-                {
-                    if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
-                        return 0.0f;
-                    return clip->duration_ticks / clip->ticks_per_second;
-                };
+                    {
+                        if (!clip || clip->duration_ticks <= 0.0f || clip->ticks_per_second <= 0.0f)
+                            return 0.0f;
+                        return clip->duration_ticks / clip->ticks_per_second;
+                    };
 
                 const float dur0 = duration_sec(ctx.clips[0]);
                 const float dur1 = duration_sec(ctx.clips[1]);
@@ -1380,23 +1380,23 @@ namespace
         sb.pos = glm::vec3(b[3]);
 
         auto extract_sample = [](const glm::mat4& m, NodeSample& s)
-        {
-            glm::vec3 scale;
-            scale.x = glm::length(glm::vec3(m[0]));
-            scale.y = glm::length(glm::vec3(m[1]));
-            scale.z = glm::length(glm::vec3(m[2]));
-            if (scale.x == 0.0f) scale.x = 1.0f;
-            if (scale.y == 0.0f) scale.y = 1.0f;
-            if (scale.z == 0.0f) scale.z = 1.0f;
+            {
+                glm::vec3 scale;
+                scale.x = glm::length(glm::vec3(m[0]));
+                scale.y = glm::length(glm::vec3(m[1]));
+                scale.z = glm::length(glm::vec3(m[2]));
+                if (scale.x == 0.0f) scale.x = 1.0f;
+                if (scale.y == 0.0f) scale.y = 1.0f;
+                if (scale.z == 0.0f) scale.z = 1.0f;
 
-            glm::mat3 rot_m(
-                glm::vec3(m[0]) / scale.x,
-                glm::vec3(m[1]) / scale.y,
-                glm::vec3(m[2]) / scale.z);
+                glm::mat3 rot_m(
+                    glm::vec3(m[0]) / scale.x,
+                    glm::vec3(m[1]) / scale.y,
+                    glm::vec3(m[2]) / scale.z);
 
-            s.scale = scale;
-            s.rot = glm::quat_cast(rot_m);
-        };
+                s.scale = scale;
+                s.rot = glm::quat_cast(rot_m);
+            };
 
         extract_sample(a, sa);
         extract_sample(b, sb);
@@ -1558,286 +1558,280 @@ namespace eeng::ecs::systems
             if (!gpu_read)
                 continue;
 
-            if (!eeng::try_read_asset(
+            // Read model and graph assets under lock
+            const bool read_ok = eeng::try_read_asset_pair(
                 *rm,
                 model_handle,
                 model_guid,
+                graph_component.graph_ref.handle,
+                graph_component.graph_ref.guid,
                 ctx,
                 "AnimationGraphSystem",
                 "Missing ModelDataAsset for AnimationGraphComponent:",
-                [&](const assets::ModelDataAsset& model)
+                "Missing AnimationGraphAsset for AnimationGraphComponent:",
+                [&](const assets::ModelDataAsset& model, const assets::AnimationGraphAsset& graph)
                 {
-                    eeng::try_read_asset_ref(
-                        *rm,
-                        graph_component.graph_ref,
-                        ctx,
-                        "AnimationGraphSystem",
-                        "Missing AnimationGraphAsset for AnimationGraphComponent:",
-                        [&](const assets::AnimationGraphAsset& graph)
+                    auto& instance = graph_component.instance;
+                    if (!instance.initialized)
+                        return;
+
+                    // Policy: Build clip cache once per model+graph to avoid per-frame string lookups.
+                    ensure_clip_cache(instance, graph, model, model_guid, ctx);
+
+                    std::vector<LayerEvalContext> layer_contexts;
+                    layer_contexts.reserve(graph.layers.size());
+
+                    // Build evaluation contexts for all layers before advancing time.
+                    for (std::size_t i = 0; i < graph.layers.size(); i++)
+                    {
+                        const auto& layer = graph.layers[i];
+                        auto& runtime = instance.layers[i];
+                        LayerEvalContext lctx{};
+                        lctx.layer = &layer;
+
+                        if (runtime.transition.active && runtime.transition.to >= 0
+                            && runtime.transition.to < static_cast<int>(layer.states.size()))
                         {
-                            auto& instance = graph_component.instance;
-                            if (!instance.initialized)
-                                return;
-
-                            // Policy: Build clip cache once per model+graph to avoid per-frame string lookups.
-                            ensure_clip_cache(instance, graph, model, model_guid, ctx);
-
-                            std::vector<LayerEvalContext> layer_contexts;
-                            layer_contexts.reserve(graph.layers.size());
-
-                            // Build evaluation contexts for all layers before advancing time.
-                            for (std::size_t i = 0; i < graph.layers.size(); i++)
+                            // Transition: blend from current state to destination state.
+                            const auto& from_state = layer.states[static_cast<std::size_t>(runtime.transition.from)];
+                            const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
+                            const auto* from_cache = get_state_cache(instance, i, runtime.transition.from);
+                            const auto* to_cache = get_state_cache(instance, i, runtime.transition.to);
+                            lctx.from_ctx = build_state_context(
+                                from_state, graph, instance, model, from_cache, runtime.state_time);
+                            lctx.to_ctx = build_state_context(
+                                to_state, graph, instance, model, to_cache, runtime.transition.dest_time);
+                            if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
                             {
-                                const auto& layer = graph.layers[i];
-                                auto& runtime = instance.layers[i];
-                                LayerEvalContext lctx{};
-                                lctx.layer = &layer;
-
-                                if (runtime.transition.active && runtime.transition.to >= 0
-                                    && runtime.transition.to < static_cast<int>(layer.states.size()))
-                                {
-                                    // Transition: blend from current state to destination state.
-                                    const auto& from_state = layer.states[static_cast<std::size_t>(runtime.transition.from)];
-                                    const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
-                                    const auto* from_cache = get_state_cache(instance, i, runtime.transition.from);
-                                    const auto* to_cache = get_state_cache(instance, i, runtime.transition.to);
-                                    lctx.from_ctx = build_state_context(
-                                        from_state, graph, instance, model, from_cache, runtime.state_time);
-                                    lctx.to_ctx = build_state_context(
-                                        to_state, graph, instance, model, to_cache, runtime.transition.dest_time);
-                                    if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
-                                    {
-                                        // Policy: Additive layers use the same weights but sample reference poses at time 0.
-                                        lctx.from_ref_ctx = build_state_context(
-                                            from_state, graph, instance, model, from_cache, 0.0f, false);
-                                        lctx.to_ref_ctx = build_state_context(
-                                            to_state, graph, instance, model, to_cache, 0.0f, false);
-                                    }
-                                    lctx.transition_alpha = runtime.transition.duration > 0.0f
-                                        ? std::min(runtime.transition.time / runtime.transition.duration, 1.0f)
-                                        : 1.0f;
-                                    lctx.in_transition = true;
-                                }
-                                else if (runtime.state >= 0 && runtime.state < static_cast<int>(layer.states.size()))
-                                {
-                                    // No transition: use active state only.
-                                    const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
-                                    const auto* state_cache = get_state_cache(instance, i, runtime.state);
-                                    lctx.from_ctx = build_state_context(
-                                        state, graph, instance, model, state_cache, runtime.state_time);
-                                    if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
-                                        lctx.from_ref_ctx = build_state_context(
-                                            state, graph, instance, model, state_cache, 0.0f, false);
-                                    lctx.in_transition = false;
-                                }
-
-                                layer_contexts.push_back(std::move(lctx));
+                                // Policy: Additive layers use the same weights but sample reference poses at time 0.
+                                lctx.from_ref_ctx = build_state_context(
+                                    from_state, graph, instance, model, from_cache, 0.0f, false);
+                                lctx.to_ref_ctx = build_state_context(
+                                    to_state, graph, instance, model, to_cache, 0.0f, false);
                             }
+                            lctx.transition_alpha = runtime.transition.duration > 0.0f
+                                ? std::min(runtime.transition.time / runtime.transition.duration, 1.0f)
+                                : 1.0f;
+                            lctx.in_transition = true;
+                        }
+                        else if (runtime.state >= 0 && runtime.state < static_cast<int>(layer.states.size()))
+                        {
+                            // No transition: use active state only.
+                            const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
+                            const auto* state_cache = get_state_cache(instance, i, runtime.state);
+                            lctx.from_ctx = build_state_context(
+                                state, graph, instance, model, state_cache, runtime.state_time);
+                            if (layer.blend_mode == assets::AnimGraphBlendMode::Additive)
+                                lctx.from_ref_ctx = build_state_context(
+                                    state, graph, instance, model, state_cache, 0.0f, false);
+                            lctx.in_transition = false;
+                        }
 
-                            // Advance runtime times and resolve transitions.
-                            for (std::size_t i = 0; i < graph.layers.size(); i++)
+                        layer_contexts.push_back(std::move(lctx));
+                    }
+
+                    // Advance runtime times and resolve transitions.
+                    for (std::size_t i = 0; i < graph.layers.size(); i++)
+                    {
+                        if (i >= instance.layers.size())
+                            continue;
+
+                        auto& runtime = instance.layers[i];
+                        const auto& layer = graph.layers[i];
+                        const auto& lctx = layer_contexts[i];
+
+                        // Policy: Short-lived transition history for visualization of instant transitions.
+                        if (runtime.last_transition_ttl > 0.0f)
+                            runtime.last_transition_ttl = std::max(0.0f, runtime.last_transition_ttl - delta_time);
+
+                        if (runtime.transition.active)
+                        {
+                            // Transition in progress: advance destination time and end if complete.
+                            runtime.transition.time += delta_time;
+                            const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
+                            const float phase_rate = lctx.to_ctx.phase_rate;
+                            advance_state_time(to_state, delta_time, phase_rate, runtime.transition.dest_time);
+                            if (runtime.transition.time >= runtime.transition.duration)
                             {
-                                if (i >= instance.layers.size())
-                                    continue;
+                                runtime.last_transition = runtime.transition;
+                                runtime.last_transition_ttl = 0.2f;
+                                runtime.state = runtime.transition.to;
+                                runtime.state_time = runtime.transition.dest_time;
+                                runtime.transition = {};
+                            }
+                            continue;
+                        }
 
-                                auto& runtime = instance.layers[i];
-                                const auto& layer = graph.layers[i];
-                                const auto& lctx = layer_contexts[i];
+                        if (runtime.state < 0 || runtime.state >= static_cast<int>(layer.states.size()))
+                            continue;
 
-                                // Policy: Short-lived transition history for visualization of instant transitions.
-                                if (runtime.last_transition_ttl > 0.0f)
-                                    runtime.last_transition_ttl = std::max(0.0f, runtime.last_transition_ttl - delta_time);
+                        const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
+                        const auto* state_cache = get_state_cache(instance, i, runtime.state);
+                        const float phase_rate = lctx.from_ctx.phase_rate;
+                        advance_state_time(state, delta_time, phase_rate, runtime.state_time);
 
-                                if (runtime.transition.active)
+                        // Resolve the highest-priority valid transition.
+                        int best_transition = -1;
+                        int best_priority = std::numeric_limits<int>::min();
+                        float state_ntime = state_exit_time(state, model, state_cache, runtime.state_time);
+
+                        for (std::size_t t = 0; t < layer.transitions.size(); t++)
+                        {
+                            const auto& trans = layer.transitions[t];
+                            if (trans.from != "*" && trans.from != state.id)
+                                continue;
+                            if (trans.has_exit_time && state_ntime < trans.exit_time)
+                                continue;
+                            if (!evaluate_conditions(trans.conditions, graph, instance))
+                                continue;
+
+                            if (trans.priority >= best_priority)
+                            {
+                                best_priority = trans.priority;
+                                best_transition = static_cast<int>(t);
+                            }
+                        }
+
+                        if (best_transition >= 0)
+                        {
+                            const auto& trans = layer.transitions[static_cast<std::size_t>(best_transition)];
+                            int dest = -1;
+                            if (graph.runtime.built && i < graph.runtime.layers.size())
+                            {
+                                auto it = graph.runtime.layers[i].state_index.find(trans.to);
+                                if (it != graph.runtime.layers[i].state_index.end())
+                                    dest = static_cast<int>(it->second);
+                            }
+                            if (dest < 0)
+                            {
+                                for (std::size_t s = 0; s < layer.states.size(); s++)
                                 {
-                                    // Transition in progress: advance destination time and end if complete.
-                                    runtime.transition.time += delta_time;
-                                    const auto& to_state = layer.states[static_cast<std::size_t>(runtime.transition.to)];
-                                    const float phase_rate = lctx.to_ctx.phase_rate;
-                                    advance_state_time(to_state, delta_time, phase_rate, runtime.transition.dest_time);
-                                    if (runtime.transition.time >= runtime.transition.duration)
+                                    if (layer.states[s].id == trans.to)
                                     {
-                                        runtime.last_transition = runtime.transition;
-                                        runtime.last_transition_ttl = 0.2f;
-                                        runtime.state = runtime.transition.to;
-                                        runtime.state_time = runtime.transition.dest_time;
-                                        runtime.transition = {};
-                                    }
-                                    continue;
-                                }
-
-                                if (runtime.state < 0 || runtime.state >= static_cast<int>(layer.states.size()))
-                                    continue;
-
-                                const auto& state = layer.states[static_cast<std::size_t>(runtime.state)];
-                                const auto* state_cache = get_state_cache(instance, i, runtime.state);
-                                const float phase_rate = lctx.from_ctx.phase_rate;
-                                advance_state_time(state, delta_time, phase_rate, runtime.state_time);
-
-                                // Resolve the highest-priority valid transition.
-                                int best_transition = -1;
-                                int best_priority = std::numeric_limits<int>::min();
-                                float state_ntime = state_exit_time(state, model, state_cache, runtime.state_time);
-
-                                for (std::size_t t = 0; t < layer.transitions.size(); t++)
-                                {
-                                    const auto& trans = layer.transitions[t];
-                                    if (trans.from != "*" && trans.from != state.id)
-                                        continue;
-                                    if (trans.has_exit_time && state_ntime < trans.exit_time)
-                                        continue;
-                                    if (!evaluate_conditions(trans.conditions, graph, instance))
-                                        continue;
-
-                                    if (trans.priority >= best_priority)
-                                    {
-                                        best_priority = trans.priority;
-                                        best_transition = static_cast<int>(t);
-                                    }
-                                }
-
-                                if (best_transition >= 0)
-                                {
-                                    const auto& trans = layer.transitions[static_cast<std::size_t>(best_transition)];
-                                    int dest = -1;
-                                    if (graph.runtime.built && i < graph.runtime.layers.size())
-                                    {
-                                        auto it = graph.runtime.layers[i].state_index.find(trans.to);
-                                        if (it != graph.runtime.layers[i].state_index.end())
-                                            dest = static_cast<int>(it->second);
-                                    }
-                                    if (dest < 0)
-                                    {
-                                        for (std::size_t s = 0; s < layer.states.size(); s++)
-                                        {
-                                            if (layer.states[s].id == trans.to)
-                                            {
-                                                dest = static_cast<int>(s);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    if (dest < 0)
-                                        continue;
-                                    const auto& dest_state = layer.states[static_cast<std::size_t>(dest)];
-                                    // Map current phase to destination time when not rewinding.
-                                    const float phase = state_phase(state, graph, instance, model, state_cache, runtime.state_time);
-                                    const auto* dest_cache = get_state_cache(instance, i, dest);
-                                    const float dest_time = dest_state.rewind_on_enter
-                                        ? 0.0f
-                                        : phase_to_state_time(dest_state, graph, instance, model, dest_cache, phase);
-                                    if (trans.duration <= 0.0f)
-                                    {
-                                        runtime.last_transition = {};
-                                        runtime.last_transition.active = true;
-                                        runtime.last_transition.from = runtime.state;
-                                        runtime.last_transition.to = dest;
-                                        runtime.last_transition.time = 0.0f;
-                                        runtime.last_transition.duration = 0.0f;
-                                        runtime.last_transition.dest_time = dest_time;
-                                        runtime.last_transition_ttl = 0.2f;
-                                        runtime.state = dest;
-                                        runtime.state_time = dest_time;
-                                    }
-                                    else
-                                    {
-                                        runtime.transition.active = true;
-                                        runtime.transition.from = runtime.state;
-                                        runtime.transition.to = dest;
-                                        runtime.transition.time = 0.0f;
-                                        runtime.transition.duration = trans.duration;
-                                        runtime.transition.dest_time = dest_time;
+                                        dest = static_cast<int>(s);
+                                        break;
                                     }
                                 }
                             }
-
-                            const std::size_t node_count = model.nodetree.size();
-                            if (model_component.node_global_matrices.size() != node_count)
-                                model_component.node_global_matrices.assign(node_count, glm::mat4(1.0f));
-
-                            const std::size_t bone_count = model.bones.size();
-                            if (model_component.bone_matrices.size() != bone_count)
-                                model_component.bone_matrices.assign(bone_count, glm::mat4(1.0f));
-
-                            // Traverse skeleton depth-first so parent transforms are ready for children.
-                            model.nodetree.traverse_depthfirst(
-                                [&](const assets::SkeletonNode* node,
-                                    const assets::SkeletonNode* parent,
-                                    std::size_t node_index,
-                                    std::size_t parent_index)
-                                {
-                                    glm::mat4 local = node->local_bind_tfm;
-
-                                    // Apply all layers in order, blending into local space.
-                                    for (const auto& lctx : layer_contexts)
-                                    {
-                                        if (!lctx.layer)
-                                            continue;
-
-                                        float weight = lctx.layer->weight;
-                                        if (weight <= 0.0f)
-                                            continue;
-
-                                        const float mask_weight = layer_mask_weight(graph, *lctx.layer, *node);
-                                        if (mask_weight <= 0.0f)
-                                            continue;
-
-                                        const float layer_weight = std::min(std::max(weight * mask_weight, 0.0f), 1.0f);
-
-                                        NodeSample sample = lctx.in_transition
-                                            ? blend_samples(
-                                                sample_state_node(node_index, lctx.from_ctx, model.nodetree),
-                                                sample_state_node(node_index, lctx.to_ctx, model.nodetree),
-                                                lctx.transition_alpha)
-                                            : sample_state_node(node_index, lctx.from_ctx, model.nodetree);
-
-                                        glm::mat4 layer_local = compose_trs(sample);
-
-                                        if (lctx.layer->blend_mode == AnimGraphBlendMode::Additive)
-                                        {
-                                            // Additive: apply delta against a reference pose from the same layer.
-                                            NodeSample ref_sample = lctx.in_transition
-                                                ? blend_samples(
-                                                    sample_state_node(node_index, lctx.from_ref_ctx, model.nodetree),
-                                                    sample_state_node(node_index, lctx.to_ref_ctx, model.nodetree),
-                                                    lctx.transition_alpha)
-                                                : sample_state_node(node_index, lctx.from_ref_ctx, model.nodetree);
-                                            const glm::mat4 ref_local = compose_trs(ref_sample);
-                                            const glm::mat4 delta = layer_local * glm::inverse(ref_local);
-                                            const glm::mat4 delta_blend = blend_matrices(glm::mat4(1.0f), delta, layer_weight);
-                                            local = delta_blend * local;
-                                        }
-                                        else
-                                        {
-                                            // Override/Blend: interpolate local toward layer result.
-                                            local = blend_matrices(local, layer_local, layer_weight);
-                                        }
-                                    }
-
-                                    // Convert local to global using parent transform.
-                                    if (parent)
-                                        local = model_component.node_global_matrices[parent_index] * local;
-                                    model_component.node_global_matrices[node_index] = local;
-                                });
-
-                            // Compute bone matrices from node globals.
-                            for (std::size_t i = 0; i < bone_count; i++)
+                            if (dest < 0)
+                                continue;
+                            const auto& dest_state = layer.states[static_cast<std::size_t>(dest)];
+                            // Map current phase to destination time when not rewinding.
+                            const float phase = state_phase(state, graph, instance, model, state_cache, runtime.state_time);
+                            const auto* dest_cache = get_state_cache(instance, i, dest);
+                            const float dest_time = dest_state.rewind_on_enter
+                                ? 0.0f
+                                : phase_to_state_time(dest_state, graph, instance, model, dest_cache, phase);
+                            if (trans.duration <= 0.0f)
                             {
-                                const auto& bone = model.bones[i];
-                                if (bone.node_index == assets::null_index)
-                                {
-                                    model_component.bone_matrices[i] = glm::mat4(1.0f);
-                                    continue;
-                                }
-
-                                const auto& node_tfm = model_component.node_global_matrices[bone.node_index];
-                                model_component.bone_matrices[i] = node_tfm * bone.inverse_bind_tfm;
+                                runtime.last_transition = {};
+                                runtime.last_transition.active = true;
+                                runtime.last_transition.from = runtime.state;
+                                runtime.last_transition.to = dest;
+                                runtime.last_transition.time = 0.0f;
+                                runtime.last_transition.duration = 0.0f;
+                                runtime.last_transition.dest_time = dest_time;
+                                runtime.last_transition_ttl = 0.2f;
+                                runtime.state = dest;
+                                runtime.state_time = dest_time;
                             }
+                            else
+                            {
+                                runtime.transition.active = true;
+                                runtime.transition.from = runtime.state;
+                                runtime.transition.to = dest;
+                                runtime.transition.time = 0.0f;
+                                runtime.transition.duration = trans.duration;
+                                runtime.transition.dest_time = dest_time;
+                            }
+                        }
+                    }
+
+                    const std::size_t node_count = model.nodetree.size();
+                    if (model_component.node_global_matrices.size() != node_count)
+                        model_component.node_global_matrices.assign(node_count, glm::mat4(1.0f));
+
+                    const std::size_t bone_count = model.bones.size();
+                    if (model_component.bone_matrices.size() != bone_count)
+                        model_component.bone_matrices.assign(bone_count, glm::mat4(1.0f));
+
+                    // Traverse skeleton depth-first so parent transforms are ready for children.
+                    model.nodetree.traverse_depthfirst(
+                        [&](const assets::SkeletonNode* node,
+                            const assets::SkeletonNode* parent,
+                            std::size_t node_index,
+                            std::size_t parent_index)
+                        {
+                            glm::mat4 local = node->local_bind_tfm;
+
+                            // Apply all layers in order, blending into local space.
+                            for (const auto& lctx : layer_contexts)
+                            {
+                                if (!lctx.layer)
+                                    continue;
+
+                                float weight = lctx.layer->weight;
+                                if (weight <= 0.0f)
+                                    continue;
+
+                                const float mask_weight = layer_mask_weight(graph, *lctx.layer, *node);
+                                if (mask_weight <= 0.0f)
+                                    continue;
+
+                                const float layer_weight = std::min(std::max(weight * mask_weight, 0.0f), 1.0f);
+
+                                NodeSample sample = lctx.in_transition
+                                    ? blend_samples(
+                                        sample_state_node(node_index, lctx.from_ctx, model.nodetree),
+                                        sample_state_node(node_index, lctx.to_ctx, model.nodetree),
+                                        lctx.transition_alpha)
+                                    : sample_state_node(node_index, lctx.from_ctx, model.nodetree);
+
+                                glm::mat4 layer_local = compose_trs(sample);
+
+                                if (lctx.layer->blend_mode == AnimGraphBlendMode::Additive)
+                                {
+                                    // Additive: apply delta against a reference pose from the same layer.
+                                    NodeSample ref_sample = lctx.in_transition
+                                        ? blend_samples(
+                                            sample_state_node(node_index, lctx.from_ref_ctx, model.nodetree),
+                                            sample_state_node(node_index, lctx.to_ref_ctx, model.nodetree),
+                                            lctx.transition_alpha)
+                                        : sample_state_node(node_index, lctx.from_ref_ctx, model.nodetree);
+                                    const glm::mat4 ref_local = compose_trs(ref_sample);
+                                    const glm::mat4 delta = layer_local * glm::inverse(ref_local);
+                                    const glm::mat4 delta_blend = blend_matrices(glm::mat4(1.0f), delta, layer_weight);
+                                    local = delta_blend * local;
+                                }
+                                else
+                                {
+                                    // Override/Blend: interpolate local toward layer result.
+                                    local = blend_matrices(local, layer_local, layer_weight);
+                                }
+                            }
+
+                            // Convert local to global using parent transform.
+                            if (parent)
+                                local = model_component.node_global_matrices[parent_index] * local;
+                            model_component.node_global_matrices[node_index] = local;
                         });
-                }))
-            {
+
+                    // Compute bone matrices from node globals.
+                    for (std::size_t i = 0; i < bone_count; i++)
+                    {
+                        const auto& bone = model.bones[i];
+                        if (bone.node_index == assets::null_index)
+                        {
+                            model_component.bone_matrices[i] = glm::mat4(1.0f);
+                            continue;
+                        }
+
+                        const auto& node_tfm = model_component.node_global_matrices[bone.node_index];
+                        model_component.bone_matrices[i] = node_tfm * bone.inverse_bind_tfm;
+                    }
+                });
+            if (!read_ok)
                 continue;
-            }
         }
     }
 }

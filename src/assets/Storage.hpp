@@ -221,6 +221,7 @@ namespace eeng
         class Pool : public IPool
         {
             // using Handle = Handle<T>;
+            friend class Storage;
 
             PoolAllocatorTFH<T> m_pool;
 
@@ -687,6 +688,59 @@ namespace eeng
         {
             const auto& pool = get_pool<T>();
             return pool.with_cref(h, std::forward<Fn>(f));
+        }
+
+        template<typename T, typename U, typename Fn>
+            requires (!std::is_same_v<T, U> && std::invocable<Fn, const T&, const U&>)
+        auto read2(const Handle<T>& a, const Handle<U>& b, Fn&& f) const
+            -> std::invoke_result_t<Fn, const T&, const U&>
+        {
+            const auto& pool_a = get_pool<T>();
+            const auto& pool_b = get_pool<U>();
+
+            std::scoped_lock lock{ pool_a.m_mutex, pool_b.m_mutex };
+
+            if (!pool_a.validate_handle_no_lock(a))
+                throw ValidationError{ "Invalid or not-ready Handle<T> in read2" };
+
+            if (!pool_b.validate_handle_no_lock(b))
+                throw ValidationError{ "Invalid or not-ready Handle<U> in read2" };
+
+            const T& ref_a = pool_a.m_pool.get(a);
+            const U& ref_b = pool_b.m_pool.get(b);
+
+            if constexpr (std::is_void_v<std::invoke_result_t<Fn, const T&, const U&>>) {
+                std::forward<Fn>(f)(ref_a, ref_b);
+            }
+            else {
+                return std::forward<Fn>(f)(ref_a, ref_b);
+            }
+        }
+
+        template<typename T, typename Fn>
+            requires std::invocable<Fn, const T&, const T&>
+        auto read2(const Handle<T>& a, const Handle<T>& b, Fn&& f) const
+            -> std::invoke_result_t<Fn, const T&, const T&>
+        {
+            const auto& pool = get_pool<T>();
+
+            std::lock_guard lock{ pool.m_mutex };
+
+            if (!pool.validate_handle_no_lock(a))
+                throw ValidationError{ "Invalid or not-ready Handle<T> in read2" };
+
+            if (!pool.validate_handle_no_lock(b))
+                throw ValidationError{ "Invalid or not-ready Handle<T> in read2" };
+
+            const T& ref_a = pool.m_pool.get(a);
+            const T& ref_b = pool.m_pool.get(b);
+
+            if constexpr (std::is_void_v<std::invoke_result_t<Fn, const T&, const T&>>) {
+                std::forward<Fn>(f)(ref_a, ref_b);
+            }
+            else {
+                return std::forward<Fn>(f)(ref_a, ref_b);
+            }
         }
 
         // --- Meta typed read -----------------------------------------------
