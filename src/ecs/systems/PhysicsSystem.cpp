@@ -141,6 +141,7 @@ namespace eeng::ecs::systems
         auto* registry = eeng::try_get_registry_ptr(ctx, "PhysicsSystem");
         if (registry)
         {
+            // RAII entt signal holders
             rb_construct_conn_ = registry->on_construct<ecs::RigidBodyComponent>()
                 .connect<&PhysicsSystem::on_rigidbody_construct>(this);
             rb_destroy_conn_ = registry->on_destroy<ecs::RigidBodyComponent>()
