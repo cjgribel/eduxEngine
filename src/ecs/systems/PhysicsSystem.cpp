@@ -135,6 +135,11 @@ namespace eeng::ecs::systems
                 {
                     handle_field_changed_event(event);
                 });
+            // Batch load/unload is a structural change; request a one-shot sync afterwards.
+            event_queue->register_callback([this](const BatchTaskCompletedEvent& event)
+                {
+                    handle_batch_task_event(event);
+                });
         }
 
         // Lifecycle hooks: respond immediately to component add/remove.
@@ -190,7 +195,12 @@ namespace eeng::ecs::systems
             return;
 
         // Keep the Bullet world in sync with ECS ownership.
-        sync_bodies(registry, ctx);
+        // We only scan when there are dirty entities or a batch boundary requests a sync.
+        if (batch_sync_requested_ || !dirty_entities_.empty())
+        {
+            sync_bodies(registry, ctx);
+            batch_sync_requested_ = false;
+        }
 
         // Push transforms for static/kinematic bodies into Bullet.
         sync_transforms_to_bullet(registry);
@@ -527,6 +537,22 @@ namespace eeng::ecs::systems
         // Store in the local dirty set; rebuild happens on the next PhysicsSystem update.
         // RigidBody/Collider edits always dirty; Transform edits are filtered above.
         dirty_entities_.insert(*entity_opt);
+    }
+
+    void PhysicsSystem::handle_batch_task_event(const BatchTaskCompletedEvent& event)
+    {
+        // Batch load/unload changes the live entity set; force a sync on the next update.
+        switch (event.type)
+        {
+        case BatchTaskType::Load:
+        case BatchTaskType::LoadAll:
+        case BatchTaskType::Unload:
+        case BatchTaskType::UnloadAll:
+            batch_sync_requested_ = true;
+            break;
+        default:
+            break;
+        }
     }
 
     void PhysicsSystem::on_rigidbody_construct(entt::registry& registry, entt::entity entity)

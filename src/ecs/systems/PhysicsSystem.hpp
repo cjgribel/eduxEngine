@@ -19,6 +19,7 @@
 namespace eeng
 {
     struct EngineContext;
+    struct BatchTaskCompletedEvent;
 }
 
 namespace eeng::editor
@@ -31,6 +32,7 @@ namespace eeng::ecs::systems
     // Physics system that bridges ECS components to a Bullet world.
     // Notes:
     // - Uses a private dirty set fed by FieldChangedEvent + lifecycle hooks.
+    // - Uses a batch sync request flag to avoid per-frame structural scans.
     // - Keeps a small cache of motion/scale so non-editor changes are also caught safely.
     class PhysicsSystem
     {
@@ -64,6 +66,8 @@ namespace eeng::ecs::systems
         std::unordered_map<entt::entity, BodyRuntime> bodies_;
         // Central dirty set populated from editor field edit events + construct hooks.
         std::unordered_set<entt::entity> dirty_entities_;
+        // Set when batch load/unload completes to force a structural sync on the next update.
+        bool batch_sync_requested_ = false;
         bool initialized_ = false;
 
         // Non-owning context pointer used by lifecycle hooks (valid while system is active).
@@ -83,6 +87,8 @@ namespace eeng::ecs::systems
 
         // Callback for field edit events; filters for physics-affecting component changes.
         void handle_field_changed_event(const editor::FieldChangedEvent& event);
+        // Callback for batch load/unload completion; triggers a one-shot structural sync.
+        void handle_batch_task_event(const BatchTaskCompletedEvent& event);
 
         // Lifecycle hooks to create/destroy Bullet bodies as components appear/disappear.
         void on_rigidbody_construct(entt::registry& registry, entt::entity entity);
