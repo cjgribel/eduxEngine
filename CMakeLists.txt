@@ -290,6 +290,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/TransformSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/DebugRenderSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/PhysicsSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/ScriptSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/StickyNoteSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands_Entities.cpp

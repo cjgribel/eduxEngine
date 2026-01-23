@@ -13,6 +13,7 @@
 #include "ecs/ModelComponent.hpp"
 #include "ecs/AnimationGraphComponent.hpp"
 #include "ecs/PlayerControllerComponent.hpp"
+#include "ecs/ScriptComponent.hpp"
 #include "ecs/StickyNoteComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/CoreComponents.hpp"
@@ -670,6 +671,21 @@ namespace eeng
                 .traits(MetaFlags::none)
                 ;
             register_component<ecs::PlayerControllerComponent>();
+        }
+
+        // --- Script component ----------------------------------------------
+        {
+            entt::meta_factory<eeng::ecs::ScriptComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.ScriptComponent", .name = "ScriptComponent", .tooltip = "Script binding placeholder." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ScriptComponent::script_id>("script_id"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "script_id", "Script Id", "Script identifier or path." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ScriptComponent::enabled>("enabled"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable script execution." })
+                .traits(MetaFlags::none)
+                ;
+            register_component<ecs::ScriptComponent>();
         }
 
         // --- Physics enums --------------------------------------------------

@@ -9,6 +9,7 @@
 #include "ecs/systems/AnimationGraphSystem.hpp"
 #include "ecs/systems/PlayerControllerSystem.hpp"
 #include "ecs/systems/PhysicsSystem.hpp"
+#include "ecs/systems/ScriptSystem.hpp"
 #include "ecs/systems/DebugRenderSystem.hpp"
 #include "ecs/systems/RenderSystem.hpp"
 #include "ecs/systems/StickyNoteSystem.hpp"
@@ -96,6 +97,8 @@ private:
     std::unique_ptr<eeng::ecs::systems::TransformSystem> transformSystem;
     // Bullet integration + ECS sync.
     std::unique_ptr<eeng::ecs::systems::PhysicsSystem> physicsSystem;
+    // Script system placeholder wired into component lifetime.
+    std::unique_ptr<eeng::ecs::systems::ScriptSystem> scriptSystem;
     std::unique_ptr<eeng::ecs::systems::DebugRenderSystem> debugRenderSystem;
     std::unique_ptr<eeng::ecs::systems::StickyNoteSystem> stickyNoteSystem;
     std::unique_ptr<eeng::editor::EditorRuntime> editorRuntime;

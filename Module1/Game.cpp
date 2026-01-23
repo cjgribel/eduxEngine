@@ -335,6 +335,9 @@ bool Game::init()
     // Physics system holds the Bullet world and ECS bindings.
     physicsSystem = std::make_unique<eeng::ecs::systems::PhysicsSystem>();
     physicsSystem->init(*ctx);
+    // Script system placeholder (lifecycle hooks only for now).
+    scriptSystem = std::make_unique<eeng::ecs::systems::ScriptSystem>();
+    scriptSystem->init(*ctx);
     debugRenderSystem = std::make_unique<eeng::ecs::systems::DebugRenderSystem>();
     stickyNoteSystem = std::make_unique<eeng::ecs::systems::StickyNoteSystem>();
 
@@ -1019,6 +1022,13 @@ void Game::update(
         physicsSystem->update(registry, *ctx, deltaTime);
     }
 
+    if (scriptSystem)
+    {
+        // Placeholder: script execution will live here once we bind Lua.
+        auto& registry = ctx->entity_manager->registry();
+        scriptSystem->update(registry, *ctx, deltaTime);
+    }
+
     // TODO: consider scheduling transform cache updates as an Engine-level system phase.
     if (editorRuntime)
     {
@@ -1298,6 +1308,9 @@ void Game::destroy()
     if (physicsSystem)
         // Ensure Bullet resources are released cleanly.
         physicsSystem->shutdown();
+    if (scriptSystem)
+        // Ensure script runtime cleanup is called once it exists.
+        scriptSystem->shutdown();
 }
 
 void Game::updateCamera()
