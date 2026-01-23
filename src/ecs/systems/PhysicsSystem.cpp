@@ -123,6 +123,9 @@ namespace eeng::ecs::systems
         if (initialized_)
             return;
 
+        // Cache context for lifecycle hooks and log messages.
+        ctx_ = &ctx;
+
         // Centralized dirtying: listen to field edits and mark entities for rebuild.
         // We intentionally avoid per-component post-assign hooks to keep this policy in one place.
         auto* event_queue = eeng::try_get_event_queue(ctx, "PhysicsSystem");
@@ -132,6 +135,24 @@ namespace eeng::ecs::systems
                 {
                     handle_field_changed_event(event);
                 });
+        }
+
+        // Lifecycle hooks: respond immediately to component add/remove.
+        auto* registry = eeng::try_get_registry_ptr(ctx, "PhysicsSystem");
+        if (registry)
+        {
+            rb_construct_conn_ = registry->on_construct<ecs::RigidBodyComponent>()
+                .connect<&PhysicsSystem::on_rigidbody_construct>(this);
+            rb_destroy_conn_ = registry->on_destroy<ecs::RigidBodyComponent>()
+                .connect<&PhysicsSystem::on_rigidbody_destroy>(this);
+            collider_construct_conn_ = registry->on_construct<ecs::ColliderComponent>()
+                .connect<&PhysicsSystem::on_collider_construct>(this);
+            collider_destroy_conn_ = registry->on_destroy<ecs::ColliderComponent>()
+                .connect<&PhysicsSystem::on_collider_destroy>(this);
+            transform_construct_conn_ = registry->on_construct<ecs::TransformComponent>()
+                .connect<&PhysicsSystem::on_transform_construct>(this);
+            transform_destroy_conn_ = registry->on_destroy<ecs::TransformComponent>()
+                .connect<&PhysicsSystem::on_transform_destroy>(this);
         }
 
         // Configure and spin up the Bullet world.
@@ -156,6 +177,8 @@ namespace eeng::ecs::systems
         }
 
         bodies_.clear();
+        dirty_entities_.clear();
+        ctx_ = nullptr;
         world_.shutdown();
         initialized_ = false;
     }
@@ -238,115 +261,8 @@ namespace eeng::ecs::systems
             if (bodies_.find(entity) != bodies_.end())
                 continue;
 
-            const auto& tfm = view.get<ecs::TransformComponent>(entity);
-            const auto& rb = view.get<ecs::RigidBodyComponent>(entity);
-            const auto& colliders = view.get<ecs::ColliderComponent>(entity);
-
-            if (colliders.colliders.empty())
-            {
-                EENG_LOG_WARN(&ctx, "PhysicsSystem: Entity %u has RigidBody but no colliders.",
-                    static_cast<unsigned>(entt::to_integral(entity)));
-                continue;
-            }
-
-            BodyRuntime runtime{};
-            runtime.compound_shape = std::make_unique<btCompoundShape>();
-
-            // Build child shapes for every collider (rebuilds are driven by the dirty set).
-            for (const auto& collider : colliders.colliders)
-            {
-                auto shape = build_shape(collider, tfm.scale, settings_.units_per_meter);
-                if (!shape)
-                    continue;
-
-                btTransform local;
-                local.setIdentity();
-                // Collider offsets should respect entity scale in the same way as size.
-                local.setOrigin(to_bt_vec3(collider.local_position * tfm.scale, settings_.units_per_meter));
-                local.setRotation(to_bt_quat(collider.local_rotation));
-
-                runtime.compound_shape->addChildShape(local, shape.get());
-                runtime.child_shapes.emplace_back(std::move(shape));
-            }
-
-            if (runtime.child_shapes.empty())
-                continue;
-
-            // Update compound bounds after adding all children.
-            runtime.compound_shape->recalculateLocalAabb();
-
-            // Initial world transform uses current ECS local position/rotation.
-            // Note: this ignores parent transforms for now; we handle hierarchy later.
-            btTransform start_transform;
-            start_transform.setIdentity();
-            start_transform.setOrigin(to_bt_vec3(tfm.position, settings_.units_per_meter));
-            start_transform.setRotation(to_bt_quat(tfm.rotation));
-
-            runtime.motion_state = std::make_unique<btDefaultMotionState>(start_transform);
-
-            const bool is_dynamic = (rb.motion == ecs::PhysicsMotionType::Dynamic);
-            const bool is_kinematic = (rb.motion == ecs::PhysicsMotionType::Kinematic);
-
-            float mass = is_dynamic ? rb.mass : 0.0f;
-            if (is_dynamic && rb.auto_mass)
-            {
-                // Auto-mass is not computed yet; keep a reasonable non-zero default.
-                mass = rb.mass > 0.0f ? rb.mass : 1.0f;
-            }
-
-            btVector3 inertia(0.0f, 0.0f, 0.0f);
-            if (is_dynamic && mass > 0.0f)
-            {
-                // For now, rely on Bullet's shape-based inertia.
-                runtime.compound_shape->calculateLocalInertia(mass, inertia);
-            }
-
-            btRigidBody::btRigidBodyConstructionInfo info(
-                mass,
-                runtime.motion_state.get(),
-                runtime.compound_shape.get(),
-                inertia);
-
-            runtime.body = std::make_unique<btRigidBody>(info);
-
-            runtime.body->setDamping(rb.linear_damping, rb.angular_damping);
-
-            if (!rb.allow_sleep || is_kinematic)
-                runtime.body->setActivationState(DISABLE_DEACTIVATION);
-
-            if (is_dynamic)
-            {
-                // Gravity is set per-body so we can respect gravity_scale.
-                const btVector3 gravity(
-                    settings_.gravity.x * rb.gravity_scale,
-                    settings_.gravity.y * rb.gravity_scale,
-                    settings_.gravity.z * rb.gravity_scale);
-                runtime.body->setGravity(gravity);
-            }
-
-            if (rb.enable_ccd)
-            {
-                runtime.body->setCcdMotionThreshold(rb.ccd_motion_threshold);
-                runtime.body->setCcdSweptSphereRadius(rb.ccd_swept_sphere_radius);
-            }
-
-            if (is_kinematic)
-            {
-                runtime.body->setCollisionFlags(
-                    runtime.body->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-            }
-
-            // Store the entity id on the Bullet body for future contact callbacks.
-            runtime.body->setUserIndex(static_cast<int>(entt::to_integral(entity)));
-
-            world->addRigidBody(runtime.body.get());
-            // Cache state so we can detect edits later.
-            runtime.motion = rb.motion;
-            runtime.scale = tfm.scale;
-            bodies_.emplace(entity, std::move(runtime));
-
-            // Clear any pending dirty request once we have rebuilt the Bullet body.
-            dirty_entities_.erase(entity);
+            if (!create_body_for_entity(registry, ctx, entity, true))
+                dirty_entities_.erase(entity);
         }
 
         // Drop dirty flags for entities that are no longer valid or lack required components.
@@ -358,6 +274,149 @@ namespace eeng::ecs::systems
             else
                 ++it;
         }
+    }
+
+    bool PhysicsSystem::create_body_for_entity(
+        entt::registry& registry,
+        EngineContext& ctx,
+        entt::entity entity,
+        bool log_missing_colliders)
+    {
+        if (bodies_.find(entity) != bodies_.end())
+            return true;
+
+        if (!registry.all_of<ecs::TransformComponent, ecs::RigidBodyComponent, ecs::ColliderComponent>(entity))
+            return false;
+
+        const auto& tfm = registry.get<ecs::TransformComponent>(entity);
+        const auto& rb = registry.get<ecs::RigidBodyComponent>(entity);
+        const auto& colliders = registry.get<ecs::ColliderComponent>(entity);
+
+        if (colliders.colliders.empty())
+        {
+            if (log_missing_colliders)
+            {
+                EENG_LOG_WARN(&ctx, "PhysicsSystem: Entity %u has RigidBody but no colliders.",
+                    static_cast<unsigned>(entt::to_integral(entity)));
+            }
+            return false;
+        }
+
+        BodyRuntime runtime{};
+        runtime.compound_shape = std::make_unique<btCompoundShape>();
+
+        // Build child shapes for every collider (rebuilds are driven by the dirty set).
+        for (const auto& collider : colliders.colliders)
+        {
+            auto shape = build_shape(collider, tfm.scale, settings_.units_per_meter);
+            if (!shape)
+                continue;
+
+            btTransform local;
+            local.setIdentity();
+            // Collider offsets should respect entity scale in the same way as size.
+            local.setOrigin(to_bt_vec3(collider.local_position * tfm.scale, settings_.units_per_meter));
+            local.setRotation(to_bt_quat(collider.local_rotation));
+
+            runtime.compound_shape->addChildShape(local, shape.get());
+            runtime.child_shapes.emplace_back(std::move(shape));
+        }
+
+        if (runtime.child_shapes.empty())
+            return false;
+
+        // Update compound bounds after adding all children.
+        runtime.compound_shape->recalculateLocalAabb();
+
+        // Initial world transform uses current ECS local position/rotation.
+        // Note: this ignores parent transforms for now; we handle hierarchy later.
+        btTransform start_transform;
+        start_transform.setIdentity();
+        start_transform.setOrigin(to_bt_vec3(tfm.position, settings_.units_per_meter));
+        start_transform.setRotation(to_bt_quat(tfm.rotation));
+
+        runtime.motion_state = std::make_unique<btDefaultMotionState>(start_transform);
+
+        const bool is_dynamic = (rb.motion == ecs::PhysicsMotionType::Dynamic);
+        const bool is_kinematic = (rb.motion == ecs::PhysicsMotionType::Kinematic);
+
+        float mass = is_dynamic ? rb.mass : 0.0f;
+        if (is_dynamic && rb.auto_mass)
+        {
+            // Auto-mass is not computed yet; keep a reasonable non-zero default.
+            mass = rb.mass > 0.0f ? rb.mass : 1.0f;
+        }
+
+        btVector3 inertia(0.0f, 0.0f, 0.0f);
+        if (is_dynamic && mass > 0.0f)
+        {
+            // For now, rely on Bullet's shape-based inertia.
+            runtime.compound_shape->calculateLocalInertia(mass, inertia);
+        }
+
+        btRigidBody::btRigidBodyConstructionInfo info(
+            mass,
+            runtime.motion_state.get(),
+            runtime.compound_shape.get(),
+            inertia);
+
+        runtime.body = std::make_unique<btRigidBody>(info);
+
+        runtime.body->setDamping(rb.linear_damping, rb.angular_damping);
+
+        if (!rb.allow_sleep || is_kinematic)
+            runtime.body->setActivationState(DISABLE_DEACTIVATION);
+
+        if (is_dynamic)
+        {
+            // Gravity is set per-body so we can respect gravity_scale.
+            const btVector3 gravity(
+                settings_.gravity.x * rb.gravity_scale,
+                settings_.gravity.y * rb.gravity_scale,
+                settings_.gravity.z * rb.gravity_scale);
+            runtime.body->setGravity(gravity);
+        }
+
+        if (rb.enable_ccd)
+        {
+            runtime.body->setCcdMotionThreshold(rb.ccd_motion_threshold);
+            runtime.body->setCcdSweptSphereRadius(rb.ccd_swept_sphere_radius);
+        }
+
+        if (is_kinematic)
+        {
+            runtime.body->setCollisionFlags(
+                runtime.body->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+        }
+
+        // Store the entity id on the Bullet body for future contact callbacks.
+        runtime.body->setUserIndex(static_cast<int>(entt::to_integral(entity)));
+
+        if (auto* world = world_.world())
+            world->addRigidBody(runtime.body.get());
+
+        // Cache state so we can detect edits later.
+        runtime.motion = rb.motion;
+        runtime.scale = tfm.scale;
+        bodies_.emplace(entity, std::move(runtime));
+        // Clear any pending dirty request once we have created the Bullet body.
+        dirty_entities_.erase(entity);
+        return true;
+    }
+
+    void PhysicsSystem::destroy_body_for_entity(entt::entity entity)
+    {
+        auto it = bodies_.find(entity);
+        if (it == bodies_.end())
+            return;
+
+        if (auto* world = world_.world())
+        {
+            if (it->second.body)
+                world->removeRigidBody(it->second.body.get());
+        }
+        bodies_.erase(it);
+        dirty_entities_.erase(entity);
     }
 
     void PhysicsSystem::sync_transforms_to_bullet(entt::registry& registry)
@@ -467,6 +526,54 @@ namespace eeng::ecs::systems
         // Store in the local dirty set; rebuild happens on the next PhysicsSystem update.
         // RigidBody/Collider edits always dirty; Transform edits are filtered above.
         dirty_entities_.insert(*entity_opt);
+    }
+
+    void PhysicsSystem::on_rigidbody_construct(entt::registry& registry, entt::entity entity)
+    {
+        if (!ctx_)
+            return;
+
+        // Structural change: try to create immediately, otherwise mark for next sync.
+        if (!create_body_for_entity(registry, *ctx_, entity, false))
+            dirty_entities_.insert(entity);
+    }
+
+    void PhysicsSystem::on_rigidbody_destroy(entt::registry&, entt::entity entity)
+    {
+        // Structural change: remove Bullet body immediately if present.
+        destroy_body_for_entity(entity);
+    }
+
+    void PhysicsSystem::on_collider_construct(entt::registry& registry, entt::entity entity)
+    {
+        if (!ctx_)
+            return;
+
+        // Structural change: try to create immediately, otherwise mark for next sync.
+        if (!create_body_for_entity(registry, *ctx_, entity, false))
+            dirty_entities_.insert(entity);
+    }
+
+    void PhysicsSystem::on_collider_destroy(entt::registry&, entt::entity entity)
+    {
+        // Structural change: remove Bullet body immediately if present.
+        destroy_body_for_entity(entity);
+    }
+
+    void PhysicsSystem::on_transform_construct(entt::registry& registry, entt::entity entity)
+    {
+        if (!ctx_)
+            return;
+
+        // Structural change: try to create immediately, otherwise mark for next sync.
+        if (!create_body_for_entity(registry, *ctx_, entity, false))
+            dirty_entities_.insert(entity);
+    }
+
+    void PhysicsSystem::on_transform_destroy(entt::registry&, entt::entity entity)
+    {
+        // Structural change: remove Bullet body immediately if present.
+        destroy_body_for_entity(entity);
     }
 
 } // namespace eeng::ecs::systems

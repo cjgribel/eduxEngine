@@ -30,7 +30,7 @@ namespace eeng::ecs::systems
 {
     // Physics system that bridges ECS components to a Bullet world.
     // Notes:
-    // - Uses a private dirty set fed by FieldChangedEvent for editor edits.
+    // - Uses a private dirty set fed by FieldChangedEvent + lifecycle hooks.
     // - Keeps a small cache of motion/scale so non-editor changes are also caught safely.
     class PhysicsSystem
     {
@@ -62,9 +62,20 @@ namespace eeng::ecs::systems
         physics::PhysicsWorld world_;
         physics::PhysicsWorldSettings settings_{};
         std::unordered_map<entt::entity, BodyRuntime> bodies_;
-        // Central dirty set populated from editor field edit events.
+        // Central dirty set populated from editor field edit events + construct hooks.
         std::unordered_set<entt::entity> dirty_entities_;
         bool initialized_ = false;
+
+        // Non-owning context pointer used by lifecycle hooks (valid while system is active).
+        EngineContext* ctx_ = nullptr;
+
+        // Scoped connections keep entt signal hooks tied to this system's lifetime.
+        entt::scoped_connection rb_construct_conn_;
+        entt::scoped_connection rb_destroy_conn_;
+        entt::scoped_connection collider_construct_conn_;
+        entt::scoped_connection collider_destroy_conn_;
+        entt::scoped_connection transform_construct_conn_;
+        entt::scoped_connection transform_destroy_conn_;
 
         void sync_bodies(entt::registry& registry, EngineContext& ctx);
         void sync_transforms_to_bullet(entt::registry& registry);
@@ -72,5 +83,20 @@ namespace eeng::ecs::systems
 
         // Callback for field edit events; filters for physics-affecting component changes.
         void handle_field_changed_event(const editor::FieldChangedEvent& event);
+
+        // Lifecycle hooks to create/destroy Bullet bodies as components appear/disappear.
+        void on_rigidbody_construct(entt::registry& registry, entt::entity entity);
+        void on_rigidbody_destroy(entt::registry& registry, entt::entity entity);
+        void on_collider_construct(entt::registry& registry, entt::entity entity);
+        void on_collider_destroy(entt::registry& registry, entt::entity entity);
+        void on_transform_construct(entt::registry& registry, entt::entity entity);
+        void on_transform_destroy(entt::registry& registry, entt::entity entity);
+
+        // Helpers for creating/removing bodies without duplicating sync_bodies logic.
+        bool create_body_for_entity(entt::registry& registry,
+            EngineContext& ctx,
+            entt::entity entity,
+            bool log_missing_colliders);
+        void destroy_body_for_entity(entt::entity entity);
     };
 } // namespace eeng::ecs::systems
