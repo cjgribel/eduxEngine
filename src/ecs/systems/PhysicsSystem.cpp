@@ -161,6 +161,9 @@ namespace eeng::ecs::systems
                 .connect<&PhysicsSystem::on_transform_destroy>(this);
         }
 
+        // Force an initial sync in case entities existed before hooks were connected.
+        batch_sync_requested_ = true;
+
         // Configure and spin up the Bullet world.
         settings_ = physics::PhysicsWorldSettings{};
         world_.init(settings_);
