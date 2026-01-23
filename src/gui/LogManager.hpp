@@ -15,6 +15,7 @@ namespace eeng
         ~LogManager();
 
         void log(const char* fmt, ...) override;
+        void log(const ILogManager::LogColor& color, const char* fmt, ...) override;
         void clear() override;
 
     private:

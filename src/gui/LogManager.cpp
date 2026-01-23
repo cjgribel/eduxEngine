@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <string>
+#include <vector>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
@@ -68,9 +69,18 @@ namespace eeng
 {
     struct LogManager::Widget
     {
-        ImGuiTextBuffer buf;
+        using LogColor = ILogManager::LogColor;
+
+        struct LogEntry
+        {
+            std::string message;
+            std::string display;
+            int count = 1;
+            LogColor color;
+        };
+
+        std::vector<LogEntry> entries;
         ImGuiTextFilter filter;
-        ImVector<int> line_offsets;
         bool auto_scroll = true;
         bool scroll_to_bottom = false;
 
@@ -81,22 +91,59 @@ namespace eeng
 
         void clear()
         {
-            buf.clear();
-            line_offsets.clear();
-            line_offsets.push_back(0);
+            entries.clear();
         }
 
-        void add_log(const std::string& text)
+        static bool same_color(const LogColor& a, const LogColor& b)
         {
-            int old_size = buf.size();
-            buf.appendf("%s", text.c_str());
+            if (a.has_color != b.has_color)
+                return false;
+            if (!a.has_color)
+                return true;
+            return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+        }
 
-            for (int i = old_size; i < buf.size(); ++i)
-                if (buf[i] == '\n')
-                    line_offsets.push_back(i + 1);
+        static std::string format_display_line(const std::string& time_prefix, const std::string& message, int count)
+        {
+            if (count > 1)
+                return time_prefix + " " + message + " (x" + std::to_string(count) + ")";
+            return time_prefix + " " + message;
+        }
+
+        void add_log(const std::string& message, const LogColor& color)
+        {
+            std::string time_prefix = relative_time_string();
+            if (!entries.empty() && entries.back().message == message && same_color(entries.back().color, color))
+            {
+                LogEntry& entry = entries.back();
+                ++entry.count;
+                entry.display = format_display_line(time_prefix, message, entry.count);
+            }
+            else
+            {
+                LogEntry entry;
+                entry.message = message;
+                entry.display = format_display_line(time_prefix, message, 1);
+                entry.color = color;
+                entries.push_back(std::move(entry));
+            }
 
             if (auto_scroll)
                 scroll_to_bottom = true;
+        }
+
+        void draw_line(const LogEntry& entry) const
+        {
+            if (entry.color.has_color)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(entry.color.r, entry.color.g, entry.color.b, entry.color.a));
+                ImGui::TextUnformatted(entry.display.c_str());
+                ImGui::PopStyleColor();
+            }
+            else
+            {
+                ImGui::TextUnformatted(entry.display.c_str());
+            }
         }
 
         void draw(const char* title, bool* p_open)
@@ -134,33 +181,25 @@ namespace eeng
                 ImGui::LogToClipboard();
 
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-            const char* buf_begin = buf.begin();
-            const char* buf_end = buf.end();
             if (filter.IsActive())
             {
-                for (int line_no = 0; line_no < line_offsets.Size; line_no++)
+                for (const LogEntry& entry : entries)
                 {
-                    const char* line_start = buf_begin + line_offsets[line_no];
-                    const char* line_end = (line_no + 1 < line_offsets.Size)
-                        ? (buf_begin + line_offsets[line_no + 1] - 1)
-                        : buf_end;
+                    const char* line_start = entry.display.c_str();
+                    const char* line_end = line_start + entry.display.size();
                     if (filter.PassFilter(line_start, line_end))
-                        ImGui::TextUnformatted(line_start, line_end);
+                        draw_line(entry);
                 }
             }
             else
             {
                 ImGuiListClipper clipper;
-                clipper.Begin(line_offsets.Size);
+                clipper.Begin(static_cast<int>(entries.size()));
                 while (clipper.Step())
                 {
                     for (int line_no = clipper.DisplayStart; line_no < clipper.DisplayEnd; line_no++)
                     {
-                        const char* line_start = buf_begin + line_offsets[line_no];
-                        const char* line_end = (line_no + 1 < line_offsets.Size)
-                            ? (buf_begin + line_offsets[line_no + 1] - 1)
-                            : buf_end;
-                        ImGui::TextUnformatted(line_start, line_end);
+                        draw_line(entries[static_cast<size_t>(line_no)]);
                     }
                 }
                 clipper.End();
@@ -192,16 +231,22 @@ namespace eeng
         std::string formatted = format_string(fmt, args);
         va_end(args);
 
-        // Frame counter prefix
-            //std::string with_prefix = "[frame#" + std::to_string(ImGui::GetFrameCount()) + "] " + formatted + "\n";
-        // Wall clock time stamp
-            //std::string with_prefix = current_time_string() + " " + formatted + "\n";
-        // Relative time stamp
-        std::string with_prefix = relative_time_string() + " " + formatted + "\n";
+        {
+            std::lock_guard<std::mutex> lk(mutex_);
+            widget_ptr->add_log(formatted, ILogManager::LogColor{});
+        }
+    }
+
+    void LogManager::log(const ILogManager::LogColor& color, const char* fmt, ...)
+    {
+        va_list args;
+        va_start(args, fmt);
+        std::string formatted = format_string(fmt, args);
+        va_end(args);
 
         {
             std::lock_guard<std::mutex> lk(mutex_);
-            widget_ptr->add_log(with_prefix);
+            widget_ptr->add_log(formatted, color);
         }
     }
 

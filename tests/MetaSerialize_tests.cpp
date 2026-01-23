@@ -155,6 +155,7 @@ namespace
     {
     public:
         void log(const char* fmt, ...) override {}
+        void log(const LogColor& color, const char* fmt, ...) override {}
         void clear() override {}
     };
 
