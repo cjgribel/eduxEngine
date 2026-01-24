@@ -81,6 +81,7 @@ namespace eeng::ecs
         AssetRef<assets::ModelDataAsset> mesh_ref;
         int submesh_index = -1;
 
+        // Trigger colliders emit events without physical response (see PhysicsSystem limitation).
         bool is_trigger = false;
     };
 
@@ -142,7 +143,8 @@ namespace eeng::ecs
     // Optional collision/trigger event toggles + runtime event buffer.
     struct PhysicsEventsComponent
     {
-        bool emit_collisions = true;
+        // Collision events are opt-in by default; triggers remain opt-out.
+        bool emit_collisions = false;
         bool emit_triggers = true;
         // Runtime-only event buffer populated by PhysicsSystem each frame.
         std::vector<CollisionEvent> events;

@@ -365,6 +365,9 @@ namespace eeng::ecs::systems
         BodyRuntime runtime{};
         runtime.compound_shape = std::make_unique<btCompoundShape>();
 
+        bool has_trigger = false;
+        bool has_solid = false;
+
         // Build child shapes for every collider (rebuilds are driven by the dirty set).
         for (const auto& collider : colliders.colliders)
         {
@@ -383,6 +386,11 @@ namespace eeng::ecs::systems
             // Track collider metadata by child index so contact events can resolve ids.
             runtime.collider_info.push_back(
                 BodyRuntime::ColliderRuntimeInfo{ collider.id, collider.is_trigger });
+
+            if (collider.is_trigger)
+                has_trigger = true;
+            else
+                has_solid = true;
         }
 
         if (runtime.child_shapes.empty())
@@ -450,6 +458,16 @@ namespace eeng::ecs::systems
         {
             runtime.body->setCollisionFlags(
                 runtime.body->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+        }
+
+        // Trigger rule: any trigger collider makes the entire body non-contact-response.
+        // Limitation: Bullet flags are per-body, so mixing trigger + solid colliders on one body
+        // will disable physical response for all colliders; use separate entities in that case.
+        if (has_trigger)
+        {
+            runtime.body->setCollisionFlags(
+                runtime.body->getCollisionFlags() | btCollisionObject::CF_NO_CONTACT_RESPONSE);
+            (void)has_solid;
         }
 
         // Store the entity id on the Bullet body for future contact callbacks.
@@ -621,6 +639,15 @@ namespace eeng::ecs::systems
             const auto collider1 = resolve_collider_info(runtime1_it->second, point->m_partId1);
             // Trigger policy: if either collider is marked as trigger, treat the pair as trigger.
             const bool is_trigger = collider0.is_trigger || collider1.is_trigger;
+
+            // Interest gating: only build contact records when at least one side requests events
+            // for the current contact type (trigger vs collision).
+            const auto* events0 = registry.try_get<ecs::PhysicsEventsComponent>(entity0);
+            const auto* events1 = registry.try_get<ecs::PhysicsEventsComponent>(entity1);
+            const bool wants0 = events0 && (is_trigger ? events0->emit_triggers : events0->emit_collisions);
+            const bool wants1 = events1 && (is_trigger ? events1->emit_triggers : events1->emit_collisions);
+            if (!wants0 && !wants1)
+                continue;
 
             const btVector3 point_world_bt =
                 (point->m_positionWorldOnA + point->m_positionWorldOnB) * btScalar(0.5f);
