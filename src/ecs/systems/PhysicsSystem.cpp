@@ -633,10 +633,10 @@ namespace eeng::ecs::systems
         if (!dispatcher)
             return;
 
-        std::unordered_map<ContactKey, ContactInfo, ContactKeyHash> current_contacts;
+        current_contacts_.clear();
         const int manifold_count = dispatcher->getNumManifolds();
         if (manifold_count > 0)
-            current_contacts.reserve(static_cast<std::size_t>(manifold_count));
+            current_contacts_.reserve(static_cast<std::size_t>(manifold_count));
 
         // Build the current contact set from Bullet manifolds.
         for (int i = 0; i < manifold_count; ++i)
@@ -696,7 +696,7 @@ namespace eeng::ecs::systems
             }
 
             ContactInfo info{ point_world, normal_world, impulse };
-            auto [it, inserted] = current_contacts.emplace(key, info);
+            auto [it, inserted] = current_contacts_.emplace(key, info);
             if (!inserted && info.impulse > it->second.impulse)
             {
                 // Prefer the strongest contact point for this pair.
@@ -783,7 +783,7 @@ namespace eeng::ecs::systems
         };
 
         // Emit enter/stay events for current contacts.
-        for (const auto& [key, info] : current_contacts)
+        for (const auto& [key, info] : current_contacts_)
         {
             const auto prev_it = previous_contacts_.find(key);
             const ecs::ContactPhase phase =
@@ -800,7 +800,7 @@ namespace eeng::ecs::systems
         // Emit exit events for contacts that disappeared.
         for (const auto& [key, info] : previous_contacts_)
         {
-            if (current_contacts.find(key) != current_contacts.end())
+            if (current_contacts_.find(key) != current_contacts_.end())
                 continue;
 
             emit_event(key.entity_a, key.entity_b, key.collider_a, key.collider_b,
@@ -810,7 +810,7 @@ namespace eeng::ecs::systems
         }
 
         // Carry current contacts forward for the next frame's enter/stay/exit tests.
-        previous_contacts_ = std::move(current_contacts);
+        previous_contacts_.swap(current_contacts_);
     }
 
     void PhysicsSystem::handle_field_changed_event(const editor::FieldChangedEvent& event)
