@@ -5,7 +5,9 @@
 
 #include "EngineContext.hpp"
 #include "LogMacros.h"
+#include "ecs/HeaderComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
+#include "ecs/StickyNoteComponent.hpp"
 #include "ecs/TransformComponent.hpp"
 #include "engineapi/EngineContextHelpers.hpp"
 #include "editor/AssignFieldCommand.hpp"
@@ -14,6 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <string>
 
 namespace
 {
@@ -52,6 +55,12 @@ namespace
         return glm::vec3(v.x(), v.y(), v.z()) * units_per_meter;
     }
 
+    // Convert Bullet-space direction vectors without unit scaling.
+    glm::vec3 from_bt_dir3(const btVector3& v)
+    {
+        return glm::vec3(v.x(), v.y(), v.z());
+    }
+
     // Convert quaternion (same numeric layout, different type).
     btQuaternion to_bt_quat(const glm::quat& q)
     {
@@ -68,6 +77,37 @@ namespace
     {
         return (scale.x + scale.y + scale.z) / 3.0f;
     }
+
+    // Pick a representative contact point from a manifold (prefer a penetrating one).
+    const btManifoldPoint* select_contact_point(const btPersistentManifold& manifold)
+    {
+        if (manifold.getNumContacts() == 0)
+            return nullptr;
+
+        const btManifoldPoint* best = &manifold.getContactPoint(0);
+        for (int i = 0; i < manifold.getNumContacts(); ++i)
+        {
+            const btManifoldPoint& point = manifold.getContactPoint(i);
+            if (point.getDistance() < 0.0f)
+                return &point;
+        }
+        return best;
+    }
+
+    // Consistent ordering for contact keys so enter/exit works regardless of Bullet body order.
+    bool should_swap_contact(
+        entt::entity entity_a,
+        entt::entity entity_b,
+        eeng::ecs::ColliderId collider_a,
+        eeng::ecs::ColliderId collider_b)
+    {
+        const auto id_a = entt::to_integral(entity_a);
+        const auto id_b = entt::to_integral(entity_b);
+        if (id_a != id_b)
+            return id_a > id_b;
+        return collider_a > collider_b;
+    }
+
 
     // Build a Bullet shape from a collider description and entity scale.
     std::unique_ptr<btCollisionShape> build_shape(
@@ -197,6 +237,9 @@ namespace eeng::ecs::systems
         if (!initialized_)
             return;
 
+        // Clear per-frame physics event buffers before we run the next simulation step.
+        clear_contact_events(registry);
+
         // Keep the Bullet world in sync with ECS ownership.
         // We only scan when there are dirty entities or a batch boundary requests a sync.
         if (batch_sync_requested_ || !dirty_entities_.empty())
@@ -210,6 +253,9 @@ namespace eeng::ecs::systems
 
         // Step the simulation.
         world_.step_simulation(delta_time);
+
+        // Gather contact events from Bullet for enter/stay/exit classification.
+        emit_contact_events(registry, ctx);
 
         // Pull transforms back for dynamic bodies.
         sync_transforms_from_bullet(registry);
@@ -334,6 +380,9 @@ namespace eeng::ecs::systems
 
             runtime.compound_shape->addChildShape(local, shape.get());
             runtime.child_shapes.emplace_back(std::move(shape));
+            // Track collider metadata by child index so contact events can resolve ids.
+            runtime.collider_info.push_back(
+                BodyRuntime::ColliderRuntimeInfo{ collider.id, collider.is_trigger });
         }
 
         if (runtime.child_shapes.empty())
@@ -487,6 +536,222 @@ namespace eeng::ecs::systems
             tfm->rotation = glm::normalize(from_bt_quat(transform.getRotation()));
             tfm->mark_local_dirty();
         }
+    }
+
+    PhysicsSystem::BodyRuntime::ColliderRuntimeInfo
+    PhysicsSystem::resolve_collider_info(
+        const BodyRuntime& runtime,
+        int part_id)
+    {
+        if (runtime.collider_info.empty())
+            return {};
+
+        int index = part_id;
+        if (index < 0 || index >= static_cast<int>(runtime.collider_info.size()))
+            index = 0;
+
+        return runtime.collider_info[static_cast<std::size_t>(index)];
+    }
+
+    void PhysicsSystem::clear_contact_events(entt::registry& registry)
+    {
+        if (event_entities_.empty())
+            return;
+
+        // Clear only the entities we touched last frame to avoid full registry scans.
+        for (const auto entity : event_entities_)
+        {
+            if (!registry.valid(entity))
+                continue;
+
+            if (auto* events = registry.try_get<ecs::PhysicsEventsComponent>(entity))
+                events->events.clear();
+        }
+
+        event_entities_.clear();
+    }
+
+    void PhysicsSystem::emit_contact_events(entt::registry& registry, EngineContext& ctx)
+    {
+        // Context is reserved for future logging/metrics without threading through globals.
+        (void)ctx;
+        auto* world = world_.world();
+        if (!world)
+            return;
+
+        auto* dispatcher = world->getDispatcher();
+        if (!dispatcher)
+            return;
+
+        std::unordered_map<ContactKey, ContactInfo, ContactKeyHash> current_contacts;
+        const int manifold_count = dispatcher->getNumManifolds();
+        if (manifold_count > 0)
+            current_contacts.reserve(static_cast<std::size_t>(manifold_count));
+
+        // Build the current contact set from Bullet manifolds.
+        for (int i = 0; i < manifold_count; ++i)
+        {
+            const btPersistentManifold* manifold = dispatcher->getManifoldByIndexInternal(i);
+            if (!manifold)
+                continue;
+
+            const btCollisionObject* body0 = manifold->getBody0();
+            const btCollisionObject* body1 = manifold->getBody1();
+            if (!body0 || !body1)
+                continue;
+
+            const int id0 = body0->getUserIndex();
+            const int id1 = body1->getUserIndex();
+            if (id0 < 0 || id1 < 0)
+                continue;
+
+            const entt::entity entity0 = static_cast<entt::entity>(id0);
+            const entt::entity entity1 = static_cast<entt::entity>(id1);
+
+            auto runtime0_it = bodies_.find(entity0);
+            auto runtime1_it = bodies_.find(entity1);
+            if (runtime0_it == bodies_.end() || runtime1_it == bodies_.end())
+                continue;
+
+            const btManifoldPoint* point = select_contact_point(*manifold);
+            if (!point)
+                continue;
+
+            const auto collider0 = resolve_collider_info(runtime0_it->second, point->m_partId0);
+            const auto collider1 = resolve_collider_info(runtime1_it->second, point->m_partId1);
+            // Trigger policy: if either collider is marked as trigger, treat the pair as trigger.
+            const bool is_trigger = collider0.is_trigger || collider1.is_trigger;
+
+            const btVector3 point_world_bt =
+                (point->m_positionWorldOnA + point->m_positionWorldOnB) * btScalar(0.5f);
+            glm::vec3 point_world = from_bt_vec3(point_world_bt, settings_.units_per_meter);
+            glm::vec3 normal_world = from_bt_dir3(point->m_normalWorldOnB);
+            const float impulse = point->getAppliedImpulse();
+
+            ContactKey key{ entity0, entity1, collider0.id, collider1.id, is_trigger };
+            if (should_swap_contact(entity0, entity1, collider0.id, collider1.id))
+            {
+                std::swap(key.entity_a, key.entity_b);
+                std::swap(key.collider_a, key.collider_b);
+                normal_world = -normal_world;
+            }
+
+            ContactInfo info{ point_world, normal_world, impulse };
+            auto [it, inserted] = current_contacts.emplace(key, info);
+            if (!inserted && info.impulse > it->second.impulse)
+            {
+                // Prefer the strongest contact point for this pair.
+                it->second = info;
+            }
+        }
+
+        // Local helper to push events into components and sticky notes when requested.
+        auto emit_event = [&](entt::entity self,
+            entt::entity other,
+            ecs::ColliderId self_collider,
+            ecs::ColliderId other_collider,
+            const ContactInfo& info,
+            ecs::ContactPhase phase,
+            bool is_trigger,
+            bool invert_normal)
+        {
+            if (!registry.valid(self) || !registry.valid(other))
+                return;
+
+            auto* events = registry.try_get<ecs::PhysicsEventsComponent>(self);
+            if (!events)
+                return;
+
+            // Trigger policy: trigger pairs are filtered by emit_triggers.
+            if (is_trigger && !events->emit_triggers)
+                return;
+            // Trigger policy: non-trigger pairs are filtered by emit_collisions.
+            if (!is_trigger && !events->emit_collisions)
+                return;
+
+            ecs::CollisionEvent event{};
+            event.entity_a = ecs::Entity(self);
+            event.entity_b = ecs::Entity(other);
+            event.collider_id_a = self_collider;
+            event.collider_id_b = other_collider;
+            event.phase = phase;
+            event.is_trigger = is_trigger;
+            event.point = info.point;
+            event.normal = invert_normal ? -info.normal : info.normal;
+            event.impulse = info.impulse;
+
+            events->events.push_back(event);
+            event_entities_.insert(self);
+
+            // Optional quick debug output via StickyNoteComponent.
+            if (auto* note = registry.try_get<ecs::StickyNoteComponent>(self))
+            {
+                const char* phase_label = (phase == ecs::ContactPhase::Enter) ? "Enter"
+                    : (phase == ecs::ContactPhase::Stay) ? "Stay"
+                    : "Exit";
+                const char* type_label = is_trigger ? "Trigger" : "Collision";
+
+                std::string other_label;
+                if (auto* header = registry.try_get<ecs::HeaderComponent>(other);
+                    header && !header->name.empty())
+                {
+                    other_label = header->name;
+                }
+                else
+                {
+                    other_label = "Entity " + std::to_string(entt::to_integral(other));
+                }
+
+                std::string message;
+                message.reserve(64);
+                message.append(type_label);
+                message.push_back(' ');
+                message.append(phase_label);
+                message.append(": ");
+                message.append(other_label);
+
+                if (other_collider != 0)
+                {
+                    message.append(" #");
+                    message.append(std::to_string(other_collider));
+                }
+
+                if (phase == ecs::ContactPhase::Stay)
+                    StickyNoteComponent_AppendStack(*note, message);
+                else
+                    StickyNoteComponent_Append(*note, message);
+            }
+        };
+
+        // Emit enter/stay events for current contacts.
+        for (const auto& [key, info] : current_contacts)
+        {
+            const auto prev_it = previous_contacts_.find(key);
+            const ecs::ContactPhase phase =
+                (prev_it == previous_contacts_.end())
+                ? ecs::ContactPhase::Enter
+                : ecs::ContactPhase::Stay;
+
+            emit_event(key.entity_a, key.entity_b, key.collider_a, key.collider_b,
+                info, phase, key.is_trigger, false);
+            emit_event(key.entity_b, key.entity_a, key.collider_b, key.collider_a,
+                info, phase, key.is_trigger, true);
+        }
+
+        // Emit exit events for contacts that disappeared.
+        for (const auto& [key, info] : previous_contacts_)
+        {
+            if (current_contacts.find(key) != current_contacts.end())
+                continue;
+
+            emit_event(key.entity_a, key.entity_b, key.collider_a, key.collider_b,
+                info, ecs::ContactPhase::Exit, key.is_trigger, false);
+            emit_event(key.entity_b, key.entity_a, key.collider_b, key.collider_a,
+                info, ecs::ContactPhase::Exit, key.is_trigger, true);
+        }
+
+        // Carry current contacts forward for the next frame's enter/stay/exit tests.
+        previous_contacts_ = std::move(current_contacts);
     }
 
     void PhysicsSystem::handle_field_changed_event(const editor::FieldChangedEvent& event)

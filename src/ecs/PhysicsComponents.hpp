@@ -124,13 +124,6 @@ namespace eeng::ecs
         CollisionFilter filter;
     };
 
-    // Optional collision/trigger event toggles.
-    struct PhysicsEventsComponent
-    {
-        bool emit_collisions = true;
-        bool emit_triggers = true;
-    };
-
     // Event payload emitted by the physics system.
     struct CollisionEvent
     {
@@ -144,6 +137,15 @@ namespace eeng::ecs
         glm::vec3 point{ 0.0f };
         glm::vec3 normal{ 0.0f };
         float impulse = 0.0f;
+    };
+
+    // Optional collision/trigger event toggles + runtime event buffer.
+    struct PhysicsEventsComponent
+    {
+        bool emit_collisions = true;
+        bool emit_triggers = true;
+        // Runtime-only event buffer populated by PhysicsSystem each frame.
+        std::vector<CollisionEvent> events;
     };
 
     inline std::string to_string(const RigidBodyComponent& t)
