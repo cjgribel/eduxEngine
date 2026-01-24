@@ -245,6 +245,8 @@ message(STATUS "Creating executable target for Module1")
 add_executable(Module1 
     Module1/main.cpp
     Module1/Game.cpp 
+    Module1/ThirdPersonCameraSystem.cpp
+    Module1/FirstPersonCameraSystem.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -343,6 +345,7 @@ set_target_properties(Module1 PROPERTIES
 # https://developer.apple.com/documentation/macos-release-notes/macos-26-release-notes
 target_include_directories(Module1 PRIVATE
     ${glew_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Module1
 )
 
 target_link_libraries(Module1 PRIVATE 

@@ -4,6 +4,7 @@
 #include "editor/BatchCommands.hpp"
 #include "editor/CommandAsync.hpp"
 #include "editor/CommandContext.hpp"
+#include "ThreadPool.hpp"
 #include "ecs/EntityBatchPolicy.hpp"
 #include "ecs/EntityManager.hpp"
 #include "LogMacros.h"
@@ -187,6 +188,9 @@ namespace eeng::editor
 
     CommandStatus BatchLoadAllCommand::execute()
     {
+        if (in_flight)
+            return update();
+
         CommandContext cmd_ctx{ ctx };
         auto ctx_sp = cmd_ctx.lock();
         if (!ctx_sp)
@@ -195,6 +199,16 @@ namespace eeng::editor
         auto* br = cmd_ctx.batch_registry(*ctx_sp);
         if (!br)
             return CommandStatus::Done;
+
+        undo_unload_ids.clear();
+        const auto batches = br->list();
+        for (const auto* batch : batches)
+        {
+            if (!batch)
+                continue;
+            if (batch->state == BatchInfo::State::Unloaded)
+                undo_unload_ids.push_back(batch->id);
+        }
 
         future = br->queue_load_all_async(*ctx_sp);
         in_flight = true;
@@ -212,7 +226,33 @@ namespace eeng::editor
         if (!br)
             return CommandStatus::Done;
 
-        future = br->queue_unload_all_async(*ctx_sp);
+        if (undo_unload_ids.empty())
+            return CommandStatus::Done;
+
+        if (!ctx_sp->thread_pool)
+            return CommandStatus::Done;
+
+        auto ids = undo_unload_ids;
+        future = ctx_sp->thread_pool->queue_task(
+            [br, ids = std::move(ids), &ctx = *ctx_sp]() mutable -> TaskResult
+            {
+                TaskResult merged{};
+                merged.success = true;
+
+                std::vector<std::shared_future<TaskResult>> futs;
+                futs.reserve(ids.size());
+                for (const auto& id : ids)
+                    futs.emplace_back(br->queue_unload(id, ctx));
+
+                for (auto& f : futs)
+                {
+                    TaskResult r = f.get();
+                    merged.success &= r.success;
+                }
+
+                return merged;
+            }).share();
+
         in_flight = true;
         return poll_task_future(future, in_flight);
     }
@@ -248,6 +288,16 @@ namespace eeng::editor
         if (stage != UnloadStage::None)
             return update();
 
+        undo_load_ids.clear();
+        const auto batches = br->list();
+        for (const auto* batch : batches)
+        {
+            if (!batch)
+                continue;
+            if (batch->state != BatchInfo::State::Unloaded)
+                undo_load_ids.push_back(batch->id);
+        }
+
         future = br->queue_save_all_async(*ctx_sp);
         in_flight = true;
         stage = UnloadStage::Saving;
@@ -270,7 +320,33 @@ namespace eeng::editor
         if (!br)
             return CommandStatus::Done;
 
-        future = br->queue_load_all_async(*ctx_sp);
+        if (undo_load_ids.empty())
+            return CommandStatus::Done;
+
+        if (!ctx_sp->thread_pool)
+            return CommandStatus::Done;
+
+        auto ids = undo_load_ids;
+        future = ctx_sp->thread_pool->queue_task(
+            [br, ids = std::move(ids), &ctx = *ctx_sp]() mutable -> TaskResult
+            {
+                TaskResult merged{};
+                merged.success = true;
+
+                std::vector<std::shared_future<TaskResult>> futs;
+                futs.reserve(ids.size());
+                for (const auto& id : ids)
+                    futs.emplace_back(br->queue_load(id, ctx));
+
+                for (auto& f : futs)
+                {
+                    TaskResult r = f.get();
+                    merged.success &= r.success;
+                }
+
+                return merged;
+            }).share();
+
         in_flight = true;
         return poll_task_future(future, in_flight);
     }

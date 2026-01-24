@@ -2,10 +2,13 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "Game.hpp"
+#include "FirstPersonCameraComponent.hpp"
+#include "ThirdPersonCameraComponent.hpp"
 #include "glmcommon.hpp"
 #include "ImGuiHelpers.hpp"
 #include "imgui.h"
 #include "LogMacros.h"
+#include "engineapi/SelectionManager.hpp"
 #include <entt/entt.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <cstdio>
@@ -74,7 +77,8 @@ namespace eeng::dev
                     // Create/load batch index
                     EENG_LOG(ctx.get(), "[startup] Loading/Creating batch index at: %s", batches_root.string().c_str());
                     auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
-                    br.load_or_create_index(batches_root / "index.json");
+                    if (br.list().empty())
+                        br.load_or_create_index(batches_root / "index.json");
 
                     // Wait for scan to finish
                     scan_fut.get();
@@ -340,6 +344,8 @@ bool Game::init()
     scriptSystem->init(*ctx);
     debugRenderSystem = std::make_unique<eeng::ecs::systems::DebugRenderSystem>();
     stickyNoteSystem = std::make_unique<eeng::ecs::systems::StickyNoteSystem>();
+    thirdPersonCameraSystem = std::make_unique<eeng::module1::systems::ThirdPersonCameraSystem>();
+    firstPersonCameraSystem = std::make_unique<eeng::module1::systems::FirstPersonCameraSystem>();
 
     // LEVEL CYCLE API TESTS
     {
@@ -402,6 +408,27 @@ bool Game::init()
         std::filesystem::path batches_root = "/Users/ag1498/GitHub/eduxEngine/Module1/project1/batches/";
         //std::filesystem::path asset_root = "C:/Users/Admin/source/repos/eduEngine/Module1/project1/imported_assets/";
         resource_manager.set_assets_root(imported_assets_root);
+
+        // Always load editor + default batches so editor helpers are available.
+        if (ctx->batch_registry)
+        {
+            auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
+            br.load_or_create_index(batches_root / "index.json");
+
+            eeng::BatchId editor_id{};
+            if (br.try_get_batch_id_by_name(eeng::BatchRegistry::kEditorBatchName, editor_id))
+            {
+                if (!br.is_batch_loaded(editor_id))
+                    br.queue_load(editor_id, *ctx);
+            }
+
+            eeng::BatchId default_id{};
+            if (br.try_get_batch_id_by_name(eeng::BatchRegistry::kDefaultBatchName, default_id))
+            {
+                if (!br.is_batch_loaded(default_id))
+                    br.queue_load(default_id, *ctx);
+            }
+        }
 
         // 1.   IMPORT resources concurrently
         //
@@ -961,30 +988,38 @@ void Game::update(
     float time,
     float deltaTime)
 {
-    updateCamera();
+    sync_active_entity();
+    ensure_editor_camera_entities();
 
-    // Keep camera matrices in sync for systems that run during update (e.g. gizmos).
-    if (matrices.windowSize.x > 0 && matrices.windowSize.y > 0)
+    auto& registry = ctx->entity_manager->registry();
+
+    // Handle "focus" input: set third-person target to the selected entity.
+    if (ctx->input_manager)
     {
-        const float aspectRatio = float(matrices.windowSize.x) / matrices.windowSize.y;
-        matrices.P = glm::perspective(glm::radians(60.0f), aspectRatio, camera.nearPlane, camera.farPlane);
-        matrices.V = glm::lookAt(camera.pos, camera.lookAt, camera.up);
-        matrices.VP = glm_aux::create_viewport_matrix(0.0f, 0.0f,
-            static_cast<float>(matrices.windowSize.x),
-            static_cast<float>(matrices.windowSize.y),
-            0.0f, 1.0f);
-    }
+        using Key = eeng::IInputManager::Key;
+        const bool f_down = ctx->input_manager->IsKeyPressed(Key::F);
+        if (active_camera_mode == CameraMode::ThirdPerson && f_down && !f_was_down)
+        {
+            if (active_entity.has_id() && ctx->entity_manager->entity_valid(active_entity))
+            {
+                if (auto* camera = registry.try_get<eeng::module1::ThirdPersonCameraComponent>(
+                    third_person_camera_entity))
+                {
+                    camera->target.unbind();
+                    camera->target.bind(active_entity);
+                    camera->target_offset = glm::vec3(0.0f, 0.0f, 0.0f);
 
-    updatePlayer(deltaTime);
+                    if (const auto* tfm = registry.try_get<eeng::ecs::TransformComponent>(active_entity))
+                        camera->look_at = glm::vec3(tfm->world_matrix[3]);
+                }
+            }
+        }
+        f_was_down = f_down;
+    }
 
     pointlight.pos = glm::vec3(
         glm_aux::R(time * 0.1f, { 0.0f, 1.0f, 0.0f }) *
         glm::vec4(100.0f, 100.0f, 100.0f, 1.0f));
-
-    characterWorldMatrix1 = glm_aux::TRS(
-        player.pos,
-        0.0f, { 0, 1, 0 },
-        { 0.03f, 0.03f, 0.03f });
 
     characterWorldMatrix2 = glm_aux::TRS(
         { -3, 0, 0 },
@@ -999,37 +1034,77 @@ void Game::update(
     // TODO: consider scheduling animation updates as a dedicated system phase.
     if (playerControllerSystem)
     {
-        auto& registry = ctx->entity_manager->registry();
         playerControllerSystem->update(registry, *ctx, deltaTime);
     }
 
     if (animationGraphSystem)
     {
-        auto& registry = ctx->entity_manager->registry();
         animationGraphSystem->update(registry, *ctx, deltaTime);
     }
 
     if (animationSystem)
     {
-        auto& registry = ctx->entity_manager->registry();
         animationSystem->update(registry, *ctx, deltaTime);
     }
 
     if (physicsSystem)
     {
         // Physics runs before transform cache update so results are reflected in world matrices.
-        auto& registry = ctx->entity_manager->registry();
         physicsSystem->update(registry, *ctx, deltaTime);
     }
 
     if (scriptSystem)
     {
         // Placeholder: script execution will live here once we bind Lua.
-        auto& registry = ctx->entity_manager->registry();
         scriptSystem->update(registry, *ctx, deltaTime);
     }
 
-    // TODO: consider scheduling transform cache updates as an Engine-level system phase.
+    if (transformSystem)
+        transformSystem->update(*ctx, deltaTime);
+
+    // Drive the main character instance from the player entity transform.
+    glm::vec3 player_pos = glm::vec3(0.0f, 0.0f, 0.0f);
+    if (player_entity.has_id() && registry.valid(player_entity))
+    {
+        if (const auto* tfm = registry.try_get<eeng::ecs::TransformComponent>(player_entity))
+            player_pos = glm::vec3(tfm->world_matrix[3]);
+    }
+
+    characterWorldMatrix1 = glm_aux::TRS(
+        player_pos,
+        0.0f, { 0, 1, 0 },
+        { 0.03f, 0.03f, 0.03f });
+
+    if (!play_mode)
+    {
+        if (thirdPersonCameraSystem)
+            thirdPersonCameraSystem->update(registry, *ctx, deltaTime);
+
+        if (firstPersonCameraSystem)
+            firstPersonCameraSystem->update(registry, *ctx, deltaTime);
+    }
+
+    refresh_active_camera_state();
+
+    // Build a view ray from the active camera (useful for debug/picking).
+    view_ray = glm_aux::Ray(active_camera.position, active_camera.forward);
+
+    // Keep camera matrices in sync for systems that run during update (e.g. gizmos).
+    if (matrices.windowSize.x > 0 && matrices.windowSize.y > 0)
+    {
+        const float aspectRatio = float(matrices.windowSize.x) / matrices.windowSize.y;
+        matrices.P = glm::perspective(
+            glm::radians(60.0f),
+            aspectRatio,
+            active_camera.near_plane,
+            active_camera.far_plane);
+        matrices.V = active_camera.model_to_view;
+        matrices.VP = glm_aux::create_viewport_matrix(0.0f, 0.0f,
+            static_cast<float>(matrices.windowSize.x),
+            static_cast<float>(matrices.windowSize.y),
+            0.0f, 1.0f);
+    }
+
     if (editorRuntime)
     {
         // Use the latest cached camera matrices from the previous frame.
@@ -1037,25 +1112,22 @@ void Game::update(
         editorRuntime->update(*ctx, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
     }
 
-    if (transformSystem)
-        transformSystem->update(*ctx, deltaTime);
-
     if (stickyNoteSystem)
     {
-        auto& registry = ctx->entity_manager->registry();
         stickyNoteSystem->update(registry, *ctx, deltaTime);
     }
 
-    // Intersect player view ray with AABBs of other objects 
-    glm_aux::intersect_ray_AABB(player.viewRay, character_aabb2.min, character_aabb2.max);
-    glm_aux::intersect_ray_AABB(player.viewRay, character_aabb3.min, character_aabb3.max);
-    glm_aux::intersect_ray_AABB(player.viewRay, horse_aabb.min, horse_aabb.max);
+    // Intersect view ray with AABBs of other objects.
+    glm_aux::intersect_ray_AABB(view_ray, character_aabb2.min, character_aabb2.max);
+    glm_aux::intersect_ray_AABB(view_ray, character_aabb3.min, character_aabb3.max);
+    glm_aux::intersect_ray_AABB(view_ray, horse_aabb.min, horse_aabb.max);
 
     // We can also compute a ray from the current mouse position,
     // to use for object picking and such ...
-    if (ctx->input_manager->GetMouseState().rightButton)
+    if (ctx->input_manager && ctx->input_manager->GetMouseState().rightButton)
     {
-        glm::ivec2 windowPos(camera.mouse_xy_prev.x, matrices.windowSize.y - camera.mouse_xy_prev.y);
+        const auto mouse = ctx->input_manager->GetMouseState();
+        glm::ivec2 windowPos(mouse.x, matrices.windowSize.y - mouse.y);
         auto ray = glm_aux::world_ray_from_window_coords(windowPos, matrices.V, matrices.P, matrices.VP);
         // Intersect with e.g. AABBs ...
 
@@ -1072,14 +1144,20 @@ void Game::render(
 {
     renderUI();
 
+    refresh_active_camera_state();
+
     matrices.windowSize = glm::ivec2(windowWidth, windowHeight);
 
     // Projection matrix
     const float aspectRatio = float(windowWidth) / windowHeight;
-    matrices.P = glm::perspective(glm::radians(60.0f), aspectRatio, camera.nearPlane, camera.farPlane);
+    matrices.P = glm::perspective(
+        glm::radians(60.0f),
+        aspectRatio,
+        active_camera.near_plane,
+        active_camera.far_plane);
 
     // View matrix
-    matrices.V = glm::lookAt(camera.pos, camera.lookAt, camera.up);
+    matrices.V = active_camera.model_to_view;
 
     matrices.VP = glm_aux::create_viewport_matrix(0.0f, 0.0f, windowWidth, windowHeight, 0.0f, 1.0f);
 
@@ -1097,7 +1175,7 @@ void Game::render(
     }
 
     // Begin rendering pass
-    forwardRenderer->beginPass(matrices.P, matrices.V, pointlight.pos, pointlight.color, camera.pos);
+    forwardRenderer->beginPass(matrices.P, matrices.V, pointlight.pos, pointlight.color, active_camera.position);
 
     // Grass
     forwardRenderer->renderMesh(grassMesh, grassWorldMatrix);
@@ -1173,20 +1251,20 @@ void Game::render(
                     glm::value_ptr(proj_view));
                 glUniform3fv(glGetUniformLocation(program, "lightpos"), 1, glm::value_ptr(pointlight.pos));
                 glUniform3fv(glGetUniformLocation(program, "lightColor"), 1, glm::value_ptr(pointlight.color));
-                glUniform3fv(glGetUniformLocation(program, "eyepos"), 1, glm::value_ptr(camera.pos));
+                glUniform3fv(glGetUniformLocation(program, "eyepos"), 1, glm::value_ptr(active_camera.position));
             });
     }
 
     // Draw player view ray
-    if (player.viewRay)
+    if (view_ray)
     {
         shapeRenderer->push_states(ShapeRendering::Color4u{ 0xff00ff00 });
-        shapeRenderer->push_line(player.viewRay.origin, player.viewRay.point_of_contact());
+        shapeRenderer->push_line(view_ray.origin, view_ray.point_of_contact());
     }
     else
     {
         shapeRenderer->push_states(ShapeRendering::Color4u{ 0xffffffff });
-        shapeRenderer->push_line(player.viewRay.origin, player.viewRay.origin + player.viewRay.dir * 100.0f);
+        shapeRenderer->push_line(view_ray.origin, view_ray.origin + view_ray.dir * 100.0f);
     }
     shapeRenderer->pop_states<ShapeRendering::Color4u>();
 
@@ -1232,6 +1310,16 @@ void Game::renderUI()
     ImGui::Begin("Game Info");
 
     ImGui::Text("Drawcall count %i", drawcallCount);
+
+    {
+        const char* camera_labels[] = { "ThirdPerson", "FirstPerson" };
+        int camera_index = (active_camera_mode == CameraMode::ThirdPerson) ? 0 : 1;
+        if (ImGui::Combo("Active camera", &camera_index, camera_labels, IM_ARRAYSIZE(camera_labels)))
+        {
+            const CameraMode mode = (camera_index == 0) ? CameraMode::ThirdPerson : CameraMode::FirstPerson;
+            set_active_camera_mode(mode);
+        }
+    }
 
     if (ImGui::ColorEdit3("Light color",
         glm::value_ptr(pointlight.color),
@@ -1299,6 +1387,22 @@ void Game::renderUI()
     ImGui::SliderFloat("Animation mix", &characterAnimBlend, 0.0f, 1.0f);
 
     ImGui::End(); // end info window
+
+    if (physicsSystem)
+    {
+        // Small monitor window for Bullet + ECS physics counters.
+        const auto stats = physicsSystem->get_stats();
+        ImGui::Begin("Physics Monitor");
+        ImGui::Text("Bodies: %zu", stats.body_count);
+        ImGui::Text("Collision objects: %d", stats.collision_objects);
+        ImGui::Text("Manifolds: %d", stats.manifolds);
+        ImGui::Text("Contact points: %d", stats.contact_points);
+        ImGui::Separator();
+        ImGui::Text("Dirty entities: %zu", stats.dirty_entities);
+        ImGui::Text("Event entities: %zu", stats.event_entities);
+        ImGui::Text("Tracked contacts: %zu", stats.tracked_contacts);
+        ImGui::End();
+    }
 }
 
 void Game::destroy()
@@ -1313,51 +1417,100 @@ void Game::destroy()
         scriptSystem->shutdown();
 }
 
-void Game::updateCamera()
+void Game::set_active_camera_mode(CameraMode mode)
 {
-    // Fetch mouse and compute movement since last frame
-    auto mouse = ctx->input_manager->GetMouseState();
-    glm::ivec2 mouse_xy{ mouse.x, mouse.y };
-    glm::ivec2 mouse_xy_diff{ 0, 0 };
-    if (mouse.leftButton && camera.mouse_xy_prev.x >= 0)
-        mouse_xy_diff = camera.mouse_xy_prev - mouse_xy;
-    camera.mouse_xy_prev = mouse_xy;
+    active_camera_mode = mode;
+    ensure_editor_camera_entities();
+    active_camera_entity = (mode == CameraMode::ThirdPerson)
+        ? third_person_camera_entity
+        : first_person_camera_entity;
 
-    // Update camera rotation from mouse movement
-    camera.yaw += mouse_xy_diff.x * camera.sensitivity;
-    camera.pitch += mouse_xy_diff.y * camera.sensitivity;
-    camera.pitch = glm::clamp(camera.pitch, -glm::radians(89.0f), 0.0f);
+    if (!ctx || !ctx->entity_manager)
+        return;
 
-    // Update camera position
-    const glm::vec4 rotatedPos = glm_aux::R(camera.yaw, camera.pitch) * glm::vec4(0.0f, 0.0f, camera.distance, 1.0f);
-    camera.pos = camera.lookAt + glm::vec3(rotatedPos);
+    auto& registry = ctx->entity_manager->registry();
+    if (auto* third = registry.try_get<eeng::module1::ThirdPersonCameraComponent>(third_person_camera_entity))
+        third->active = (mode == CameraMode::ThirdPerson);
+    if (auto* first = registry.try_get<eeng::module1::FirstPersonCameraComponent>(first_person_camera_entity))
+        first->active = (mode == CameraMode::FirstPerson);
 }
 
-void Game::updatePlayer(float deltaTime)
+void Game::ensure_editor_camera_entities()
 {
-    // Fetch keys relevant for player movement
-    using Key = eeng::IInputManager::Key;
-    auto& input = ctx->input_manager;
-    bool W = input->IsKeyPressed(Key::W);
-    bool A = input->IsKeyPressed(Key::A);
-    bool S = input->IsKeyPressed(Key::S);
-    bool D = input->IsKeyPressed(Key::D);
+    if (!ctx || !ctx->entity_manager)
+        return;
 
-    // Compute vectors in the local space of the player
-    player.fwd = glm::vec3(glm_aux::R(camera.yaw, glm_aux::vec3_010) * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f));
-    player.right = glm::cross(player.fwd, glm_aux::vec3_010);
+    auto& registry = ctx->entity_manager->registry();
 
-    // Compute the total movement as a 3D vector
-    auto movement =
-        player.fwd * player.velocity * deltaTime * ((W ? 1.0f : 0.0f) + (S ? -1.0f : 0.0f)) +
-        player.right * player.velocity * deltaTime * ((A ? -1.0f : 0.0f) + (D ? 1.0f : 0.0f));
+    const auto resolve_camera = [&]<typename Component>(eeng::ecs::Entity& slot)
+    {
+        if (slot.has_id() && registry.valid(slot) && registry.all_of<Component>(slot))
+            return;
 
-    // Update player position and forward view ray
-    player.pos += movement;
-    player.viewRay = glm_aux::Ray{ player.pos + glm::vec3(0.0f, 2.0f, 0.0f), player.fwd };
+        slot = eeng::ecs::Entity::EntityNull;
+        auto view = registry.view<Component>();
+        if (view.begin() != view.end())
+            slot = eeng::ecs::Entity{ *view.begin() };
+    };
 
-    // Update camera to track the player
-    camera.lookAt += movement;
-    camera.pos += movement;
+    resolve_camera.operator()<eeng::module1::ThirdPersonCameraComponent>(third_person_camera_entity);
+    resolve_camera.operator()<eeng::module1::FirstPersonCameraComponent>(first_person_camera_entity);
+
+    active_camera_entity = (active_camera_mode == CameraMode::ThirdPerson)
+        ? third_person_camera_entity
+        : first_person_camera_entity;
+
+    if (auto* third = registry.try_get<eeng::module1::ThirdPersonCameraComponent>(third_person_camera_entity))
+        third->active = (active_camera_mode == CameraMode::ThirdPerson);
+    if (auto* first = registry.try_get<eeng::module1::FirstPersonCameraComponent>(first_person_camera_entity))
+        first->active = (active_camera_mode == CameraMode::FirstPerson);
+}
+
+void Game::sync_active_entity()
+{
+    active_entity = eeng::ecs::Entity::EntityNull;
+    if (!ctx || !ctx->entity_selection || ctx->entity_selection->empty())
+        return;
+
+    active_entity = ctx->entity_selection->last();
+    if (!ctx->entity_manager || !ctx->entity_manager->entity_valid(active_entity))
+        active_entity = eeng::ecs::Entity::EntityNull;
+}
+
+void Game::refresh_active_camera_state()
+{
+    if (!ctx || !ctx->entity_manager)
+        return;
+
+    ensure_editor_camera_entities();
+
+    auto& registry = ctx->entity_manager->registry();
+
+    if (active_camera_mode == CameraMode::ThirdPerson)
+    {
+        if (const auto* camera = registry.try_get<eeng::module1::ThirdPersonCameraComponent>(third_person_camera_entity))
+        {
+            active_camera.position = camera->position;
+            active_camera.forward = camera->forward;
+            active_camera.up = camera->up;
+            active_camera.model_to_view = camera->model_to_view;
+            active_camera.view_to_world = camera->view_to_world;
+            active_camera.near_plane = camera->near_plane;
+            active_camera.far_plane = camera->far_plane;
+        }
+    }
+    else
+    {
+        if (const auto* camera = registry.try_get<eeng::module1::FirstPersonCameraComponent>(first_person_camera_entity))
+        {
+            active_camera.position = camera->position;
+            active_camera.forward = camera->forward;
+            active_camera.up = camera->up;
+            active_camera.model_to_view = camera->model_to_view;
+            active_camera.view_to_world = camera->view_to_world;
+            active_camera.near_plane = camera->near_plane;
+            active_camera.far_plane = camera->far_plane;
+        }
+    }
 
 }

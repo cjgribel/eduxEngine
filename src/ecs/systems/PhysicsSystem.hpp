@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -37,6 +38,18 @@ namespace eeng::ecs::systems
     class PhysicsSystem
     {
     public:
+        // Snapshot of physics runtime counters used by the monitor window.
+        struct PhysicsStats
+        {
+            std::size_t body_count = 0;
+            int collision_objects = 0;
+            int manifolds = 0;
+            int contact_points = 0;
+            std::size_t dirty_entities = 0;
+            std::size_t event_entities = 0;
+            std::size_t tracked_contacts = 0;
+        };
+
         PhysicsSystem() = default;
         ~PhysicsSystem();
 
@@ -47,6 +60,8 @@ namespace eeng::ecs::systems
         void shutdown();
 
         void update(entt::registry& registry, EngineContext& ctx, float delta_time);
+        // Query a lightweight snapshot of Bullet + ECS counters for UI display.
+        PhysicsStats get_stats() const;
 
     private:
         struct BodyRuntime

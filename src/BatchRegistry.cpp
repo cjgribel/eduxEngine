@@ -595,13 +595,16 @@ namespace eeng
     std::shared_future<TaskResult>
         BatchRegistry::queue_load_all_async(EngineContext& ctx)
     {
-        // 1) Snapshot ids under lock
+        // 1) Snapshot ids of unloaded batches under lock
         std::vector<BatchId> ids;
         {
             std::lock_guard lk(mtx_);
             ids.reserve(batches_.size());
-            for (auto& [id, _] : batches_)
-                ids.push_back(id);
+            for (auto& [id, info] : batches_)
+            {
+                if (info.state == BatchInfo::State::Unloaded)
+                    ids.push_back(id);
+            }
         }
 
         // 2) Kick a worker that will do the waiting
@@ -1467,6 +1470,19 @@ namespace eeng
 
         TaskResult res{};
         res.success = true;
+
+        {
+            // Ensure the GUID -> batch map doesn't retain stale entries for this batch.
+            std::lock_guard lk(mtx_);
+            for (const auto& er : B.live)
+            {
+                if (!er.guid.valid())
+                    continue;
+                auto it = entity_to_batch_.find(er.guid);
+                if (it != entity_to_batch_.end() && it->second == B.id)
+                    entity_to_batch_.erase(it);
+            }
+        }
 
         auto batch_path = index_path_.parent_path() / B.filename;
         std::ifstream f(batch_path);

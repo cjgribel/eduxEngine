@@ -15,6 +15,9 @@
 #include "ecs/systems/StickyNoteSystem.hpp"
 #include "ecs/systems/TransformSystem.hpp"
 #include "editor/EditorRuntime.hpp"
+#include "FirstPersonCameraSystem.hpp"
+#include "ThirdPersonCameraSystem.hpp"
+#include "glmcommon.hpp"
 #include <entt/fwd.hpp> // For entt::registry - remove from here
 
 // --> ENGINE API
@@ -102,6 +105,8 @@ private:
     std::unique_ptr<eeng::ecs::systems::DebugRenderSystem> debugRenderSystem;
     std::unique_ptr<eeng::ecs::systems::StickyNoteSystem> stickyNoteSystem;
     std::unique_ptr<eeng::editor::EditorRuntime> editorRuntime;
+    std::unique_ptr<eeng::module1::systems::ThirdPersonCameraSystem> thirdPersonCameraSystem;
+    std::unique_ptr<eeng::module1::systems::FirstPersonCameraSystem> firstPersonCameraSystem;
 
     // Entity registry - to use in labs
     std::shared_ptr<entt::registry> entity_registry; // unique + and out weak ptrs?
@@ -119,24 +124,31 @@ private:
         glm::ivec2 windowSize;
     } matrices;
 
-    // Basic third-person camera
-    struct Camera
+    enum class CameraMode
     {
-        glm::vec3 lookAt = glm_aux::vec3_000;   // Point of interest
-        glm::vec3 up = glm_aux::vec3_010;       // Local up-vector
-        float distance = 15.0f;                 // Distance to point-of-interest
-        float sensitivity = 0.005f;             // Mouse sensitivity
-        const float nearPlane = 1.0f;           // Rendering near plane
-        const float farPlane = 500.0f;          // Rendering far plane
+        ThirdPerson = 0,
+        FirstPerson = 1
+    };
 
-        // Position and view angles (computed when camera is updated)
-        float yaw = 0.0f;                       // Horizontal angle (radians)
-        float pitch = -glm::pi<float>() / 8;    // Vertical angle (radians)
-        glm::vec3 pos;                          // Camera position
+    struct ActiveCameraState
+    {
+        glm::vec3 position{ 0.0f, 0.0f, 0.0f };
+        glm::vec3 forward{ 0.0f, 0.0f, -1.0f };
+        glm::vec3 up{ 0.0f, 1.0f, 0.0f };
+        glm::mat4 model_to_view{ 1.0f };
+        glm::mat4 view_to_world{ 1.0f };
+        float near_plane = 1.0f;
+        float far_plane = 500.0f;
+    } active_camera;
 
-        // Previous mouse position
-        glm::ivec2 mouse_xy_prev{ -1, -1 };
-    } camera;
+    eeng::ecs::Entity active_entity;
+    eeng::ecs::Entity player_entity;
+    eeng::ecs::Entity third_person_camera_entity;
+    eeng::ecs::Entity first_person_camera_entity;
+    eeng::ecs::Entity active_camera_entity;
+    CameraMode active_camera_mode = CameraMode::ThirdPerson;
+    glm_aux::Ray view_ray;
+    bool f_was_down = false;
 
     // Light properties
     struct PointLight
@@ -144,17 +156,6 @@ private:
         glm::vec3 pos;
         glm::vec3 color{ 1.0f, 1.0f, 0.8f };
     } pointlight;
-
-    // (Placeholder) Player data
-    struct Player
-    {
-        glm::vec3 pos = glm_aux::vec3_000;
-        float velocity{ 6.0f };
-
-        // Local vectors & view ray (computed when camera/player is updated)
-        glm::vec3 fwd, right;
-        glm_aux::Ray viewRay;
-    } player;
 
     // Game meshes
     std::shared_ptr<eeng::RenderableMesh> grassMesh, horseMesh, characterMesh;
@@ -195,13 +196,13 @@ private:
     // Stats
     int drawcallCount = 0;
 
-    /// @brief Placeholder system for updating the camera position based on inputs
-    /// @param input Input from mouse, keyboard and controllers
-    void updateCamera();
+    void set_active_camera_mode(CameraMode mode);
+    void ensure_editor_camera_entities();
+    void sync_active_entity();
+    void refresh_active_camera_state();
 
-    /// @brief Placeholder system for updating the 'player' based on inputs
-    /// @param deltaTime 
-    void updatePlayer(float deltaTime);
+    // Placeholder for a future play-mode toggle that will swap in runtime cameras.
+    bool play_mode = false;
 };
 
 #endif

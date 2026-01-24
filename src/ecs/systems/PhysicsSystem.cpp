@@ -261,6 +261,38 @@ namespace eeng::ecs::systems
         sync_transforms_from_bullet(registry);
     }
 
+    PhysicsSystem::PhysicsStats PhysicsSystem::get_stats() const
+    {
+        PhysicsStats stats{};
+        stats.body_count = bodies_.size();
+        stats.dirty_entities = dirty_entities_.size();
+        stats.event_entities = event_entities_.size();
+        stats.tracked_contacts = previous_contacts_.size();
+
+        auto* world = world_.world();
+        if (!world)
+            return stats;
+
+        stats.collision_objects = world->getNumCollisionObjects();
+
+        auto* dispatcher = world->getDispatcher();
+        if (!dispatcher)
+            return stats;
+
+        stats.manifolds = dispatcher->getNumManifolds();
+        // Count raw Bullet contact points for a quick health check.
+        int total_contacts = 0;
+        for (int i = 0; i < stats.manifolds; ++i)
+        {
+            const btPersistentManifold* manifold = dispatcher->getManifoldByIndexInternal(i);
+            if (!manifold)
+                continue;
+            total_contacts += manifold->getNumContacts();
+        }
+        stats.contact_points = total_contacts;
+        return stats;
+    }
+
     void PhysicsSystem::sync_bodies(entt::registry& registry, EngineContext& ctx)
     {
         auto* world = world_.world();

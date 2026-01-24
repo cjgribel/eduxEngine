@@ -20,16 +20,16 @@ namespace eeng::editor
         void init(EngineContext& ctx);
 
     private:
-        // React to batch-load events and trigger a gizmo ensure pass when needed.
+        // React to batch-load events and trigger an editor-entity ensure pass when needed.
         void on_batch_task_completed(EngineContext& ctx, const BatchTaskCompletedEvent& event);
         // Coalesce multiple requests and run the ensure work on a background thread.
-        void request_ensure_transform_gizmo(EngineContext& ctx);
-        // Ensure a TransformGizmoComponent exists and is attached to the editor batch.
-        void ensure_editor_transform_gizmo_entity(EngineContext& ctx);
+        void request_ensure_editor_entities(EngineContext& ctx);
+        // Ensure editor-only helper entities exist and are attached to the editor batch.
+        void ensure_editor_entities(EngineContext& ctx);
 
         // Coalescing state so repeated load events do not spawn duplicate work.
-        std::atomic_bool ensure_transform_gizmo_in_flight_{ false };
-        std::atomic_bool ensure_transform_gizmo_requested_{ false };
+        std::atomic_bool ensure_editor_entities_in_flight_{ false };
+        std::atomic_bool ensure_editor_entities_requested_{ false };
         bool initialized_ = false;
     };
 } // namespace eeng::editor

@@ -73,6 +73,7 @@ namespace eeng::editor
         EngineContextWeakPtr ctx;
         std::shared_future<TaskResult> future{};
         bool in_flight{ false };
+        std::vector<BatchId> undo_unload_ids;
         std::string display_name;
 
     public:
@@ -104,6 +105,7 @@ namespace eeng::editor
 #ifdef EENG_BATCH_UNLOAD_AUTOSAVE
         UnloadStage stage{ UnloadStage::None };
 #endif
+        std::vector<BatchId> undo_load_ids;
         std::string display_name;
 
     public:

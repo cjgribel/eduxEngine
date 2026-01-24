@@ -21,6 +21,8 @@
 #include "ecs/systems/TransformSystem.hpp"
 #include "mock/MockTypes.hpp"
 #include "mock/CopySignaller.hpp"
+#include "ThirdPersonCameraComponent.hpp"
+#include "FirstPersonCameraComponent.hpp"
 #include "editor/ecs/TransformGizmoComponent.hpp"
 
 #include "editor/EntityRefInspect.hpp"
@@ -269,6 +271,142 @@ namespace eeng
         register_component<eeng::ecs::mock::MockCameraComponent>();
         // warm_start_meta_type<eeng::ecs::mock::MockCameraComponent>();
         // meta::type_id_map()["eeng.ecs.mock.MockCameraComponent"] = entt::resolve<eeng::ecs::mock::MockCameraComponent>().id();
+
+        // --- ThirdPersonCameraComponent ------------------------------------
+
+        entt::meta_factory<eeng::module1::ThirdPersonCameraComponent>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{
+            .id = "eeng.module1.ThirdPersonCameraComponent",
+            .name = "ThirdPersonCameraComponent",
+            .tooltip = "Pivot/third-person camera settings."
+            })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::active>("active"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "active", "Active", "Responds to input when true." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::target>("target"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "target", "Target", "Entity to follow and orbit around." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::target_offset>("target_offset"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "target_offset", "Target Offset", "Offset added to the target position." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::distance>("distance"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "distance", "Distance", "Orbit radius from the pivot." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::mouse_sensitivity>("mouse_sensitivity"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "mouse_sensitivity", "Mouse Sensitivity", "Radians per pixel." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::controller_look_speed>("controller_look_speed"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "controller_look_speed", "Controller Look Speed", "Radians per second." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::move_speed>("move_speed"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "move_speed", "Move Speed", "Units per second." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::near_plane>("near_plane"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "near_plane", "Near Plane", "Camera near clip plane." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::far_plane>("far_plane"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "far_plane", "Far Plane", "Camera far clip plane." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::yaw>("yaw"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "yaw", "Yaw", "Horizontal orbit angle (radians)." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::pitch>("pitch"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "pitch", "Pitch", "Vertical orbit angle (radians)." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::look_at>("look_at"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "look_at", "Look At", "Cached look-at position." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::position>("position"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Cached camera position." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::forward>("forward"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "forward", "Forward", "Cached forward direction." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::model_to_view>("model_to_view"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "model_to_view", "Model To View", "Cached view matrix." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::module1::ThirdPersonCameraComponent::view_to_world>("view_to_world"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "view_to_world", "View To World", "Cached inverse view matrix." })
+            .traits(MetaFlags::readonly_inspection)
+            ;
+        register_component<eeng::module1::ThirdPersonCameraComponent>();
+
+        // --- FirstPersonCameraComponent ------------------------------------
+
+        entt::meta_factory<eeng::module1::FirstPersonCameraComponent>{}
+        .custom<TypeMetaInfo>(TypeMetaInfo{
+            .id = "eeng.module1.FirstPersonCameraComponent",
+            .name = "FirstPersonCameraComponent",
+            .tooltip = "First-person/free-look camera settings."
+            })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::active>("active"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "active", "Active", "Responds to input when true." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::position>("position"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Camera position." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::move_speed>("move_speed"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "move_speed", "Move Speed", "Units per second." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::mouse_sensitivity>("mouse_sensitivity"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "mouse_sensitivity", "Mouse Sensitivity", "Radians per pixel." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::controller_look_speed>("controller_look_speed"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "controller_look_speed", "Controller Look Speed", "Radians per second." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::near_plane>("near_plane"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "near_plane", "Near Plane", "Camera near clip plane." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::far_plane>("far_plane"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "far_plane", "Far Plane", "Camera far clip plane." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::yaw>("yaw"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "yaw", "Yaw", "Horizontal view angle (radians)." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::pitch>("pitch"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "pitch", "Pitch", "Vertical view angle (radians)." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::forward>("forward"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "forward", "Forward", "Cached forward direction." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::model_to_view>("model_to_view"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "model_to_view", "Model To View", "Cached view matrix." })
+            .traits(MetaFlags::readonly_inspection)
+
+            .data<&eeng::module1::FirstPersonCameraComponent::view_to_world>("view_to_world"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "view_to_world", "View To World", "Cached inverse view matrix." })
+            .traits(MetaFlags::readonly_inspection)
+            ;
+        register_component<eeng::module1::FirstPersonCameraComponent>();
 
         // --- TransformComponent ----------------------------------------------
 
