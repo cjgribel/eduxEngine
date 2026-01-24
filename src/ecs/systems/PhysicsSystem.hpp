@@ -92,6 +92,7 @@ namespace eeng::ecs::systems
             std::vector<std::unique_ptr<btCollisionShape>> child_shapes;
             // Per-child collider metadata for contact event lookup.
             std::vector<ColliderRuntimeInfo> collider_info;
+            // Bullet stores raw pointers to these objects; we own them and must keep them alive.
             std::unique_ptr<btDefaultMotionState> motion_state;
             std::unique_ptr<btRigidBody> body;
             // Cached component state so we can rebuild when key properties change.
