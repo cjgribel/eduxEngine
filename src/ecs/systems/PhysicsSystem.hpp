@@ -31,6 +31,19 @@ namespace eeng::editor
 namespace eeng::ecs::systems
 {
     // Physics system that bridges ECS components to a Bullet world.
+    // Overview:
+    // - Authoring uses a RigidBody bundle: add RigidBodyComponent in the editor and it auto-adds
+    //   Collider/Material/Filter/Events components (colliders are kept when the bundle is removed).
+    // - Motion types: Static = immovable, Kinematic = driven by Transform, Dynamic = simulated.
+    // - Runtime Bullet objects live here (not in components) and are created/removed via hooks.
+    // - Sync flow: Transform -> Bullet for static/kinematic; Bullet -> Transform for dynamic.
+    // - Dirtying: a private dirty set is fed by editor field edits + lifecycle hooks; a batch flag
+    //   triggers a one-shot sync after load/unload.
+    // - Contact events: we read Bullet manifolds after stepping, classify enter/stay/exit, and emit
+    //   events only if PhysicsEventsComponent is present and its emit flags allow it.
+    // - Interest gating: we skip building contact records if neither side requests events.
+    // - Trigger policy: any trigger collider marks the whole body as no-contact-response
+    //   (limitation: mixed trigger + solid colliders require separate entities).
     // Notes:
     // - Uses a private dirty set fed by FieldChangedEvent + lifecycle hooks.
     // - Uses a batch sync request flag to avoid per-frame structural scans.
@@ -140,7 +153,8 @@ namespace eeng::ecs::systems
         std::unordered_set<entt::entity> dirty_entities_;
         // Event buffers cleared each frame for entities that received physics events.
         std::unordered_set<entt::entity> event_entities_;
-        // Contact history for enter/stay/exit classification.
+        // Contact buffers for enter/stay/exit classification (kept to avoid per-frame allocations).
+        std::unordered_map<ContactKey, ContactInfo, ContactKeyHash> current_contacts_;
         std::unordered_map<ContactKey, ContactInfo, ContactKeyHash> previous_contacts_;
         // Set when batch load/unload completes to force a structural sync on the next update.
         bool batch_sync_requested_ = false;
