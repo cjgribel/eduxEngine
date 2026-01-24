@@ -78,6 +78,27 @@ namespace
         return (scale.x + scale.y + scale.z) / 3.0f;
     }
 
+    // Check if a collider has an identity local transform (used to skip compound shapes).
+    bool is_identity_collider_transform(const eeng::ecs::ColliderDesc& collider)
+    {
+        constexpr float kEpsilon = 1e-4f;
+        const float pos_len = std::sqrt(
+            collider.local_position.x * collider.local_position.x
+            + collider.local_position.y * collider.local_position.y
+            + collider.local_position.z * collider.local_position.z);
+        if (pos_len > kEpsilon)
+            return false;
+
+        if (std::abs(collider.local_rotation.w - 1.0f) > kEpsilon)
+            return false;
+        if (std::abs(collider.local_rotation.x) > kEpsilon
+            || std::abs(collider.local_rotation.y) > kEpsilon
+            || std::abs(collider.local_rotation.z) > kEpsilon)
+            return false;
+
+        return true;
+    }
+
     // Pick a representative contact point from a manifold (prefer a penetrating one).
     const btManifoldPoint* select_contact_point(const btPersistentManifold& manifold)
     {
@@ -395,29 +416,46 @@ namespace eeng::ecs::systems
         }
 
         BodyRuntime runtime{};
-        runtime.compound_shape = std::make_unique<btCompoundShape>();
+        // Optimization: skip btCompoundShape when a single collider has an identity local transform.
+        const bool single_collider = (colliders.colliders.size() == 1);
+        const bool single_identity =
+            single_collider && is_identity_collider_transform(colliders.colliders.front());
+        const bool use_compound = !single_identity;
+
+        if (use_compound)
+            runtime.compound_shape = std::make_unique<btCompoundShape>();
 
         bool has_trigger = false;
         bool has_solid = false;
 
-        // Build child shapes for every collider (rebuilds are driven by the dirty set).
+        // Build collision shapes (rebuilds are driven by the dirty set).
         for (const auto& collider : colliders.colliders)
         {
             auto shape = build_shape(collider, tfm.scale, settings_.units_per_meter);
             if (!shape)
                 continue;
 
-            btTransform local;
-            local.setIdentity();
-            // Collider offsets should respect entity scale in the same way as size.
-            local.setOrigin(to_bt_vec3(collider.local_position * tfm.scale, settings_.units_per_meter));
-            local.setRotation(to_bt_quat(collider.local_rotation));
+            if (use_compound)
+            {
+                btTransform local;
+                local.setIdentity();
+                // Collider offsets should respect entity scale in the same way as size.
+                local.setOrigin(to_bt_vec3(collider.local_position * tfm.scale, settings_.units_per_meter));
+                local.setRotation(to_bt_quat(collider.local_rotation));
 
-            runtime.compound_shape->addChildShape(local, shape.get());
-            runtime.child_shapes.emplace_back(std::move(shape));
-            // Track collider metadata by child index so contact events can resolve ids.
-            runtime.collider_info.push_back(
-                BodyRuntime::ColliderRuntimeInfo{ collider.id, collider.is_trigger });
+                runtime.compound_shape->addChildShape(local, shape.get());
+                runtime.child_shapes.emplace_back(std::move(shape));
+                // Track collider metadata by child index so contact events can resolve ids.
+                runtime.collider_info.push_back(
+                    BodyRuntime::ColliderRuntimeInfo{ collider.id, collider.is_trigger });
+            }
+            else
+            {
+                // Single collider with identity local transform: no compound required.
+                runtime.root_shape = std::move(shape);
+                runtime.collider_info.push_back(
+                    BodyRuntime::ColliderRuntimeInfo{ collider.id, collider.is_trigger });
+            }
 
             if (collider.is_trigger)
                 has_trigger = true;
@@ -425,11 +463,14 @@ namespace eeng::ecs::systems
                 has_solid = true;
         }
 
-        if (runtime.child_shapes.empty())
+        if (use_compound && runtime.child_shapes.empty())
+            return false;
+        if (!use_compound && !runtime.root_shape)
             return false;
 
         // Update compound bounds after adding all children.
-        runtime.compound_shape->recalculateLocalAabb();
+        if (runtime.compound_shape)
+            runtime.compound_shape->recalculateLocalAabb();
 
         // Initial world transform uses current ECS local position/rotation.
         // Note: this ignores parent transforms for now; we handle hierarchy later.
@@ -443,6 +484,12 @@ namespace eeng::ecs::systems
         const bool is_dynamic = (rb.motion == ecs::PhysicsMotionType::Dynamic);
         const bool is_kinematic = (rb.motion == ecs::PhysicsMotionType::Kinematic);
 
+        btCollisionShape* collision_shape = runtime.compound_shape
+            ? static_cast<btCollisionShape*>(runtime.compound_shape.get())
+            : static_cast<btCollisionShape*>(runtime.root_shape.get());
+        if (!collision_shape)
+            return false;
+
         float mass = is_dynamic ? rb.mass : 0.0f;
         if (is_dynamic && rb.auto_mass)
         {
@@ -454,13 +501,13 @@ namespace eeng::ecs::systems
         if (is_dynamic && mass > 0.0f)
         {
             // For now, rely on Bullet's shape-based inertia.
-            runtime.compound_shape->calculateLocalInertia(mass, inertia);
+            collision_shape->calculateLocalInertia(mass, inertia);
         }
 
         btRigidBody::btRigidBodyConstructionInfo info(
             mass,
             runtime.motion_state.get(),
-            runtime.compound_shape.get(),
+            collision_shape,
             inertia);
 
         runtime.body = std::make_unique<btRigidBody>(info);
@@ -511,6 +558,7 @@ namespace eeng::ecs::systems
         // Cache state so we can detect edits later.
         runtime.motion = rb.motion;
         runtime.scale = tfm.scale;
+        runtime.local_version = tfm.local_version;
         bodies_.emplace(entity, std::move(runtime));
         // Clear any pending dirty request once we have created the Bullet body.
         dirty_entities_.erase(entity);
@@ -548,6 +596,10 @@ namespace eeng::ecs::systems
             if (rb->motion == ecs::PhysicsMotionType::Dynamic)
                 continue;
 
+            // Optimization: only push static/kinematic transforms when the authoring transform changed.
+            if (runtime.local_version == tfm->local_version)
+                continue;
+
             btTransform transform;
             transform.setIdentity();
             transform.setOrigin(to_bt_vec3(tfm->position, settings_.units_per_meter));
@@ -559,6 +611,7 @@ namespace eeng::ecs::systems
             // Avoid carrying velocities on kinematic/static bodies.
             runtime.body->setLinearVelocity(btVector3(0.0f, 0.0f, 0.0f));
             runtime.body->setAngularVelocity(btVector3(0.0f, 0.0f, 0.0f));
+            runtime.local_version = tfm->local_version;
         }
     }
 
@@ -576,6 +629,10 @@ namespace eeng::ecs::systems
                 continue;
 
             if (rb->motion != ecs::PhysicsMotionType::Dynamic)
+                continue;
+
+            // Optimization: skip sleeping bodies to avoid unnecessary write-backs.
+            if (!runtime.body->isActive())
                 continue;
 
             btTransform transform;

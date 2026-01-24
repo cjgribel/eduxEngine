@@ -87,6 +87,8 @@ namespace eeng::ecs::systems
 
             // Compound shape acts as the root to support multiple colliders per entity.
             std::unique_ptr<btCompoundShape> compound_shape;
+            // Single collider root shape (used when no compound is required).
+            std::unique_ptr<btCollisionShape> root_shape;
             std::vector<std::unique_ptr<btCollisionShape>> child_shapes;
             // Per-child collider metadata for contact event lookup.
             std::vector<ColliderRuntimeInfo> collider_info;
@@ -95,6 +97,8 @@ namespace eeng::ecs::systems
             // Cached component state so we can rebuild when key properties change.
             ecs::PhysicsMotionType motion = ecs::PhysicsMotionType::Dynamic;
             glm::vec3 scale{ 1.0f };
+            // Cached local transform version for kinematic/static sync throttling.
+            std::uint32_t local_version = 0;
         };
 
         // Contact key used to track enter/stay/exit across frames.
