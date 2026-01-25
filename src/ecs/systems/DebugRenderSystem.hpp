@@ -32,7 +32,7 @@ namespace eeng::ecs::systems
         // Collider wireframe + labels.
         bool show_colliders = true;
         bool show_collider_labels = true;
-        std::uint32_t collider_wire_color = 0xff00ffffu;
+        // Collider wireframes use the label text color to keep visuals consistent.
         std::uint32_t collider_label_bg = 0x80202020u;
         std::uint32_t collider_label_text = 0xff80ff80u;
         glm::vec3 collider_label_offset{ 0.0f, 0.15f, 0.0f };
@@ -42,6 +42,14 @@ namespace eeng::ecs::systems
         std::uint32_t rigidbody_label_bg = 0x80202040u;
         std::uint32_t rigidbody_label_text = 0xffffc080u;
         glm::vec3 rigidbody_label_offset{ 0.0f, 0.3f, 0.0f };
+
+        // Raycast debug overlays.
+        bool show_raycast_debug = true;
+        std::uint32_t raycast_line_color = 0xffff00ffu;
+        std::uint32_t raycast_hit_color = 0xff000000u;
+        std::uint32_t raycast_normal_color = 0xff00ff00u;
+        float raycast_hit_normal_length = 0.25f;
+        unsigned raycast_hit_point_size = 8;
     };
 
     class DebugRenderSystem

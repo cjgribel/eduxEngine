@@ -1065,6 +1065,12 @@ namespace eeng
                 .traits(MetaFlags::none)
                 ;
             register_component<ecs::PhysicsEventsComponent>();
+
+            entt::meta_factory<eeng::ecs::PhysicsRaycastDebugComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.PhysicsRaycastDebugComponent", .name = "PhysicsRaycastDebugComponent", .tooltip = "Debug-only raycast cache." })
+                .traits(MetaFlags::no_inspection | MetaFlags::no_serialize)
+                ;
+            register_component<ecs::PhysicsRaycastDebugComponent>();
         }
 
         // --- AnimationGraphComponent ----------------------------------------

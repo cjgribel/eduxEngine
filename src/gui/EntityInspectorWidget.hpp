@@ -175,7 +175,8 @@ namespace eeng::gui
                         {
                             return type_id == "eeng.ecs.PhysicsMaterialComponent"
                                 || type_id == "eeng.ecs.CollisionFilterComponent"
-                                || type_id == "eeng.ecs.PhysicsEventsComponent";
+                                || type_id == "eeng.ecs.PhysicsEventsComponent"
+                                || type_id == "eeng.ecs.PhysicsRaycastDebugComponent";
                         };
 
                         for (auto&& [id, type] : entt::resolve())

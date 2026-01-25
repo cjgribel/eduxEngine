@@ -552,8 +552,14 @@ namespace eeng::ecs::systems
         // Store the entity id on the Bullet body for future contact callbacks.
         runtime.body->setUserIndex(static_cast<int>(entt::to_integral(entity)));
 
+        // Apply collision filtering (layer/mask) when registering the body with Bullet.
+        const auto* filter_comp = registry.try_get<ecs::CollisionFilterComponent>(entity);
+        const ecs::CollisionFilter filter = filter_comp ? filter_comp->filter : ecs::CollisionFilter{};
+        const short group = static_cast<short>(filter.layer & 0xFFFFu);
+        const short mask = static_cast<short>(filter.mask & 0xFFFFu);
+
         if (auto* world = world_.world())
-            world->addRigidBody(runtime.body.get());
+            world->addRigidBody(runtime.body.get(), group, mask);
 
         // Cache state so we can detect edits later.
         runtime.motion = rb.motion;
@@ -643,6 +649,105 @@ namespace eeng::ecs::systems
             tfm->rotation = glm::normalize(from_bt_quat(transform.getRotation()));
             tfm->mark_local_dirty();
         }
+    }
+
+    struct PhysicsSystem::RaycastCallback final : public btCollisionWorld::ClosestRayResultCallback
+    {
+        RaycastCallback(
+            const btVector3& from,
+            const btVector3& to,
+            const PhysicsSystem& system,
+            const RaycastFilter& filter)
+            : btCollisionWorld::ClosestRayResultCallback(from, to),
+              system_(system),
+              include_triggers_(filter.include_triggers)
+        {
+        }
+
+        const PhysicsSystem& system_;
+        bool include_triggers_ = true;
+        entt::entity hit_entity = entt::null;
+        ecs::ColliderId hit_collider = 0;
+        bool hit_is_trigger = false;
+
+        btScalar addSingleResult(btCollisionWorld::LocalRayResult& ray_result,
+            bool normal_in_world_space) override
+        {
+            const auto* collision_object = ray_result.m_collisionObject;
+            if (!collision_object)
+                return m_closestHitFraction;
+
+            const int user_index = collision_object->getUserIndex();
+            if (user_index < 0)
+                return m_closestHitFraction;
+
+            const entt::entity entity = static_cast<entt::entity>(user_index);
+            const auto runtime_it = system_.bodies_.find(entity);
+            if (runtime_it == system_.bodies_.end())
+                return m_closestHitFraction;
+
+            int part_id = -1;
+            if (ray_result.m_localShapeInfo)
+                part_id = ray_result.m_localShapeInfo->m_shapePart;
+
+            const auto collider = resolve_collider_info(runtime_it->second, part_id);
+            if (!include_triggers_ && collider.is_trigger)
+                return m_closestHitFraction;
+
+            if (ray_result.m_hitFraction < m_closestHitFraction)
+            {
+                hit_entity = entity;
+                hit_collider = collider.id;
+                hit_is_trigger = collider.is_trigger;
+            }
+
+            return btCollisionWorld::ClosestRayResultCallback::addSingleResult(
+                ray_result, normal_in_world_space);
+        }
+    };
+
+    bool PhysicsSystem::raycast(const glm::vec3& origin,
+        const glm::vec3& direction,
+        float max_distance,
+        RaycastHit& out_hit,
+        const RaycastFilter& filter) const
+    {
+        out_hit = RaycastHit{};
+
+        auto* world = world_.world();
+        if (!world)
+            return false;
+
+        glm::vec3 dir = direction;
+        const float dir_len = glm::length(dir);
+        if (dir_len <= 0.0f)
+            return false;
+
+        dir /= dir_len;
+        const float distance = max_distance > 0.0f ? max_distance : dir_len;
+        if (distance <= 0.0f)
+            return false;
+
+        const glm::vec3 end = origin + dir * distance;
+        const btVector3 from = to_bt_vec3(origin, settings_.units_per_meter);
+        const btVector3 to = to_bt_vec3(end, settings_.units_per_meter);
+
+        RaycastCallback callback(from, to, *this, filter);
+        callback.m_collisionFilterGroup = static_cast<short>(filter.layer & 0xFFFFu);
+        callback.m_collisionFilterMask = static_cast<short>(filter.mask & 0xFFFFu);
+
+        world->rayTest(from, to, callback);
+        if (!callback.hasHit())
+            return false;
+
+        out_hit.hit = true;
+        out_hit.entity = ecs::Entity(callback.hit_entity);
+        out_hit.collider_id = callback.hit_collider;
+        out_hit.point = from_bt_vec3(callback.m_hitPointWorld, settings_.units_per_meter);
+        out_hit.normal = from_bt_dir3(callback.m_hitNormalWorld);
+        out_hit.distance = callback.m_closestHitFraction * distance;
+        out_hit.is_trigger = callback.hit_is_trigger;
+        return true;
     }
 
     PhysicsSystem::BodyRuntime::ColliderRuntimeInfo
@@ -879,11 +984,13 @@ namespace eeng::ecs::systems
         const entt::id_type rb_id = entt::type_hash<ecs::RigidBodyComponent>::value();
         const entt::id_type collider_id = entt::type_hash<ecs::ColliderComponent>::value();
         const entt::id_type transform_id = entt::type_hash<ecs::TransformComponent>::value();
+        const entt::id_type filter_id = entt::type_hash<ecs::CollisionFilterComponent>::value();
 
         const bool is_rb = (event.target.component_id == rb_id);
         const bool is_collider = (event.target.component_id == collider_id);
         const bool is_transform = (event.target.component_id == transform_id);
-        if (!is_rb && !is_collider && !is_transform)
+        const bool is_filter = (event.target.component_id == filter_id);
+        if (!is_rb && !is_collider && !is_transform && !is_filter)
             return;
 
         // Only scale edits require collider rebuilds; position/rotation do not.

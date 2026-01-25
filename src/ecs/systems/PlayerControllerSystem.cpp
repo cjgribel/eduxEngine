@@ -11,7 +11,10 @@
 
 #include "EngineContextHelpers.hpp"
 #include "ecs/AnimationGraphComponent.hpp"
+#include "ecs/PhysicsComponents.hpp"
 #include "ecs/PlayerControllerComponent.hpp"
+#include "ecs/TransformComponent.hpp"
+#include "ecs/systems/PhysicsSystem.hpp"
 #include "engineapi/IInputManager.hpp"
 #include "assets/types/AnimationGraphAsset.hpp"
 
@@ -369,6 +372,39 @@ namespace eeng::ecs::systems
                     set_param_bool(graph, graph_comp.instance, controller.hit2_param, hit2_press);
                     set_param_bool(graph, graph_comp.instance, controller.hit3_param, hit3_press);
                 });
+
+            // Debug raycast: cast a short ray downward from the player.
+            if (physics_system_)
+            {
+                auto* tfm = registry.try_get<ecs::TransformComponent>(entity);
+                if (tfm)
+                {
+                    auto& debug = registry.get_or_emplace<ecs::PhysicsRaycastDebugComponent>(entity);
+
+                    // Use local position for now (player entities are expected to be root-level).
+                    const glm::vec3 origin = tfm->position;
+                    const glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f);
+                    const float length = 2.0f;
+
+                    ecs::systems::PhysicsSystem::RaycastFilter filter{};
+                    filter.include_triggers = false;
+
+                    ecs::systems::PhysicsSystem::RaycastHit hit{};
+                    const bool hit_any = physics_system_->raycast(origin, direction, length, hit, filter);
+
+                    ecs::PhysicsRaycastDebugRay ray{};
+                    ray.origin = origin;
+                    ray.direction = direction;
+                    ray.length = length;
+                    ray.hit = hit_any;
+                    ray.hit_point = hit.point;
+                    ray.hit_normal = hit.normal;
+                    ray.hit_entity = hit.entity;
+                    ray.hit_collider = hit.collider_id;
+                    ray.hit_is_trigger = hit.is_trigger;
+                    debug.rays.push_back(ray);
+                }
+            }
         }
     }
 }

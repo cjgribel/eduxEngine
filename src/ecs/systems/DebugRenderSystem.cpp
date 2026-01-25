@@ -116,7 +116,7 @@ namespace eeng::ecs::systems
 
                     if (settings.show_colliders)
                     {
-                        renderer.push_states(ShapeRendering::Color4u{ settings.collider_wire_color }, world);
+                        renderer.push_states(ShapeRendering::Color4u{ settings.collider_label_text }, world);
 
                         switch (collider.type)
                         {
@@ -208,6 +208,44 @@ namespace eeng::ecs::systems
                     window_name.c_str(),
                     settings.rigidbody_label_bg,
                     settings.rigidbody_label_text);
+            }
+        }
+
+        // --- Raycast debug -------------------------------------------------
+        if (settings.show_raycast_debug)
+        {
+            auto view = registry.view<ecs::PhysicsRaycastDebugComponent>();
+            for (const auto entity : view)
+            {
+                (void)entity;
+                auto& debug = view.get<ecs::PhysicsRaycastDebugComponent>(entity);
+
+                for (const auto& ray : debug.rays)
+                {
+                    const glm::vec3 ray_end = ray.origin + ray.direction * ray.length;
+
+                    // Draw ray line.
+                    renderer.push_states(ShapeRendering::Color4u{ settings.raycast_line_color });
+                    renderer.push_line(ray.origin, ray_end);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                if (!ray.hit)
+                    continue;
+
+                // Draw hit point and normal line when we have a hit.
+                renderer.push_states(ShapeRendering::Color4u{ settings.raycast_hit_color });
+                renderer.push_point(ray.hit_point, settings.raycast_hit_point_size);
+                renderer.pop_states<ShapeRendering::Color4u>();
+
+                const float normal_len = settings.raycast_hit_normal_length;
+                renderer.push_states(ShapeRendering::Color4u{ settings.raycast_normal_color });
+                renderer.push_line(ray.hit_point,
+                    ray.hit_point + ray.hit_normal * normal_len);
+                renderer.pop_states<ShapeRendering::Color4u>();
+            }
+
+                // Clear cached rays after drawing so they only last one frame by default.
+                debug.rays.clear();
             }
         }
     }

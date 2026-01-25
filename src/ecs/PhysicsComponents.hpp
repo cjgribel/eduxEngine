@@ -150,6 +150,28 @@ namespace eeng::ecs
         std::vector<CollisionEvent> events;
     };
 
+    // Debug-only ray record used by PhysicsRaycastDebugComponent.
+    struct PhysicsRaycastDebugRay
+    {
+        glm::vec3 origin{ 0.0f };
+        glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
+        float length = 0.0f;
+
+        bool hit = false;
+        glm::vec3 hit_point{ 0.0f };
+        glm::vec3 hit_normal{ 0.0f, 1.0f, 0.0f };
+        Entity hit_entity{};
+        ColliderId hit_collider = 0;
+        bool hit_is_trigger = false;
+    };
+
+    // Debug-only component to store recent raycasts for visualization.
+    // Callers should clear rays each frame if they want a single-frame view.
+    struct PhysicsRaycastDebugComponent
+    {
+        std::vector<PhysicsRaycastDebugRay> rays;
+    };
+
     inline std::string to_string(const RigidBodyComponent& t)
     {
         return std::format("RigidBodyComponent(motion = {})",
@@ -174,6 +196,11 @@ namespace eeng::ecs
     inline std::string to_string(const PhysicsEventsComponent&)
     {
         return "PhysicsEventsComponent";
+    }
+
+    inline std::string to_string(const PhysicsRaycastDebugComponent&)
+    {
+        return "PhysicsRaycastDebugComponent";
     }
 
     // Asset reference traversal hooks used by the ResourceManager.
@@ -212,4 +239,10 @@ namespace eeng::ecs
 
     template<typename Visitor>
     void visit_entity_refs(PhysicsEventsComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_asset_refs(PhysicsRaycastDebugComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_entity_refs(PhysicsRaycastDebugComponent&, Visitor&&) {}
 }

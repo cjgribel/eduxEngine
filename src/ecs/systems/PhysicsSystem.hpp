@@ -63,6 +63,26 @@ namespace eeng::ecs::systems
             std::size_t tracked_contacts = 0;
         };
 
+        struct RaycastFilter
+        {
+            // Collision groups and masks (same semantics as CollisionFilterComponent).
+            std::uint32_t layer = 1;
+            std::uint32_t mask = 0xFFFFFFFFu;
+            // Include trigger-only colliders in ray hits.
+            bool include_triggers = true;
+        };
+
+        struct RaycastHit
+        {
+            bool hit = false;
+            ecs::Entity entity;
+            ecs::ColliderId collider_id = 0;
+            glm::vec3 point{ 0.0f };
+            glm::vec3 normal{ 0.0f };
+            float distance = 0.0f;
+            bool is_trigger = false;
+        };
+
         PhysicsSystem() = default;
         ~PhysicsSystem();
 
@@ -75,8 +95,23 @@ namespace eeng::ecs::systems
         void update(entt::registry& registry, EngineContext& ctx, float delta_time);
         // Query a lightweight snapshot of Bullet + ECS counters for UI display.
         PhysicsStats get_stats() const;
+        // Raycast against the Bullet world (direction is normalized internally).
+        bool raycast(const glm::vec3& origin,
+            const glm::vec3& direction,
+            float max_distance,
+            RaycastHit& out_hit,
+            const RaycastFilter& filter) const;
+        // Convenience overload using a default filter.
+        bool raycast(const glm::vec3& origin,
+            const glm::vec3& direction,
+            float max_distance,
+            RaycastHit& out_hit) const
+        {
+            return raycast(origin, direction, max_distance, out_hit, RaycastFilter{});
+        }
 
     private:
+        struct RaycastCallback;
         struct BodyRuntime
         {
             struct ColliderRuntimeInfo

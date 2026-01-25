@@ -12,9 +12,16 @@ namespace eeng
 
 namespace eeng::ecs::systems
 {
+    class PhysicsSystem;
+
     class PlayerControllerSystem
     {
     public:
+        // Optional hookup to the physics system for raycast queries.
+        void set_physics_system(PhysicsSystem* physics_system) { physics_system_ = physics_system; }
         void update(entt::registry& registry, EngineContext& ctx, float delta_time);
+
+    private:
+        PhysicsSystem* physics_system_ = nullptr;
     };
 }

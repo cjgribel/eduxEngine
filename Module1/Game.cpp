@@ -339,6 +339,8 @@ bool Game::init()
     // Physics system holds the Bullet world and ECS bindings.
     physicsSystem = std::make_unique<eeng::ecs::systems::PhysicsSystem>();
     physicsSystem->init(*ctx);
+    if (playerControllerSystem)
+        playerControllerSystem->set_physics_system(physicsSystem.get());
     // Script system placeholder (lifecycle hooks only for now).
     scriptSystem = std::make_unique<eeng::ecs::systems::ScriptSystem>();
     scriptSystem->init(*ctx);
