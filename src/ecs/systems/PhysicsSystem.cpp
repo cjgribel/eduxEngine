@@ -201,6 +201,14 @@ namespace eeng::ecs::systems
                 {
                     handle_batch_task_event(event);
                 });
+            event_queue->register_callback([this, &ctx](const SetPlayModeEvent&)
+                {
+                    reset_for_world(ctx);
+                });
+            event_queue->register_callback([this, &ctx](const TogglePlayModeEvent&)
+                {
+                    reset_for_world(ctx);
+                });
         }
 
         // Lifecycle hooks: respond immediately to component add/remove.
@@ -229,6 +237,56 @@ namespace eeng::ecs::systems
         settings_ = physics::PhysicsWorldSettings{};
         world_.init(settings_);
         initialized_ = true;
+    }
+
+    void PhysicsSystem::reset_for_world(EngineContext& ctx)
+    {
+        if (!initialized_)
+            return;
+
+        ctx_ = &ctx;
+
+        if (auto* world = world_.world())
+        {
+            for (auto& [entity, runtime] : bodies_)
+            {
+                if (runtime.body)
+                    world->removeRigidBody(runtime.body.get());
+            }
+        }
+
+        bodies_.clear();
+        dirty_entities_.clear();
+        event_entities_.clear();
+        current_contacts_.clear();
+        previous_contacts_.clear();
+        batch_sync_requested_ = true;
+
+        auto* registry = eeng::try_get_registry_ptr(ctx, "PhysicsSystem");
+        if (registry)
+        {
+            rb_construct_conn_ = registry->on_construct<ecs::RigidBodyComponent>()
+                .connect<&PhysicsSystem::on_rigidbody_construct>(this);
+            rb_destroy_conn_ = registry->on_destroy<ecs::RigidBodyComponent>()
+                .connect<&PhysicsSystem::on_rigidbody_destroy>(this);
+            collider_construct_conn_ = registry->on_construct<ecs::ColliderComponent>()
+                .connect<&PhysicsSystem::on_collider_construct>(this);
+            collider_destroy_conn_ = registry->on_destroy<ecs::ColliderComponent>()
+                .connect<&PhysicsSystem::on_collider_destroy>(this);
+            transform_construct_conn_ = registry->on_construct<ecs::TransformComponent>()
+                .connect<&PhysicsSystem::on_transform_construct>(this);
+            transform_destroy_conn_ = registry->on_destroy<ecs::TransformComponent>()
+                .connect<&PhysicsSystem::on_transform_destroy>(this);
+        }
+        else
+        {
+            rb_construct_conn_.release();
+            rb_destroy_conn_.release();
+            collider_construct_conn_.release();
+            collider_destroy_conn_.release();
+            transform_construct_conn_.release();
+            transform_destroy_conn_.release();
+        }
     }
 
     void PhysicsSystem::shutdown()

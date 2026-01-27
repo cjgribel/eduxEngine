@@ -65,12 +65,26 @@ public:
     void update(
         float time,
         float deltaTime) override;
+    void update_edit(
+        float time,
+        float deltaTime) override;
+    void update_play(
+        float time,
+        float deltaTime) override;
 
     /// @brief For rendering of game contents
     /// @param time Total time elapsed in seconds
     /// @param screenWidth Current width of the window in pixels
     /// @param screenHeight Current height of the window in pixels
     void render(
+        float time,
+        int windowWidth,
+        int windowHeight) override;
+    void render_edit(
+        float time,
+        int windowWidth,
+        int windowHeight) override;
+    void render_play(
         float time,
         int windowWidth,
         int windowHeight) override;

@@ -12,6 +12,7 @@
 #include "editor/CommandQueue.hpp"
 #include "editor/CommandSanityChecks.hpp"
 #include "BatchRegistry.hpp"
+#include "ecs/EntityManager.hpp"
 
 #include "LogMacros.h"
 #include "LogGlobals.hpp"
@@ -27,6 +28,7 @@
 #include <SDL_opengl.h>
 #include <chrono>
 #include <memory>
+#include <vector>
 
 namespace
 {
@@ -123,6 +125,13 @@ namespace eeng
     Engine::Engine(std::shared_ptr<EngineContext> ctx)
         : ctx(ctx)
     {
+        if (ctx)
+        {
+            services_ = ctx->services_owner;
+            edit_world_ = ctx->world_owner;
+            if (services_)
+                services_->play_mode_active.store(false, std::memory_order_relaxed);
+        }
     }
 
     Engine::~Engine()
@@ -203,6 +212,8 @@ namespace eeng
         ctx->event_queue->register_callback([&](const SetWireFrameRenderingEvent& event) { this->on_set_wireframe(event); });
         ctx->event_queue->register_callback([&](const SetDebugLoggingEvent& event) { this->on_set_debug_logging(event); });
         ctx->event_queue->register_callback([&](const SetMinFrameTimeEvent& event) { this->on_set_min_frametime(event); });
+        ctx->event_queue->register_callback([&](const SetPlayModeEvent& event) { this->on_set_play_mode(event); });
+        ctx->event_queue->register_callback([&](const TogglePlayModeEvent& event) { this->on_toggle_play_mode(event); });
         ctx->event_queue->register_callback([&](const ResourceTaskCompletedEvent& event) { this->on_resource_task_completed(event); });
         ctx->event_queue->register_callback([&](const BatchTaskCompletedEvent& event) { this->on_batch_task_completed(event); });
 
@@ -310,7 +321,10 @@ namespace eeng
 
             // --- Game systems ---
             START_TIMER("Frame", "Game Update");
-            game->update(time_s, deltaTime_s);
+            if (mode_ == EngineMode::Play)
+                game->update_play(time_s, deltaTime_s);
+            else
+                game->update_edit(time_s, deltaTime_s);
             STOP_TIMER("Frame", "Game Update");
 
             // --- Main thread tasks ---
@@ -333,13 +347,14 @@ namespace eeng
             // --- Event dispatch / Command execution / Entity destruction ---
 #if 1
             START_TIMER("Frame", "Commands & Batches");
-            if (ctx->command_queue->has_in_flight()
-                || ctx->command_queue->has_ready_commands())
+            if (mode_ == EngineMode::Edit
+                && (ctx->command_queue->has_in_flight()
+                    || ctx->command_queue->has_ready_commands()))
             {
                 ctx->command_queue->process();
             }
 
-            if (ctx->batch_registry)
+            if (mode_ == EngineMode::Edit && ctx->batch_registry)
             {
                 auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
                 br.process_dirty_batches(*ctx);
@@ -375,7 +390,10 @@ namespace eeng
 
             // --- Render ---
             START_TIMER("Frame", "Render");
-            game->render(time_s, window_width, window_height);
+            if (mode_ == EngineMode::Play)
+                game->render_play(time_s, window_width, window_height);
+            else
+                game->render_edit(time_s, window_width, window_height);
             STOP_TIMER("Frame", "Render");
 
             // =================================================================
@@ -578,6 +596,12 @@ namespace eeng
 
             static_cast<InputManager&>(*ctx->input_manager).HandleEvent(&event);
 
+            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F5)
+            {
+                if (ctx->event_queue)
+                    ctx->event_queue->dispatch(TogglePlayModeEvent{});
+            }
+
             if (event.type == SDL_QUIT)
                 shutdown_state_ = ShutdownState::Draining;
         }
@@ -630,6 +654,89 @@ namespace eeng
             ctx->shutdown_requested->store(true, std::memory_order_relaxed);
         drain_shutdown_queues(*ctx);
         return true;
+    }
+
+    void Engine::set_mode(EngineMode mode)
+    {
+        if (mode_ == mode)
+            return;
+
+        if (mode == EngineMode::Play)
+        {
+            if (!enter_play_mode())
+                return;
+        }
+        else
+        {
+            exit_play_mode();
+        }
+    }
+
+    bool Engine::enter_play_mode()
+    {
+        if (!ctx || mode_ == EngineMode::Play)
+            return false;
+
+        if (!services_)
+            services_ = ctx->services_owner;
+        if (!edit_world_)
+            edit_world_ = ctx->world_owner;
+        if (!services_ || !edit_world_)
+            return false;
+
+        std::vector<BatchSnapshot> snapshots;
+        if (ctx->batch_registry)
+        {
+            auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
+            snapshots = br.snapshot_loaded_batches(*ctx);
+        }
+
+        std::vector<BatchSnapshot> filtered;
+        filtered.reserve(snapshots.size());
+        for (auto& snapshot : snapshots)
+        {
+            if (snapshot.info.name == BatchRegistry::kEditorBatchName)
+                continue;
+            filtered.push_back(std::move(snapshot));
+        }
+        snapshots = std::move(filtered);
+
+        play_world_ = std::make_shared<WorldState>(
+            std::make_unique<EntityManager>(),
+            std::make_unique<BatchRegistry>());
+
+        ctx->bind(*services_, *play_world_);
+        ctx->world_owner = play_world_;
+
+        if (ctx->batch_registry)
+        {
+            auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
+            TaskResult res = br.load_batches_from_snapshots(snapshots, *ctx, true);
+            if (!res.success)
+                EENG_LOG_WARN(ctx, "Play mode: snapshot load failed");
+        }
+
+        mode_ = EngineMode::Play;
+        if (services_)
+            services_->play_mode_active.store(true, std::memory_order_relaxed);
+        EENG_LOG(ctx, "Play mode: entered");
+        return true;
+    }
+
+    void Engine::exit_play_mode()
+    {
+        if (!ctx || mode_ == EngineMode::Edit)
+            return;
+        if (!services_ || !edit_world_)
+            return;
+
+        ctx->bind(*services_, *edit_world_);
+        ctx->world_owner = edit_world_;
+        play_world_.reset();
+        mode_ = EngineMode::Edit;
+        if (services_)
+            services_->play_mode_active.store(false, std::memory_order_relaxed);
+        EENG_LOG(ctx, "Play mode: exited");
     }
 
     void Engine::begin_frame()
@@ -700,6 +807,17 @@ namespace eeng
     void Engine::on_set_min_frametime(const SetMinFrameTimeEvent& e)
     {
         min_frametime_ms = e.dt;
+    }
+
+    void Engine::on_set_play_mode(const SetPlayModeEvent& e)
+    {
+        set_mode(e.enabled ? EngineMode::Play : EngineMode::Edit);
+    }
+
+    void Engine::on_toggle_play_mode(const TogglePlayModeEvent& e)
+    {
+        (void)e;
+        set_mode(mode_ == EngineMode::Play ? EngineMode::Edit : EngineMode::Play);
     }
 
     void Engine::on_resource_task_completed(const ResourceTaskCompletedEvent& e)

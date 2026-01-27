@@ -14,6 +14,7 @@
 #include <mutex>
 #include <future>
 #include <string>
+#include <vector>
 
 #pragma once
 
@@ -74,6 +75,12 @@ namespace eeng {
         State       state{ State::Unloaded };
         TaskResult  last_result{};
     };
+
+    struct BatchSnapshot
+    {
+        BatchInfo info{};
+        nlohmann::json entities = nlohmann::json::array();
+    };
     // struct BatchInfo
     // {
     //     using State = enum { Idle, Queued, Loading, Bound, Unloading, Error };
@@ -112,6 +119,11 @@ namespace eeng {
 
 
         std::shared_future<TaskResult> queue_save_batch(const BatchId& id, EngineContext& ctx);
+
+        bool snapshot_batch(const BatchId& id, EngineContext& ctx, BatchSnapshot& out_snapshot);
+        std::vector<BatchSnapshot> snapshot_loaded_batches(EngineContext& ctx);
+        TaskResult load_batch_from_snapshot(const BatchSnapshot& snapshot, EngineContext& ctx, bool skip_asset_load = false);
+        TaskResult load_batches_from_snapshots(const std::vector<BatchSnapshot>& snapshots, EngineContext& ctx, bool skip_asset_load = false);
 
         /**
          * @brief Enqueue loading of all batches listed in the batch index.

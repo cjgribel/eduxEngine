@@ -39,6 +39,22 @@ public:
         float time_s,
         float deltaTime_s) = 0;
 
+    /// @brief Update while in edit mode (defaults to update()).
+    virtual void update_edit(
+        float time_s,
+        float deltaTime_s)
+    {
+        update(time_s, deltaTime_s);
+    }
+
+    /// @brief Update while in play mode (defaults to update()).
+    virtual void update_play(
+        float time_s,
+        float deltaTime_s)
+    {
+        update(time_s, deltaTime_s);
+    }
+
     /**
      * @brief Render the game game.
      *
@@ -52,6 +68,24 @@ public:
         float time_s,
         int windowWidth,
         int windowHeight) = 0;
+
+    /// @brief Render while in edit mode (defaults to render()).
+    virtual void render_edit(
+        float time_s,
+        int windowWidth,
+        int windowHeight)
+    {
+        render(time_s, windowWidth, windowHeight);
+    }
+
+    /// @brief Render while in play mode (defaults to render()).
+    virtual void render_play(
+        float time_s,
+        int windowWidth,
+        int windowHeight)
+    {
+        render(time_s, windowWidth, windowHeight);
+    }
 
     /**
      * @brief Clean up game resources.

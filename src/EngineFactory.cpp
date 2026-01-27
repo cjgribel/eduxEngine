@@ -11,14 +11,19 @@ namespace eeng
 {
     std::unique_ptr<Engine> make_default_engine()
     {
-        std::shared_ptr<EngineContext> ctx = std::make_shared<EngineContext>(
-            std::make_unique<EntityManager>(),
+        auto services = std::make_shared<EngineServices>(
             std::make_shared<ResourceManager>(),
-            std::make_unique<BatchRegistry>(),
             std::make_unique<GuiManager>(),
             std::make_unique<InputManager>(),
-            std::make_shared<LogManager>()
-        );
+            std::make_shared<LogManager>());
+
+        auto world = std::make_shared<WorldState>(
+            std::make_unique<EntityManager>(),
+            std::make_unique<BatchRegistry>());
+
+        std::shared_ptr<EngineContext> ctx = std::make_shared<EngineContext>(
+            std::move(services),
+            std::move(world));
         return std::make_unique<Engine>(ctx);
     }
 }

@@ -49,6 +49,8 @@ namespace eeng
     struct SetDebugLoggingEvent { bool enabled; };
     struct SetMinFrameTimeEvent { float dt; };
     struct ResourceTaskCompletedEvent { TaskResult result; };
+    struct SetPlayModeEvent { bool enabled; };
+    struct TogglePlayModeEvent { };
 
     enum class BatchTaskType : uint8_t
     {
@@ -123,8 +125,64 @@ namespace eeng
         EventQueue& event_queue;
     };
 
+    template<typename T>
+    class PtrView
+    {
+    public:
+        PtrView() = default;
+        explicit PtrView(T* ptr) : ptr_(ptr) {}
+
+        void reset(T* ptr = nullptr) { ptr_ = ptr; }
+        T* get() const { return ptr_; }
+        T& operator*() const { return *ptr_; }
+        T* operator->() const { return ptr_; }
+        explicit operator bool() const { return ptr_ != nullptr; }
+
+    private:
+        T* ptr_ = nullptr;
+    };
+
+    struct EngineServices
+    {
+        EngineServices(
+            std::shared_ptr<IResourceManager> resource_manager,
+            std::unique_ptr<IGuiManager> gui_manager,
+            std::unique_ptr<IInputManager> input_manager,
+            std::shared_ptr<ILogManager> log_manager);
+
+        ~EngineServices();
+
+        std::shared_ptr<IResourceManager>       resource_manager;
+        std::unique_ptr<IGuiManager>            gui_manager;
+        std::unique_ptr<IInputManager>          input_manager;
+        std::shared_ptr<ILogManager>            log_manager;
+        std::shared_ptr<std::atomic<bool>>      shutdown_requested;
+        std::atomic<bool>                       play_mode_active{ false };
+        std::unique_ptr<MainThreadQueue>        main_thread_queue;
+        std::unique_ptr<ThreadPool>             thread_pool;
+        std::unique_ptr<EventQueue>             event_queue;
+        std::unique_ptr<editor::CommandQueue>   command_queue;
+        std::unique_ptr<GuidSelection>          asset_selection;
+        std::unique_ptr<EngineConfig>           engine_config;
+    };
+
+    struct WorldState
+    {
+        WorldState(
+            std::unique_ptr<IEntityManager> entity_manager,
+            std::unique_ptr<IBatchRegistry> batch_registry);
+
+        ~WorldState();
+
+        std::unique_ptr<IEntityManager>         entity_manager;
+        std::unique_ptr<IBatchRegistry>         batch_registry;
+        std::unique_ptr<EntitySelection>        entity_selection;
+        std::unique_ptr<BatchSelection>         batch_selection;
+    };
+
     struct EngineContext : public std::enable_shared_from_this<EngineContext>
     {
+        // Compatibility constructor for existing call sites (builds services + world).
         EngineContext(
             std::unique_ptr<IEntityManager>     entity_manager,
             std::shared_ptr<IResourceManager>   resource_manager,
@@ -133,23 +191,35 @@ namespace eeng
             std::unique_ptr<IInputManager>      input_manager,
             std::shared_ptr<ILogManager>        log_manager);
 
+        EngineContext(
+            std::shared_ptr<EngineServices> services,
+            std::shared_ptr<WorldState> world);
+
         ~EngineContext();
 
-        std::unique_ptr<IEntityManager>         entity_manager;
-        std::shared_ptr<IResourceManager>       resource_manager;
-        std::unique_ptr<IBatchRegistry>         batch_registry;
-        std::unique_ptr<IGuiManager>            gui_manager;
-        std::unique_ptr<IInputManager>          input_manager;
-        std::shared_ptr<ILogManager>            log_manager;
-        std::shared_ptr<std::atomic<bool>>      shutdown_requested;
-        std::unique_ptr<MainThreadQueue>        main_thread_queue;
-        std::unique_ptr<ThreadPool>             thread_pool;
-        std::unique_ptr<EventQueue>             event_queue;
-        std::unique_ptr<editor::CommandQueue>   command_queue;
-        std::unique_ptr<GuidSelection>          asset_selection;
-        std::unique_ptr<EntitySelection>        entity_selection;
-        std::unique_ptr<BatchSelection>         batch_selection;
-        std::unique_ptr<EngineConfig>           engine_config;
+        void bind(EngineServices& services, WorldState& world);
+
+        std::shared_ptr<EngineServices> services_owner;
+        std::shared_ptr<WorldState> world_owner;
+        EngineServices* services = nullptr;
+        WorldState* world = nullptr;
+
+        // Compatibility view (non-owning, mirrors current world/services).
+        PtrView<IEntityManager>         entity_manager;
+        std::shared_ptr<IResourceManager> resource_manager;
+        PtrView<IBatchRegistry>         batch_registry;
+        PtrView<IGuiManager>            gui_manager;
+        PtrView<IInputManager>          input_manager;
+        std::shared_ptr<ILogManager>    log_manager;
+        std::shared_ptr<std::atomic<bool>> shutdown_requested;
+        PtrView<MainThreadQueue>        main_thread_queue;
+        PtrView<ThreadPool>             thread_pool;
+        PtrView<EventQueue>             event_queue;
+        PtrView<editor::CommandQueue>   command_queue;
+        PtrView<GuidSelection>          asset_selection;
+        PtrView<EntitySelection>        entity_selection;
+        PtrView<BatchSelection>         batch_selection;
+        PtrView<EngineConfig>           engine_config;
     };
 
     using EngineContextPtr = std::shared_ptr<EngineContext>;

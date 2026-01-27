@@ -383,7 +383,7 @@ namespace eeng
             // Selection -> assign to batch
             const auto& entity_selection = *ctx.entity_selection;
             const int selection_count = static_cast<int>(entity_selection.size());
-            const bool can_queue = (ctx.command_queue != nullptr);
+            const bool can_queue = static_cast<bool>(ctx.command_queue);
             const bool can_assign = can_queue
                 && ctx.entity_manager
                 && selection_count > 0

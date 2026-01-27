@@ -30,7 +30,7 @@ namespace eeng::editor
 
         bool can_queue(EngineContext& ctx)
         {
-            return ctx.command_queue != nullptr;
+        return static_cast<bool>(ctx.command_queue);
         }
 
         bool can_queue_action(EngineContext& ctx, const char* action_label)

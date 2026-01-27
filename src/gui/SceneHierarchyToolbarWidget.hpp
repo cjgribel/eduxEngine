@@ -3,6 +3,7 @@
 
 #pragma once
 #include "EngineContext.hpp"
+#include "EventQueue.h"
 #include "editor/EditorActions.hpp"
 // #include "ecs/EntityManager.hpp"
 #include "engineapi/SelectionManager.hpp"
@@ -32,9 +33,12 @@ namespace eeng::gui
 
             const bool has_selection = !entity_selection.empty();
             const bool has_multi_selection = entity_selection.size() > 1;
-            const bool can_queue = (ctx.command_queue != nullptr);
+            const bool can_queue = static_cast<bool>(ctx.command_queue);
+            const bool is_playing = ctx.services
+                && ctx.services->play_mode_active.load(std::memory_order_relaxed);
+            const bool allow_edit_actions = can_queue && !is_playing;
 
-            if (!can_queue)
+            if (!allow_edit_actions)
                 ImGui::BeginDisabled();
 
             // New entity
@@ -89,7 +93,26 @@ namespace eeng::gui
             }
             if (!has_selection) ImGui::EndDisabled();
 
-            if (!can_queue)
+            if (!allow_edit_actions)
+                ImGui::EndDisabled();
+
+            const bool can_toggle = static_cast<bool>(ctx.event_queue);
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(12.0f, 0.0f));
+            ImGui::SameLine();
+            ImGui::TextUnformatted("Mode:");
+            ImGui::SameLine();
+            const ImVec4 mode_color = is_playing ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f)
+                                                 : ImVec4(0.9f, 0.8f, 0.2f, 1.0f);
+            ImGui::TextColored(mode_color, "%s", is_playing ? "Play" : "Edit");
+            ImGui::SameLine();
+            if (!can_toggle)
+                ImGui::BeginDisabled();
+            if (ImGui::Button(is_playing ? "Stop" : "Play"))
+            {
+                ctx.event_queue->dispatch(TogglePlayModeEvent{});
+            }
+            if (!can_toggle)
                 ImGui::EndDisabled();
         }
     };

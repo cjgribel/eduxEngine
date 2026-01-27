@@ -513,6 +513,222 @@ namespace eeng
             });
     }
 
+    bool BatchRegistry::snapshot_batch(
+        const BatchId& id,
+        EngineContext& ctx,
+        BatchSnapshot& out_snapshot)
+    {
+        BatchInfo snapshot_info;
+        {
+            std::lock_guard lk(mtx_);
+            auto it = batches_.find(id);
+            if (it == batches_.end())
+                return false;
+            if (it->second.state != BatchInfo::State::Loaded)
+                return false;
+            snapshot_info = it->second;
+        }
+
+        nlohmann::json entities_json = ctx.main_thread_queue->push_and_wait([&]() {
+            nlohmann::json arr = nlohmann::json::array();
+
+            auto registry_sptr = ctx.entity_manager->registry_wptr().lock();
+            if (!registry_sptr)
+                return nlohmann::json::array();
+
+            for (const auto& er : snapshot_info.live)
+            {
+                if (!er.is_bound())
+                    continue;
+
+                nlohmann::json ejson = eeng::meta::serialize_entity(
+                    er,
+                    registry_sptr,
+                    eeng::meta::SerializationPurpose::file);
+                arr.push_back(std::move(ejson));
+            }
+
+            return arr;
+            });
+
+        out_snapshot.info = std::move(snapshot_info);
+        out_snapshot.entities = std::move(entities_json);
+        return true;
+    }
+
+    std::vector<BatchSnapshot> BatchRegistry::snapshot_loaded_batches(EngineContext& ctx)
+    {
+        std::vector<BatchId> ids;
+        {
+            std::lock_guard lk(mtx_);
+            ids.reserve(batches_.size());
+            for (const auto& [id, info] : batches_)
+            {
+                if (info.state == BatchInfo::State::Loaded)
+                    ids.push_back(id);
+            }
+        }
+
+        std::vector<BatchSnapshot> snapshots;
+        snapshots.reserve(ids.size());
+        for (const auto& id : ids)
+        {
+            BatchSnapshot snapshot{};
+            if (snapshot_batch(id, ctx, snapshot))
+                snapshots.push_back(std::move(snapshot));
+        }
+
+        return snapshots;
+    }
+
+    TaskResult BatchRegistry::load_batch_from_snapshot(
+        const BatchSnapshot& snapshot,
+        EngineContext& ctx,
+        bool skip_asset_load)
+    {
+        TaskResult res{};
+        res.success = false;
+
+        if (!snapshot.info.id.valid())
+            return res;
+
+        BatchInfo* B = nullptr;
+        std::vector<ecs::EntityRef> old_live;
+        {
+            std::lock_guard lk(mtx_);
+            auto it = batches_.find(snapshot.info.id);
+            if (it == batches_.end())
+            {
+                BatchInfo info = snapshot.info;
+                info.state = BatchInfo::State::Unloaded;
+                info.last_result = TaskResult{};
+                info.live.clear();
+                if (info.filename.empty())
+                    info.filename = info.id.to_string() + ".json";
+
+                auto [ins_it, inserted] = batches_.emplace(info.id, std::move(info));
+                B = &ins_it->second;
+            }
+            else
+            {
+                B = &it->second;
+                B->name = snapshot.info.name;
+                if (!snapshot.info.filename.empty())
+                    B->filename = snapshot.info.filename;
+                B->asset_closure_hdr = snapshot.info.asset_closure_hdr;
+                old_live = B->live;
+                B->live.clear();
+            }
+
+            B->state = BatchInfo::State::Queued;
+            B->last_result = TaskResult{};
+        }
+
+        if (!B)
+            return res;
+
+        // Mark batch as loading.
+        B->state = BatchInfo::State::Loading;
+
+        res.success = true;
+
+        // Ensure the GUID -> batch map doesn't retain stale entries for this batch.
+        if (!old_live.empty())
+        {
+            std::lock_guard lk(mtx_);
+            for (const auto& er : old_live)
+            {
+                if (!er.guid.valid())
+                    continue;
+                auto it = entity_to_batch_.find(er.guid);
+                if (it != entity_to_batch_.end() && it->second == B->id)
+                    entity_to_batch_.erase(it);
+            }
+        }
+
+        // Parse entities from the snapshot.
+        std::vector<eeng::meta::EntitySpawnDesc> entity_descs;
+        if (snapshot.entities.is_array())
+        {
+            entity_descs.reserve(snapshot.entities.size());
+            for (const auto& ent_json : snapshot.entities)
+                entity_descs.push_back(eeng::meta::create_entity_spawn_desc(ent_json));
+        }
+
+        // Load assets from the snapshot header if any.
+        if (!skip_asset_load && !B->asset_closure_hdr.empty())
+        {
+            res = ctx.resource_manager->load_and_bind_async(
+                std::deque<Guid>(B->asset_closure_hdr.begin(), B->asset_closure_hdr.end()),
+                B->id,
+                ctx
+            ).get();
+            if (!res.success)
+            {
+                std::lock_guard lk(mtx_);
+                B->last_result = res;
+                B->state = BatchInfo::State::Error;
+                return res;
+            }
+        }
+
+        // Spawn entities on the main thread.
+        ctx.main_thread_queue->push_and_wait([&]()
+            {
+                B->live.clear();
+                std::vector<ecs::Entity> new_entities;
+                new_entities.reserve(entity_descs.size());
+
+                for (const auto& desc : entity_descs)
+                {
+                    auto er = eeng::meta::spawn_entity_from_desc(
+                        desc,
+                        ctx,
+                        eeng::meta::SerializationPurpose::file);
+                    B->live.push_back(er);
+                    new_entities.push_back(er.entity);
+                }
+                ctx.entity_manager->register_entities_from_deserialization(new_entities);
+            });
+
+        {
+            std::lock_guard lk(mtx_);
+            for (const auto& er : B->live)
+            {
+                if (er.guid.valid())
+                    entity_to_batch_[er.guid] = B->id;
+            }
+        }
+
+        // Bind AssetRef<> + EntityRef<> inside components.
+        bind_refs_for_entities_on_main(B->live, ctx);
+
+        {
+            std::lock_guard lk(mtx_);
+            B->last_result = res;
+            B->state = res.success ? BatchInfo::State::Loaded : BatchInfo::State::Error;
+        }
+
+        return res;
+    }
+
+    TaskResult BatchRegistry::load_batches_from_snapshots(
+        const std::vector<BatchSnapshot>& snapshots,
+        EngineContext& ctx,
+        bool skip_asset_load)
+    {
+        TaskResult merged{};
+        merged.success = true;
+
+        for (const auto& snapshot : snapshots)
+        {
+            TaskResult r = load_batch_from_snapshot(snapshot, ctx, skip_asset_load);
+            merged.success = merged.success && r.success;
+        }
+
+        return merged;
+    }
+
     // TODO -> update index file as well?
     bool BatchRegistry::save_batch(const eeng::BatchId& id, EngineContext& ctx)
     {

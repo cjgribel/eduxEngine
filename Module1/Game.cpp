@@ -986,17 +986,36 @@ bool Game::init()
     return true;
 }
 
+void Game::update_edit(
+    float time,
+    float deltaTime)
+{
+    play_mode = false;
+    update(time, deltaTime);
+}
+
+void Game::update_play(
+    float time,
+    float deltaTime)
+{
+    play_mode = true;
+    update(time, deltaTime);
+}
+
 void Game::update(
     float time,
     float deltaTime)
 {
-    sync_active_entity();
-    ensure_editor_camera_entities();
+    if (!play_mode)
+    {
+        sync_active_entity();
+        ensure_editor_camera_entities();
+    }
 
     auto& registry = ctx->entity_manager->registry();
 
     // Handle "focus" input: set third-person target to the selected entity.
-    if (ctx->input_manager)
+    if (!play_mode && ctx->input_manager)
     {
         using Key = eeng::IInputManager::Key;
         const bool f_down = ctx->input_manager->IsKeyPressed(Key::F);
@@ -1034,28 +1053,28 @@ void Game::update(
         { 0.03f, 0.03f, 0.03f });
 
     // TODO: consider scheduling animation updates as a dedicated system phase.
-    if (playerControllerSystem)
+    if (play_mode && playerControllerSystem)
     {
         playerControllerSystem->update(registry, *ctx, deltaTime);
     }
 
-    if (animationGraphSystem)
+    if (play_mode && animationGraphSystem)
     {
         animationGraphSystem->update(registry, *ctx, deltaTime);
     }
 
-    if (animationSystem)
+    if (play_mode && animationSystem)
     {
         animationSystem->update(registry, *ctx, deltaTime);
     }
 
-    if (physicsSystem)
+    if (play_mode && physicsSystem)
     {
         // Physics runs before transform cache update so results are reflected in world matrices.
         physicsSystem->update(registry, *ctx, deltaTime);
     }
 
-    if (scriptSystem)
+    if (play_mode && scriptSystem)
     {
         // Placeholder: script execution will live here once we bind Lua.
         scriptSystem->update(registry, *ctx, deltaTime);
@@ -1107,14 +1126,14 @@ void Game::update(
             0.0f, 1.0f);
     }
 
-    if (editorRuntime)
+    if (!play_mode && editorRuntime)
     {
         // Use the latest cached camera matrices from the previous frame.
         // These are refreshed in render() once the window size is known.
         editorRuntime->update(*ctx, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
     }
 
-    if (stickyNoteSystem)
+    if (!play_mode && stickyNoteSystem)
     {
         stickyNoteSystem->update(registry, *ctx, deltaTime);
     }
@@ -1126,7 +1145,7 @@ void Game::update(
 
     // We can also compute a ray from the current mouse position,
     // to use for object picking and such ...
-    if (ctx->input_manager && ctx->input_manager->GetMouseState().rightButton)
+    if (!play_mode && ctx->input_manager && ctx->input_manager->GetMouseState().rightButton)
     {
         const auto mouse = ctx->input_manager->GetMouseState();
         glm::ivec2 windowPos(mouse.x, matrices.windowSize.y - mouse.y);
@@ -1137,6 +1156,24 @@ void Game::update(
             glm_aux::to_string(ray.origin).c_str(),
             glm_aux::to_string(ray.dir).c_str());
     }
+}
+
+void Game::render_edit(
+    float time,
+    int windowWidth,
+    int windowHeight)
+{
+    play_mode = false;
+    render(time, windowWidth, windowHeight);
+}
+
+void Game::render_play(
+    float time,
+    int windowWidth,
+    int windowHeight)
+{
+    play_mode = true;
+    render(time, windowWidth, windowHeight);
 }
 
 void Game::render(
@@ -1299,7 +1336,7 @@ void Game::render(
     }
 #endif
 
-    if (editorRuntime)
+    if (!play_mode && editorRuntime)
         editorRuntime->render(*ctx, *shapeRenderer, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
 
     // Draw shape batches

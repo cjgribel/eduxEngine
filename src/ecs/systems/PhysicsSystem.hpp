@@ -91,6 +91,7 @@ namespace eeng::ecs::systems
 
         void init(EngineContext& ctx);
         void shutdown();
+        void reset_for_world(EngineContext& ctx);
 
         void update(entt::registry& registry, EngineContext& ctx, float delta_time);
         // Query a lightweight snapshot of Bullet + ECS counters for UI display.

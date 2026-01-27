@@ -18,6 +18,12 @@ typedef void* SDL_GLContext;    // Forward declaration
 
 namespace eeng
 {
+    enum class EngineMode : std::uint8_t
+    {
+        Edit,
+        Play
+    };
+
     /**
      * @brief Main engine class handling SDL, OpenGL, ImGui initialization and the main loop.
      */
@@ -80,8 +86,12 @@ namespace eeng
         bool debug_logging = false; ///< Debug logging enabled state
         float min_frametime_ms = 0.0f; ///< Minimum frame duration in milliseconds (default 60 FPS)
         std::atomic<bool> shutdown_started_{ false };
+        EngineMode mode_{ EngineMode::Edit };
 
         std::shared_ptr<EngineContext> ctx;
+        std::shared_ptr<EngineServices> services_;
+        std::shared_ptr<WorldState> edit_world_;
+        std::shared_ptr<WorldState> play_world_;
         
         ShutdownState shutdown_state_{ ShutdownState::Running };
         bool shutdown_drain_started_ = false;
@@ -118,10 +128,16 @@ namespace eeng
         // Returns true when all async unloads are finished and it is safe to tear down.
         bool advance_shutdown_drain();
 
+        void set_mode(EngineMode mode);
+        bool enter_play_mode();
+        void exit_play_mode();
+
         void on_set_vsync(const SetVsyncEvent& e);
         void on_set_wireframe(const SetWireFrameRenderingEvent& e);
         void on_set_debug_logging(const SetDebugLoggingEvent& e);
         void on_set_min_frametime(const SetMinFrameTimeEvent& e);
+        void on_set_play_mode(const SetPlayModeEvent& e);
+        void on_toggle_play_mode(const TogglePlayModeEvent& e);
         void on_resource_task_completed(const ResourceTaskCompletedEvent& e);
         void on_batch_task_completed(const BatchTaskCompletedEvent& e);
 
