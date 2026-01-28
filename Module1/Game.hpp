@@ -5,16 +5,8 @@
 #include "engineapi/IGameRuntime.hpp"
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
-#include "ecs/systems/AnimationSystem.hpp"
-#include "ecs/systems/AnimationGraphSystem.hpp"
 #include "ecs/systems/PlayerControllerSystem.hpp"
-#include "ecs/systems/PhysicsSystem.hpp"
-#include "ecs/systems/ScriptSystem.hpp"
-#include "ecs/systems/DebugRenderSystem.hpp"
-#include "ecs/systems/RenderSystem.hpp"
-#include "ecs/systems/StickyNoteSystem.hpp"
-#include "ecs/systems/TransformSystem.hpp"
-#include "editor/EditorRuntime.hpp"
+#include "ecs/RuntimePipeline.hpp"
 #include "FirstPersonCameraSystem.hpp"
 #include "ThirdPersonCameraSystem.hpp"
 #include "glmcommon.hpp"
@@ -106,19 +98,8 @@ private:
     // Immediate-mode renderer for basic 2D or 3D primitives
     ShapeRendererPtr shapeRenderer;
 
-    // TODO: Core systems to Engine
-    std::unique_ptr<eeng::ecs::systems::RenderSystem> renderSystem;
     std::unique_ptr<eeng::ecs::systems::PlayerControllerSystem> playerControllerSystem;
-    std::unique_ptr<eeng::ecs::systems::AnimationSystem> animationSystem;
-    std::unique_ptr<eeng::ecs::systems::AnimationGraphSystem> animationGraphSystem;
-    std::unique_ptr<eeng::ecs::systems::TransformSystem> transformSystem;
-    // Bullet integration + ECS sync.
-    std::unique_ptr<eeng::ecs::systems::PhysicsSystem> physicsSystem;
-    // Script system placeholder wired into component lifetime.
-    std::unique_ptr<eeng::ecs::systems::ScriptSystem> scriptSystem;
-    std::unique_ptr<eeng::ecs::systems::DebugRenderSystem> debugRenderSystem;
-    std::unique_ptr<eeng::ecs::systems::StickyNoteSystem> stickyNoteSystem;
-    std::unique_ptr<eeng::editor::EditorRuntime> editorRuntime;
+    eeng::ecs::RuntimePipeline runtime_pipeline_;
     std::unique_ptr<eeng::module1::systems::ThirdPersonCameraSystem> thirdPersonCameraSystem;
     std::unique_ptr<eeng::module1::systems::FirstPersonCameraSystem> firstPersonCameraSystem;
 

@@ -326,26 +326,10 @@ bool Game::init()
     shapeRenderer = std::make_shared<ShapeRendering::ShapeRenderer>();
     shapeRenderer->init();
 
-    editorRuntime = std::make_unique<eeng::editor::EditorRuntime>();
-    editorRuntime->init(*ctx);
-
-    renderSystem = std::make_unique<eeng::ecs::systems::RenderSystem>();
-    renderSystem->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
+    runtime_pipeline_.init(*ctx);
     playerControllerSystem = std::make_unique<eeng::ecs::systems::PlayerControllerSystem>();
-    animationSystem = std::make_unique<eeng::ecs::systems::AnimationSystem>();
-    animationGraphSystem = std::make_unique<eeng::ecs::systems::AnimationGraphSystem>();
-    transformSystem = std::make_unique<eeng::ecs::systems::TransformSystem>();
-    transformSystem->init(*ctx);
-    // Physics system holds the Bullet world and ECS bindings.
-    physicsSystem = std::make_unique<eeng::ecs::systems::PhysicsSystem>();
-    physicsSystem->init(*ctx);
     if (playerControllerSystem)
-        playerControllerSystem->set_physics_system(physicsSystem.get());
-    // Script system placeholder (lifecycle hooks only for now).
-    scriptSystem = std::make_unique<eeng::ecs::systems::ScriptSystem>();
-    scriptSystem->init(*ctx);
-    debugRenderSystem = std::make_unique<eeng::ecs::systems::DebugRenderSystem>();
-    stickyNoteSystem = std::make_unique<eeng::ecs::systems::StickyNoteSystem>();
+        playerControllerSystem->set_physics_system(runtime_pipeline_.physics_system());
     thirdPersonCameraSystem = std::make_unique<eeng::module1::systems::ThirdPersonCameraSystem>();
     firstPersonCameraSystem = std::make_unique<eeng::module1::systems::FirstPersonCameraSystem>();
 
@@ -1052,36 +1036,15 @@ void Game::update(
         time * glm::radians(50.0f) * 0, { 0, 1, 0 },
         { 0.03f, 0.03f, 0.03f });
 
-    // TODO: consider scheduling animation updates as a dedicated system phase.
     if (play_mode && playerControllerSystem)
     {
         playerControllerSystem->update(registry, *ctx, deltaTime);
     }
 
-    if (play_mode && animationGraphSystem)
-    {
-        animationGraphSystem->update(registry, *ctx, deltaTime);
-    }
-
-    if (play_mode && animationSystem)
-    {
-        animationSystem->update(registry, *ctx, deltaTime);
-    }
-
-    if (play_mode && physicsSystem)
-    {
-        // Physics runs before transform cache update so results are reflected in world matrices.
-        physicsSystem->update(registry, *ctx, deltaTime);
-    }
-
-    if (play_mode && scriptSystem)
-    {
-        // Placeholder: script execution will live here once we bind Lua.
-        scriptSystem->update(registry, *ctx, deltaTime);
-    }
-
-    if (transformSystem)
-        transformSystem->update(*ctx, deltaTime);
+    if (play_mode)
+        runtime_pipeline_.update_play(*ctx, deltaTime);
+    else
+        runtime_pipeline_.update_edit(*ctx, deltaTime);
 
     // Drive the main character instance from the player entity transform.
     glm::vec3 player_pos = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -1124,18 +1087,6 @@ void Game::update(
             static_cast<float>(matrices.windowSize.x),
             static_cast<float>(matrices.windowSize.y),
             0.0f, 1.0f);
-    }
-
-    if (!play_mode && editorRuntime)
-    {
-        // Use the latest cached camera matrices from the previous frame.
-        // These are refreshed in render() once the window size is known.
-        editorRuntime->update(*ctx, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
-    }
-
-    if (!play_mode && stickyNoteSystem)
-    {
-        stickyNoteSystem->update(registry, *ctx, deltaTime);
     }
 
     // Intersect view ray with AABBs of other objects.
@@ -1201,16 +1152,16 @@ void Game::render(
     matrices.VP = glm_aux::create_viewport_matrix(0.0f, 0.0f, windowWidth, windowHeight, 0.0f, 1.0f);
 
     // Debug gizmos (ImGui overlay)
-    if (debugRenderSystem || stickyNoteSystem)
+    if (shapeRenderer && ctx->entity_manager)
     {
         const auto VP_P_V = matrices.VP * matrices.P * matrices.V;
         auto& registry = ctx->entity_manager->registry();
-
-        // Debug render uses ShapeRenderer to batch wireframes.
-        if (debugRenderSystem && shapeRenderer)
-            debugRenderSystem->render(registry, *ctx, *shapeRenderer, VP_P_V, matrices.windowSize.y);
-        if (stickyNoteSystem)
-            stickyNoteSystem->render(registry, *ctx, VP_P_V, matrices.windowSize.y);
+        runtime_pipeline_.render_debug(
+            registry,
+            *ctx,
+            *shapeRenderer,
+            VP_P_V,
+            matrices.windowSize.y);
     }
 
     // Begin rendering pass
@@ -1273,25 +1224,18 @@ void Game::render(
     drawcallCount = forwardRenderer->endPass();
 
     // "New" render system
-    if (renderSystem && renderSystem->initialized())
+    if (ctx->entity_manager)
     {
         auto& registry = ctx->entity_manager->registry();
         const auto proj_view = matrices.P * matrices.V;
 
-        renderSystem->render(
+        runtime_pipeline_.render_entities(
             registry,
             *ctx,
-            [&](GLuint program)
-            {
-                glUniformMatrix4fv(
-                    glGetUniformLocation(program, "ProjViewMatrix"),
-                    1,
-                    0,
-                    glm::value_ptr(proj_view));
-                glUniform3fv(glGetUniformLocation(program, "lightpos"), 1, glm::value_ptr(pointlight.pos));
-                glUniform3fv(glGetUniformLocation(program, "lightColor"), 1, glm::value_ptr(pointlight.color));
-                glUniform3fv(glGetUniformLocation(program, "eyepos"), 1, glm::value_ptr(active_camera.position));
-            });
+            proj_view,
+            pointlight.pos,
+            pointlight.color,
+            active_camera.position);
     }
 
     // Draw player view ray
@@ -1335,9 +1279,6 @@ void Game::render(
         shapeRenderer->pop_states<glm::mat4>();
     }
 #endif
-
-    if (!play_mode && editorRuntime)
-        editorRuntime->render(*ctx, *shapeRenderer, matrices.V, matrices.P, matrices.VP, matrices.windowSize);
 
     // Draw shape batches
     shapeRenderer->render(matrices.P * matrices.V);
@@ -1427,10 +1368,10 @@ void Game::renderUI()
 
     ImGui::End(); // end info window
 
-    if (physicsSystem)
+    if (const auto* physics = runtime_pipeline_.physics_system())
     {
         // Small monitor window for Bullet + ECS physics counters.
-        const auto stats = physicsSystem->get_stats();
+        const auto stats = physics->get_stats();
         ImGui::Begin("Physics Monitor");
         ImGui::Text("Bodies: %zu", stats.body_count);
         ImGui::Text("Collision objects: %d", stats.collision_objects);
@@ -1446,14 +1387,7 @@ void Game::renderUI()
 
 void Game::destroy()
 {
-    if (renderSystem)
-        renderSystem->shutdown();
-    if (physicsSystem)
-        // Ensure Bullet resources are released cleanly.
-        physicsSystem->shutdown();
-    if (scriptSystem)
-        // Ensure script runtime cleanup is called once it exists.
-        scriptSystem->shutdown();
+    runtime_pipeline_.shutdown();
 }
 
 void Game::set_active_camera_mode(CameraMode mode)
