@@ -33,17 +33,17 @@ namespace eeng::project2
     {
     }
 
-    PlayModePolicy ReferenceGame::play_mode_policy() const
+    PlayModePolicy ReferenceGame::preferred_play_policy() const
     {
-        // Return Preview to reuse the current edit-world state, or Strict to request
-        // explicit batch loading each time play starts.
+        // Prefer Preview to reuse the current edit-world state, or Strict to request
+        // explicit batch loading each time play starts (the app can override).
         return PlayModePolicy::Strict;
     }
 
-    std::vector<std::string> ReferenceGame::play_startup_batches() const
+    std::vector<std::string> ReferenceGame::preferred_startup_batches() const
     {
-        // In Strict mode, list the batch names that should be loaded at play start.
-        // These are resolved through the play world's BatchRegistry.
+        // In Strict mode, list preferred batch names to load at play start.
+        // These are resolved through the play world's BatchRegistry by the app.
         return { std::string(BatchRegistry::kDefaultBatchName) };
     }
 

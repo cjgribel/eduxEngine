@@ -11,6 +11,11 @@ int main(int argc, char* argv[])
     if (!engine->init("eduxEngine - project2", 1280, 720))
         return -1;
 
-    engine->run<eeng::project2::ReferenceGame>();
+    // With editor
+    engine->run_editor<eeng::project2::ReferenceGame>();
+
+    // Without editor
+    // engine->run_game<eeng::project2::ReferenceGame>();
+
     return 0;
 }

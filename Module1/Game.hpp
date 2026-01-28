@@ -2,7 +2,7 @@
 #define Game_hpp
 #pragma once
 
-#include "GameBase.h"
+#include "engineapi/IGameRuntime.hpp"
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
 #include "ecs/systems/AnimationSystem.hpp"
@@ -46,7 +46,7 @@
 #endif
 
 /// @brief A Game may hold, update and render 3D geometry and GUI elements
-class Game : public eeng::GameBase
+class Game : public eeng::IGameRuntime
 {
 public:
     Game(std::shared_ptr<eeng::EngineContext> ctx)

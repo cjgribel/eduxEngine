@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    engine->run<Game>();
+    engine->run_editor<Game>();
 
     std::cout << "Exiting eduxEngine." << std::endl;
     return 0;

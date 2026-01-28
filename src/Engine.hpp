@@ -5,7 +5,9 @@
 #define ENGINE_HPP
 
 #include "config.h"
-#include "GameBase.h"
+#include "engineapi/IApp.hpp"
+#include "app/GameApp.hpp"
+#include "editor/app/EditorApp.hpp"
 #include "EngineContext.hpp"
 #include <cstdint>
 #include <future>
@@ -52,19 +54,35 @@ namespace eeng
          */
         bool init(const char* title, int width, int height);
 
-        /// @brief Create a game of a given type and run main loop
-        /// @tparam TGame Game type
+        /// @brief Create an app of a given type and run main loop
+        /// @tparam TApp App type
         /// @tparam ...Args 
         /// @param ...args 
-        template<typename TGame, typename... Args>
-            requires (std::is_base_of<GameBase, TGame>::value)
+        template<typename TApp, typename... Args>
+            requires (std::is_base_of<IApp, TApp>::value)
         void run(Args&&... args)
         {
-            if constexpr (requires { TGame(ctx); })
-                game_ = std::make_unique<TGame>(ctx, std::forward<Args>(args)...);
+            if constexpr (requires { TApp(ctx); })
+                app_ = std::make_unique<TApp>(ctx, std::forward<Args>(args)...);
             else
-                game_ = std::make_unique<TGame>(std::forward<Args>(args)...);
+                app_ = std::make_unique<TApp>(std::forward<Args>(args)...);
             run();
+        }
+
+        /// @brief Convenience: run an editor-hosted game runtime.
+        template<typename TRuntime>
+            requires (std::is_base_of<IGameRuntime, TRuntime>::value)
+        void run_editor()
+        {
+            run<editor::EditorApp<TRuntime>>();
+        }
+
+        /// @brief Convenience: run a game runtime without editor tooling.
+        template<typename TRuntime>
+            requires (std::is_base_of<IGameRuntime, TRuntime>::value)
+        void run_game()
+        {
+            run<GameApp<TRuntime>>();
         }
 
         /** @brief Clean up and close the engine. */
@@ -90,7 +108,7 @@ namespace eeng
         EngineMode mode_{ EngineMode::Edit };
 
         std::shared_ptr<EngineContext> ctx;
-        std::unique_ptr<GameBase> game_;
+        std::unique_ptr<IApp> app_;
         std::shared_ptr<EngineServices> services_;
         std::shared_ptr<WorldState> edit_world_;
         std::shared_ptr<WorldState> play_world_;
@@ -103,8 +121,7 @@ namespace eeng
         std::shared_future<TaskResult> shutdown_unload_future_;
 
         /**
-         * @brief Start the main loop.
-         * @param game Unique pointer to the initial game game
+         * @brief Start the main loop using the currently assigned app.
          */
         void run();
 

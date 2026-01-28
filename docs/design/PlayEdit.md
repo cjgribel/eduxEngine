@@ -45,7 +45,7 @@ Play/Edit is implemented as two distinct worlds that share engine services. Edit
 Ensure play uses only runtime-approved batches/assets, with deterministic loading and clean lifetimes.
 
 ### Flow
-1) Determine runtime batch set (game-owned).
+1) Determine runtime batch set (app-owned; often sourced from the game runtime).
 2) Create a fresh play `WorldState` (new `EntityManager`, `BatchRegistry`).
 3) Load runtime batches with asset leases:
    - Call `load_and_bind_async` for each batch.
@@ -53,11 +53,15 @@ Ensure play uses only runtime-approved batches/assets, with deterministic loadin
 4) Switch to Play mode and run runtime systems.
 5) Exit Play: unload play batches (release leases), destroy play world, and rebind edit world.
 
-### Game Hooks
-- `play_mode_policy()` selects Preview vs Strict.
-- `on_play_world_created(ctx)` lets the game configure the new play world (e.g., load batch index).
-- `play_startup_batches()` returns batch names to load for Strict mode.
-- `on_enter_play(ctx)` and `on_exit_play(ctx)` bracket the play session.
+### App Hooks
+- `IApp::play_policy()` selects Preview vs Strict (EditorApp may override via UI).
+- `IApp::on_play_world_created(ctx)` configures the new play world (e.g., load batch index).
+- `IApp::play_startup_batches()` returns batch names to load for Strict mode.
+- `IApp::on_enter_play(ctx)` and `IApp::on_exit_play(ctx)` bracket the play session.
+
+### Runtime Preferences
+- `IGameRuntime::preferred_play_policy()` expresses the runtime default.
+- `IGameRuntime::preferred_startup_batches()` provides default Strict-mode batches.
 
 ### Edit World Lifetime
 Default: keep edit world alive but inactive so returning to Edit is instant.
@@ -89,3 +93,4 @@ Optional: unload edit batches during play to free memory (slower exit).
 - [ ] Move game-specific components/systems out of `src/ecs` into game module.
 - [ ] Add tests for snapshot + restore integrity.
 - [ ] Restructure folders into `engine/`, `editor/`, `game/` roots.
+- [ ] Add a runtime/plugin system to allow swapping game types in the editor (beyond data reload).

@@ -251,12 +251,12 @@ namespace eeng
 
     void Engine::run()
     {
-        if (!game_)
-            throw std::runtime_error("No game assigned to engine");
+        if (!app_)
+            throw std::runtime_error("No app assigned to engine");
 
-        if (!game_->init())
+        if (!app_->init())
         {
-            throw std::runtime_error("Game initialization failed");
+            throw std::runtime_error("App initialization failed");
         }
 
         bool running = true;
@@ -323,13 +323,13 @@ namespace eeng
             // Can entities be destroyed here?
             // ctx->command_queue->execute_all(*registry, deltaTime_s);
 
-            // --- Game systems ---
-            START_TIMER("Frame", "Game Update");
+            // --- App update ---
+            START_TIMER("Frame", "App Update");
             if (mode_ == EngineMode::Play)
-                game_->update_play(time_s, deltaTime_s);
+                app_->update_play(time_s, deltaTime_s);
             else
-                game_->update_edit(time_s, deltaTime_s);
-            STOP_TIMER("Frame", "Game Update");
+                app_->update_edit(time_s, deltaTime_s);
+            STOP_TIMER("Frame", "App Update");
 
             // --- Main thread tasks ---
             // entt::storage mutations etc
@@ -395,9 +395,9 @@ namespace eeng
             // --- Render ---
             START_TIMER("Frame", "Render");
             if (mode_ == EngineMode::Play)
-                game_->render_play(time_s, window_width, window_height);
+                app_->render_play(time_s, window_width, window_height);
             else
-                game_->render_edit(time_s, window_width, window_height);
+                app_->render_edit(time_s, window_width, window_height);
             STOP_TIMER("Frame", "Render");
 
             // =================================================================
@@ -422,8 +422,8 @@ namespace eeng
             util::Profiler::snapshot_and_reset("Frame");
         }
 
-        game_->destroy();
-        game_ = nullptr;
+        app_->destroy();
+        app_ = nullptr;
         shutdown();
     }
 
@@ -692,11 +692,9 @@ namespace eeng
 
         // Decide which play policy to use (Preview or Strict). This is independent
         // of whether a game exists; Preview is the safe default if there is none.
-        PlayModePolicy policy = game_
-            ? game_->play_mode_policy()
+        PlayModePolicy policy = app_
+            ? app_->play_policy()
             : PlayModePolicy::Preview;
-        if (services_ && services_->play_mode_policy_override_enabled.load(std::memory_order_relaxed))
-            policy = services_->play_mode_policy_override.load(std::memory_order_relaxed);
 
         std::vector<BatchSnapshot> snapshots;
         if (policy == PlayModePolicy::Preview)
@@ -728,9 +726,9 @@ namespace eeng
         ctx->bind(*services_, *play_world_);
         ctx->world_owner = play_world_;
 
-        // Allow the game to initialize the play world (e.g., load batch index).
-        if (game_)
-            game_->on_play_world_created(*ctx);
+        // Allow the app to initialize the play world (e.g., load batch index).
+        if (app_)
+            app_->on_play_world_created(*ctx);
 
         if (policy == PlayModePolicy::Preview)
         {
@@ -745,10 +743,10 @@ namespace eeng
         }
         else
         {
-            // Strict: ask the game which batches to load, then load them with leases.
+            // Strict: ask the app which batches to load, then load them with leases.
             std::vector<std::string> batch_names;
-            if (game_)
-                batch_names = game_->play_startup_batches();
+            if (app_)
+                batch_names = app_->play_startup_batches();
 
             if (ctx->batch_registry && !batch_names.empty())
             {
@@ -780,8 +778,8 @@ namespace eeng
         mode_ = EngineMode::Play;
         if (services_)
             services_->play_mode_active.store(true, std::memory_order_relaxed);
-        if (game_)
-            game_->on_enter_play(*ctx);
+        if (app_)
+            app_->on_enter_play(*ctx);
         EENG_LOG(ctx, "Play mode: entered");
         return true;
     }
@@ -793,8 +791,8 @@ namespace eeng
         if (!services_ || !edit_world_)
             return;
 
-        if (game_)
-            game_->on_exit_play(*ctx);
+        if (app_)
+            app_->on_exit_play(*ctx);
 
         ctx->bind(*services_, *edit_world_);
         ctx->world_owner = edit_world_;
