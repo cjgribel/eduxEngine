@@ -28,6 +28,7 @@
 #include <SDL_opengl.h>
 #include <chrono>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace
@@ -248,9 +249,12 @@ namespace eeng
         return true;
     }
 
-    void Engine::run(std::unique_ptr<GameBase> game)
+    void Engine::run()
     {
-        if (!game->init())
+        if (!game_)
+            throw std::runtime_error("No game assigned to engine");
+
+        if (!game_->init())
         {
             throw std::runtime_error("Game initialization failed");
         }
@@ -322,9 +326,9 @@ namespace eeng
             // --- Game systems ---
             START_TIMER("Frame", "Game Update");
             if (mode_ == EngineMode::Play)
-                game->update_play(time_s, deltaTime_s);
+                game_->update_play(time_s, deltaTime_s);
             else
-                game->update_edit(time_s, deltaTime_s);
+                game_->update_edit(time_s, deltaTime_s);
             STOP_TIMER("Frame", "Game Update");
 
             // --- Main thread tasks ---
@@ -391,9 +395,9 @@ namespace eeng
             // --- Render ---
             START_TIMER("Frame", "Render");
             if (mode_ == EngineMode::Play)
-                game->render_play(time_s, window_width, window_height);
+                game_->render_play(time_s, window_width, window_height);
             else
-                game->render_edit(time_s, window_width, window_height);
+                game_->render_edit(time_s, window_width, window_height);
             STOP_TIMER("Frame", "Render");
 
             // =================================================================
@@ -418,7 +422,8 @@ namespace eeng
             util::Profiler::snapshot_and_reset("Frame");
         }
 
-        game->destroy();
+        game_->destroy();
+        game_ = nullptr;
         shutdown();
     }
 
@@ -677,6 +682,7 @@ namespace eeng
         if (!ctx || mode_ == EngineMode::Play)
             return false;
 
+        // Acquire cached handles and guard against missing services/worlds.
         if (!services_)
             services_ = ctx->services_owner;
         if (!edit_world_)
@@ -684,23 +690,37 @@ namespace eeng
         if (!services_ || !edit_world_)
             return false;
 
+        // Decide which play policy to use (Preview or Strict). This is independent
+        // of whether a game exists; Preview is the safe default if there is none.
+        PlayModePolicy policy = game_
+            ? game_->play_mode_policy()
+            : PlayModePolicy::Preview;
+        if (services_ && services_->play_mode_policy_override_enabled.load(std::memory_order_relaxed))
+            policy = services_->play_mode_policy_override.load(std::memory_order_relaxed);
+
         std::vector<BatchSnapshot> snapshots;
-        if (ctx->batch_registry)
+        if (policy == PlayModePolicy::Preview)
         {
-            auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
-            snapshots = br.snapshot_loaded_batches(*ctx);
+            // Preview mode: snapshot the currently loaded edit batches and rehydrate them.
+            if (ctx->batch_registry)
+            {
+                auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
+                snapshots = br.snapshot_loaded_batches(*ctx);
+            }
+
+            // Filter out the editor batch so editor-only entities never appear in Play.
+            std::vector<BatchSnapshot> filtered;
+            filtered.reserve(snapshots.size());
+            for (auto& snapshot : snapshots)
+            {
+                if (snapshot.info.name == BatchRegistry::kEditorBatchName)
+                    continue;
+                filtered.push_back(std::move(snapshot));
+            }
+            snapshots = std::move(filtered);
         }
 
-        std::vector<BatchSnapshot> filtered;
-        filtered.reserve(snapshots.size());
-        for (auto& snapshot : snapshots)
-        {
-            if (snapshot.info.name == BatchRegistry::kEditorBatchName)
-                continue;
-            filtered.push_back(std::move(snapshot));
-        }
-        snapshots = std::move(filtered);
-
+        // Create a fresh play world and bind the EngineContext to it.
         play_world_ = std::make_shared<WorldState>(
             std::make_unique<EntityManager>(),
             std::make_unique<BatchRegistry>());
@@ -708,17 +728,60 @@ namespace eeng
         ctx->bind(*services_, *play_world_);
         ctx->world_owner = play_world_;
 
-        if (ctx->batch_registry)
+        // Allow the game to initialize the play world (e.g., load batch index).
+        if (game_)
+            game_->on_play_world_created(*ctx);
+
+        if (policy == PlayModePolicy::Preview)
         {
-            auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
-            TaskResult res = br.load_batches_from_snapshots(snapshots, *ctx, true);
-            if (!res.success)
-                EENG_LOG_WARN(ctx, "Play mode: snapshot load failed");
+            // Preview: rebuild entities from snapshots and reuse already loaded assets.
+            if (ctx->batch_registry)
+            {
+                auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
+                TaskResult res = br.load_batches_from_snapshots(snapshots, *ctx, true);
+                if (!res.success)
+                    EENG_LOG_WARN(ctx, "Play mode: snapshot load failed");
+            }
+        }
+        else
+        {
+            // Strict: ask the game which batches to load, then load them with leases.
+            std::vector<std::string> batch_names;
+            if (game_)
+                batch_names = game_->play_startup_batches();
+
+            if (ctx->batch_registry && !batch_names.empty())
+            {
+                auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
+                std::vector<std::shared_future<TaskResult>> futures;
+                futures.reserve(batch_names.size());
+
+                for (const auto& name : batch_names)
+                {
+                    BatchId id{};
+                    if (!br.try_get_batch_id_by_name(name, id))
+                    {
+                        EENG_LOG_WARN(ctx, "Play mode: batch '%s' not found", name.c_str());
+                        continue;
+                    }
+                    futures.emplace_back(br.queue_load(id, *ctx));
+                }
+
+                // Wait for all batch loads while pumping main-thread work to avoid deadlocks.
+                for (auto& fut : futures)
+                {
+                    if (!pump_until_ready(*ctx, fut, "Play mode: batch load wait timed out", 0))
+                        EENG_LOG_WARN(ctx, "Play mode: batch load wait timed out");
+                }
+            }
         }
 
+        // Finalize and notify.
         mode_ = EngineMode::Play;
         if (services_)
             services_->play_mode_active.store(true, std::memory_order_relaxed);
+        if (game_)
+            game_->on_enter_play(*ctx);
         EENG_LOG(ctx, "Play mode: entered");
         return true;
     }
@@ -729,6 +792,9 @@ namespace eeng
             return;
         if (!services_ || !edit_world_)
             return;
+
+        if (game_)
+            game_->on_exit_play(*ctx);
 
         ctx->bind(*services_, *edit_world_);
         ctx->world_owner = edit_world_;

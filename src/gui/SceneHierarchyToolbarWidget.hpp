@@ -4,6 +4,7 @@
 #pragma once
 #include "EngineContext.hpp"
 #include "EventQueue.h"
+#include "engineapi/PlayModePolicy.hpp"
 #include "editor/EditorActions.hpp"
 // #include "ecs/EntityManager.hpp"
 #include "engineapi/SelectionManager.hpp"
@@ -113,6 +114,43 @@ namespace eeng::gui
                 ctx.event_queue->dispatch(TogglePlayModeEvent{});
             }
             if (!can_toggle)
+                ImGui::EndDisabled();
+
+            const bool has_services = (ctx.services != nullptr);
+            int policy_choice = 0; // 0 = Game, 1 = Preview, 2 = Strict
+            if (has_services
+                && ctx.services->play_mode_policy_override_enabled.load(std::memory_order_relaxed))
+            {
+                const auto override_policy = ctx.services->play_mode_policy_override.load(
+                    std::memory_order_relaxed);
+                policy_choice = (override_policy == PlayModePolicy::Strict) ? 2 : 1;
+            }
+
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(8.0f, 0.0f));
+            ImGui::SameLine();
+            ImGui::TextUnformatted("Policy:");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(110.0f);
+            if (!has_services)
+                ImGui::BeginDisabled();
+            if (ImGui::Combo("##PlayPolicy", &policy_choice, "Game\0Preview\0Strict\0"))
+            {
+                if (policy_choice == 0)
+                {
+                    ctx.services->play_mode_policy_override_enabled.store(
+                        false, std::memory_order_relaxed);
+                }
+                else
+                {
+                    ctx.services->play_mode_policy_override_enabled.store(
+                        true, std::memory_order_relaxed);
+                    ctx.services->play_mode_policy_override.store(
+                        (policy_choice == 2) ? PlayModePolicy::Strict : PlayModePolicy::Preview,
+                        std::memory_order_relaxed);
+                }
+            }
+            if (!has_services)
                 ImGui::EndDisabled();
         }
     };

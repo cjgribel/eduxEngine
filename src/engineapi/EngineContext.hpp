@@ -10,6 +10,7 @@
 #include "IInputManager.hpp"
 #include "ILogManager.hpp"
 #include "Guid.h"
+#include "engineapi/PlayModePolicy.hpp"
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -158,6 +159,8 @@ namespace eeng
         std::shared_ptr<ILogManager>            log_manager;
         std::shared_ptr<std::atomic<bool>>      shutdown_requested;
         std::atomic<bool>                       play_mode_active{ false };
+        std::atomic<bool>                       play_mode_policy_override_enabled{ false };
+        std::atomic<PlayModePolicy>             play_mode_policy_override{ PlayModePolicy::Preview };
         std::unique_ptr<MainThreadQueue>        main_thread_queue;
         std::unique_ptr<ThreadPool>             thread_pool;
         std::unique_ptr<EventQueue>             event_queue;

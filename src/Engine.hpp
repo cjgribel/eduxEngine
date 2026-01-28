@@ -61,9 +61,10 @@ namespace eeng
         void run(Args&&... args)
         {
             if constexpr (requires { TGame(ctx); })
-                run(std::make_unique<TGame>(ctx, std::forward<Args>(args)...));
+                game_ = std::make_unique<TGame>(ctx, std::forward<Args>(args)...);
             else
-                run(std::make_unique<TGame>(std::forward<Args>(args)...));
+                game_ = std::make_unique<TGame>(std::forward<Args>(args)...);
+            run();
         }
 
         /** @brief Clean up and close the engine. */
@@ -89,6 +90,7 @@ namespace eeng
         EngineMode mode_{ EngineMode::Edit };
 
         std::shared_ptr<EngineContext> ctx;
+        std::unique_ptr<GameBase> game_;
         std::shared_ptr<EngineServices> services_;
         std::shared_ptr<WorldState> edit_world_;
         std::shared_ptr<WorldState> play_world_;
@@ -104,7 +106,7 @@ namespace eeng
          * @brief Start the main loop.
          * @param game Unique pointer to the initial game game
          */
-        void run(std::unique_ptr<GameBase> game);
+        void run();
 
         /** Initialize SDL library and window. */
         bool init_sdl(const char* title, int width, int height);

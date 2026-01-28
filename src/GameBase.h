@@ -5,6 +5,15 @@
 #define GameBase_h
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "engineapi/PlayModePolicy.hpp"
+
+namespace eeng {
+    struct EngineContext;
+}
+
 namespace eeng {
 
 /**
@@ -68,6 +77,33 @@ public:
         float time_s,
         int windowWidth,
         int windowHeight) = 0;
+
+    /// @brief Choose the play mode policy for this game (Preview or Strict).
+    virtual PlayModePolicy play_mode_policy() const
+    {
+        return PlayModePolicy::Preview;
+    }
+
+    /// @brief Return batch names to load when entering Strict play mode.
+    virtual std::vector<std::string> play_startup_batches() const
+    {
+        return {};
+    }
+
+    /// @brief Configure the play world before loading batches (Strict mode hook).
+    virtual void on_play_world_created(EngineContext&)
+    {
+    }
+
+    /// @brief Called after entering play mode (after any Strict-mode loads).
+    virtual void on_enter_play(EngineContext&)
+    {
+    }
+
+    /// @brief Called before leaving play mode.
+    virtual void on_exit_play(EngineContext&)
+    {
+    }
 
     /// @brief Render while in edit mode (defaults to render()).
     virtual void render_edit(

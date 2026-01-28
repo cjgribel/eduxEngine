@@ -53,6 +53,12 @@ Ensure play uses only runtime-approved batches/assets, with deterministic loadin
 4) Switch to Play mode and run runtime systems.
 5) Exit Play: unload play batches (release leases), destroy play world, and rebind edit world.
 
+### Game Hooks
+- `play_mode_policy()` selects Preview vs Strict.
+- `on_play_world_created(ctx)` lets the game configure the new play world (e.g., load batch index).
+- `play_startup_batches()` returns batch names to load for Strict mode.
+- `on_enter_play(ctx)` and `on_exit_play(ctx)` bracket the play session.
+
 ### Edit World Lifetime
 Default: keep edit world alive but inactive so returning to Edit is instant.
 Optional: unload edit batches during play to free memory (slower exit).
