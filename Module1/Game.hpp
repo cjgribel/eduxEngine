@@ -10,11 +10,9 @@
 #include "FirstPersonCameraSystem.hpp"
 #include "ThirdPersonCameraSystem.hpp"
 #include "glmcommon.hpp"
-#include <entt/fwd.hpp> // For entt::registry - remove from here
 
 // --> ENGINE API
 #include "ShapeRenderer.hpp"
-#include "Storage.hpp"
 #include "EngineContext.hpp"
 
 #if 0
@@ -80,6 +78,7 @@ public:
         float time,
         int windowWidth,
         int windowHeight) override;
+    bool get_editor_view(eeng::EditorViewState& out) const override;
 
     /// @brief For destruction of game resources
     void destroy() override;
@@ -102,11 +101,6 @@ private:
     eeng::ecs::RuntimePipeline runtime_pipeline_;
     std::unique_ptr<eeng::module1::systems::ThirdPersonCameraSystem> thirdPersonCameraSystem;
     std::unique_ptr<eeng::module1::systems::FirstPersonCameraSystem> firstPersonCameraSystem;
-
-    // Entity registry - to use in labs
-    std::shared_ptr<entt::registry> entity_registry; // unique + and out weak ptrs?
-
-    // std::unique_ptr<eeng::ResourceRegistry> resource_registry;
 
     // <-- ENGINE API
 

@@ -13,13 +13,29 @@ namespace eeng::project2
 
     bool ReferenceGame::init()
     {
+        if (ctx_)
+            runtime_pipeline_.init(*ctx_);
         return true;
     }
 
     void ReferenceGame::update(float time_s, float deltaTime_s)
     {
         (void)time_s;
-        (void)deltaTime_s;
+        update_edit(time_s, deltaTime_s);
+    }
+
+    void ReferenceGame::update_edit(float time_s, float deltaTime_s)
+    {
+        (void)time_s;
+        if (ctx_)
+            runtime_pipeline_.update_edit(*ctx_, deltaTime_s);
+    }
+
+    void ReferenceGame::update_play(float time_s, float deltaTime_s)
+    {
+        (void)time_s;
+        if (ctx_)
+            runtime_pipeline_.update_play(*ctx_, deltaTime_s);
     }
 
     void ReferenceGame::render(float time_s, int windowWidth, int windowHeight)
@@ -31,6 +47,7 @@ namespace eeng::project2
 
     void ReferenceGame::destroy()
     {
+        runtime_pipeline_.shutdown();
     }
 
     PlayModePolicy ReferenceGame::preferred_play_policy() const

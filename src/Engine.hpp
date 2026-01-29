@@ -70,11 +70,11 @@ namespace eeng
         }
 
         /// @brief Convenience: run an editor-hosted game runtime.
-        template<typename TRuntime>
+        template<typename TRuntime, typename... Args>
             requires (std::is_base_of<IGameRuntime, TRuntime>::value)
-        void run_editor()
+        void run_editor(Args&&... args)
         {
-            run<editor::EditorApp<TRuntime>>();
+            run<editor::EditorApp<TRuntime>>(std::forward<Args>(args)...);
         }
 
         /// @brief Convenience: run a game runtime without editor tooling.

@@ -5,10 +5,14 @@
 
 #include "engineapi/IApp.hpp"
 #include "editor/EditorRuntime.hpp"
+#include "editor/ProjectBootstrap.hpp"
+#include "editor/ProjectConfig.hpp"
 #include "EngineContext.hpp"
 #include "engineapi/IGameRuntime.hpp"
+#include "LogMacros.h"
 #include <glm/glm.hpp>
 #include <atomic>
+#include <filesystem>
 #include <memory>
 #include <type_traits>
 
@@ -26,8 +30,11 @@ namespace eeng::editor
     class EditorApp final : public IApp
     {
     public:
-        explicit EditorApp(std::shared_ptr<EngineContext> ctx)
+        explicit EditorApp(
+            std::shared_ptr<EngineContext> ctx,
+            std::filesystem::path project_config_path = {})
             : ctx_(std::move(ctx))
+            , project_config_path_(std::move(project_config_path))
         {
             if constexpr (requires { TRuntime(ctx_); })
                 runtime_ = std::make_unique<TRuntime>(ctx_);
@@ -40,6 +47,22 @@ namespace eeng::editor
             if (!runtime_)
                 return false;
             editor_.init(*ctx_);
+            if (!project_config_path_.empty())
+            {
+                auto config_path = project_config_path_;
+                if (config_path.is_relative())
+                    config_path = std::filesystem::current_path() / config_path;
+
+                if (auto config = ProjectConfig::load_from_file(config_path))
+                {
+                    bootstrap_project(*ctx_, *config);
+                }
+                else
+                {
+                    EENG_LOG_WARN(ctx_, "Project config not found: %s",
+                        config_path.string().c_str());
+                }
+            }
             return runtime_->init();
         }
 
@@ -67,7 +90,13 @@ namespace eeng::editor
             if (runtime_)
                 runtime_->update_edit(time_s, deltaTime_s);
 
-            if (last_window_size_.x > 0 && last_window_size_.y > 0)
+            EditorViewState view{};
+            if (runtime_ && runtime_->get_editor_view(view)
+                && view.window_size.x > 0 && view.window_size.y > 0)
+            {
+                editor_.update(*ctx_, view.view, view.proj, view.viewport, view.window_size);
+            }
+            else if (last_window_size_.x > 0 && last_window_size_.y > 0)
             {
                 const glm::mat4 identity(1.0f);
                 editor_.update(*ctx_, identity, identity, identity, last_window_size_);
@@ -134,6 +163,7 @@ namespace eeng::editor
     private:
         std::shared_ptr<EngineContext> ctx_;
         std::unique_ptr<TRuntime> runtime_;
+        std::filesystem::path project_config_path_;
         EditorRuntime editor_{};
         glm::ivec2 last_window_size_{ 0, 0 };
     };

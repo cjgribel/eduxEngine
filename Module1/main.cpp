@@ -1,6 +1,7 @@
 #include "Engine.hpp"
 #include "EngineFactory.hpp"
 #include "Game.hpp"
+#include <filesystem>
 
 int main(int argc, char* argv[])
 {
@@ -14,7 +15,9 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    engine->run_editor<Game>();
+    const std::filesystem::path project_config =
+        std::filesystem::path(EENG_SOURCE_DIR) / "Module1/project1/project.json";
+    engine->run_editor<Game>(project_config);
 
     std::cout << "Exiting eduxEngine." << std::endl;
     return 0;
