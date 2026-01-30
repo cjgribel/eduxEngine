@@ -263,6 +263,7 @@ add_executable(LegacyGame
     ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp # ImGui widgets for std::string
     ${imgui_file_dialog_SOURCE_DIR}/ImGuiFileDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/Engine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/EngineOverlayGui.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/EngineFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/GLDebugMessageCallback.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/glmcommon.cpp
@@ -336,8 +337,8 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/serializers/AnimationGraphSerialization.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/GuiManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/ProfilerWidget.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/LogManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/LogGlobals.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/LogManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/LogGlobals.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/physics/PhysicsWorld.cpp
     )
 

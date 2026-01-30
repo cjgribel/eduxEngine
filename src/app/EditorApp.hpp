@@ -47,6 +47,19 @@ namespace eeng::editor
             if (!runtime_)
                 return false;
             editor_.init(*ctx_);
+            if (ctx_ && ctx_->gui_manager)
+            {
+                // Editor UI defaults (engine overlay flags are set by Engine).
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowProfiler, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowStorageWindow, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowResourceBrowser, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowSceneGraph, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowEntityInspector, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowBatchRegistry, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowTaskMonitor, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowCommandQueue, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowAnimationGraphVisualizer, true);
+            }
             if (ctx_ && ctx_->services)
             {
                 // Provide a hook so game renderers can draw editor overlays.
@@ -135,6 +148,8 @@ namespace eeng::editor
         {
             if (runtime_)
                 runtime_->render_edit(time_s, windowWidth, windowHeight);
+            if (ctx_ && ctx_->gui_manager)
+                ctx_->gui_manager->draw(*ctx_);
             last_window_size_ = glm::ivec2(windowWidth, windowHeight);
             // TODO: wire editor gizmo rendering once a shared ShapeRenderer is available here.
         }
@@ -143,6 +158,8 @@ namespace eeng::editor
         {
             if (runtime_)
                 runtime_->render_play(time_s, windowWidth, windowHeight);
+            if (ctx_ && ctx_->gui_manager)
+                ctx_->gui_manager->draw(*ctx_);
             last_window_size_ = glm::ivec2(windowWidth, windowHeight);
         }
 

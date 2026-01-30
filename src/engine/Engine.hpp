@@ -9,6 +9,7 @@
 #include "app/GameApp.hpp"
 #include "app/EditorApp.hpp"
 #include "EngineContext.hpp"
+#include "EngineOverlayGui.hpp"
 #include <cstdint>
 #include <future>
 #include <iostream>
@@ -112,6 +113,7 @@ namespace eeng
         std::shared_ptr<EngineServices> services_;
         std::shared_ptr<WorldState> edit_world_;
         std::shared_ptr<WorldState> play_world_;
+        EngineOverlayGui engine_overlay_{};
         
         ShutdownState shutdown_state_{ ShutdownState::Running };
         bool shutdown_drain_started_ = false;

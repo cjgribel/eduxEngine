@@ -24,14 +24,12 @@ namespace eeng
 
         // GUI windows
         void draw_profiler(EngineContext& ctx) const;
-        void draw_log(EngineContext& ctx) const;
         void draw_storage(EngineContext& ctx) const;
 
         void draw_resource_browser(EngineContext& ctx) const;
 
         void draw_batch_registry(EngineContext& ctx) const;
         void draw_task_monitor(EngineContext& ctx) const;
-        void draw_engine_info(EngineContext& ctx) const;
         void draw_command_queue(EngineContext& ctx) const;
 
         void draw_scene_graph(EngineContext& ctx) const;

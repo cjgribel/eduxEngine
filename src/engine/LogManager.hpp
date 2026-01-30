@@ -17,11 +17,9 @@ namespace eeng
         void log(const char* fmt, ...) override;
         void log(const ILogManager::LogColor& color, const char* fmt, ...) override;
         void clear() override;
+        void draw_gui_widget(const char* label, bool* p_open = nullptr);
 
     private:
-        void draw_gui_widget(const char* label, bool* p_open = nullptr);
-        friend class GuiManager; // draw_gui_widget is called from here
-
         struct Widget;
         std::unique_ptr<Widget> widget_ptr;
         mutable std::mutex mutex_;

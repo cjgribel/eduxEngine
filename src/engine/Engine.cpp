@@ -233,18 +233,9 @@ namespace eeng
         ctx->engine_config->set_flag(EngineFlag::DebugLogging, true);
         ctx->engine_config->set_value(EngineValue::MinFrameTime, 1000.0f / 60.0f);
 
-        // Gui flags
+        // Gui flags (engine overlay only; editor/game apps own their UI toggles).
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEngineInfo, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowProfiler, true);
         ctx->gui_manager->set_flag(eeng::GuiFlags::ShowLogWindow, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowStorageWindow, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowResourceBrowser, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowSceneGraph, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowEntityInspector, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowBatchRegistry, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowTaskMonitor, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowCommandQueue, true);
-        ctx->gui_manager->set_flag(eeng::GuiFlags::ShowAnimationGraphVisualizer, true);
 
         // Post command hook with sanity checks
 #ifdef EENG_DEBUG
@@ -301,6 +292,8 @@ namespace eeng
                 // Keep GUI responsive during draining so the log window and
                 // shutdown progress remain visible.
                 begin_frame();
+                if (ctx)
+                    engine_overlay_.draw(*ctx);
                 end_frame();
                 SDL_GL_SwapWindow(window_);
                 SDL_Delay(1);
@@ -308,7 +301,7 @@ namespace eeng
             }
 
             START_TIMER("Frame", "Frame Begin");
-            begin_frame(); // imgui_backend::show_demo_window(); ctx->gui_manager->draw(*ctx); GL setup
+            begin_frame(); // GL setup + ImGui frame begin
             STOP_TIMER("Frame", "Frame Begin");
             // =================================================================
 
@@ -423,6 +416,9 @@ namespace eeng
                 ctx->shape_renderer->post_render();
                 ctx->overlay_view_state->valid = false;
             }
+
+            if (ctx)
+                engine_overlay_.draw(*ctx);
 
             // =================================================================
             START_TIMER("Frame", "Frame End");
@@ -830,9 +826,6 @@ namespace eeng
     void Engine::begin_frame()
     {
         imgui_backend::begin_frame();
-
-        imgui_backend::show_demo_window();
-        ctx->gui_manager->draw(*ctx);
 
         // Set up OpenGL state:
 
