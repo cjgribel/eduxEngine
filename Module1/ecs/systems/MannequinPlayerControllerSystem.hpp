@@ -14,7 +14,7 @@ namespace eeng::ecs::systems
 {
     class PhysicsSystem;
 
-    class PlayerControllerSystem
+    class MannequinPlayerControllerSystem
     {
     public:
         // Optional hookup to the physics system for raycast queries.

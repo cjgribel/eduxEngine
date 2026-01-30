@@ -245,6 +245,7 @@ message(STATUS "Creating executable target for Module1")
 add_executable(Module1 
     Module1/main.cpp
     Module1/Game.cpp 
+    Module1/Module1MetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/ThirdPersonCameraSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/FirstPersonCameraSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/EditorCameraSystem.cpp
@@ -287,7 +288,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/StickyNoteComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/CoreComponents.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/RenderSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/PlayerControllerSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Module1/ecs/systems/MannequinPlayerControllerSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/AnimationSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/AnimationGraphSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/TransformSystem.cpp

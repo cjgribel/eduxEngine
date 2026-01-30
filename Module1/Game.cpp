@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "Game.hpp"
+#include "Module1MetaReg.hpp"
 #include "editor/ecs/FirstPersonCameraComponent.hpp"
 #include "editor/ecs/ThirdPersonCameraComponent.hpp"
 #include "editor/ProjectConfig.hpp"
@@ -19,6 +20,9 @@
 
 bool Game::init()
 {
+    if (ctx)
+        eeng::module1::register_module1_meta_types(*ctx);
+
     forwardRenderer = std::make_shared<eeng::ForwardRenderer>();
     forwardRenderer->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
 
@@ -32,7 +36,7 @@ bool Game::init()
     }
 
     runtime_pipeline_.init(*ctx);
-    playerControllerSystem = std::make_unique<eeng::ecs::systems::PlayerControllerSystem>();
+    playerControllerSystem = std::make_unique<eeng::ecs::systems::MannequinPlayerControllerSystem>();
     if (playerControllerSystem)
         playerControllerSystem->set_physics_system(runtime_pipeline_.physics_system());
 

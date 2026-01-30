@@ -12,7 +12,6 @@
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/AnimationGraphComponent.hpp"
-#include "ecs/PlayerControllerComponent.hpp"
 #include "ecs/ScriptComponent.hpp"
 #include "ecs/StickyNoteComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
@@ -724,91 +723,6 @@ namespace eeng
                 .traits(MetaFlags::none)
                 ;
             register_component<ecs::ModelComponent>();
-        }
-
-        // --- PlayerControllerComponent ------------------------------------
-        {
-            entt::meta_factory<eeng::ecs::PlayerControllerComponent>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.PlayerControllerComponent", .name = "PlayerControllerComponent", .tooltip = "Input-driven animation graph parameter control." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::name>("name"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Component name." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::enabled>("enabled"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable input-driven animation control." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::controller_id>("controller_id"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "controller_id", "Controller Id", "Controller instance id (-1 = first connected)." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::use_keyboard_fallback>("use_keyboard_fallback"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "use_keyboard_fallback", "Keyboard Fallback", "Use keyboard/mouse when no controller is active." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::use_mouse_aim>("use_mouse_aim"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "use_mouse_aim", "Mouse Aim", "Drive aim parameters from mouse delta when using keyboard." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::stick_deadzone>("stick_deadzone"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "stick_deadzone", "Stick Deadzone", "Deadzone for controller sticks." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::trigger_deadzone>("trigger_deadzone"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "trigger_deadzone", "Trigger Deadzone", "Deadzone threshold for controller triggers." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::mouse_sensitivity>("mouse_sensitivity"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "mouse_sensitivity", "Mouse Sensitivity", "Sensitivity for mouse-driven aim parameters." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::move_x_param>("move_x_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "move_x_param", "Move X Param", "Graph parameter for locomotion X." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::move_y_param>("move_y_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "move_y_param", "Move Y Param", "Graph parameter for locomotion Y." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::aim_x_param>("aim_x_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "aim_x_param", "Aim X Param", "Graph parameter for aim X." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::aim_y_param>("aim_y_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "aim_y_param", "Aim Y Param", "Graph parameter for aim Y." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::jump_param>("jump_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "jump_param", "Jump Param", "Graph parameter for jump trigger." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::fire_param>("fire_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "fire_param", "Fire Param", "Graph parameter for fire trigger." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::reload_param>("reload_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "reload_param", "Reload Param", "Graph parameter for reload trigger." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::hit0_param>("hit0_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "hit0_param", "Hit0 Param", "Graph parameter for hit reaction 0." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::hit1_param>("hit1_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "hit1_param", "Hit1 Param", "Graph parameter for hit reaction 1." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::hit2_param>("hit2_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "hit2_param", "Hit2 Param", "Graph parameter for hit reaction 2." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::PlayerControllerComponent::hit3_param>("hit3_param"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "hit3_param", "Hit3 Param", "Graph parameter for hit reaction 3." })
-                .traits(MetaFlags::none)
-                ;
-            register_component<ecs::PlayerControllerComponent>();
         }
 
         // --- Script component ----------------------------------------------

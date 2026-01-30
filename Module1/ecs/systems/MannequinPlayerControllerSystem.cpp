@@ -1,7 +1,7 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-#include "ecs/systems/PlayerControllerSystem.hpp"
+#include "ecs/systems/MannequinPlayerControllerSystem.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,7 +12,7 @@
 #include "EngineContextHelpers.hpp"
 #include "ecs/AnimationGraphComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
-#include "ecs/PlayerControllerComponent.hpp"
+#include "ecs/MannequinPlayerControllerComponent.hpp"
 #include "ecs/TransformComponent.hpp"
 #include "ecs/systems/PhysicsSystem.hpp"
 #include "engineapi/IInputManager.hpp"
@@ -46,7 +46,7 @@ namespace
     }
 
     void update_mouse_aim(
-        eeng::ecs::PlayerControllerComponent& controller,
+        eeng::ecs::MannequinPlayerControllerComponent& controller,
         const eeng::IInputManager::MouseState& mouse)
     {
         if (!controller.has_mouse_origin)
@@ -218,21 +218,21 @@ namespace
 
 namespace eeng::ecs::systems
 {
-    void PlayerControllerSystem::update(entt::registry& registry, EngineContext& ctx, float)
+    void MannequinPlayerControllerSystem::update(entt::registry& registry, EngineContext& ctx, float)
     {
         auto* input = ctx.input_manager.get();
         if (!input)
             return;
 
-        auto rm = eeng::try_get_resource_manager(ctx, "PlayerControllerSystem");
+        auto rm = eeng::try_get_resource_manager(ctx, "MannequinPlayerControllerSystem");
         if (!rm)
             return;
 
         // Policy: Use same-entity component access so animation control stays local to the entity.
-        auto view = registry.view<ecs::PlayerControllerComponent, ecs::AnimationGraphComponent>();
+        auto view = registry.view<ecs::MannequinPlayerControllerComponent, ecs::AnimationGraphComponent>();
         for (auto entity : view)
         {
-            auto& controller = view.get<ecs::PlayerControllerComponent>(entity);
+            auto& controller = view.get<ecs::MannequinPlayerControllerComponent>(entity);
             auto& graph_comp = view.get<ecs::AnimationGraphComponent>(entity);
 
             if (!controller.enabled || !graph_comp.enabled)
@@ -354,8 +354,8 @@ namespace eeng::ecs::systems
                 *rm,
                 graph_comp.graph_ref,
                 ctx,
-                "PlayerControllerSystem",
-                "Missing AnimationGraphAsset for PlayerControllerSystem:",
+                "MannequinPlayerControllerSystem",
+                "Missing AnimationGraphAsset for MannequinPlayerControllerSystem:",
                 [&](const assets::AnimationGraphAsset& graph)
                 {
                     set_param_float(graph, graph_comp.instance, controller.move_x_param, move_x);

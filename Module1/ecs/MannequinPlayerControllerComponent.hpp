@@ -8,7 +8,8 @@
 
 namespace eeng::ecs
 {
-    struct PlayerControllerComponent
+    // Mannequin-specific controller bindings for driving animation graph parameters.
+    struct MannequinPlayerControllerComponent
     {
         std::string name;
         bool enabled = true;
@@ -50,14 +51,14 @@ namespace eeng::ecs
         bool last_hit3 = false;
     };
 
-    inline std::string to_string(const PlayerControllerComponent& t)
+    inline std::string to_string(const MannequinPlayerControllerComponent& t)
     {
-        return std::format("PlayerControllerComponent(name = {} ...)", t.name);
+        return std::format("MannequinPlayerControllerComponent(name = {} ...)", t.name);
     }
 
     template<typename Visitor>
-    void visit_asset_refs(PlayerControllerComponent&, Visitor&&) {}
+    void visit_asset_refs(MannequinPlayerControllerComponent&, Visitor&&) {}
 
     template<typename Visitor>
-    void visit_entity_refs(PlayerControllerComponent&, Visitor&&) {}
+    void visit_entity_refs(MannequinPlayerControllerComponent&, Visitor&&) {}
 }

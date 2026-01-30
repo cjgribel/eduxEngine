@@ -5,7 +5,7 @@
 #include "engineapi/IGameRuntime.hpp"
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
-#include "ecs/systems/PlayerControllerSystem.hpp"
+#include "ecs/systems/MannequinPlayerControllerSystem.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "glmcommon.hpp"
 
@@ -95,7 +95,7 @@ private:
     // Immediate-mode renderer for basic 2D or 3D primitives
     ShapeRendererPtr shapeRenderer;
 
-    std::unique_ptr<eeng::ecs::systems::PlayerControllerSystem> playerControllerSystem;
+    std::unique_ptr<eeng::ecs::systems::MannequinPlayerControllerSystem> playerControllerSystem;
     eeng::ecs::RuntimePipeline runtime_pipeline_;
 
     // <-- ENGINE API
