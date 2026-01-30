@@ -22,14 +22,14 @@ FetchContent_MakeAvailable(googletest)
 
 # Single executable for all tests
 add_executable(tests 
-    AnimationGraph_tests.cpp ../src/assets/AnimationGraphValidation.cpp
+    AnimationGraph_tests.cpp ../src/engine/assets/AnimationGraphValidation.cpp
     VecTree_tests.cpp 
     PoolAllocatorFH_tests.cpp
     PoolAllocatorTFH_tests.cpp
     MetaThreading_tests.cpp
     Meta_tests.cpp
-    MetaSerialize_tests.cpp ../src/ecs/Entity.cpp ../src/meta/MetaSerialize.cpp ../src/engineapi/EngineContext.cpp ../src/util/ThreadPool.cpp
-    Storage_tests.cpp ../src/assets/Storage.cpp
+    MetaSerialize_tests.cpp ../src/engine/ecs/Entity.cpp ../src/engine/meta/MetaSerialize.cpp ../src/engine/engineapi/EngineContext.cpp ../src/engine/util/ThreadPool.cpp
+    Storage_tests.cpp ../src/engine/assets/Storage.cpp
     EventQueue_tests.cpp
     MetaFieldAssign_tests.cpp ../src/editor/MetaFieldAssign.cpp
     )

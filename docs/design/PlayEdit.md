@@ -90,7 +90,7 @@ Optional: unload edit batches during play to free memory (slower exit).
 
 ### Later
 - [ ] Split component meta registration: engine vs game.
-- [ ] Move game-specific components/systems out of `src/ecs` into game module.
+- [ ] Move game-specific components/systems out of `src/engine/ecs` into game module.
 - [ ] Add tests for snapshot + restore integrity.
 - [ ] Restructure folders into `engine/`, `editor/`, `game/` roots.
 - [ ] Legacy Game cleanup: move editor UI, selection-driven camera focus, debug draw, and bootstrap logic out of `projects/legacy_game/Game.cpp`.

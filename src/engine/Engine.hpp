@@ -7,7 +7,7 @@
 #include "config.h"
 #include "engineapi/IApp.hpp"
 #include "app/GameApp.hpp"
-#include "editor/app/EditorApp.hpp"
+#include "app/EditorApp.hpp"
 #include "EngineContext.hpp"
 #include <cstdint>
 #include <future>

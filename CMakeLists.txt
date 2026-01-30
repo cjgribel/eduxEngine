@@ -36,13 +36,17 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # skip all these ->
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/util)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/meta)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/assets)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/util)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/gui)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/input)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engine)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engine/engineapi)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engine/util)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engine/meta)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engine/serializers)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets/importers)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/engine/input)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/editor)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/app)
 
 #
 # OpenGL
@@ -258,44 +262,44 @@ add_executable(LegacyGame
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
     ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp # ImGui widgets for std::string
     ${imgui_file_dialog_SOURCE_DIR}/ImGuiFileDialog.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/EngineFactory.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/GLDebugMessageCallback.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/glmcommon.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/input/InputManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderableMesh.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ForwardRenderer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ShapeRenderer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ImGuiBackendSDL.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/BatchRegistry.cpp # where?
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/engineapi/EngineContext.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Storage.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AssetIndex.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ResourceManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AnimationGraphRuntime.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/AnimationGraphValidation.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/AssimpImporter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/assets/importers/MockImporter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/GpuAssetOps.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/Entity.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/EntityManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/EntityBatchPolicy.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/SceneGraph.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/AnimationGraphComponent.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/TransformComponent.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/HeaderComponent.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/StickyNoteComponent.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/CoreComponents.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/RenderSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/Engine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/EngineFactory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/GLDebugMessageCallback.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/glmcommon.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/input/InputManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/Texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/RenderableMesh.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ForwardRenderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ShapeRenderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ImGuiBackendSDL.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/BatchRegistry.cpp # where?
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/engineapi/EngineContext.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets/Storage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets/AssetIndex.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets/ResourceManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets/AnimationGraphRuntime.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets/AnimationGraphValidation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets/importers/AssimpImporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/assets/importers/MockImporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/gpu/GpuAssetOps.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/Entity.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/EntityManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/EntityBatchPolicy.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/SceneGraph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/AnimationGraphComponent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/TransformComponent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/HeaderComponent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/StickyNoteComponent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/CoreComponents.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/RenderSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/projects/legacy_game/ecs/systems/MannequinPlayerControllerSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/AnimationSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/AnimationGraphSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/TransformSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/DebugRenderSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/PhysicsSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/ScriptSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/StickyNoteSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/AnimationSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/AnimationGraphSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/TransformSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/DebugRenderSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/PhysicsSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/ScriptSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/StickyNoteSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands_Entities.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands_Components.cpp
@@ -318,23 +322,23 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/TransformGizmo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/EditorBootstrapSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/TransformGizmoSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/util/Profiler.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/util/ThreadPool.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/AssetMetaReg.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/ComponentMetaReg.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/GLMMetaReg.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaSerialize.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaInspect.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/meta/MetaClone.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/GuidSerialize.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/GLMSerialize.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/ModelDataAssetSerialization.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/serializers/AnimationGraphSerialization.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/GuiManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ProfilerWidget.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/LogGlobals.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/physics/PhysicsWorld.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/util/Profiler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/util/ThreadPool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/meta/AssetMetaReg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/meta/ComponentMetaReg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/meta/GLMMetaReg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/meta/MetaSerialize.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/meta/MetaInspect.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/meta/MetaClone.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/serializers/GuidSerialize.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/serializers/GLMSerialize.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/serializers/ModelDataAssetSerialization.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/serializers/AnimationGraphSerialization.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/GuiManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/ProfilerWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/LogManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/LogGlobals.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/physics/PhysicsWorld.cpp
     )
 
 set_target_properties(LegacyGame PROPERTIES
