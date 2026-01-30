@@ -47,6 +47,15 @@ namespace eeng::editor
             if (!runtime_)
                 return false;
             editor_.init(*ctx_);
+            if (ctx_ && ctx_->services)
+            {
+                // Provide a hook so game renderers can draw editor overlays.
+                ctx_->services->editor_render_hook =
+                    [this](EngineContext& ctx, ShapeRendering::ShapeRenderer& renderer, const OverlayViewState& view)
+                    {
+                        editor_.render(ctx, renderer, view.view, view.proj, view.viewport, view.window_size);
+                    };
+            }
             if (!project_config_path_.empty())
             {
                 auto config_path = project_config_path_;
@@ -55,6 +64,12 @@ namespace eeng::editor
 
                 if (auto config = ProjectConfig::load_from_file(config_path))
                 {
+                    // Stash config for game/runtime access (assets root, batches root, etc).
+                    if (ctx_ && ctx_->services)
+                    {
+                        ctx_->services->project_config = std::make_shared<ProjectConfig>(*config);
+                        ctx_->project_config = ctx_->services->project_config;
+                    }
                     bootstrap_project(*ctx_, *config);
                 }
                 else
@@ -83,14 +98,21 @@ namespace eeng::editor
         {
             if (runtime_)
                 runtime_->destroy();
+            if (ctx_ && ctx_->services)
+            {
+                // Clear the overlay hook to avoid dangling callbacks.
+                ctx_->services->editor_render_hook = {};
+            }
         }
 
         void update_edit(float time_s, float deltaTime_s) override
         {
+            // Update editor cameras first so the game can consume fresh view state.
+            editor_.update_cameras(*ctx_, deltaTime_s);
             if (runtime_)
                 runtime_->update_edit(time_s, deltaTime_s);
 
-            EditorViewState view{};
+            OverlayViewState view{};
             if (runtime_ && runtime_->get_editor_view(view)
                 && view.window_size.x > 0 && view.window_size.y > 0)
             {

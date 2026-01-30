@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "editor/ecs/EditorCameraSystem.hpp"
 #include "editor/ecs/EditorBootstrapSystem.hpp"
 #include "editor/ecs/TransformGizmoSystem.hpp"
 
@@ -32,6 +33,9 @@ namespace eeng::editor
             const glm::mat4& viewport,
             const glm::ivec2& window_size);
 
+        // Update editor-owned camera components before game update.
+        void update_cameras(EngineContext& ctx, float delta_time);
+
         void render(
             EngineContext& ctx,
             ShapeRendering::ShapeRenderer& renderer,
@@ -42,6 +46,7 @@ namespace eeng::editor
 
     private:
         EditorBootstrapSystem bootstrap_;
+        EditorCameraSystem camera_system_;
         TransformGizmoSystem transform_gizmo_system_;
     };
 } // namespace eeng::editor

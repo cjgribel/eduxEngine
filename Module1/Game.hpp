@@ -7,8 +7,6 @@
 #include "ForwardRenderer.hpp"
 #include "ecs/systems/PlayerControllerSystem.hpp"
 #include "ecs/RuntimePipeline.hpp"
-#include "FirstPersonCameraSystem.hpp"
-#include "ThirdPersonCameraSystem.hpp"
 #include "glmcommon.hpp"
 
 // --> ENGINE API
@@ -78,7 +76,7 @@ public:
         float time,
         int windowWidth,
         int windowHeight) override;
-    bool get_editor_view(eeng::EditorViewState& out) const override;
+    bool get_editor_view(eeng::OverlayViewState& out) const override;
 
     /// @brief For destruction of game resources
     void destroy() override;
@@ -99,8 +97,6 @@ private:
 
     std::unique_ptr<eeng::ecs::systems::PlayerControllerSystem> playerControllerSystem;
     eeng::ecs::RuntimePipeline runtime_pipeline_;
-    std::unique_ptr<eeng::module1::systems::ThirdPersonCameraSystem> thirdPersonCameraSystem;
-    std::unique_ptr<eeng::module1::systems::FirstPersonCameraSystem> firstPersonCameraSystem;
 
     // <-- ENGINE API
 
@@ -113,12 +109,6 @@ private:
         glm::ivec2 windowSize;
     } matrices;
 
-    enum class CameraMode
-    {
-        ThirdPerson = 0,
-        FirstPerson = 1
-    };
-
     struct ActiveCameraState
     {
         glm::vec3 position{ 0.0f, 0.0f, 0.0f };
@@ -130,14 +120,8 @@ private:
         float far_plane = 500.0f;
     } active_camera;
 
-    eeng::ecs::Entity active_entity;
     eeng::ecs::Entity player_entity;
-    eeng::ecs::Entity third_person_camera_entity;
-    eeng::ecs::Entity first_person_camera_entity;
-    eeng::ecs::Entity active_camera_entity;
-    CameraMode active_camera_mode = CameraMode::ThirdPerson;
     glm_aux::Ray view_ray;
-    bool f_was_down = false;
 
     // Light properties
     struct PointLight
@@ -185,10 +169,8 @@ private:
     // Stats
     int drawcallCount = 0;
 
-    void set_active_camera_mode(CameraMode mode);
-    void ensure_editor_camera_entities();
-    void sync_active_entity();
-    void refresh_active_camera_state();
+    // Pull the active editor camera matrices into local render state.
+    void update_active_camera_state();
 
     // Placeholder for a future play-mode toggle that will swap in runtime cameras.
     bool play_mode = false;

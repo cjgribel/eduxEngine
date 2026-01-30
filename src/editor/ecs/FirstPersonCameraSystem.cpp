@@ -1,12 +1,12 @@
-// Created by Codex 2025.
+// Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-#include "FirstPersonCameraSystem.hpp"
+#include "editor/ecs/FirstPersonCameraSystem.hpp"
 
 #include "EngineContext.hpp"
 #include "engineapi/IInputManager.hpp"
 #include "glmcommon.hpp"
-#include "FirstPersonCameraComponent.hpp"
+#include "editor/ecs/FirstPersonCameraComponent.hpp"
 
 #include <cmath>
 
@@ -14,6 +14,7 @@ namespace
 {
     float apply_deadzone(float value, float deadzone)
     {
+        // Treat small controller drift as zero.
         if (std::fabs(value) <= deadzone)
             return 0.0f;
         return value;
@@ -37,7 +38,7 @@ namespace
     }
 }
 
-namespace eeng::module1::systems
+namespace eeng::editor
 {
     void FirstPersonCameraSystem::update(entt::registry& registry, EngineContext& ctx, float delta_time)
     {
@@ -58,6 +59,7 @@ namespace eeng::module1::systems
 
             if (camera.active)
             {
+                // Read movement/look input only for the active camera.
                 // Movement input: controller if present, otherwise WASD.
                 glm::vec3 move_axes{};
                 if (controller)
@@ -129,4 +131,4 @@ namespace eeng::module1::systems
             camera.view_to_world = glm::inverse(camera.model_to_view);
         }
     }
-} // namespace eeng::module1::systems
+} // namespace eeng::editor

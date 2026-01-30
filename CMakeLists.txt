@@ -245,8 +245,9 @@ message(STATUS "Creating executable target for Module1")
 add_executable(Module1 
     Module1/main.cpp
     Module1/Game.cpp 
-    Module1/ThirdPersonCameraSystem.cpp
-    Module1/FirstPersonCameraSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/ThirdPersonCameraSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/FirstPersonCameraSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/EditorCameraSystem.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp

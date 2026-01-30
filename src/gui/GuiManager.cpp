@@ -624,6 +624,27 @@ namespace eeng
             }
         }
 
+        if (ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            // Read-only snapshot populated by RuntimePipeline each frame.
+            if (!ctx.physics_monitor_stats || !ctx.physics_monitor_stats->valid)
+            {
+                ImGui::TextDisabled("No physics stats available.");
+            }
+            else
+            {
+                const auto& stats = *ctx.physics_monitor_stats;
+                ImGui::Text("Bodies: %zu", stats.body_count);
+                ImGui::Text("Collision objects: %d", stats.collision_objects);
+                ImGui::Text("Manifolds: %d", stats.manifolds);
+                ImGui::Text("Contact points: %d", stats.contact_points);
+                ImGui::Separator();
+                ImGui::Text("Dirty entities: %zu", stats.dirty_entities);
+                ImGui::Text("Event entities: %zu", stats.event_entities);
+                ImGui::Text("Tracked contacts: %zu", stats.tracked_contacts);
+            }
+        }
+
         if (ImGui::CollapsingHeader("Controllers", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::Text("Controllers connected: %i", ctx.input_manager->GetConnectedControllerCount());

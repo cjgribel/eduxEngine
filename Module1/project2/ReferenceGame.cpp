@@ -3,6 +3,7 @@
 
 #include "Module1/project2/ReferenceGame.hpp"
 #include "BatchRegistry.hpp"
+#include <glm/glm.hpp>
 
 namespace eeng::project2
 {
@@ -41,8 +42,20 @@ namespace eeng::project2
     void ReferenceGame::render(float time_s, int windowWidth, int windowHeight)
     {
         (void)time_s;
-        (void)windowWidth;
-        (void)windowHeight;
+        if (!ctx_ || !ctx_->overlay_view_state)
+            return;
+
+        if (windowWidth <= 0 || windowHeight <= 0)
+            return;
+
+        // Publish a placeholder overlay view so editor gizmos can draw, even though
+        // ReferenceGame has no camera of its own yet.
+        auto& overlay = *ctx_->overlay_view_state;
+        overlay.view = glm::mat4(1.0f);
+        overlay.proj = glm::mat4(1.0f);
+        overlay.viewport = glm::mat4(1.0f);
+        overlay.window_size = glm::ivec2(windowWidth, windowHeight);
+        overlay.valid = true;
     }
 
     void ReferenceGame::destroy()

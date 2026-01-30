@@ -5,6 +5,7 @@
 
 #include "ImGuiHelpers.hpp"
 #include "ShapeRenderer.hpp"
+#include "glmcommon.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/TransformComponent.hpp"
@@ -247,6 +248,17 @@ namespace eeng::ecs::systems
                 // Clear cached rays after drawing so they only last one frame by default.
                 debug.rays.clear();
             }
+        }
+
+        if (settings.show_demo_shapes)
+        {
+            // Use a shared_ptr alias to reuse the existing renderer API.
+            renderer.push_states(glm_aux::T(settings.demo_shape_offset));
+            ShapeRendererPtr renderer_ptr(
+                &renderer,
+                [](ShapeRendering::ShapeRenderer*) {});
+            ShapeRendering::DemoDraw(renderer_ptr);
+            renderer.pop_states<glm::mat4>();
         }
     }
 }

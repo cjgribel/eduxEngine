@@ -70,6 +70,8 @@ namespace eeng::ecs
                 script_system_->update(registry, ctx, delta_time);
 
             update_common(ctx, delta_time);
+            // Push a snapshot for editor UI without requiring direct system access.
+            update_physics_monitor_stats(ctx);
         }
 
         void update_edit(EngineContext& ctx, float delta_time)
@@ -78,6 +80,8 @@ namespace eeng::ecs
                 return;
 
             update_common(ctx, delta_time);
+            // Keep physics stats fresh in edit mode as well.
+            update_physics_monitor_stats(ctx);
 
             auto& registry = ctx.entity_manager->registry();
             if (sticky_note_system_)
@@ -142,6 +146,24 @@ namespace eeng::ecs
         {
             if (transform_system_)
                 transform_system_->update(ctx, delta_time);
+        }
+
+        void update_physics_monitor_stats(EngineContext& ctx)
+        {
+            // Only write stats when the shared snapshot is available.
+            if (!physics_system_ || !ctx.services || !ctx.services->physics_monitor_stats)
+                return;
+
+            const auto stats = physics_system_->get_stats();
+            auto& out = *ctx.services->physics_monitor_stats;
+            out.body_count = stats.body_count;
+            out.collision_objects = stats.collision_objects;
+            out.manifolds = stats.manifolds;
+            out.contact_points = stats.contact_points;
+            out.dirty_entities = stats.dirty_entities;
+            out.event_entities = stats.event_entities;
+            out.tracked_contacts = stats.tracked_contacts;
+            out.valid = true;
         }
 
         std::unique_ptr<systems::RenderSystem> render_system_;

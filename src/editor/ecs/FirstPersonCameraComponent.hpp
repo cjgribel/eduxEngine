@@ -1,4 +1,4 @@
-// Created by Codex 2025.
+// Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
 #pragma once
@@ -6,9 +6,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
-namespace eeng::module1
+namespace eeng::editor
 {
-    // Simple first-person/free-look camera data stored as an ECS component.
+    // Simple first-person/free-look camera data stored as an editor ECS component.
     struct FirstPersonCameraComponent
     {
         // True if this camera should react to input this frame.
@@ -51,8 +51,14 @@ namespace eeng::module1
     };
 
     template<typename Visitor>
-    void visit_asset_refs(FirstPersonCameraComponent&, Visitor&&) {}
+    void visit_asset_refs(FirstPersonCameraComponent&, Visitor&&)
+    {
+        // No asset references to track.
+    }
 
     template<typename Visitor>
-    void visit_entity_refs(FirstPersonCameraComponent&, Visitor&&) {}
-} // namespace eeng::module1
+    void visit_entity_refs(FirstPersonCameraComponent&, Visitor&&)
+    {
+        // No entity references to track.
+    }
+} // namespace eeng::editor

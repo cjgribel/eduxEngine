@@ -78,6 +78,9 @@ namespace eeng
         , input_manager(std::move(input_manager))
         , log_manager(std::move(log_manager))
         , shutdown_requested(std::make_shared<std::atomic<bool>>(false))
+        // Shared snapshot updated by runtime pipeline for editor UI.
+        , physics_monitor_stats(std::make_shared<PhysicsMonitorStats>())
+        , overlay_view_state(std::make_shared<OverlayViewState>())
         , main_thread_queue(std::make_unique<MainThreadQueue>(shutdown_requested))
         , thread_pool(std::make_unique<ThreadPool>(std::thread::hardware_concurrency(), shutdown_requested)) // 2+, reload async deadlocks for < 2 threads
         , event_queue(std::make_unique<EventQueue>(shutdown_requested))
@@ -153,6 +156,11 @@ namespace eeng
         command_queue.reset(services.command_queue.get());
         asset_selection.reset(services.asset_selection.get());
         engine_config.reset(services.engine_config.get());
+        // Mirror shared editor services into the compatibility view.
+        physics_monitor_stats = services.physics_monitor_stats;
+        project_config = services.project_config;
+        shape_renderer = services.shape_renderer;
+        overlay_view_state = services.overlay_view_state;
     }
 
 } // namespace eeng

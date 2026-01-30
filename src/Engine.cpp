@@ -13,6 +13,7 @@
 #include "editor/CommandSanityChecks.hpp"
 #include "BatchRegistry.hpp"
 #include "ecs/EntityManager.hpp"
+#include "ShapeRenderer.hpp"
 
 #include "LogMacros.h"
 #include "LogGlobals.hpp"
@@ -208,6 +209,14 @@ namespace eeng
         register_asset_meta_types(*ctx);
         register_component_meta_types(*ctx);
 
+        if (ctx->services && !ctx->services->shape_renderer)
+        {
+            // Shared debug renderer for editor overlays and game debug draw.
+            ctx->services->shape_renderer = std::make_shared<ShapeRendering::ShapeRenderer>();
+            ctx->services->shape_renderer->init();
+            ctx->shape_renderer = ctx->services->shape_renderer;
+        }
+
         // Event subscriptions
         ctx->event_queue->register_callback([&](const SetVsyncEvent& event) { this->on_set_vsync(event); });
         ctx->event_queue->register_callback([&](const SetWireFrameRenderingEvent& event) { this->on_set_wireframe(event); });
@@ -399,6 +408,21 @@ namespace eeng
             else
                 app_->render_edit(time_s, window_width, window_height);
             STOP_TIMER("Frame", "Render");
+
+            if (ctx && ctx->shape_renderer && ctx->overlay_view_state && ctx->overlay_view_state->valid)
+            {
+                // Allow editor overlays (gizmos) to enqueue shapes before the flush.
+                if (ctx->services && ctx->services->editor_render_hook)
+                {
+                    ctx->services->editor_render_hook(*ctx, *ctx->shape_renderer, *ctx->overlay_view_state);
+                }
+
+                // Flush all queued overlay/debug shapes once per frame.
+                const auto proj_view = ctx->overlay_view_state->proj * ctx->overlay_view_state->view;
+                ctx->shape_renderer->render(proj_view);
+                ctx->shape_renderer->post_render();
+                ctx->overlay_view_state->valid = false;
+            }
 
             // =================================================================
             START_TIMER("Frame", "Frame End");

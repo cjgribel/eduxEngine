@@ -3,15 +3,10 @@
 
 #pragma once
 
-#include <glm/glm.hpp>
+#include "engineapi/OverlayViewState.hpp"
 
 namespace eeng
 {
-    struct EditorViewState
-    {
-        glm::mat4 view{ 1.0f };
-        glm::mat4 proj{ 1.0f };
-        glm::mat4 viewport{ 1.0f };
-        glm::ivec2 window_size{ 0, 0 };
-    };
+    // Backwards compatibility: prefer OverlayViewState going forward.
+    using EditorViewState = OverlayViewState;
 } // namespace eeng

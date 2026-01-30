@@ -11,6 +11,8 @@
 #include "ILogManager.hpp"
 #include "Guid.h"
 #include "engineapi/PlayModePolicy.hpp"
+#include "engineapi/OverlayViewState.hpp"
+#include <functional>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -23,10 +25,18 @@ class EventQueue;
 namespace eeng::editor {
     template<typename T> class SelectionManager;
     class CommandQueue;
+    struct ProjectConfig;
+}
+
+namespace ShapeRendering
+{
+    class ShapeRenderer;
 }
 
 namespace eeng
 {
+    struct EngineContext;
+    struct OverlayViewState;
     /*
     Engine context facilities:
     - (TODO?) Main thread queue
@@ -143,6 +153,22 @@ namespace eeng
         T* ptr_ = nullptr;
     };
 
+    // Lightweight stats snapshot shared with editor UI.
+    struct PhysicsMonitorStats
+    {
+        std::size_t body_count = 0;
+        int collision_objects = 0;
+        int manifolds = 0;
+        int contact_points = 0;
+        std::size_t dirty_entities = 0;
+        std::size_t event_entities = 0;
+        std::size_t tracked_contacts = 0;
+        bool valid = false;
+    };
+
+    using EditorRenderHook =
+        std::function<void(EngineContext&, ::ShapeRendering::ShapeRenderer&, const OverlayViewState&)>;
+
     struct EngineServices
     {
         EngineServices(
@@ -161,12 +187,22 @@ namespace eeng
         std::atomic<bool>                       play_mode_active{ false };
         std::atomic<bool>                       play_mode_policy_override_enabled{ false };
         std::atomic<PlayModePolicy>             play_mode_policy_override{ PlayModePolicy::Preview };
+        // Shared stats snapshot for editor UI (updated by runtime systems).
+        std::shared_ptr<PhysicsMonitorStats>    physics_monitor_stats;
+        // Current view state for overlay/debug rendering.
+        std::shared_ptr<OverlayViewState>       overlay_view_state;
+        // Core debug renderer shared across engine/editor/game.
+        std::shared_ptr<::ShapeRendering::ShapeRenderer> shape_renderer;
+        // Optional editor overlay hook (e.g. gizmo rendering) for shared renderers.
+        EditorRenderHook                         editor_render_hook;
         std::unique_ptr<MainThreadQueue>        main_thread_queue;
         std::unique_ptr<ThreadPool>             thread_pool;
         std::unique_ptr<EventQueue>             event_queue;
         std::unique_ptr<editor::CommandQueue>   command_queue;
         std::unique_ptr<GuidSelection>          asset_selection;
         std::unique_ptr<EngineConfig>           engine_config;
+        // Active project configuration for resolving asset/batch roots.
+        std::shared_ptr<editor::ProjectConfig>  project_config;
     };
 
     struct WorldState
@@ -223,6 +259,11 @@ namespace eeng
         PtrView<EntitySelection>        entity_selection;
         PtrView<BatchSelection>         batch_selection;
         PtrView<EngineConfig>           engine_config;
+        // Compatibility view of shared editor stats/config.
+        std::shared_ptr<PhysicsMonitorStats> physics_monitor_stats;
+        std::shared_ptr<editor::ProjectConfig> project_config;
+        std::shared_ptr<::ShapeRendering::ShapeRenderer> shape_renderer;
+        std::shared_ptr<OverlayViewState> overlay_view_state;
     };
 
     using EngineContextPtr = std::shared_ptr<EngineContext>;

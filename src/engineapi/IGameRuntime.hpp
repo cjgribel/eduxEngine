@@ -3,10 +3,15 @@
 
 #pragma once
 
-#include "engineapi/EditorViewState.hpp"
+#include "engineapi/OverlayViewState.hpp"
 #include "engineapi/PlayModePolicy.hpp"
 #include <string>
 #include <vector>
+
+namespace ShapeRendering
+{
+    class ShapeRenderer;
+}
 
 namespace eeng
 {
@@ -81,9 +86,10 @@ namespace eeng
         }
 
         /// @brief Provide the current editor view state (for gizmos/picking).
-        virtual bool get_editor_view(EditorViewState&) const
+        virtual bool get_editor_view(OverlayViewState&) const
         {
             return false;
         }
+
     };
 } // namespace eeng

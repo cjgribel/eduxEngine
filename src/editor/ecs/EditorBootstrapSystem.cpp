@@ -9,9 +9,9 @@
 #include "MainThreadQueue.hpp"
 #include "ThreadPool.hpp"
 #include "ecs/HeaderComponent.hpp"
-#include "FirstPersonCameraComponent.hpp"
+#include "editor/ecs/FirstPersonCameraComponent.hpp"
 #include "editor/ecs/TransformGizmoComponent.hpp"
-#include "ThirdPersonCameraComponent.hpp"
+#include "editor/ecs/ThirdPersonCameraComponent.hpp"
 
 #include <algorithm>
 #include <entt/entt.hpp>
@@ -307,16 +307,16 @@ namespace eeng::editor
             "Transform Gizmo",
             [](TransformGizmoComponent&) {});
 
-        ensure_editor_entity.operator()<eeng::module1::ThirdPersonCameraComponent>(
+        ensure_editor_entity.operator()<ThirdPersonCameraComponent>(
             "Third Person Camera",
-            [](eeng::module1::ThirdPersonCameraComponent& camera)
+            [](ThirdPersonCameraComponent& camera)
             {
                 camera.active = true;
             });
 
-        ensure_editor_entity.operator()<eeng::module1::FirstPersonCameraComponent>(
+        ensure_editor_entity.operator()<FirstPersonCameraComponent>(
             "First Person Camera",
-            [](eeng::module1::FirstPersonCameraComponent& camera)
+            [](FirstPersonCameraComponent& camera)
             {
                 camera.active = false;
             });

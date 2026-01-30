@@ -1,13 +1,13 @@
-// Created by Codex 2025.
+// Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-#include "ThirdPersonCameraSystem.hpp"
+#include "editor/ecs/ThirdPersonCameraSystem.hpp"
 
 #include "EngineContext.hpp"
 #include "engineapi/IInputManager.hpp"
 #include "glmcommon.hpp"
 #include "ecs/TransformComponent.hpp"
-#include "ThirdPersonCameraComponent.hpp"
+#include "editor/ecs/ThirdPersonCameraComponent.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -16,6 +16,7 @@ namespace
 {
     float apply_deadzone(float value, float deadzone)
     {
+        // Treat small controller drift as zero.
         if (std::fabs(value) <= deadzone)
             return 0.0f;
         return value;
@@ -49,7 +50,7 @@ namespace
     }
 }
 
-namespace eeng::module1::systems
+namespace eeng::editor
 {
     void ThirdPersonCameraSystem::update(entt::registry& registry, EngineContext& ctx, float delta_time)
     {
@@ -69,6 +70,7 @@ namespace eeng::module1::systems
         {
             auto& camera = view.get<ThirdPersonCameraComponent>(entity);
 
+            // Resolve the pivot target from the bound entity if it is still live.
             // Resolve the base target position from the bound entity (if any).
             glm::vec3 target_pos = camera.look_at;
             if (camera.target.is_bound() && registry.valid(camera.target.entity))
@@ -82,6 +84,7 @@ namespace eeng::module1::systems
 
             if (camera.active)
             {
+                // Read orbit inputs only for the active camera.
                 // Orbit input: controller if present, otherwise keyboard.
                 float yaw_axis = 0.0f;
                 float distance_axis = 0.0f;
@@ -161,4 +164,4 @@ namespace eeng::module1::systems
             camera.view_to_world = glm::inverse(camera.model_to_view);
         }
     }
-} // namespace eeng::module1::systems
+} // namespace eeng::editor

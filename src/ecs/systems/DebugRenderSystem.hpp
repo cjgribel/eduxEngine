@@ -50,6 +50,10 @@ namespace eeng::ecs::systems
         std::uint32_t raycast_normal_color = 0xff00ff00u;
         float raycast_hit_normal_length = 0.25f;
         unsigned raycast_hit_point_size = 8;
+
+        // ShapeRenderer demo overlay (debug visualization).
+        bool show_demo_shapes = true;
+        glm::vec3 demo_shape_offset{ 0.0f, 0.0f, -5.0f };
     };
 
     class DebugRenderSystem

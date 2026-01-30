@@ -2,16 +2,17 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "Game.hpp"
-#include "FirstPersonCameraComponent.hpp"
-#include "ThirdPersonCameraComponent.hpp"
+#include "editor/ecs/FirstPersonCameraComponent.hpp"
+#include "editor/ecs/ThirdPersonCameraComponent.hpp"
+#include "editor/ProjectConfig.hpp"
 #include "glmcommon.hpp"
 #include "ImGuiHelpers.hpp"
 #include "imgui.h"
 #include "LogMacros.h"
-#include "engineapi/SelectionManager.hpp"
 #include "ecs/TransformComponent.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <cstdio>
+#include <filesystem>
 
 
 
@@ -21,47 +22,61 @@ bool Game::init()
     forwardRenderer = std::make_shared<eeng::ForwardRenderer>();
     forwardRenderer->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");
 
-    shapeRenderer = std::make_shared<ShapeRendering::ShapeRenderer>();
-    shapeRenderer->init();
+    // Use the shared debug renderer owned by the engine services.
+    shapeRenderer = ctx ? ctx->shape_renderer : nullptr;
+    if (!shapeRenderer)
+    {
+        // Fallback for non-engine contexts or tests.
+        shapeRenderer = std::make_shared<ShapeRendering::ShapeRenderer>();
+        shapeRenderer->init();
+    }
 
     runtime_pipeline_.init(*ctx);
     playerControllerSystem = std::make_unique<eeng::ecs::systems::PlayerControllerSystem>();
     if (playerControllerSystem)
         playerControllerSystem->set_physics_system(runtime_pipeline_.physics_system());
-    thirdPersonCameraSystem = std::make_unique<eeng::module1::systems::ThirdPersonCameraSystem>();
-    firstPersonCameraSystem = std::make_unique<eeng::module1::systems::FirstPersonCameraSystem>();
+
+    // Prefer project config asset root when running inside the editor.
+    std::filesystem::path assets_root = "assets";
+    if (ctx && ctx->project_config)
+        assets_root = ctx->project_config->assets_root;
+    const auto asset_path = [&](const std::string& relative)
+    {
+        // Normalize asset lookups through the project root.
+        return (assets_root / relative).string();
+    };
 
     // Grass
     grassMesh = std::make_shared<eeng::RenderableMesh>();
-    grassMesh->load("assets/grass/grass_trees_merged.fbx", false);
+    grassMesh->load(asset_path("grass/grass_trees_merged.fbx"), false);
 
     // Horse
     horseMesh = std::make_shared<eeng::RenderableMesh>();
-    horseMesh->load("assets/Animals/Horse.fbx", false);
+    horseMesh->load(asset_path("Animals/Horse.fbx"), false);
 
     // Character
     characterMesh = std::make_shared<eeng::RenderableMesh>();
 #if 0
     // Character
-    characterMesh->load("assets/Ultimate Platformer Pack/Character/Character.fbx", false);
+    characterMesh->load(asset_path("Ultimate Platformer Pack/Character/Character.fbx"), false);
 #endif
 #if 0
     // Enemy
-    characterMesh->load("assets/Ultimate Platformer Pack/Enemies/Bee.fbx", false);
+    characterMesh->load(asset_path("Ultimate Platformer Pack/Enemies/Bee.fbx"), false);
 #endif
 #if 0
     // ExoRed 5.0.1 PACK FBX, 60fps, No keyframe reduction
-    characterMesh->load("assets/ExoRed/exo_red.fbx");
-    characterMesh->load("assets/ExoRed/idle (2).fbx", true);
-    characterMesh->load("assets/ExoRed/walking.fbx", true);
+    characterMesh->load(asset_path("ExoRed/exo_red.fbx"));
+    characterMesh->load(asset_path("ExoRed/idle (2).fbx"), true);
+    characterMesh->load(asset_path("ExoRed/walking.fbx"), true);
     // Remove root motion
     characterMesh->removeTranslationKeys("mixamorig:Hips");
 #endif
 #if 1
     // Amy 5.0.1 PACK FBX
-    characterMesh->load("assets/Amy/Ch46_nonPBR.fbx");
-    characterMesh->load("assets/Amy/idle.fbx", true);
-    characterMesh->load("assets/Amy/walking.fbx", true);
+    characterMesh->load(asset_path("Amy/Ch46_nonPBR.fbx"));
+    characterMesh->load(asset_path("Amy/idle.fbx"), true);
+    characterMesh->load(asset_path("Amy/walking.fbx"), true);
     // Remove root motion
     characterMesh->removeTranslationKeys("mixamorig:Hips");
 #endif
@@ -70,9 +85,9 @@ bool Game::init()
     // Fix for assimp 5.0.1 (https://github.com/assimp/assimp/issues/4486)
     // FBXConverter.cpp, line 648: 
     //      const float zero_epsilon = 1e-6f; => const float zero_epsilon = Math::getEpsilon<float>();
-    characterMesh->load("assets/Eve/Eve By J.Gonzales.fbx");
-    characterMesh->load("assets/Eve/idle.fbx", true);
-    characterMesh->load("assets/Eve/walking.fbx", true);
+    characterMesh->load(asset_path("Eve/Eve By J.Gonzales.fbx"));
+    characterMesh->load(asset_path("Eve/idle.fbx"), true);
+    characterMesh->load(asset_path("Eve/walking.fbx"), true);
     // Remove root motion
     characterMesh->removeTranslationKeys("mixamorig:Hips");
 #endif
@@ -145,37 +160,7 @@ void Game::update(
     float time,
     float deltaTime)
 {
-    if (!play_mode)
-    {
-        sync_active_entity();
-        ensure_editor_camera_entities();
-    }
-
     auto& registry = ctx->entity_manager->registry();
-
-    // Handle "focus" input: set third-person target to the selected entity.
-    if (!play_mode && ctx->input_manager)
-    {
-        using Key = eeng::IInputManager::Key;
-        const bool f_down = ctx->input_manager->IsKeyPressed(Key::F);
-        if (active_camera_mode == CameraMode::ThirdPerson && f_down && !f_was_down)
-        {
-            if (active_entity.has_id() && ctx->entity_manager->entity_valid(active_entity))
-            {
-                if (auto* camera = registry.try_get<eeng::module1::ThirdPersonCameraComponent>(
-                    third_person_camera_entity))
-                {
-                    camera->target.unbind();
-                    camera->target.bind(active_entity);
-                    camera->target_offset = glm::vec3(0.0f, 0.0f, 0.0f);
-
-                    if (const auto* tfm = registry.try_get<eeng::ecs::TransformComponent>(active_entity))
-                        camera->look_at = glm::vec3(tfm->world_matrix[3]);
-                }
-            }
-        }
-        f_was_down = f_down;
-    }
 
     pointlight.pos = glm::vec3(
         glm_aux::R(time * 0.1f, { 0.0f, 1.0f, 0.0f }) *
@@ -214,16 +199,7 @@ void Game::update(
         0.0f, { 0, 1, 0 },
         { 0.03f, 0.03f, 0.03f });
 
-    if (!play_mode)
-    {
-        if (thirdPersonCameraSystem)
-            thirdPersonCameraSystem->update(registry, *ctx, deltaTime);
-
-        if (firstPersonCameraSystem)
-            firstPersonCameraSystem->update(registry, *ctx, deltaTime);
-    }
-
-    refresh_active_camera_state();
+    update_active_camera_state();
 
     // Build a view ray from the active camera (useful for debug/picking).
     view_ray = glm_aux::Ray(active_camera.position, active_camera.forward);
@@ -289,7 +265,7 @@ void Game::render(
 {
     renderUI();
 
-    refresh_active_camera_state();
+    update_active_camera_state();
 
     matrices.windowSize = glm::ivec2(windowWidth, windowHeight);
 
@@ -426,21 +402,25 @@ void Game::render(
         shapeRenderer->pop_states<ShapeRendering::Color4u>();
     }
 
-#if 1
-    // Demo draw other shapes
+    if (ctx && ctx->overlay_view_state)
     {
-        shapeRenderer->push_states(glm_aux::T(glm::vec3(0.0f, 0.0f, -5.0f)));
-        ShapeRendering::DemoDraw(shapeRenderer);
-        shapeRenderer->pop_states<glm::mat4>();
+        // Publish the overlay view so the engine can flush shared debug rendering.
+        auto& overlay = *ctx->overlay_view_state;
+        overlay.view = matrices.V;
+        overlay.proj = matrices.P;
+        overlay.viewport = matrices.VP;
+        overlay.window_size = matrices.windowSize;
+        overlay.valid = true;
     }
-#endif
-
-    // Draw shape batches
-    shapeRenderer->render(matrices.P * matrices.V);
-    shapeRenderer->post_render();
+    else if (shapeRenderer)
+    {
+        // Standalone fallback when no engine-owned overlay view exists.
+        shapeRenderer->render(matrices.P * matrices.V);
+        shapeRenderer->post_render();
+    }
 }
 
-bool Game::get_editor_view(eeng::EditorViewState& out) const
+bool Game::get_editor_view(eeng::OverlayViewState& out) const
 {
     if (matrices.windowSize.x <= 0 || matrices.windowSize.y <= 0)
         return false;
@@ -449,6 +429,7 @@ bool Game::get_editor_view(eeng::EditorViewState& out) const
     out.proj = matrices.P;
     out.viewport = matrices.VP;
     out.window_size = matrices.windowSize;
+    out.valid = true;
     return true;
 }
 
@@ -457,16 +438,6 @@ void Game::renderUI()
     ImGui::Begin("Game Info");
 
     ImGui::Text("Drawcall count %i", drawcallCount);
-
-    {
-        const char* camera_labels[] = { "ThirdPerson", "FirstPerson" };
-        int camera_index = (active_camera_mode == CameraMode::ThirdPerson) ? 0 : 1;
-        if (ImGui::Combo("Active camera", &camera_index, camera_labels, IM_ARRAYSIZE(camera_labels)))
-        {
-            const CameraMode mode = (camera_index == 0) ? CameraMode::ThirdPerson : CameraMode::FirstPerson;
-            set_active_camera_mode(mode);
-        }
-    }
 
     if (ImGui::ColorEdit3("Light color",
         glm::value_ptr(pointlight.color),
@@ -534,22 +505,6 @@ void Game::renderUI()
     ImGui::SliderFloat("Animation mix", &characterAnimBlend, 0.0f, 1.0f);
 
     ImGui::End(); // end info window
-
-    if (const auto* physics = runtime_pipeline_.physics_system())
-    {
-        // Small monitor window for Bullet + ECS physics counters.
-        const auto stats = physics->get_stats();
-        ImGui::Begin("Physics Monitor");
-        ImGui::Text("Bodies: %zu", stats.body_count);
-        ImGui::Text("Collision objects: %d", stats.collision_objects);
-        ImGui::Text("Manifolds: %d", stats.manifolds);
-        ImGui::Text("Contact points: %d", stats.contact_points);
-        ImGui::Separator();
-        ImGui::Text("Dirty entities: %zu", stats.dirty_entities);
-        ImGui::Text("Event entities: %zu", stats.event_entities);
-        ImGui::Text("Tracked contacts: %zu", stats.tracked_contacts);
-        ImGui::End();
-    }
 }
 
 void Game::destroy()
@@ -557,102 +512,69 @@ void Game::destroy()
     runtime_pipeline_.shutdown();
 }
 
-void Game::set_active_camera_mode(CameraMode mode)
-{
-    active_camera_mode = mode;
-    ensure_editor_camera_entities();
-    active_camera_entity = (mode == CameraMode::ThirdPerson)
-        ? third_person_camera_entity
-        : first_person_camera_entity;
-
-    if (!ctx || !ctx->entity_manager)
-        return;
-
-    auto& registry = ctx->entity_manager->registry();
-    if (auto* third = registry.try_get<eeng::module1::ThirdPersonCameraComponent>(third_person_camera_entity))
-        third->active = (mode == CameraMode::ThirdPerson);
-    if (auto* first = registry.try_get<eeng::module1::FirstPersonCameraComponent>(first_person_camera_entity))
-        first->active = (mode == CameraMode::FirstPerson);
-}
-
-/// @brief Ensure that editor camera entities are valid,
-///       by resolving them from the registry if needed.
-void Game::ensure_editor_camera_entities()
+void Game::update_active_camera_state()
 {
     if (!ctx || !ctx->entity_manager)
         return;
 
     auto& registry = ctx->entity_manager->registry();
 
-    const auto resolve_camera = [&]<typename Component>(eeng::ecs::Entity& slot)
+    const auto copy_third_person = [&](const eeng::editor::ThirdPersonCameraComponent& camera)
     {
-        if (slot.has_id() && registry.valid(slot) && registry.all_of<Component>(slot))
-            return;
-
-        slot = eeng::ecs::Entity::EntityNull;
-        auto view = registry.view<Component>();
-        if (view.begin() != view.end())
-            slot = eeng::ecs::Entity{ *view.begin() };
+        active_camera.position = camera.position;
+        active_camera.forward = camera.forward;
+        active_camera.up = camera.up;
+        active_camera.model_to_view = camera.model_to_view;
+        active_camera.view_to_world = camera.view_to_world;
+        active_camera.near_plane = camera.near_plane;
+        active_camera.far_plane = camera.far_plane;
     };
 
-    resolve_camera.operator()<eeng::module1::ThirdPersonCameraComponent>(third_person_camera_entity);
-    resolve_camera.operator()<eeng::module1::FirstPersonCameraComponent>(first_person_camera_entity);
-
-    active_camera_entity = (active_camera_mode == CameraMode::ThirdPerson)
-        ? third_person_camera_entity
-        : first_person_camera_entity;
-
-    if (auto* third = registry.try_get<eeng::module1::ThirdPersonCameraComponent>(third_person_camera_entity))
-        third->active = (active_camera_mode == CameraMode::ThirdPerson);
-    if (auto* first = registry.try_get<eeng::module1::FirstPersonCameraComponent>(first_person_camera_entity))
-        first->active = (active_camera_mode == CameraMode::FirstPerson);
-}
-
-void Game::sync_active_entity()
-{
-    active_entity = eeng::ecs::Entity::EntityNull;
-    if (!ctx || !ctx->entity_selection || ctx->entity_selection->empty())
-        return;
-
-    active_entity = ctx->entity_selection->last();
-    if (!ctx->entity_manager || !ctx->entity_manager->entity_valid(active_entity))
-        active_entity = eeng::ecs::Entity::EntityNull;
-}
-
-void Game::refresh_active_camera_state()
-{
-    if (!ctx || !ctx->entity_manager)
-        return;
-
-    ensure_editor_camera_entities();
-
-    auto& registry = ctx->entity_manager->registry();
-
-    if (active_camera_mode == CameraMode::ThirdPerson)
+    const auto copy_first_person = [&](const eeng::editor::FirstPersonCameraComponent& camera)
     {
-        if (const auto* camera = registry.try_get<eeng::module1::ThirdPersonCameraComponent>(third_person_camera_entity))
-        {
-            active_camera.position = camera->position;
-            active_camera.forward = camera->forward;
-            active_camera.up = camera->up;
-            active_camera.model_to_view = camera->model_to_view;
-            active_camera.view_to_world = camera->view_to_world;
-            active_camera.near_plane = camera->near_plane;
-            active_camera.far_plane = camera->far_plane;
-        }
-    }
-    else
+        active_camera.position = camera.position;
+        active_camera.forward = camera.forward;
+        active_camera.up = camera.up;
+        active_camera.model_to_view = camera.model_to_view;
+        active_camera.view_to_world = camera.view_to_world;
+        active_camera.near_plane = camera.near_plane;
+        active_camera.far_plane = camera.far_plane;
+    };
+
+    // Prefer an active third-person camera if present.
+    auto third_view = registry.view<eeng::editor::ThirdPersonCameraComponent>();
+    for (auto entity : third_view)
     {
-        if (const auto* camera = registry.try_get<eeng::module1::FirstPersonCameraComponent>(first_person_camera_entity))
-        {
-            active_camera.position = camera->position;
-            active_camera.forward = camera->forward;
-            active_camera.up = camera->up;
-            active_camera.model_to_view = camera->model_to_view;
-            active_camera.view_to_world = camera->view_to_world;
-            active_camera.near_plane = camera->near_plane;
-            active_camera.far_plane = camera->far_plane;
-        }
+        const auto& camera = third_view.get<eeng::editor::ThirdPersonCameraComponent>(entity);
+        if (!camera.active)
+            continue;
+        copy_third_person(camera);
+        return;
     }
 
+    // Fall back to an active first-person camera.
+    auto first_view = registry.view<eeng::editor::FirstPersonCameraComponent>();
+    for (auto entity : first_view)
+    {
+        const auto& camera = first_view.get<eeng::editor::FirstPersonCameraComponent>(entity);
+        if (!camera.active)
+            continue;
+        copy_first_person(camera);
+        return;
+    }
+
+    // If nothing is active, pick the first available camera in a stable order.
+    if (third_view.begin() != third_view.end())
+    {
+        const auto& camera = third_view.get<eeng::editor::ThirdPersonCameraComponent>(*third_view.begin());
+        copy_third_person(camera);
+        return;
+    }
+
+    if (first_view.begin() != first_view.end())
+    {
+        const auto& camera = first_view.get<eeng::editor::FirstPersonCameraComponent>(*first_view.begin());
+        copy_first_person(camera);
+        return;
+    }
 }

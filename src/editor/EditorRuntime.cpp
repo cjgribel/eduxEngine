@@ -23,6 +23,12 @@ namespace eeng::editor
         transform_gizmo_system_.update(ctx, view, proj, viewport, window_size);
     }
 
+    void EditorRuntime::update_cameras(EngineContext& ctx, float delta_time)
+    {
+        // Editor cameras are driven separately from the game runtime.
+        camera_system_.update(ctx, delta_time);
+    }
+
     void EditorRuntime::render(
         EngineContext& ctx,
         ShapeRendering::ShapeRenderer& renderer,
