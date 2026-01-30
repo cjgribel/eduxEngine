@@ -5,7 +5,7 @@
 
 #include "EngineContext.hpp"
 
-namespace eeng::module1
+namespace eeng::legacy_game
 {
-    void register_module1_meta_types(EngineContext& ctx);
+    void register_legacy_game_meta_types(EngineContext& ctx);
 }

@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "Game.hpp"
-#include "Module1MetaReg.hpp"
+#include "LegacyGameMetaReg.hpp"
 #include "editor/ecs/FirstPersonCameraComponent.hpp"
 #include "editor/ecs/ThirdPersonCameraComponent.hpp"
 #include "editor/ProjectConfig.hpp"
@@ -21,7 +21,7 @@
 bool Game::init()
 {
     if (ctx)
-        eeng::module1::register_module1_meta_types(*ctx);
+        eeng::legacy_game::register_legacy_game_meta_types(*ctx);
 
     forwardRenderer = std::make_shared<eeng::ForwardRenderer>();
     forwardRenderer->init("shaders/phong_vert.glsl", "shaders/phong_frag.glsl");

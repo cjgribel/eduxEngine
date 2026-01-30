@@ -240,12 +240,12 @@ FetchContent_MakeAvailable(nlohmann_json)
 # Targets
 #
 
-# Module1
-message(STATUS "Creating executable target for Module1")
-add_executable(Module1 
-    Module1/main.cpp
-    Module1/Game.cpp 
-    Module1/Module1MetaReg.cpp
+# Legacy game
+message(STATUS "Creating executable target for LegacyGame")
+add_executable(LegacyGame
+    projects/legacy_game/main.cpp
+    projects/legacy_game/Game.cpp
+    projects/legacy_game/LegacyGameMetaReg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/ThirdPersonCameraSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/FirstPersonCameraSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/EditorCameraSystem.cpp
@@ -288,7 +288,7 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/StickyNoteComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/CoreComponents.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/RenderSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Module1/ecs/systems/MannequinPlayerControllerSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/projects/legacy_game/ecs/systems/MannequinPlayerControllerSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/AnimationSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/AnimationGraphSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/TransformSystem.cpp
@@ -337,8 +337,8 @@ add_executable(Module1
     ${CMAKE_CURRENT_SOURCE_DIR}/src/physics/PhysicsWorld.cpp
     )
 
-set_target_properties(Module1 PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Module1"
+set_target_properties(LegacyGame PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/legacy_game"
 )
 
 # GLEW headers and library
@@ -347,12 +347,12 @@ set_target_properties(Module1 PROPERTIES
 # and 2) link to the glew library file directly, rather than the glew target.
 # Should work equally well on all platforms.
 # https://developer.apple.com/documentation/macos-release-notes/macos-26-release-notes
-target_include_directories(Module1 PRIVATE
+target_include_directories(LegacyGame PRIVATE
     ${glew_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/Module1
+    ${CMAKE_CURRENT_SOURCE_DIR}/projects/legacy_game
 )
 
-target_link_libraries(Module1 PRIVATE 
+target_link_libraries(LegacyGame PRIVATE 
     SDL2 
     assimp  
     $<TARGET_FILE:libglew_static> # link to library file directly to avoid AGL framework # libglew_static
@@ -362,31 +362,31 @@ target_link_libraries(Module1 PRIVATE
     ${OPENGL_LIBRARIES}
     )
 if (TARGET ZLIB::ZLIB)
-    target_link_libraries(Module1 PRIVATE ZLIB::ZLIB)
+    target_link_libraries(LegacyGame PRIVATE ZLIB::ZLIB)
 endif()
 
-target_compile_definitions(Module1 PRIVATE
-    META_OUTPUT_DIR="${CMAKE_BINARY_DIR}/Module1/meta"
+target_compile_definitions(LegacyGame PRIVATE
+    META_OUTPUT_DIR="${CMAKE_BINARY_DIR}/legacy_game/meta"
     EENG_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
-# target_compile_definitions(Module1 PRIVATE VERBOSE_LOGGING)
+# target_compile_definitions(LegacyGame PRIVATE VERBOSE_LOGGING)
 
 # Post-build commands
-add_custom_command(TARGET Module1 POST_BUILD
+add_custom_command(TARGET LegacyGame POST_BUILD
     # Copy SDL2 DLL to the build directory (for Windows)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:SDL2>
-        $<TARGET_FILE_DIR:Module1>
+        $<TARGET_FILE_DIR:LegacyGame>
     # Copy assimp DLL to the build directory (for Windows)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "$<TARGET_FILE_DIR:assimp>"
-        $<TARGET_FILE_DIR:Module1>
+        $<TARGET_FILE_DIR:LegacyGame>
 )
-message(STATUS "Post-build commands to copy SDL2 and Assimp DLLs to Module1 folder")
+message(STATUS "Post-build commands to copy SDL2 and Assimp DLLs to LegacyGame folder")
 
 # Set the working directory for the Visual Studio debugger
 if(CMAKE_GENERATOR MATCHES "Visual Studio")
-    set_property(TARGET Module1 PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+    set_property(TARGET LegacyGame PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
     message(STATUS "Set Visual Studio debugger working directory")
 endif()
 
@@ -394,12 +394,12 @@ endif()
 
 # Set the startup project for Visual Studio
 if(CMAKE_GENERATOR MATCHES "Visual Studio")
-    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Module1)
-    message(STATUS "Set Visual Studio startup project to Module1")
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT LegacyGame)
+    message(STATUS "Set Visual Studio startup project to LegacyGame")
 endif()
 
 # For 'make install'
-#install(TARGETS Module1 Module2)
+#install(TARGETS LegacyGame Module2)
 # message(STATUS "Install targets
 
 enable_testing()

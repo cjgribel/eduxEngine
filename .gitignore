@@ -5,7 +5,10 @@ doxygen/
 
 assets/
 # Ignore project files for now
-Module1/project1
+projects/legacy_game/project.json
+projects/legacy_game/texture.png
+projects/legacy_game/batches
+projects/legacy_game/imported_assets
 # Whitelist
 !src/assets/
 

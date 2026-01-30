@@ -5,7 +5,7 @@
 #include "EngineContext.hpp"
 #include <memory>
 
-namespace eeng::project2
+namespace eeng::reference_game
 {
     // ReferenceGame is a minimal stub kept in sync with the evolving engine API.
     class ReferenceGame : public IGameRuntime

@@ -93,6 +93,6 @@ Optional: unload edit batches during play to free memory (slower exit).
 - [ ] Move game-specific components/systems out of `src/ecs` into game module.
 - [ ] Add tests for snapshot + restore integrity.
 - [ ] Restructure folders into `engine/`, `editor/`, `game/` roots.
-- [ ] Legacy Game cleanup: move editor UI, selection-driven camera focus, debug draw, and bootstrap logic out of `Module1/Game.cpp`.
-- [ ] Rename `Module1` to a clearer legacy/samples name and update build files.
+- [ ] Legacy Game cleanup: move editor UI, selection-driven camera focus, debug draw, and bootstrap logic out of `projects/legacy_game/Game.cpp`.
+- [x] Rename `Module1` to `projects/legacy_game` and update build files.
 - [ ] Add a runtime/plugin system to allow swapping game types in the editor (beyond data reload).

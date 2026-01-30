@@ -16,7 +16,7 @@ int main(int argc, char* argv[])
     }
 
     const std::filesystem::path project_config =
-        std::filesystem::path(EENG_SOURCE_DIR) / "Module1/project1/project.json";
+        std::filesystem::path(EENG_SOURCE_DIR) / "projects/legacy_game/project.json";
     engine->run_editor<Game>(project_config);
 
     std::cout << "Exiting eduxEngine." << std::endl;

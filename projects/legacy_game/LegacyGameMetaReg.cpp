@@ -1,7 +1,7 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
-#include "Module1MetaReg.hpp"
+#include "LegacyGameMetaReg.hpp"
 
 #include "meta/EntityMetaHelpers.hpp"
 #include "meta/MetaAux.h"
@@ -14,7 +14,7 @@
 #include <type_traits>
 #include <stdexcept>
 
-namespace eeng::module1
+namespace eeng::legacy_game
 {
     namespace
     {
@@ -48,15 +48,15 @@ namespace eeng::module1
         }
     }
 
-    void register_module1_meta_types(EngineContext& ctx)
+    void register_legacy_game_meta_types(EngineContext& ctx)
     {
-        EENG_LOG_INFO(&ctx, "Registering Module1 component meta types...");
+        EENG_LOG_INFO(&ctx, "Registering legacy game component meta types...");
 
         // --- MannequinPlayerControllerComponent --------------------------
         {
             entt::meta_factory<eeng::ecs::MannequinPlayerControllerComponent>{}
             .custom<TypeMetaInfo>(TypeMetaInfo{
-                .id = "eeng.module1.MannequinPlayerControllerComponent",
+                .id = "eeng.legacy_game.MannequinPlayerControllerComponent",
                 .name = "MannequinPlayerControllerComponent",
                 .tooltip = "Mannequin-specific input-driven animation graph parameter control." })
                 .traits(MetaFlags::none)

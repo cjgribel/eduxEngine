@@ -1,11 +1,11 @@
 // ReferenceGame is a minimal stub kept in sync with the evolving engine API.
 // It demonstrates Strict play-mode hooks without depending on any gameplay code.
 
-#include "Module1/project2/ReferenceGame.hpp"
+#include "ReferenceGame.hpp"
 #include "BatchRegistry.hpp"
 #include <glm/glm.hpp>
 
-namespace eeng::project2
+namespace eeng::reference_game
 {
     ReferenceGame::ReferenceGame(std::shared_ptr<EngineContext> ctx)
         : ctx_(std::move(ctx))
@@ -84,7 +84,7 @@ namespace eeng::project2
             return;
 
         auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
-        br.load_or_create_index("Module1/project2/batches/index.json");
+        br.load_or_create_index("projects/reference_game/batches/index.json");
     }
 
     void ReferenceGame::on_enter_play(EngineContext& ctx)
