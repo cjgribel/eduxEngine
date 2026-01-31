@@ -171,6 +171,8 @@ namespace eeng::ecs
         bool enable_angular = false;
         float angular_stiffness = 0.0f;
         float angular_damping = 0.0f;
+        // When use_world_point_b is false: rest rotation from body A to body B.
+        // When use_world_point_b is true: target world rotation for body A.
         glm::quat rest_rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
 
         bool enabled = true;

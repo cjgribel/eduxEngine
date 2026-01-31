@@ -111,6 +111,21 @@ namespace eeng::ecs::systems
                     physics_system.submit_torque(entity_b, -torque);
                 }
             }
+            else if (angular_active && spring.use_world_point_b)
+            {
+                physics::AngularSpringDamper angular{
+                    spring.angular_stiffness,
+                    spring.angular_damping,
+                    glm::quat(1.0f, 0.0f, 0.0f, 0.0f)
+                };
+                const glm::vec3 torque = angular.compute_torque(
+                    state_a.rotation,
+                    spring.rest_rotation,
+                    state_a.angular_velocity,
+                    glm::vec3(0.0f));
+                if (glm::dot(torque, torque) > 0.0f)
+                    physics_system.submit_torque(entity, torque);
+            }
         }
     }
 } // namespace eeng::ecs::systems

@@ -1017,7 +1017,7 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "angular_damping", "Angular Damping", "Angular damping constant." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SpringDamperComponent::rest_rotation>("rest_rotation"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "rest_rotation", "Rest Rotation", "Rest rotation from body A to body B." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "rest_rotation", "Rest Rotation", "Rest rotation from body A to body B; when using world point, this is the target world rotation for body A." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SpringDamperComponent::enabled>("enabled"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable spring-damper." })
