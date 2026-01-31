@@ -1,0 +1,57 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1265
+{\fonttbl\f0\fswiss\fcharset0 ArialMT;}
+{\colortbl;\red255\green255\blue255;\red63\green110\blue116;\red38\green71\blue75;}
+\margl1440\margr1440\vieww9000\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\f0\fs28 \cf0 \
+
+\b cmd line parsing\
+
+\b0 cmd line parser (grammar class) + file save (XML)\
+todo:\
+toggle input & print current input string to window\
+commands:\
+	set/get etc: write & read properties of object/world/scene\
+	save & load\
+	add debug bodies (unmap as many keys as possible)\
+save/load with complete support for current version\
+	merge/remove joints from the joint/constraint classes\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\b \cf0 file save/load\
+
+\b0 todo: write & read joints, forces\
+is the 'prismatic B' needed?\
+2 bodies aways being added: camera (in WorldInstance) & background (in World). Remove also when clearing.\
+clear_all caution: some WordInstance have pointers to joints for events; UIPointer expects a camera_force which is not yet saved/loaded from file\
+what about key callbacks when loading? need a better system for this, one that can be saved. a general key-event mapping\
+store UIEvnts (part of WorldInstance) associated with each scene? could index the camera force etc. key-mappings could be defined by the WorlInstance\
+\
+
+\b Warm Starting\
+
+\b0 Probably working: fetch stored impulse, apply, initialize accumulated impulse. Then iterate as usual.\
+However: not correct together with restitution (and possibly error correction). These are part of the solution for one set of iteration, but should not be assumed to cohere with the following timestep. High restitution e.g. results in a large impulse at impact, which should not be applied again next timestep. Error correction also decreases exponentially between timesteps.\
+Best solution is probably to split these components \'96 velocity constraint, restitution, error correction \'96 into separate parts and reuse velocity part only.\
+\
+other possible causes of error:\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \ul \ulc0 errors in Sweep and Prune\ulnone  \'96\'a0with naive CD algo everything works as it should\
+friction; accumulated impulse in tangent direction not 100% correct\
+inconsistencies in contact point generation (persistence gets lost)\
+\
+Cattos steps\
+\pard\pardeftab720
+\cf0 1. Apply the stored impulses\
+2. Use the stored impulses to initialize the accumulated impulses.\
+3. Store the accumulated impulses.\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\b \cf0 MISC
+\b0 \
+deallcoate in t2WorldInstance.h: \cf2 \CocoaLigature0 t2World\cf0 ::\cf3 ~t2World\cf0 ();\
+}
