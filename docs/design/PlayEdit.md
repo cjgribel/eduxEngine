@@ -87,6 +87,8 @@ Optional: unload edit batches during play to free memory (slower exit).
 - [ ] Add a physics queries interface (raycasts/overlaps) for game code.
 - [ ] Add Play mode variants: Preview (reuse edit-loaded assets/batches) vs Strict (load runtime batches only).
 - [ ] Add per-world asset lease tracking for Strict Play mode (avoid edit/play stomping).
+- [ ] Add a strict play bootstrap contract (beyond startup batch names), e.g., a level/scene boot path.
+- [ ] Add a play-mode UI toggle for Preview vs Strict in the editor, plus policy display.
 
 ### Later
 - [ ] Split component meta registration: engine vs game.
@@ -96,3 +98,5 @@ Optional: unload edit batches during play to free memory (slower exit).
 - [ ] Legacy Game cleanup: move editor UI, selection-driven camera focus, debug draw, and bootstrap logic out of `projects/legacy_game/Game.cpp`.
 - [x] Rename `Module1` to `projects/legacy_game` and update build files.
 - [ ] Add a runtime/plugin system to allow swapping game types in the editor (beyond data reload).
+- [ ] Add a loading screen/state for Strict Play batch loads.
+- [ ] Audit global caches and runtime state for strict play reset (physics/script state, etc).
