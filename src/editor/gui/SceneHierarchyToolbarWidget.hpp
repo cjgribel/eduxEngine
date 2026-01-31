@@ -42,68 +42,7 @@ namespace eeng::gui
                 && ctx.services->play_mode_active.load(std::memory_order_relaxed);
             const bool allow_edit_actions = can_queue && !is_playing;
 
-            if (!allow_edit_actions)
-                ImGui::BeginDisabled();
-
-            // New entity
-            if (ImGui::Button("New"))
-            {
-                Entity entity_parent{};
-                if (has_selection)
-                    entity_parent = entity_selection.last();
-
-                editor::SceneActions::create_entity(ctx, entity_parent);
-            }
-
-            ImGui::SameLine();
-
-            // Destroy selected entities
-            if (!has_selection) ImGui::BeginDisabled();
-            if (ImGui::Button("Delete"))
-            {
-                editor::SceneActions::delete_entities(ctx, entity_selection.get_all());
-
-                entity_selection.clear();
-            }
-            if (!has_selection) ImGui::EndDisabled();
-
-            ImGui::SameLine();
-
-            // Copy selected entities
-            if (!has_selection) ImGui::BeginDisabled();
-            if (ImGui::Button("Copy"))
-            {
-                editor::SceneActions::copy_entities(ctx, entity_selection.get_all());
-            }
-            if (!has_selection) ImGui::EndDisabled();
-
-            ImGui::SameLine();
-
-            // Reparent selected entities
-            if (!has_multi_selection) ImGui::BeginDisabled();
-            if (ImGui::Button("Parent"))
-            {
-                editor::SceneActions::parent_entities(ctx, entity_selection.get_all());
-            }
-            if (!has_multi_selection) ImGui::EndDisabled();
-
-            ImGui::SameLine();
-
-            // Unparent selected entities (set them as roots)
-            if (!has_selection) ImGui::BeginDisabled();
-            if (ImGui::Button("Unparent"))
-            {
-                editor::SceneActions::unparent_entities(ctx, entity_selection.get_all());
-            }
-            if (!has_selection) ImGui::EndDisabled();
-
-            if (!allow_edit_actions)
-                ImGui::EndDisabled();
-
             const bool can_toggle = static_cast<bool>(ctx.event_queue);
-            ImGui::SameLine();
-            ImGui::Dummy(ImVec2(12.0f, 0.0f));
-            ImGui::SameLine();
             ImGui::TextUnformatted("Mode:");
             ImGui::SameLine();
             const ImVec4 mode_color = is_playing ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f)
@@ -120,13 +59,21 @@ namespace eeng::gui
                 ImGui::EndDisabled();
 
             const bool has_services = (ctx.services != nullptr);
-            int policy_choice = 0; // 0 = Game, 1 = Preview, 2 = Strict
+            int policy_choice = 0; // 0 = Game, 1 = Preview
             if (has_services
                 && ctx.services->play_mode_policy_override_enabled.load(std::memory_order_relaxed))
             {
                 const auto override_policy = ctx.services->play_mode_policy_override.load(
                     std::memory_order_relaxed);
-                policy_choice = (override_policy == PlayModePolicy::Strict) ? 2 : 1;
+                policy_choice = (override_policy == PlayModePolicy::Preview) ? 1 : 0;
+                if (override_policy == PlayModePolicy::Strict)
+                {
+                    // Strict mode is disabled for now; clamp any override to Preview.
+                    policy_choice = 1;
+                    ctx.services->play_mode_policy_override.store(
+                        PlayModePolicy::Preview,
+                        std::memory_order_relaxed);
+                }
             }
 
             ImGui::SameLine();
@@ -137,7 +84,7 @@ namespace eeng::gui
             ImGui::SetNextItemWidth(110.0f);
             if (!has_services)
                 ImGui::BeginDisabled();
-            if (ImGui::Combo("##PlayPolicy", &policy_choice, "Game\0Preview\0Strict\0"))
+            if (ImGui::Combo("##PlayPolicy", &policy_choice, "Game\0Preview\0"))
             {
                 if (policy_choice == 0)
                 {
@@ -149,7 +96,7 @@ namespace eeng::gui
                     ctx.services->play_mode_policy_override_enabled.store(
                         true, std::memory_order_relaxed);
                     ctx.services->play_mode_policy_override.store(
-                        (policy_choice == 2) ? PlayModePolicy::Strict : PlayModePolicy::Preview,
+                        PlayModePolicy::Preview,
                         std::memory_order_relaxed);
                 }
             }
@@ -246,6 +193,66 @@ namespace eeng::gui
             }
 
             if (is_playing)
+                ImGui::EndDisabled();
+
+            ImGui::Separator();
+
+            if (!allow_edit_actions)
+                ImGui::BeginDisabled();
+
+            // New entity
+            if (ImGui::Button("New"))
+            {
+                Entity entity_parent{};
+                if (has_selection)
+                    entity_parent = entity_selection.last();
+
+                editor::SceneActions::create_entity(ctx, entity_parent);
+            }
+
+            ImGui::SameLine();
+
+            // Destroy selected entities
+            if (!has_selection) ImGui::BeginDisabled();
+            if (ImGui::Button("Delete"))
+            {
+                editor::SceneActions::delete_entities(ctx, entity_selection.get_all());
+
+                entity_selection.clear();
+            }
+            if (!has_selection) ImGui::EndDisabled();
+
+            ImGui::SameLine();
+
+            // Copy selected entities
+            if (!has_selection) ImGui::BeginDisabled();
+            if (ImGui::Button("Copy"))
+            {
+                editor::SceneActions::copy_entities(ctx, entity_selection.get_all());
+            }
+            if (!has_selection) ImGui::EndDisabled();
+
+            ImGui::SameLine();
+
+            // Reparent selected entities
+            if (!has_multi_selection) ImGui::BeginDisabled();
+            if (ImGui::Button("Parent"))
+            {
+                editor::SceneActions::parent_entities(ctx, entity_selection.get_all());
+            }
+            if (!has_multi_selection) ImGui::EndDisabled();
+
+            ImGui::SameLine();
+
+            // Unparent selected entities (set them as roots)
+            if (!has_selection) ImGui::BeginDisabled();
+            if (ImGui::Button("Unparent"))
+            {
+                editor::SceneActions::unparent_entities(ctx, entity_selection.get_all());
+            }
+            if (!has_selection) ImGui::EndDisabled();
+
+            if (!allow_edit_actions)
                 ImGui::EndDisabled();
         }
     };
