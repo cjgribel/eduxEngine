@@ -150,6 +150,32 @@ namespace eeng::ecs
         std::vector<CollisionEvent> events;
     };
 
+    // Spring-damper between two bodies or a body and a world point.
+    struct SpringDamperComponent
+    {
+        // Optional second body; when use_world_point_b is true, entity_b is ignored.
+        EntityRef entity_b{};
+        bool use_world_point_b = false;
+        glm::vec3 world_point_b{ 0.0f };
+
+        // Anchors in local space of each body.
+        glm::vec3 local_anchor_a{ 0.0f };
+        glm::vec3 local_anchor_b{ 0.0f };
+
+        // Linear spring parameters.
+        float linear_stiffness = 0.0f;
+        float linear_damping = 0.0f;
+        float rest_length = 0.0f;
+
+        // Optional angular spring parameters (entity-to-entity only).
+        bool enable_angular = false;
+        float angular_stiffness = 0.0f;
+        float angular_damping = 0.0f;
+        glm::quat rest_rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+
+        bool enabled = true;
+    };
+
     // Debug-only ray record used by PhysicsRaycastDebugComponent.
     struct PhysicsRaycastDebugRay
     {
@@ -198,6 +224,11 @@ namespace eeng::ecs
         return "PhysicsEventsComponent";
     }
 
+    inline std::string to_string(const SpringDamperComponent&)
+    {
+        return "SpringDamperComponent";
+    }
+
     inline std::string to_string(const PhysicsRaycastDebugComponent&)
     {
         return "PhysicsRaycastDebugComponent";
@@ -239,6 +270,15 @@ namespace eeng::ecs
 
     template<typename Visitor>
     void visit_entity_refs(PhysicsEventsComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_asset_refs(SpringDamperComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_entity_refs(SpringDamperComponent& spring, Visitor&& visitor)
+    {
+        visitor(spring.entity_b);
+    }
 
     template<typename Visitor>
     void visit_asset_refs(PhysicsRaycastDebugComponent&, Visitor&&) {}

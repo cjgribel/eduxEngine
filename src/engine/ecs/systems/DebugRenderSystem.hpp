@@ -51,6 +51,13 @@ namespace eeng::ecs::systems
         float raycast_hit_normal_length = 0.25f;
         unsigned raycast_hit_point_size = 8;
 
+        // Spring-damper visualization.
+        bool show_springs = true;
+        std::uint32_t spring_color = 0xff323232u;
+        float spring_radius_outer = 0.1f;
+        float spring_radius_inner = 0.02f;
+        float spring_revs = 8.0f;
+
         // ShapeRenderer demo overlay (debug visualization).
         bool show_demo_shapes = true;
         glm::vec3 demo_shape_offset{ 0.0f, 0.0f, -5.0f };

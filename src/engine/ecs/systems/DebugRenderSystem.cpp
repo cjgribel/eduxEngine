@@ -144,7 +144,7 @@ namespace eeng::ecs::systems
                             renderer.pop_states<glm::mat4>();
                             break;
                         }
-                            break;
+                        break;
                         case ecs::ColliderType::Box:
                         case ecs::ColliderType::AABB:
                             renderer.push_AABB(-collider.half_extents, collider.half_extents);
@@ -212,6 +212,57 @@ namespace eeng::ecs::systems
             }
         }
 
+        // --- Spring-damper debug ------------------------------------------
+        if (settings.show_springs)
+        {
+            auto view = registry.view<ecs::TransformComponent, ecs::SpringDamperComponent>();
+            for (const auto entity : view)
+            {
+                const auto& tfm_a = view.get<ecs::TransformComponent>(entity);
+                const auto& spring = view.get<ecs::SpringDamperComponent>(entity);
+
+                if (!spring.enabled)
+                    continue;
+
+                const bool linear_active =
+                    (spring.linear_stiffness != 0.0f || spring.linear_damping != 0.0f);
+                if (!linear_active)
+                    continue;
+
+                glm::vec3 anchor_b{};
+                if (spring.use_world_point_b)
+                {
+                    anchor_b = spring.world_point_b;
+                }
+                else
+                {
+                    if (!spring.entity_b.is_bound())
+                        continue;
+                    const entt::entity entity_b = static_cast<entt::entity>(spring.entity_b.entity);
+                    if (!registry.valid(entity_b))
+                        continue;
+                    const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
+                    if (!tfm_b)
+                        continue;
+                    anchor_b = glm::vec3(tfm_b->world_matrix * glm::vec4(spring.local_anchor_b, 1.0f));
+                }
+
+                const glm::vec3 anchor_a =
+                    glm::vec3(tfm_a.world_matrix * glm::vec4(spring.local_anchor_a, 1.0f));
+
+                renderer.push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 3.0f });
+                renderer.push_states(ShapeRendering::Color4u{ settings.spring_color });
+                renderer.push_helix(
+                    anchor_a,
+                    anchor_b,
+                    settings.spring_radius_outer,
+                    settings.spring_radius_inner,
+                    settings.spring_revs);
+                renderer.pop_states<ShapeRendering::Color4u>();
+                renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
+            }
+        }
+
         // --- Raycast debug -------------------------------------------------
         if (settings.show_raycast_debug)
         {
@@ -230,20 +281,20 @@ namespace eeng::ecs::systems
                     renderer.push_line(ray.origin, ray_end);
                     renderer.pop_states<ShapeRendering::Color4u>();
 
-                if (!ray.hit)
-                    continue;
+                    if (!ray.hit)
+                        continue;
 
-                // Draw hit point and normal line when we have a hit.
-                renderer.push_states(ShapeRendering::Color4u{ settings.raycast_hit_color });
-                renderer.push_point(ray.hit_point, settings.raycast_hit_point_size);
-                renderer.pop_states<ShapeRendering::Color4u>();
+                    // Draw hit point and normal line when we have a hit.
+                    renderer.push_states(ShapeRendering::Color4u{ settings.raycast_hit_color });
+                    renderer.push_point(ray.hit_point, settings.raycast_hit_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
 
-                const float normal_len = settings.raycast_hit_normal_length;
-                renderer.push_states(ShapeRendering::Color4u{ settings.raycast_normal_color });
-                renderer.push_line(ray.hit_point,
-                    ray.hit_point + ray.hit_normal * normal_len);
-                renderer.pop_states<ShapeRendering::Color4u>();
-            }
+                    const float normal_len = settings.raycast_hit_normal_length;
+                    renderer.push_states(ShapeRendering::Color4u{ settings.raycast_normal_color });
+                    renderer.push_line(ray.hit_point,
+                        ray.hit_point + ray.hit_normal * normal_len);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+                }
 
                 // Clear cached rays after drawing so they only last one frame by default.
                 debug.rays.clear();

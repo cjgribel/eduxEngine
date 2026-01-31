@@ -49,6 +49,19 @@ namespace
         return btVector3(v.x * meters_per_unit, v.y * meters_per_unit, v.z * meters_per_unit);
     }
 
+    btVector3 to_bt_force(const glm::vec3& v, float units_per_meter)
+    {
+        const float meters_per_unit = units_per_meter > 0.0f ? 1.0f / units_per_meter : 1.0f;
+        return btVector3(v.x * meters_per_unit, v.y * meters_per_unit, v.z * meters_per_unit);
+    }
+
+    btVector3 to_bt_torque(const glm::vec3& v, float units_per_meter)
+    {
+        const float meters_per_unit = units_per_meter > 0.0f ? 1.0f / units_per_meter : 1.0f;
+        const float scale = meters_per_unit * meters_per_unit;
+        return btVector3(v.x * scale, v.y * scale, v.z * scale);
+    }
+
     // Convert Bullet-space vectors (meters) back to engine units.
     glm::vec3 from_bt_vec3(const btVector3& v, float units_per_meter)
     {
@@ -260,6 +273,7 @@ namespace eeng::ecs::systems
         event_entities_.clear();
         current_contacts_.clear();
         previous_contacts_.clear();
+        force_requests_.clear();
         batch_sync_requested_ = true;
 
         auto* registry = eeng::try_get_registry_ptr(ctx, "PhysicsSystem");
@@ -306,6 +320,7 @@ namespace eeng::ecs::systems
 
         bodies_.clear();
         dirty_entities_.clear();
+        force_requests_.clear();
         ctx_ = nullptr;
         world_.shutdown();
         initialized_ = false;
@@ -329,6 +344,9 @@ namespace eeng::ecs::systems
 
         // Push transforms for static/kinematic bodies into Bullet.
         sync_transforms_to_bullet(registry);
+
+        // Apply cached forces before stepping the simulation.
+        apply_force_requests();
 
         // Step the simulation.
         world_.step_simulation(delta_time);
@@ -808,6 +826,60 @@ namespace eeng::ecs::systems
         return true;
     }
 
+    void PhysicsSystem::submit_force(
+        entt::entity entity,
+        const glm::vec3& force,
+        const glm::vec3& point_world)
+    {
+        force_requests_.push_back(ForceRequest{
+            entity,
+            force,
+            point_world,
+            ForceRequest::Type::ForceAtPoint
+        });
+    }
+
+    void PhysicsSystem::submit_torque(
+        entt::entity entity,
+        const glm::vec3& torque)
+    {
+        force_requests_.push_back(ForceRequest{
+            entity,
+            torque,
+            glm::vec3(0.0f),
+            ForceRequest::Type::Torque
+        });
+    }
+
+    void PhysicsSystem::submit_impulse(
+        entt::entity entity,
+        const glm::vec3& impulse,
+        const glm::vec3& point_world)
+    {
+        force_requests_.push_back(ForceRequest{
+            entity,
+            impulse,
+            point_world,
+            ForceRequest::Type::ImpulseAtPoint
+        });
+    }
+
+    bool PhysicsSystem::get_body_state(entt::entity entity, BodyState& out_state) const
+    {
+        auto it = bodies_.find(entity);
+        if (it == bodies_.end() || !it->second.body)
+            return false;
+
+        const btRigidBody* body = it->second.body.get();
+        const btTransform& tfm = body->getWorldTransform();
+
+        out_state.position = from_bt_vec3(tfm.getOrigin(), settings_.units_per_meter);
+        out_state.rotation = glm::normalize(from_bt_quat(tfm.getRotation()));
+        out_state.linear_velocity = from_bt_vec3(body->getLinearVelocity(), settings_.units_per_meter);
+        out_state.angular_velocity = from_bt_dir3(body->getAngularVelocity());
+        return true;
+    }
+
     PhysicsSystem::BodyRuntime::ColliderRuntimeInfo
     PhysicsSystem::resolve_collider_info(
         const BodyRuntime& runtime,
@@ -821,6 +893,60 @@ namespace eeng::ecs::systems
             index = 0;
 
         return runtime.collider_info[static_cast<std::size_t>(index)];
+    }
+
+    void PhysicsSystem::apply_force_requests()
+    {
+        if (force_requests_.empty())
+            return;
+
+        auto* world = world_.world();
+        if (!world)
+        {
+            force_requests_.clear();
+            return;
+        }
+
+        for (const auto& request : force_requests_)
+        {
+            auto it = bodies_.find(request.entity);
+            if (it == bodies_.end() || !it->second.body)
+                continue;
+
+            btRigidBody* body = it->second.body.get();
+            if (!body || body->isStaticOrKinematicObject())
+                continue;
+
+            body->activate(true);
+
+            switch (request.type)
+            {
+            case ForceRequest::Type::ForceAtPoint:
+            {
+                const btVector3 force = to_bt_force(request.vector, settings_.units_per_meter);
+                const btVector3 point = to_bt_vec3(request.point, settings_.units_per_meter);
+                const btVector3 rel = point - body->getWorldTransform().getOrigin();
+                body->applyForce(force, rel);
+                break;
+            }
+            case ForceRequest::Type::Torque:
+            {
+                const btVector3 torque = to_bt_torque(request.vector, settings_.units_per_meter);
+                body->applyTorque(torque);
+                break;
+            }
+            case ForceRequest::Type::ImpulseAtPoint:
+            {
+                const btVector3 impulse = to_bt_force(request.vector, settings_.units_per_meter);
+                const btVector3 point = to_bt_vec3(request.point, settings_.units_per_meter);
+                const btVector3 rel = point - body->getWorldTransform().getOrigin();
+                body->applyImpulse(impulse, rel);
+                break;
+            }
+            }
+        }
+
+        force_requests_.clear();
     }
 
     void PhysicsSystem::clear_contact_events(entt::registry& registry)

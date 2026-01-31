@@ -83,6 +83,14 @@ namespace eeng::ecs::systems
             bool is_trigger = false;
         };
 
+        struct BodyState
+        {
+            glm::vec3 position{ 0.0f };
+            glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+            glm::vec3 linear_velocity{ 0.0f };
+            glm::vec3 angular_velocity{ 0.0f };
+        };
+
         PhysicsSystem() = default;
         ~PhysicsSystem();
 
@@ -110,6 +118,17 @@ namespace eeng::ecs::systems
         {
             return raycast(origin, direction, max_distance, out_hit, RaycastFilter{});
         }
+
+        void submit_force(entt::entity entity,
+            const glm::vec3& force,
+            const glm::vec3& point_world);
+        void submit_torque(entt::entity entity,
+            const glm::vec3& torque);
+        void submit_impulse(entt::entity entity,
+            const glm::vec3& impulse,
+            const glm::vec3& point_world);
+
+        bool get_body_state(entt::entity entity, BodyState& out_state) const;
 
     private:
         struct RaycastCallback;
@@ -197,6 +216,21 @@ namespace eeng::ecs::systems
         // Contact buffers for enter/stay/exit classification (kept to avoid per-frame allocations).
         std::unordered_map<ContactKey, ContactInfo, ContactKeyHash> current_contacts_;
         std::unordered_map<ContactKey, ContactInfo, ContactKeyHash> previous_contacts_;
+        struct ForceRequest
+        {
+            enum class Type
+            {
+                ForceAtPoint,
+                Torque,
+                ImpulseAtPoint
+            };
+
+            entt::entity entity{ entt::null };
+            glm::vec3 vector{ 0.0f };
+            glm::vec3 point{ 0.0f };
+            Type type = Type::ForceAtPoint;
+        };
+        std::vector<ForceRequest> force_requests_;
         // Set when batch load/unload completes to force a structural sync on the next update.
         bool batch_sync_requested_ = false;
         bool initialized_ = false;
@@ -215,6 +249,7 @@ namespace eeng::ecs::systems
         void sync_bodies(entt::registry& registry, EngineContext& ctx);
         void sync_transforms_to_bullet(entt::registry& registry);
         void sync_transforms_from_bullet(entt::registry& registry);
+        void apply_force_requests();
         void clear_contact_events(entt::registry& registry);
         void emit_contact_events(entt::registry& registry, EngineContext& ctx);
         // Resolve collider metadata from a compound part id (defaults to index 0).
