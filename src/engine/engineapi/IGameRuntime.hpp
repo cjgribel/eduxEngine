@@ -5,6 +5,7 @@
 
 #include "engineapi/OverlayViewState.hpp"
 #include "engineapi/PlayModePolicy.hpp"
+#include "engineapi/RenderContext.hpp"
 #include <string>
 #include <vector>
 
@@ -59,6 +60,35 @@ namespace eeng
         virtual void render_play(float time_s, int windowWidth, int windowHeight)
         {
             render(time_s, windowWidth, windowHeight);
+        }
+
+        /// @brief Render the main scene. Defaults to the mode-specific render_*.
+        virtual void render_scene(const RenderContext& ctx)
+        {
+            if (ctx.mode == RenderMode::Play)
+                render_play(ctx.time_s, ctx.window_width, ctx.window_height);
+            else
+                render_edit(ctx.time_s, ctx.window_width, ctx.window_height);
+        }
+
+        /// @brief Submit overlay/debug draw calls (ShapeRenderer, gizmos, etc).
+        virtual void render_overlay(const RenderContext& ctx)
+        {
+            (void)ctx;
+        }
+
+        /// @brief Submit GUI draw calls (ImGui windows, HUD, etc).
+        virtual void render_gui(const RenderContext& ctx)
+        {
+            (void)ctx;
+        }
+
+        /// @brief Run the standard render phases in order (scene, overlay, GUI).
+        void render_frame(const RenderContext& ctx)
+        {
+            render_scene(ctx);
+            render_overlay(ctx);
+            render_gui(ctx);
         }
 
         /// @brief Return the preferred play policy for this runtime (app may override).

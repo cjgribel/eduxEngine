@@ -1,5 +1,6 @@
 // ReferenceGame is a minimal stub kept in sync with the evolving engine API.
-// It demonstrates Strict play-mode hooks without depending on any gameplay code.
+// It demonstrates Strict play-mode hooks and render-phase structure without
+// depending on any gameplay code.
 
 #include "ReferenceGame.hpp"
 #include "BatchRegistry.hpp"
@@ -42,6 +43,32 @@ namespace eeng::reference_game
     void ReferenceGame::render(float time_s, int windowWidth, int windowHeight)
     {
         (void)time_s;
+        // Legacy render entry point: keep the overlay view in sync even if a
+        // caller bypasses render_frame/render_overlay.
+        publish_overlay_view(windowWidth, windowHeight);
+    }
+
+    void ReferenceGame::render_scene(const RenderContext& ctx)
+    {
+        // Scene rendering would typically call RuntimePipeline::render_entities()
+        // plus any game-specific renderers. ReferenceGame renders nothing.
+        (void)ctx;
+    }
+
+    void ReferenceGame::render_overlay(const RenderContext& ctx)
+    {
+        // Provide a view for editor overlays (gizmos, debug shapes).
+        publish_overlay_view(ctx.window_width, ctx.window_height);
+    }
+
+    void ReferenceGame::render_gui(const RenderContext& ctx)
+    {
+        // Games can submit ImGui windows or HUD here.
+        (void)ctx;
+    }
+
+    void ReferenceGame::publish_overlay_view(int windowWidth, int windowHeight)
+    {
         if (!ctx_ || !ctx_->overlay_view_state)
             return;
 

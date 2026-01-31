@@ -9,6 +9,7 @@
 #include "editor/ProjectConfig.hpp"
 #include "EngineContext.hpp"
 #include "engineapi/IGameRuntime.hpp"
+#include "engineapi/RenderContext.hpp"
 #include "LogMacros.h"
 #include <glm/glm.hpp>
 #include <atomic>
@@ -147,7 +148,15 @@ namespace eeng::editor
         void render_edit(float time_s, int windowWidth, int windowHeight) override
         {
             if (runtime_)
-                runtime_->render_edit(time_s, windowWidth, windowHeight);
+            {
+                RenderContext render_ctx{
+                    time_s,
+                    windowWidth,
+                    windowHeight,
+                    eeng::RenderMode::Edit
+                };
+                runtime_->render_frame(render_ctx);
+            }
             if (ctx_ && ctx_->gui_manager)
                 ctx_->gui_manager->draw(*ctx_);
             last_window_size_ = glm::ivec2(windowWidth, windowHeight);
@@ -157,7 +166,15 @@ namespace eeng::editor
         void render_play(float time_s, int windowWidth, int windowHeight) override
         {
             if (runtime_)
-                runtime_->render_play(time_s, windowWidth, windowHeight);
+            {
+                RenderContext render_ctx{
+                    time_s,
+                    windowWidth,
+                    windowHeight,
+                    eeng::RenderMode::Play
+                };
+                runtime_->render_frame(render_ctx);
+            }
             if (ctx_ && ctx_->gui_manager)
                 ctx_->gui_manager->draw(*ctx_);
             last_window_size_ = glm::ivec2(windowWidth, windowHeight);

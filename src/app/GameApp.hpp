@@ -5,6 +5,7 @@
 
 #include "engineapi/IApp.hpp"
 #include "engineapi/IGameRuntime.hpp"
+#include "engineapi/RenderContext.hpp"
 #include <memory>
 #include <type_traits>
 
@@ -67,14 +68,28 @@ namespace eeng
 
         void render_edit(float time_s, int windowWidth, int windowHeight) override
         {
-            if (runtime_)
-                runtime_->render_edit(time_s, windowWidth, windowHeight);
+            if (!runtime_)
+                return;
+            RenderContext render_ctx{
+                time_s,
+                windowWidth,
+                windowHeight,
+                RenderMode::Edit
+            };
+            runtime_->render_frame(render_ctx);
         }
 
         void render_play(float time_s, int windowWidth, int windowHeight) override
         {
-            if (runtime_)
-                runtime_->render_play(time_s, windowWidth, windowHeight);
+            if (!runtime_)
+                return;
+            RenderContext render_ctx{
+                time_s,
+                windowWidth,
+                windowHeight,
+                RenderMode::Play
+            };
+            runtime_->render_frame(render_ctx);
         }
 
         PlayModePolicy play_policy() const override
