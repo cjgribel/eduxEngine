@@ -10,7 +10,7 @@
 - [ ] Forces. Apply before physics update? See Forces.hpp/cpp & MouseForce3dComponent + MouseForce3dSystem in oengine.
 
 ### Later
-- [ ] BodyRuntime allocations -> RigidBodyRuntimePool
+- [ ] (Optimization) BodyRuntime allocations -> RigidBodyRuntimePool
 
 # Possible simple games & game systems
 
