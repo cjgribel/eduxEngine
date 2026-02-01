@@ -102,6 +102,8 @@ namespace eeng::ecs::systems
         void reset_for_world(EngineContext& ctx);
 
         void update(entt::registry& registry, EngineContext& ctx, float delta_time);
+        // Edit-mode update: rebuild bodies/COM/inertia without stepping the simulation.
+        void update_edit(entt::registry& registry, EngineContext& ctx);
         // Query a lightweight snapshot of Bullet + ECS counters for UI display.
         PhysicsStats get_stats() const;
         // Raycast against the Bullet world (direction is normalized internally).
@@ -150,6 +152,9 @@ namespace eeng::ecs::systems
             // Bullet stores raw pointers to these objects; we own them and must keep them alive.
             std::unique_ptr<btDefaultMotionState> motion_state;
             std::unique_ptr<btRigidBody> body;
+            // Body-local transform from COM/principal axes to the authoring pivot.
+            btTransform com_local = btTransform::getIdentity();
+            btTransform com_local_inverse = btTransform::getIdentity();
             // Cached component state so we can rebuild when key properties change.
             ecs::PhysicsMotionType motion = ecs::PhysicsMotionType::Dynamic;
             glm::vec3 scale{ 1.0f };

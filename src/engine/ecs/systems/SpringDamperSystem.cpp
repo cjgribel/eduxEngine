@@ -54,8 +54,9 @@ namespace eeng::ecs::systems
                     continue;
             }
 
-            const glm::vec3 anchor_a =
-                glm::vec3(tfm_a.world_matrix * glm::vec4(spring.local_anchor_a, 1.0f));
+            const glm::vec3 anchor_a = (spring.anchor_space_a == ecs::SpringAnchorSpace::Body)
+                ? state_a.position + (state_a.rotation * (spring.local_anchor_a * tfm_a.scale))
+                : glm::vec3(tfm_a.world_matrix * glm::vec4(spring.local_anchor_a, 1.0f));
             glm::vec3 anchor_b{};
             if (spring.use_world_point_b)
             {
@@ -64,7 +65,9 @@ namespace eeng::ecs::systems
             else
             {
                 const auto& tfm_b = registry.get<ecs::TransformComponent>(entity_b);
-                anchor_b = glm::vec3(tfm_b.world_matrix * glm::vec4(spring.local_anchor_b, 1.0f));
+                anchor_b = (spring.anchor_space_b == ecs::SpringAnchorSpace::Body)
+                    ? state_b.position + (state_b.rotation * (spring.local_anchor_b * tfm_b.scale))
+                    : glm::vec3(tfm_b.world_matrix * glm::vec4(spring.local_anchor_b, 1.0f));
             }
 
             const glm::vec3 rel_a = anchor_a - state_a.position;

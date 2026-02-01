@@ -11,12 +11,15 @@
 #include "ecs/TransformComponent.hpp"
 #include "engineapi/EngineContextHelpers.hpp"
 #include "editor/AssignFieldCommand.hpp"
+#include "physics/MassProperties.hpp"
+#include "assets/types/ModelAssets.hpp"
 #include <btBulletDynamicsCommon.h>
 
 #include <algorithm>
 #include <cmath>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -91,6 +94,181 @@ namespace
         return (scale.x + scale.y + scale.z) / 3.0f;
     }
 
+    // Convert glm vectors directly into Bullet without unit scaling.
+    btVector3 to_bt_vec3_raw(const glm::vec3& v)
+    {
+        return btVector3(v.x, v.y, v.z);
+    }
+
+    // Check if a Bullet quaternion is close to identity.
+    bool is_identity_quat(const btQuaternion& q)
+    {
+        constexpr float kEpsilon = 1e-4f;
+        if (std::abs(q.w() - 1.0f) > kEpsilon)
+            return false;
+        return std::abs(q.x()) <= kEpsilon
+            && std::abs(q.y()) <= kEpsilon
+            && std::abs(q.z()) <= kEpsilon;
+    }
+
+    // Check if a COM transform is effectively identity (no offset/rotation).
+    bool is_identity_com(const glm::vec3& position, const btQuaternion& rotation)
+    {
+        constexpr float kEpsilon = 1e-4f;
+        const float pos_len = std::sqrt(
+            position.x * position.x
+            + position.y * position.y
+            + position.z * position.z);
+        if (pos_len > kEpsilon)
+            return false;
+        return is_identity_quat(rotation);
+    }
+
+    // Diagonalize a symmetric inertia tensor.
+    // Returns a rotation matrix (body->pivot) and the diagonal inertia in that frame.
+    bool diagonalize_inertia(const glm::mat3& inertia,
+        btMatrix3x3& out_rotation,
+        btVector3& out_diagonal)
+    {
+        const float trace = inertia[0][0] + inertia[1][1] + inertia[2][2];
+        if (!std::isfinite(trace) || std::abs(trace) <= 1e-8f)
+            return false;
+
+        // glm is column-major; btMatrix3x3 expects row-major.
+        btMatrix3x3 inertia_bt(
+            inertia[0][0], inertia[1][0], inertia[2][0],
+            inertia[0][1], inertia[1][1], inertia[2][1],
+            inertia[0][2], inertia[1][2], inertia[2][2]);
+
+        btMatrix3x3 rotation;
+        inertia_bt.diagonalize(rotation, btScalar(1e-6f), 20);
+        const btMatrix3x3 diag = rotation.transpose() * inertia_bt * rotation;
+
+        out_rotation = rotation;
+        out_diagonal = btVector3(diag[0][0], diag[1][1], diag[2][2]);
+        return true;
+    }
+
+    std::optional<eeng::physics::MassProperties3d> compute_collider_mass_properties(
+        const eeng::ecs::ColliderDesc& collider,
+        const glm::vec3& entity_scale,
+        float units_per_meter,
+        eeng::EngineContext& ctx,
+        float density)
+    {
+        const float meters_per_unit = units_per_meter > 0.0f ? 1.0f / units_per_meter : 1.0f;
+        const glm::vec3 scale_m = entity_scale * meters_per_unit;
+        const float scale_u = uniform_scale(entity_scale) * meters_per_unit;
+
+        eeng::physics::MassProperties3d props{};
+        bool has_props = false;
+
+        switch (collider.type)
+        {
+        case eeng::ecs::ColliderType::Box:
+        case eeng::ecs::ColliderType::AABB:
+        {
+            const glm::vec3 half_extents = collider.half_extents * scale_m;
+            props = eeng::physics::mass_properties_box(half_extents, density);
+            has_props = true;
+            break;
+        }
+        case eeng::ecs::ColliderType::Sphere:
+        {
+            const float radius = std::max(0.0f, collider.radius * scale_u);
+            props = eeng::physics::mass_properties_sphere(radius, density);
+            has_props = true;
+            break;
+        }
+        case eeng::ecs::ColliderType::Capsule:
+        {
+            const float radius = std::max(0.0f, collider.radius * scale_u);
+            const float height = std::max(0.0f, collider.height * scale_u);
+            props = eeng::physics::mass_properties_capsule_z(radius, height, density);
+            has_props = true;
+            break;
+        }
+        case eeng::ecs::ColliderType::ConvexHull:
+        {
+            auto* rm = eeng::try_get_resource_manager_ptr(ctx, "PhysicsSystem");
+            if (!rm)
+                break;
+
+            bool read_ok = eeng::try_read_asset_ref(
+                *rm,
+                collider.mesh_ref,
+                ctx,
+                "PhysicsSystem",
+                "Missing ModelDataAsset for convex hull collider.",
+                [&](const eeng::assets::ModelDataAsset& model)
+                {
+                    const int sm_index = collider.submesh_index >= 0
+                        ? collider.submesh_index
+                        : 0;
+                    if (sm_index < 0
+                        || sm_index >= static_cast<int>(model.submeshes.size()))
+                        return;
+
+                    const auto& sm = model.submeshes[static_cast<std::size_t>(sm_index)];
+                    if (sm.nbr_vertices == 0 || sm.nbr_indices == 0)
+                        return;
+                    if (sm.base_vertex + sm.nbr_vertices > model.positions.size())
+                        return;
+                    if (sm.base_index + sm.nbr_indices > model.indices.size())
+                        return;
+
+                    std::vector<glm::vec3> vertices;
+                    vertices.reserve(sm.nbr_vertices);
+                    for (std::size_t i = 0; i < sm.nbr_vertices; ++i)
+                    {
+                        vertices.push_back(model.positions[sm.base_vertex + i] * scale_m);
+                    }
+
+                    std::vector<std::uint32_t> indices;
+                    indices.reserve(sm.nbr_indices);
+                    for (std::size_t i = 0; i < sm.nbr_indices; ++i)
+                    {
+                        indices.push_back(model.indices[sm.base_index + i]);
+                    }
+
+                    props = eeng::physics::mass_properties_convex_mesh(
+                        vertices.data(),
+                        vertices.size(),
+                        indices.data(),
+                        indices.size(),
+                        density);
+                    has_props = (props.mass > 0.0f);
+                });
+            (void)read_ok;
+
+            // If mesh data is unavailable, fall back to a simple box.
+            if (!has_props)
+            {
+                const glm::vec3 half_extents = collider.half_extents * scale_m;
+                props = eeng::physics::mass_properties_box(half_extents, density);
+                has_props = true;
+            }
+            break;
+        }
+        case eeng::ecs::ColliderType::TriangleMesh:
+        default:
+        {
+            // Triangle meshes may be non-convex; use a conservative box approximation for now.
+            const glm::vec3 half_extents = collider.half_extents * scale_m;
+            props = eeng::physics::mass_properties_box(half_extents, density);
+            has_props = true;
+            break;
+        }
+        }
+
+        if (!has_props)
+            return std::nullopt;
+
+        // Move inertia/COM into the entity pivot frame.
+        const glm::vec3 local_pos = collider.local_position * entity_scale * meters_per_unit;
+        props = eeng::physics::transform_mass_properties(props, local_pos, collider.local_rotation);
+        return props;
+    }
     // Check if a collider has an identity local transform (used to skip compound shapes).
     bool is_identity_collider_transform(const eeng::ecs::ColliderDesc& collider)
     {
@@ -358,6 +536,19 @@ namespace eeng::ecs::systems
         sync_transforms_from_bullet(registry);
     }
 
+    void PhysicsSystem::update_edit(entt::registry& registry, EngineContext& ctx)
+    {
+        if (!initialized_)
+            return;
+
+        // In edit mode we only rebuild bodies/COM/inertia; no stepping or force application.
+        if (batch_sync_requested_ || !dirty_entities_.empty())
+        {
+            sync_bodies(registry, ctx);
+            batch_sync_requested_ = false;
+        }
+    }
+
     PhysicsSystem::PhysicsStats PhysicsSystem::get_stats() const
     {
         PhysicsStats stats{};
@@ -478,7 +669,7 @@ namespace eeng::ecs::systems
             return false;
 
         const auto& tfm = registry.get<ecs::TransformComponent>(entity);
-        const auto& rb = registry.get<ecs::RigidBodyComponent>(entity);
+        auto& rb = registry.get<ecs::RigidBodyComponent>(entity);
         const auto& colliders = registry.get<ecs::ColliderComponent>(entity);
 
         if (colliders.colliders.empty())
@@ -491,12 +682,136 @@ namespace eeng::ecs::systems
             return false;
         }
 
+        // Compute unit-density mass properties for COM and inertia.
+        // We prefer analytic formulas and aggregate them with the parallel axis theorem.
+        physics::MassProperties3d unit_props{};
+        auto accumulate_props = [&](bool include_triggers)
+        {
+            bool has_props = false;
+            for (const auto& collider : colliders.colliders)
+            {
+                if (!include_triggers && collider.is_trigger)
+                    continue;
+
+                auto props_opt = compute_collider_mass_properties(
+                    collider,
+                    tfm.scale,
+                    settings_.units_per_meter,
+                    ctx,
+                    1.0f);
+                if (!props_opt)
+                    continue;
+
+                if (!has_props)
+                {
+                    unit_props = *props_opt;
+                    has_props = true;
+                }
+                else
+                {
+                    unit_props = physics::combine(unit_props, *props_opt);
+                }
+            }
+            return has_props;
+        };
+
+        // Prefer solid colliders for mass; fall back to triggers if needed.
+        if (!accumulate_props(false))
+            accumulate_props(true);
+
+        const bool is_dynamic = (rb.motion == ecs::PhysicsMotionType::Dynamic);
+        const bool is_kinematic = (rb.motion == ecs::PhysicsMotionType::Kinematic);
+
+        const float unit_mass = unit_props.mass;
+        // COM is already in Bullet space (meters) because inputs were scaled before aggregation.
+        const glm::vec3 com_local_pos = unit_props.center_of_mass;
+
+        float mass = is_dynamic ? rb.mass : 0.0f;
+        if (is_dynamic)
+        {
+            if (rb.auto_mass)
+            {
+                // Unit-density mass scales linearly with density.
+                mass = unit_mass * rb.density;
+            }
+
+            if (mass <= 0.0f)
+            {
+                // Safety fallback to keep Bullet stable if the mass is invalid.
+                mass = rb.mass > 0.0f ? rb.mass : 1.0f;
+            }
+
+            if (rb.auto_mass)
+                rb.mass = mass;
+        }
+
+        const float mass_scale = (unit_mass > 0.0f && mass > 0.0f)
+            ? (mass / unit_mass)
+            : 0.0f;
+
+        // Principal axes rotation for the inertia tensor (body->pivot).
+        btMatrix3x3 principal_rotation;
+        principal_rotation.setIdentity();
+        btVector3 inertia_diag_unit(0.0f, 0.0f, 0.0f);
+        const bool has_principal = rb.auto_inertia
+            && diagonalize_inertia(unit_props.inertia, principal_rotation, inertia_diag_unit);
+
+        btQuaternion com_rotation(0.0f, 0.0f, 0.0f, 1.0f);
+        if (has_principal)
+            principal_rotation.getRotation(com_rotation);
+
+        // Cache COM/principal axes in component space (engine units) for debug/inspection.
+        rb.com_local_position = com_local_pos * settings_.units_per_meter;
+        rb.com_local_rotation = glm::normalize(from_bt_quat(com_rotation));
+
+        btVector3 inertia_diag(0.0f, 0.0f, 0.0f);
+        if (is_dynamic && mass > 0.0f)
+        {
+            if (rb.auto_inertia && has_principal && mass_scale > 0.0f)
+            {
+                // Inertia scales linearly with mass for a fixed geometry.
+                inertia_diag = inertia_diag_unit * mass_scale;
+                // Editor-friendly: store the computed diagonal in engine units for inspection.
+                const float units_per_meter = settings_.units_per_meter > 0.0f
+                    ? settings_.units_per_meter
+                    : 1.0f;
+                const float scale = units_per_meter * units_per_meter;
+                rb.inertia = glm::vec3(
+                    inertia_diag.x() * scale,
+                    inertia_diag.y() * scale,
+                    inertia_diag.z() * scale);
+            }
+            else if (!rb.auto_inertia)
+            {
+                // Manual inertia is stored in engine units; convert to meters^2.
+                const float meters_per_unit = settings_.units_per_meter > 0.0f
+                    ? 1.0f / settings_.units_per_meter
+                    : 1.0f;
+                const float scale = meters_per_unit * meters_per_unit;
+                inertia_diag = btVector3(
+                    rb.inertia.x * scale,
+                    rb.inertia.y * scale,
+                    rb.inertia.z * scale);
+            }
+        }
+        // Guard against small negative diagonals from numerical noise.
+        inertia_diag = btVector3(
+            std::max(0.0f, inertia_diag.x()),
+            std::max(0.0f, inertia_diag.y()),
+            std::max(0.0f, inertia_diag.z()));
+
         BodyRuntime runtime{};
-        // Optimization: skip btCompoundShape when a single collider has an identity local transform.
+        runtime.com_local.setIdentity();
+        runtime.com_local.setOrigin(to_bt_vec3_raw(com_local_pos));
+        runtime.com_local.setRotation(com_rotation);
+        runtime.com_local_inverse = runtime.com_local.inverse();
+
+        // Optimization: skip btCompoundShape only when both collider and COM are identity.
         const bool single_collider = (colliders.colliders.size() == 1);
         const bool single_identity =
             single_collider && is_identity_collider_transform(colliders.colliders.front());
-        const bool use_compound = !single_identity;
+        const bool com_identity = is_identity_com(com_local_pos, com_rotation);
+        const bool use_compound = !(single_collider && single_identity && com_identity);
 
         if (use_compound)
             runtime.compound_shape = std::make_unique<btCompoundShape>();
@@ -519,7 +834,9 @@ namespace eeng::ecs::systems
                 local.setOrigin(to_bt_vec3(collider.local_position * tfm.scale, settings_.units_per_meter));
                 local.setRotation(to_bt_quat(collider.local_rotation));
 
-                runtime.compound_shape->addChildShape(local, shape.get());
+                // Shift the child into COM/principal-axis space for a stable body frame.
+                const btTransform shifted = runtime.com_local_inverse * local;
+                runtime.compound_shape->addChildShape(shifted, shape.get());
                 runtime.child_shapes.emplace_back(std::move(shape));
                 // Track collider metadata by child index so contact events can resolve ids.
                 runtime.collider_info.push_back(
@@ -550,15 +867,13 @@ namespace eeng::ecs::systems
 
         // Initial world transform uses current ECS local position/rotation.
         // Note: this ignores parent transforms for now; we handle hierarchy later.
-        btTransform start_transform;
-        start_transform.setIdentity();
-        start_transform.setOrigin(to_bt_vec3(tfm.position, settings_.units_per_meter));
-        start_transform.setRotation(to_bt_quat(tfm.rotation));
+        btTransform pivot_transform;
+        pivot_transform.setIdentity();
+        pivot_transform.setOrigin(to_bt_vec3(tfm.position, settings_.units_per_meter));
+        pivot_transform.setRotation(to_bt_quat(tfm.rotation));
 
+        const btTransform start_transform = pivot_transform * runtime.com_local;
         runtime.motion_state = std::make_unique<btDefaultMotionState>(start_transform);
-
-        const bool is_dynamic = (rb.motion == ecs::PhysicsMotionType::Dynamic);
-        const bool is_kinematic = (rb.motion == ecs::PhysicsMotionType::Kinematic);
 
         btCollisionShape* collision_shape = runtime.compound_shape
             ? static_cast<btCollisionShape*>(runtime.compound_shape.get())
@@ -566,25 +881,11 @@ namespace eeng::ecs::systems
         if (!collision_shape)
             return false;
 
-        float mass = is_dynamic ? rb.mass : 0.0f;
-        if (is_dynamic && rb.auto_mass)
-        {
-            // Auto-mass is not computed yet; keep a reasonable non-zero default.
-            mass = rb.mass > 0.0f ? rb.mass : 1.0f;
-        }
-
-        btVector3 inertia(0.0f, 0.0f, 0.0f);
-        if (is_dynamic && mass > 0.0f)
-        {
-            // For now, rely on Bullet's shape-based inertia.
-            collision_shape->calculateLocalInertia(mass, inertia);
-        }
-
         btRigidBody::btRigidBodyConstructionInfo info(
             mass,
             runtime.motion_state.get(),
             collision_shape,
-            inertia);
+            inertia_diag);
 
         runtime.body = std::make_unique<btRigidBody>(info);
 
@@ -687,9 +988,11 @@ namespace eeng::ecs::systems
             transform.setOrigin(to_bt_vec3(tfm->position, settings_.units_per_meter));
             transform.setRotation(to_bt_quat(tfm->rotation));
 
-            runtime.body->setWorldTransform(transform);
-            runtime.body->getMotionState()->setWorldTransform(transform);
-            runtime.body->setInterpolationWorldTransform(transform);
+            // Body lives at COM/principal axes; pivot is the authoring transform.
+            const btTransform body_transform = transform * runtime.com_local;
+            runtime.body->setWorldTransform(body_transform);
+            runtime.body->getMotionState()->setWorldTransform(body_transform);
+            runtime.body->setInterpolationWorldTransform(body_transform);
             // Avoid carrying velocities on kinematic/static bodies.
             runtime.body->setLinearVelocity(btVector3(0.0f, 0.0f, 0.0f));
             runtime.body->setAngularVelocity(btVector3(0.0f, 0.0f, 0.0f));
@@ -717,12 +1020,15 @@ namespace eeng::ecs::systems
             if (!runtime.body->isActive())
                 continue;
 
-            btTransform transform;
-            runtime.body->getMotionState()->getWorldTransform(transform);
+            btTransform body_transform;
+            runtime.body->getMotionState()->getWorldTransform(body_transform);
+
+            // Convert from COM/principal-axes frame back to the authoring pivot.
+            const btTransform pivot_transform = body_transform * runtime.com_local_inverse;
 
             // Write back into local transforms (hierarchy handling comes later).
-            tfm->position = from_bt_vec3(transform.getOrigin(), settings_.units_per_meter);
-            tfm->rotation = glm::normalize(from_bt_quat(transform.getRotation()));
+            tfm->position = from_bt_vec3(pivot_transform.getOrigin(), settings_.units_per_meter);
+            tfm->rotation = glm::normalize(from_bt_quat(pivot_transform.getRotation()));
             tfm->mark_local_dirty();
         }
     }

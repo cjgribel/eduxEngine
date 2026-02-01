@@ -33,8 +33,6 @@ namespace eeng::gui
 
         void draw()
         {
-            draw_mode_row();
-            ImGui::Separator();
             draw_scene_actions_row();
         }
 

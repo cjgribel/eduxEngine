@@ -745,6 +745,7 @@ namespace eeng
             using PhysicsMotionType = eeng::ecs::PhysicsMotionType;
             using ColliderType = eeng::ecs::ColliderType;
             using ContactPhase = eeng::ecs::ContactPhase;
+            using SpringAnchorSpace = eeng::ecs::SpringAnchorSpace;
 
             auto motion_type_info = TypeMetaInfo
             {
@@ -823,6 +824,26 @@ namespace eeng
                 ;
             meta::register_type<ContactPhase>();
             warm_start_meta_type<ContactPhase>();
+
+            auto anchor_space_info = TypeMetaInfo
+            {
+                .id = "eeng.ecs.SpringAnchorSpace",
+                .name = "SpringAnchorSpace",
+                .tooltip = "Anchor space (Transform vs Body COM).",
+                .underlying_type = entt::resolve<std::underlying_type_t<SpringAnchorSpace>>()
+            };
+            entt::meta_factory<SpringAnchorSpace>()
+                .custom<TypeMetaInfo>(anchor_space_info)
+                .traits(MetaFlags::none)
+                .data<SpringAnchorSpace::Transform>("Transform"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Transform", "Anchor in authoring transform space." })
+                .traits(MetaFlags::none)
+                .data<SpringAnchorSpace::Body>("Body"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Body", "Anchor in body COM/principal-axes space." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<SpringAnchorSpace>();
+            warm_start_meta_type<SpringAnchorSpace>();
         }
 
         // --- Physics helper types ------------------------------------------
@@ -905,7 +926,10 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "auto_mass", "Auto Mass", "Compute mass from colliders." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::RigidBodyComponent::mass>("mass"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "mass", "Mass", "Mass override." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "mass", "Mass", "Mass (computed when Auto Mass is enabled)." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::RigidBodyComponent::density>("density"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "density", "Density", "Density used for auto-mass (kg/m^3)." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::RigidBodyComponent::auto_inertia>("auto_inertia"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "auto_inertia", "Auto Inertia", "Compute inertia from colliders." })
@@ -934,6 +958,8 @@ namespace eeng
                 .data<&eeng::ecs::RigidBodyComponent::ccd_motion_threshold>("ccd_motion_threshold"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "ccd_motion_threshold", "CCD Threshold", "CCD motion threshold." })
                 .traits(MetaFlags::none)
+                .func<&eeng::editor::inspect_RigidBodyComponent>(eeng::literals::inspect_hs)
+                .template custom<FuncMetaInfo>(FuncMetaInfo{ "inspect_RigidBodyComponent", "Inspect rigid body component" })
 
                 ;
             register_component<ecs::RigidBodyComponent>();
@@ -997,6 +1023,12 @@ namespace eeng
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SpringDamperComponent::local_anchor_b>("local_anchor_b"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "local_anchor_b", "Local Anchor B", "Anchor in body B local space." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::SpringDamperComponent::anchor_space_a>("anchor_space_a"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "anchor_space_a", "Anchor Space A", "Local anchor space for body A." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::SpringDamperComponent::anchor_space_b>("anchor_space_b"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "anchor_space_b", "Anchor Space B", "Local anchor space for body B." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SpringDamperComponent::linear_stiffness>("linear_stiffness"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "linear_stiffness", "Linear Stiffness", "Linear spring stiffness." })

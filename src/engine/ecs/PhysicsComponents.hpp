@@ -49,6 +49,13 @@ namespace eeng::ecs
         Exit
     };
 
+    // Spring anchor space policy (authoring pivot vs. body COM/principal axes).
+    enum class SpringAnchorSpace : std::uint8_t
+    {
+        Transform,
+        Body
+    };
+
     // Material parameters shared across colliders.
     struct PhysicsMaterial
     {
@@ -97,10 +104,19 @@ namespace eeng::ecs
         PhysicsMotionType motion = PhysicsMotionType::Dynamic;
 
         bool auto_mass = true;
+        // Mass in kg. When auto_mass is true, this is recomputed from collider volume * density.
         float mass = 1.0f;
+        // Density used for auto_mass (kg per cubic meter in engine units).
+        float density = 1.0f;
 
         bool auto_inertia = true;
+        // Inertia diagonal in local body axes, in kg * (units^2) (auto_inertia recomputes it).
         glm::vec3 inertia{ 1.0f };
+
+        // Computed center of mass offset (pivot -> COM) in local authoring units.
+        glm::vec3 com_local_position{ 0.0f };
+        // Computed principal-axes rotation (body -> pivot). Identity when auto_inertia is off.
+        glm::quat com_local_rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
 
         float linear_damping = 0.0f;
         float angular_damping = 0.0f;
@@ -161,6 +177,8 @@ namespace eeng::ecs
         // Anchors in local space of each body.
         glm::vec3 local_anchor_a{ 0.0f };
         glm::vec3 local_anchor_b{ 0.0f };
+        SpringAnchorSpace anchor_space_a = SpringAnchorSpace::Transform;
+        SpringAnchorSpace anchor_space_b = SpringAnchorSpace::Transform;
 
         // Linear spring parameters.
         float linear_stiffness = 0.0f;

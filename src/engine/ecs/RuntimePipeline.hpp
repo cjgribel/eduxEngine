@@ -85,10 +85,12 @@ namespace eeng::ecs
                 return;
 
             update_common(ctx, delta_time);
-            // Keep physics stats fresh in edit mode as well.
-            update_physics_monitor_stats(ctx);
 
             auto& registry = ctx.entity_manager->registry();
+            if (physics_system_)
+                physics_system_->update_edit(registry, ctx);
+            // Keep physics stats fresh in edit mode as well.
+            update_physics_monitor_stats(ctx);
             if (sticky_note_system_)
                 sticky_note_system_->update(registry, ctx, delta_time);
         }

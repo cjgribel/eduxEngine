@@ -12,6 +12,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -55,6 +56,25 @@ namespace eeng::ecs::systems
                 glm::translate(glm::mat4(1.0f), collider.local_position) *
                 glm::mat4_cast(collider.local_rotation);
             return transform.world_matrix * local;
+        }
+
+        // World transform for the rigid body COM/principal axes frame.
+        glm::mat4 rigidbody_com_world_transform(
+            const eeng::ecs::TransformComponent& transform,
+            const eeng::ecs::RigidBodyComponent& rb)
+        {
+            const glm::mat4 local =
+                glm::translate(glm::mat4(1.0f), rb.com_local_position) *
+                glm::mat4_cast(rb.com_local_rotation);
+            return transform.world_matrix * local;
+        }
+
+        glm::vec3 safe_normalize(const glm::vec3& v)
+        {
+            const float len2 = glm::dot(v, v);
+            if (len2 <= 1e-6f)
+                return glm::vec3(0.0f);
+            return v / std::sqrt(len2);
         }
     } // namespace
 
@@ -185,30 +205,86 @@ namespace eeng::ecs::systems
             }
         }
 
-        // --- RigidBody labels ----------------------------------------------
-        if (settings.show_rigidbody_labels)
+        // --- RigidBody labels + COM/axes -----------------------------------
+        if (settings.show_rigidbody_labels
+            || settings.show_rigidbody_com
+            || settings.show_rigidbody_axes
+            || settings.show_rigidbody_offset)
         {
             auto view = registry.view<ecs::TransformComponent, ecs::RigidBodyComponent>();
             for (const auto entity : view)
             {
                 const auto& transform = view.get<ecs::TransformComponent>(entity);
                 const auto& rb = view.get<ecs::RigidBodyComponent>(entity);
-                const glm::vec3 label_pos = glm::vec3(transform.world_matrix[3]) + settings.rigidbody_label_offset;
+                const glm::vec3 pivot_pos = glm::vec3(transform.world_matrix[3]);
+                const glm::mat4 com_world = rigidbody_com_world_transform(transform, rb);
+                const glm::vec3 com_pos = glm::vec3(com_world[3]);
 
-                char label[128];
-                std::snprintf(label, sizeof(label), "RB %s", motion_type_label(rb.motion));
+                if (settings.show_rigidbody_offset)
+                {
+                    renderer.push_states(
+                        ShapeRendering::Color4u{ settings.rigidbody_offset_color },
+                        glm::mat4(1.0f));
+                    renderer.push_line(pivot_pos, com_pos);
+                    renderer.pop_states<glm::mat4, ShapeRendering::Color4u>();
+                }
 
-                const std::string window_name =
-                    "RigidBodyLabel##" + std::to_string(entt::to_integral(entity));
+                if (settings.show_rigidbody_com)
+                {
+                    renderer.push_states(
+                        ShapeRendering::Color4u{ settings.rigidbody_com_color },
+                        glm::translate(glm::mat4(1.0f), com_pos));
+                    renderer.push_sphere_wireframe(settings.rigidbody_com_radius, settings.rigidbody_com_radius);
+                    renderer.pop_states<glm::mat4, ShapeRendering::Color4u>();
+                }
 
-                eeng::gui::ImGuiPrintTextAt(
-                    label_pos,
-                    VP_PROJ_V,
-                    window_height,
-                    label,
-                    window_name.c_str(),
-                    settings.rigidbody_label_bg,
-                    settings.rigidbody_label_text);
+                if (settings.show_rigidbody_axes)
+                {
+                    const glm::vec3 axis_x = safe_normalize(glm::vec3(com_world[0]));
+                    const glm::vec3 axis_y = safe_normalize(glm::vec3(com_world[1]));
+                    const glm::vec3 axis_z = safe_normalize(glm::vec3(com_world[2]));
+
+                    renderer.push_states(
+                        ShapeRendering::Color4u{ settings.rigidbody_axis_x_color },
+                        glm::mat4(1.0f));
+                    if (glm::dot(axis_x, axis_x) > 0.0f)
+                        renderer.push_line(com_pos, com_pos + axis_x * settings.rigidbody_axis_length);
+                    renderer.pop_states<glm::mat4, ShapeRendering::Color4u>();
+
+                    renderer.push_states(
+                        ShapeRendering::Color4u{ settings.rigidbody_axis_y_color },
+                        glm::mat4(1.0f));
+                    if (glm::dot(axis_y, axis_y) > 0.0f)
+                        renderer.push_line(com_pos, com_pos + axis_y * settings.rigidbody_axis_length);
+                    renderer.pop_states<glm::mat4, ShapeRendering::Color4u>();
+
+                    renderer.push_states(
+                        ShapeRendering::Color4u{ settings.rigidbody_axis_z_color },
+                        glm::mat4(1.0f));
+                    if (glm::dot(axis_z, axis_z) > 0.0f)
+                        renderer.push_line(com_pos, com_pos + axis_z * settings.rigidbody_axis_length);
+                    renderer.pop_states<glm::mat4, ShapeRendering::Color4u>();
+                }
+
+                const glm::vec3 label_pos = com_pos + settings.rigidbody_label_offset;
+
+                if (settings.show_rigidbody_labels)
+                {
+                    char label[128];
+                    std::snprintf(label, sizeof(label), "RB %s", motion_type_label(rb.motion));
+
+                    const std::string window_name =
+                        "RigidBodyLabel##" + std::to_string(entt::to_integral(entity));
+
+                    eeng::gui::ImGuiPrintTextAt(
+                        label_pos,
+                        VP_PROJ_V,
+                        window_height,
+                        label,
+                        window_name.c_str(),
+                        settings.rigidbody_label_bg,
+                        settings.rigidbody_label_text);
+                }
             }
         }
 

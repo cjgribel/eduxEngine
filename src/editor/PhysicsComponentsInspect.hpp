@@ -9,6 +9,7 @@
 #include "editor/InspectorState.hpp"
 #include "editor/TypeInspect.hpp"
 #include "engineapi/EngineContextHelpers.hpp"
+#include "meta/MetaInspect.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
 #include "physics/PhysicsGeometry.hpp"
@@ -242,6 +243,123 @@ namespace eeng::editor
 
         inspector.begin_leaf("is_trigger");
         modified |= inspect_type(desc->is_trigger, inspector);
+        inspector.end_leaf();
+
+        return modified;
+    }
+
+    inline bool inspect_RigidBodyComponent(
+        entt::meta_any& any,
+        InspectorState& inspector,
+        EngineContext& ctx)
+    {
+        auto* rb = any.try_cast<ecs::RigidBodyComponent>();
+        if (!rb)
+            return false;
+
+        bool modified = false;
+
+        inspector.begin_leaf("motion");
+        {
+            auto motion_any = entt::forward_as_meta(rb->motion);
+            modified |= eeng::meta::inspect_enum_any(motion_any, inspector);
+        }
+        inspector.end_leaf();
+
+        inspector.begin_leaf("auto_mass");
+        modified |= inspect_type(rb->auto_mass, inspector);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("mass");
+        if (rb->auto_mass)
+            inspector.begin_disabled();
+        modified |= inspect_type(rb->mass, inspector);
+        if (rb->auto_mass)
+        {
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("Computed from density and collider volume.");
+            inspector.end_disabled();
+        }
+        inspector.end_leaf();
+
+        inspector.begin_leaf("density");
+        modified |= inspect_type(rb->density, inspector);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Used when Auto Mass is enabled.");
+        inspector.end_leaf();
+
+        inspector.begin_leaf("auto_inertia");
+        modified |= inspect_type(rb->auto_inertia, inspector);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("inertia");
+        if (rb->auto_inertia)
+            inspector.begin_disabled();
+        {
+            auto inertia_any = entt::forward_as_meta(rb->inertia);
+            modified |= inspect_glmvec3(inertia_any, inspector, ctx);
+        }
+        if (rb->auto_inertia)
+        {
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("Computed diagonal inertia in body axes.");
+            inspector.end_disabled();
+        }
+        inspector.end_leaf();
+
+        inspector.begin_leaf("com_local_position");
+        inspector.begin_disabled();
+        {
+            auto com_pos_any = entt::forward_as_meta(rb->com_local_position);
+            (void)inspect_glmvec3(com_pos_any, inspector, ctx);
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("Computed center of mass offset (pivot -> COM).");
+        inspector.end_disabled();
+        inspector.end_leaf();
+
+        inspector.begin_leaf("com_local_rotation");
+        inspector.begin_disabled();
+        {
+            float rotation_data[4] = {
+                rb->com_local_rotation.x,
+                rb->com_local_rotation.y,
+                rb->com_local_rotation.z,
+                rb->com_local_rotation.w
+            };
+            (void)ImGui::DragFloat4("##com_local_rotation", rotation_data, 0.01f);
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("Computed principal-axes rotation (body -> pivot).");
+        inspector.end_disabled();
+        inspector.end_leaf();
+
+        inspector.begin_leaf("linear_damping");
+        modified |= inspect_type(rb->linear_damping, inspector);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("angular_damping");
+        modified |= inspect_type(rb->angular_damping, inspector);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("gravity_scale");
+        modified |= inspect_type(rb->gravity_scale, inspector);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("allow_sleep");
+        modified |= inspect_type(rb->allow_sleep, inspector);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("enable_ccd");
+        modified |= inspect_type(rb->enable_ccd, inspector);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("ccd_swept_sphere_radius");
+        modified |= inspect_type(rb->ccd_swept_sphere_radius, inspector);
+        inspector.end_leaf();
+
+        inspector.begin_leaf("ccd_motion_threshold");
+        modified |= inspect_type(rb->ccd_motion_threshold, inspector);
         inspector.end_leaf();
 
         return modified;

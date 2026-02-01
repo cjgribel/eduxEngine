@@ -42,6 +42,17 @@ namespace eeng::ecs::systems
         std::uint32_t rigidbody_label_bg = 0x80202040u;
         std::uint32_t rigidbody_label_text = 0xffffc080u;
         glm::vec3 rigidbody_label_offset{ 0.0f, 0.3f, 0.0f };
+        // RigidBody COM + principal axes.
+        bool show_rigidbody_com = true;
+        bool show_rigidbody_axes = true;
+        bool show_rigidbody_offset = true;
+        std::uint32_t rigidbody_com_color = 0xffffffffu;
+        std::uint32_t rigidbody_axis_x_color = 0xff0000ffu;
+        std::uint32_t rigidbody_axis_y_color = 0xff00ff00u;
+        std::uint32_t rigidbody_axis_z_color = 0xffff0000u;
+        std::uint32_t rigidbody_offset_color = 0xff808080u;
+        float rigidbody_com_radius = 0.05f;
+        float rigidbody_axis_length = 0.35f;
 
         // Raycast debug overlays.
         bool show_raycast_debug = true;
