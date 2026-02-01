@@ -33,16 +33,17 @@ namespace eeng::gui
 
         void draw()
         {
-            auto& entity_selection = *ctx.entity_selection;
+            draw_mode_row();
+            ImGui::Separator();
+            draw_scene_actions_row();
+        }
 
-            const bool has_selection = !entity_selection.empty();
-            const bool has_multi_selection = entity_selection.size() > 1;
-            const bool can_queue = static_cast<bool>(ctx.command_queue);
+        void draw_mode_row()
+        {
             const bool is_playing = ctx.services
                 && ctx.services->play_mode_active.load(std::memory_order_relaxed);
-            const bool allow_edit_actions = can_queue && !is_playing;
-
             const bool can_toggle = static_cast<bool>(ctx.event_queue);
+
             ImGui::TextUnformatted("Mode:");
             ImGui::SameLine();
             const ImVec4 mode_color = is_playing ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f)
@@ -194,8 +195,17 @@ namespace eeng::gui
 
             if (is_playing)
                 ImGui::EndDisabled();
+        }
 
-            ImGui::Separator();
+        void draw_scene_actions_row()
+        {
+            auto& entity_selection = *ctx.entity_selection;
+            const bool has_selection = !entity_selection.empty();
+            const bool has_multi_selection = entity_selection.size() > 1;
+            const bool can_queue = static_cast<bool>(ctx.command_queue);
+            const bool is_playing = ctx.services
+                && ctx.services->play_mode_active.load(std::memory_order_relaxed);
+            const bool allow_edit_actions = can_queue && !is_playing;
 
             if (!allow_edit_actions)
                 ImGui::BeginDisabled();

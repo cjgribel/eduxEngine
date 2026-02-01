@@ -44,6 +44,12 @@ namespace eeng
 
     void GuiManager::draw(EngineContext& ctx) const
     {
+        const bool is_playing = ctx.services
+            && ctx.services->play_mode_active.load(std::memory_order_relaxed);
+        draw_editor_controls(ctx);
+        if (is_playing)
+            return;
+
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowStorageWindow))
             draw_storage(ctx);
 
@@ -652,6 +658,14 @@ namespace eeng
         // Inspector::inspect_command_queue(inspector);
 
 // End window
+        ImGui::End();
+    }
+
+    void GuiManager::draw_editor_controls(EngineContext& ctx) const
+    {
+        ImGui::Begin("Editor Controls", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        gui::SceneTreeToolbarWidget toolbar{ ctx };
+        toolbar.draw_mode_row();
         ImGui::End();
     }
 
