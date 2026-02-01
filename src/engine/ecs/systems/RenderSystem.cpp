@@ -235,11 +235,25 @@ namespace eeng::ecs::systems
                 }
 
                 const size_t sm_index = &sm - submeshes.data();
-                const bool submesh_skinned = (sm_index < cpu_submeshes.size())
-                    ? cpu_submeshes[sm_index].is_skinned
-                    : false;
+                const assets::SubMesh* cpu_sm = (sm_index < cpu_submeshes.size())
+                    ? &cpu_submeshes[sm_index]
+                    : nullptr;
+                const bool submesh_skinned = cpu_sm ? cpu_sm->is_skinned : false;
                 const bool use_skinning = submesh_skinned && !model.bone_matrices.empty();
                 glUniform1i(glGetUniformLocation(shader_program_, "u_is_skinned"), use_skinning ? 1 : 0);
+
+                glm::mat4 world_mesh = world;
+                if (!use_skinning && cpu_sm && cpu_sm->node_index != assets::null_index)
+                {
+                    const size_t node_index = static_cast<size_t>(cpu_sm->node_index);
+                    if (node_index < model.node_global_matrices.size())
+                        world_mesh = world * model.node_global_matrices[node_index];
+                }
+                glUniformMatrix4fv(
+                    glGetUniformLocation(shader_program_, "WorldMatrix"),
+                    1,
+                    0,
+                    glm::value_ptr(world_mesh));
 
                 CheckAndThrowGLErrors();
                 glDrawElementsBaseVertex(
