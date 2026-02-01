@@ -15,9 +15,15 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+#if 1
+    // Run with editor hosting the game runtime.
     const std::filesystem::path project_config =
         std::filesystem::path(EENG_SOURCE_DIR) / "projects/legacy_game/project.json";
     engine->run_editor<Game>(project_config);
+#else
+    // Run as a standalone game runtime.
+    engine->run_game<Game>();
+#endif
 
     std::cout << "Exiting eduxEngine." << std::endl;
     return 0;
