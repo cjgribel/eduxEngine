@@ -194,6 +194,7 @@ namespace
             if (!rm)
                 break;
 
+            bool used_fallback = false;
             bool read_ok = eeng::try_read_asset_ref(
                 *rm,
                 collider.mesh_ref,
@@ -247,6 +248,14 @@ namespace
                 const glm::vec3 half_extents = collider.half_extents * scale_m;
                 props = eeng::physics::mass_properties_box(half_extents, density);
                 has_props = true;
+                used_fallback = true;
+            }
+
+            if (used_fallback)
+            {
+                EENG_LOG_WARN(&ctx,
+                    "PhysicsSystem: ConvexHull collider %u using box mass properties (mesh data unavailable).",
+                    collider.id);
             }
             break;
         }
