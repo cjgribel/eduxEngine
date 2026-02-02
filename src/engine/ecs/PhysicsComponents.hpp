@@ -196,10 +196,8 @@ namespace eeng::ecs
 
     struct PointConstraintComponent
     {
-        // Optional second body; when use_world_point_b is true, entity_b is ignored.
+        EntityRef entity_a{};
         EntityRef entity_b{};
-        bool use_world_point_b = false;
-        glm::vec3 world_point_b{ 0.0f };
 
         glm::vec3 local_anchor_a{ 0.0f };
         glm::vec3 local_anchor_b{ 0.0f };
@@ -210,10 +208,8 @@ namespace eeng::ecs
 
     struct HingeConstraintComponent
     {
+        EntityRef entity_a{};
         EntityRef entity_b{};
-        bool use_world_point_b = false;
-        glm::vec3 world_anchor_b{ 0.0f };
-        glm::vec3 world_axis_b{ 0.0f, 1.0f, 0.0f };
 
         glm::vec3 local_anchor_a{ 0.0f };
         glm::vec3 local_anchor_b{ 0.0f };
@@ -234,10 +230,8 @@ namespace eeng::ecs
 
     struct SliderConstraintComponent
     {
+        EntityRef entity_a{};
         EntityRef entity_b{};
-        bool use_world_point_b = false;
-        glm::vec3 world_anchor_b{ 0.0f };
-        glm::vec3 world_axis_b{ 1.0f, 0.0f, 0.0f };
 
         glm::vec3 local_anchor_a{ 0.0f };
         glm::vec3 local_anchor_b{ 0.0f };
@@ -259,10 +253,8 @@ namespace eeng::ecs
 
     struct SixDofSpringConstraintComponent
     {
+        EntityRef entity_a{};
         EntityRef entity_b{};
-        bool use_world_point_b = false;
-        glm::vec3 world_anchor_b{ 0.0f };
-        glm::quat world_rotation_b{ 1.0f, 0.0f, 0.0f, 0.0f };
 
         glm::vec3 local_anchor_a{ 0.0f };
         glm::quat local_rotation_a{ 1.0f, 0.0f, 0.0f, 0.0f };
@@ -414,6 +406,7 @@ namespace eeng::ecs
     template<typename Visitor>
     void visit_entity_refs(PointConstraintComponent& constraint, Visitor&& visitor)
     {
+        visitor(constraint.entity_a);
         visitor(constraint.entity_b);
     }
 
@@ -423,6 +416,7 @@ namespace eeng::ecs
     template<typename Visitor>
     void visit_entity_refs(HingeConstraintComponent& constraint, Visitor&& visitor)
     {
+        visitor(constraint.entity_a);
         visitor(constraint.entity_b);
     }
 
@@ -432,6 +426,7 @@ namespace eeng::ecs
     template<typename Visitor>
     void visit_entity_refs(SliderConstraintComponent& constraint, Visitor&& visitor)
     {
+        visitor(constraint.entity_a);
         visitor(constraint.entity_b);
     }
 
@@ -441,6 +436,7 @@ namespace eeng::ecs
     template<typename Visitor>
     void visit_entity_refs(SixDofSpringConstraintComponent& constraint, Visitor&& visitor)
     {
+        visitor(constraint.entity_a);
         visitor(constraint.entity_b);
     }
 

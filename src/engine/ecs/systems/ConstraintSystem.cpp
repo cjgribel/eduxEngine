@@ -28,38 +28,32 @@ namespace eeng::ecs::systems
 
         // --- Point constraints ---
         {
-            auto view = registry.view<ecs::TransformComponent, ecs::PointConstraintComponent>();
+            auto view = registry.view<ecs::PointConstraintComponent>();
             for (const auto entity : view)
             {
-                auto& tfm_a = view.get<ecs::TransformComponent>(entity);
                 auto& comp = view.get<ecs::PointConstraintComponent>(entity);
                 if (!comp.enabled)
                     continue;
 
-                PhysicsSystem::PointConstraintDesc desc{};
-                desc.entity_a = entity;
-                desc.entity_b = entt::null;
-                desc.use_world_point_b = comp.use_world_point_b;
-                desc.disable_collisions = comp.disable_collisions;
-                desc.local_anchor_a = comp.local_anchor_a * tfm_a.scale;
+                if (!comp.entity_a.is_bound() || !comp.entity_b.is_bound())
+                    continue;
 
-                if (comp.use_world_point_b)
-                {
-                    desc.world_point_b = comp.world_point_b;
-                }
-                else
-                {
-                    if (!comp.entity_b.is_bound())
-                        continue;
-                    const entt::entity entity_b = static_cast<entt::entity>(comp.entity_b.entity);
-                    if (!registry.valid(entity_b))
-                        continue;
-                    const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
-                    if (!tfm_b)
-                        continue;
-                    desc.entity_b = entity_b;
-                    desc.local_anchor_b = comp.local_anchor_b * tfm_b->scale;
-                }
+                const entt::entity entity_a = static_cast<entt::entity>(comp.entity_a.entity);
+                const entt::entity entity_b = static_cast<entt::entity>(comp.entity_b.entity);
+                if (!registry.valid(entity_a) || !registry.valid(entity_b))
+                    continue;
+
+                const auto* tfm_a = registry.try_get<ecs::TransformComponent>(entity_a);
+                const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
+                if (!tfm_a || !tfm_b)
+                    continue;
+
+                PhysicsSystem::PointConstraintDesc desc{};
+                desc.entity_a = entity_a;
+                desc.entity_b = entity_b;
+                desc.disable_collisions = comp.disable_collisions;
+                desc.local_anchor_a = comp.local_anchor_a * tfm_a->scale;
+                desc.local_anchor_b = comp.local_anchor_b * tfm_b->scale;
 
                 const ConstraintKey key{ entity, ConstraintKind::Point };
                 auto it = handles_.find(key);
@@ -82,47 +76,40 @@ namespace eeng::ecs::systems
 
         // --- Hinge constraints ---
         {
-            auto view = registry.view<ecs::TransformComponent, ecs::HingeConstraintComponent>();
+            auto view = registry.view<ecs::HingeConstraintComponent>();
             for (const auto entity : view)
             {
-                auto& tfm_a = view.get<ecs::TransformComponent>(entity);
                 auto& comp = view.get<ecs::HingeConstraintComponent>(entity);
                 if (!comp.enabled)
                     continue;
 
+                if (!comp.entity_a.is_bound() || !comp.entity_b.is_bound())
+                    continue;
+
+                const entt::entity entity_a = static_cast<entt::entity>(comp.entity_a.entity);
+                const entt::entity entity_b = static_cast<entt::entity>(comp.entity_b.entity);
+                if (!registry.valid(entity_a) || !registry.valid(entity_b))
+                    continue;
+
+                const auto* tfm_a = registry.try_get<ecs::TransformComponent>(entity_a);
+                const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
+                if (!tfm_a || !tfm_b)
+                    continue;
+
                 PhysicsSystem::HingeConstraintDesc desc{};
-                desc.entity_a = entity;
-                desc.entity_b = entt::null;
-                desc.use_world_point_b = comp.use_world_point_b;
+                desc.entity_a = entity_a;
+                desc.entity_b = entity_b;
                 desc.disable_collisions = comp.disable_collisions;
-                desc.local_anchor_a = comp.local_anchor_a * tfm_a.scale;
+                desc.local_anchor_a = comp.local_anchor_a * tfm_a->scale;
+                desc.local_anchor_b = comp.local_anchor_b * tfm_b->scale;
                 desc.local_axis_a = comp.local_axis_a;
+                desc.local_axis_b = comp.local_axis_b;
                 desc.use_limits = comp.use_limits;
                 desc.limit_min = comp.limit_min;
                 desc.limit_max = comp.limit_max;
                 desc.enable_motor = comp.enable_motor;
                 desc.motor_target_velocity = comp.motor_target_velocity;
                 desc.motor_max_impulse = comp.motor_max_impulse;
-
-                if (comp.use_world_point_b)
-                {
-                    desc.world_anchor_b = comp.world_anchor_b;
-                    desc.world_axis_b = comp.world_axis_b;
-                }
-                else
-                {
-                    if (!comp.entity_b.is_bound())
-                        continue;
-                    const entt::entity entity_b = static_cast<entt::entity>(comp.entity_b.entity);
-                    if (!registry.valid(entity_b))
-                        continue;
-                    const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
-                    if (!tfm_b)
-                        continue;
-                    desc.entity_b = entity_b;
-                    desc.local_anchor_b = comp.local_anchor_b * tfm_b->scale;
-                    desc.local_axis_b = comp.local_axis_b;
-                }
 
                 const ConstraintKey key{ entity, ConstraintKind::Hinge };
                 auto it = handles_.find(key);
@@ -145,21 +132,34 @@ namespace eeng::ecs::systems
 
         // --- Slider constraints ---
         {
-            auto view = registry.view<ecs::TransformComponent, ecs::SliderConstraintComponent>();
+            auto view = registry.view<ecs::SliderConstraintComponent>();
             for (const auto entity : view)
             {
-                auto& tfm_a = view.get<ecs::TransformComponent>(entity);
                 auto& comp = view.get<ecs::SliderConstraintComponent>(entity);
                 if (!comp.enabled)
                     continue;
 
+                if (!comp.entity_a.is_bound() || !comp.entity_b.is_bound())
+                    continue;
+
+                const entt::entity entity_a = static_cast<entt::entity>(comp.entity_a.entity);
+                const entt::entity entity_b = static_cast<entt::entity>(comp.entity_b.entity);
+                if (!registry.valid(entity_a) || !registry.valid(entity_b))
+                    continue;
+
+                const auto* tfm_a = registry.try_get<ecs::TransformComponent>(entity_a);
+                const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
+                if (!tfm_a || !tfm_b)
+                    continue;
+
                 PhysicsSystem::SliderConstraintDesc desc{};
-                desc.entity_a = entity;
-                desc.entity_b = entt::null;
-                desc.use_world_point_b = comp.use_world_point_b;
+                desc.entity_a = entity_a;
+                desc.entity_b = entity_b;
                 desc.disable_collisions = comp.disable_collisions;
-                desc.local_anchor_a = comp.local_anchor_a * tfm_a.scale;
+                desc.local_anchor_a = comp.local_anchor_a * tfm_a->scale;
+                desc.local_anchor_b = comp.local_anchor_b * tfm_b->scale;
                 desc.local_axis_a = comp.local_axis_a;
+                desc.local_axis_b = comp.local_axis_b;
                 desc.linear_limit_min = comp.linear_limit_min;
                 desc.linear_limit_max = comp.linear_limit_max;
                 desc.angular_limit_min = comp.angular_limit_min;
@@ -167,26 +167,6 @@ namespace eeng::ecs::systems
                 desc.enable_linear_motor = comp.enable_linear_motor;
                 desc.linear_motor_target_velocity = comp.linear_motor_target_velocity;
                 desc.linear_motor_max_force = comp.linear_motor_max_force;
-
-                if (comp.use_world_point_b)
-                {
-                    desc.world_anchor_b = comp.world_anchor_b;
-                    desc.world_axis_b = comp.world_axis_b;
-                }
-                else
-                {
-                    if (!comp.entity_b.is_bound())
-                        continue;
-                    const entt::entity entity_b = static_cast<entt::entity>(comp.entity_b.entity);
-                    if (!registry.valid(entity_b))
-                        continue;
-                    const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
-                    if (!tfm_b)
-                        continue;
-                    desc.entity_b = entity_b;
-                    desc.local_anchor_b = comp.local_anchor_b * tfm_b->scale;
-                    desc.local_axis_b = comp.local_axis_b;
-                }
 
                 const ConstraintKey key{ entity, ConstraintKind::Slider };
                 auto it = handles_.find(key);
@@ -209,21 +189,34 @@ namespace eeng::ecs::systems
 
         // --- 6DoF spring constraints ---
         {
-            auto view = registry.view<ecs::TransformComponent, ecs::SixDofSpringConstraintComponent>();
+            auto view = registry.view<ecs::SixDofSpringConstraintComponent>();
             for (const auto entity : view)
             {
-                auto& tfm_a = view.get<ecs::TransformComponent>(entity);
                 auto& comp = view.get<ecs::SixDofSpringConstraintComponent>(entity);
                 if (!comp.enabled)
                     continue;
 
+                if (!comp.entity_a.is_bound() || !comp.entity_b.is_bound())
+                    continue;
+
+                const entt::entity entity_a = static_cast<entt::entity>(comp.entity_a.entity);
+                const entt::entity entity_b = static_cast<entt::entity>(comp.entity_b.entity);
+                if (!registry.valid(entity_a) || !registry.valid(entity_b))
+                    continue;
+
+                const auto* tfm_a = registry.try_get<ecs::TransformComponent>(entity_a);
+                const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
+                if (!tfm_a || !tfm_b)
+                    continue;
+
                 PhysicsSystem::SixDofSpringConstraintDesc desc{};
-                desc.entity_a = entity;
-                desc.entity_b = entt::null;
-                desc.use_world_point_b = comp.use_world_point_b;
+                desc.entity_a = entity_a;
+                desc.entity_b = entity_b;
                 desc.disable_collisions = comp.disable_collisions;
-                desc.local_anchor_a = comp.local_anchor_a * tfm_a.scale;
+                desc.local_anchor_a = comp.local_anchor_a * tfm_a->scale;
                 desc.local_rotation_a = comp.local_rotation_a;
+                desc.local_anchor_b = comp.local_anchor_b * tfm_b->scale;
+                desc.local_rotation_b = comp.local_rotation_b;
                 desc.linear_limit_min = comp.linear_limit_min;
                 desc.linear_limit_max = comp.linear_limit_max;
                 desc.angular_limit_min = comp.angular_limit_min;
@@ -232,26 +225,6 @@ namespace eeng::ecs::systems
                 desc.linear_damping = comp.linear_damping;
                 desc.angular_stiffness = comp.angular_stiffness;
                 desc.angular_damping = comp.angular_damping;
-
-                if (comp.use_world_point_b)
-                {
-                    desc.world_anchor_b = comp.world_anchor_b;
-                    desc.world_rotation_b = comp.world_rotation_b;
-                }
-                else
-                {
-                    if (!comp.entity_b.is_bound())
-                        continue;
-                    const entt::entity entity_b = static_cast<entt::entity>(comp.entity_b.entity);
-                    if (!registry.valid(entity_b))
-                        continue;
-                    const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
-                    if (!tfm_b)
-                        continue;
-                    desc.entity_b = entity_b;
-                    desc.local_anchor_b = comp.local_anchor_b * tfm_b->scale;
-                    desc.local_rotation_b = comp.local_rotation_b;
-                }
 
                 const ConstraintKey key{ entity, ConstraintKind::SixDofSpring };
                 auto it = handles_.find(key);

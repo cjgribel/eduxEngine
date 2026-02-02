@@ -69,6 +69,21 @@ namespace eeng::ecs::systems
         float spring_radius_inner = 0.02f;
         float spring_revs = 8.0f;
 
+        // Constraint visualization.
+        bool show_constraints = true;
+        std::uint32_t constraint_anchor_a_color = 0xff40ff40u;
+        std::uint32_t constraint_anchor_b_color = 0xffff4040u;
+        std::uint32_t constraint_line_color = 0xff909090u;
+        std::uint32_t constraint_axis_color = 0xff40ffffu;
+        std::uint32_t constraint_limit_color = 0xffc0c0c0u;
+        float constraint_anchor_radius = 0.04f;
+        unsigned constraint_anchor_point_size = 6;
+        float constraint_axis_length = 0.4f;
+        float constraint_limit_radius = 0.35f;
+        float constraint_linear_limit_tick = 0.06f;
+        int constraint_limit_segments = 24;
+        float constraint_frame_axis_length = 0.25f;
+
         // ShapeRenderer demo overlay (debug visualization).
         bool show_demo_shapes = true;
         glm::vec3 demo_shape_offset{ 0.0f, 0.0f, -5.0f };

@@ -12,9 +12,11 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace eeng::ecs::systems
 {
@@ -75,6 +77,96 @@ namespace eeng::ecs::systems
             if (len2 <= 1e-6f)
                 return glm::vec3(0.0f);
             return v / std::sqrt(len2);
+        }
+
+        glm::mat3 basis_from_axis(const glm::vec3& axis)
+        {
+            const glm::vec3 x = safe_normalize(axis);
+            if (glm::dot(x, x) <= 1e-6f)
+                return glm::mat3(1.0f);
+
+            const glm::vec3 up = (std::abs(glm::dot(x, glm::vec3(0.0f, 1.0f, 0.0f))) > 0.99f)
+                ? glm::vec3(0.0f, 0.0f, 1.0f)
+                : glm::vec3(0.0f, 1.0f, 0.0f);
+            const glm::vec3 z = safe_normalize(glm::cross(x, up));
+            const glm::vec3 y = safe_normalize(glm::cross(z, x));
+            return glm::mat3(x, y, z);
+        }
+
+        void push_arc(ShapeRendering::ShapeRenderer& renderer,
+            const glm::vec3& center,
+            const glm::vec3& axis_u,
+            const glm::vec3& axis_v,
+            float radius,
+            float angle_min,
+            float angle_max,
+            int segments)
+        {
+            if (radius <= 0.0f)
+                return;
+
+            const float span = angle_max - angle_min;
+            if (std::abs(span) <= 1e-4f)
+                return;
+
+            segments = std::max(3, segments);
+            std::vector<glm::vec3> points;
+            points.reserve(static_cast<size_t>(segments + 1));
+
+            for (int i = 0; i <= segments; ++i)
+            {
+                const float t = angle_min + span * (static_cast<float>(i) / segments);
+                const glm::vec3 dir = axis_u * std::cos(t) + axis_v * std::sin(t);
+                points.emplace_back(center + dir * radius);
+            }
+
+            renderer.push_lines(points.data(), points.size());
+        }
+
+        void push_limit_tick(ShapeRendering::ShapeRenderer& renderer,
+            const glm::vec3& pos,
+            const glm::vec3& dir,
+            float half_length)
+        {
+            if (half_length <= 0.0f)
+                return;
+            renderer.push_line(pos - dir * half_length, pos + dir * half_length);
+        }
+
+        void push_oriented_box_wire(ShapeRendering::ShapeRenderer& renderer,
+            const glm::vec3& center,
+            const glm::mat3& basis,
+            const glm::vec3& min_local,
+            const glm::vec3& max_local)
+        {
+            const auto to_world = [&](float x, float y, float z)
+            {
+                return center + basis * glm::vec3(x, y, z);
+            };
+
+            const glm::vec3 c000 = to_world(min_local.x, min_local.y, min_local.z);
+            const glm::vec3 c100 = to_world(max_local.x, min_local.y, min_local.z);
+            const glm::vec3 c010 = to_world(min_local.x, max_local.y, min_local.z);
+            const glm::vec3 c110 = to_world(max_local.x, max_local.y, min_local.z);
+            const glm::vec3 c001 = to_world(min_local.x, min_local.y, max_local.z);
+            const glm::vec3 c101 = to_world(max_local.x, min_local.y, max_local.z);
+            const glm::vec3 c011 = to_world(min_local.x, max_local.y, max_local.z);
+            const glm::vec3 c111 = to_world(max_local.x, max_local.y, max_local.z);
+
+            renderer.push_line(c000, c100);
+            renderer.push_line(c100, c110);
+            renderer.push_line(c110, c010);
+            renderer.push_line(c010, c000);
+
+            renderer.push_line(c001, c101);
+            renderer.push_line(c101, c111);
+            renderer.push_line(c111, c011);
+            renderer.push_line(c011, c001);
+
+            renderer.push_line(c000, c001);
+            renderer.push_line(c100, c101);
+            renderer.push_line(c010, c011);
+            renderer.push_line(c110, c111);
         }
     } // namespace
 
@@ -374,6 +466,322 @@ namespace eeng::ecs::systems
                 renderer.pop_states<ShapeRendering::Color4u>();
                 renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
             }
+        }
+
+        // --- Constraint debug ---------------------------------------------
+        if (settings.show_constraints)
+        {
+            auto resolve_anchor = [&](const ecs::EntityRef& entity_ref,
+                                      const glm::vec3& local_anchor,
+                                      glm::vec3& out_anchor,
+                                      const ecs::TransformComponent*& out_tfm) -> bool
+            {
+                if (!entity_ref.is_bound())
+                    return false;
+
+                const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
+                if (!registry.valid(body_entity))
+                    return false;
+
+                const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
+                if (!tfm)
+                    return false;
+
+                out_anchor = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
+                out_tfm = tfm;
+                return true;
+            };
+
+            renderer.push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 2.0f });
+
+            // Point constraints.
+            {
+                auto view = registry.view<ecs::PointConstraintComponent>();
+                for (const auto entity : view)
+                {
+                    const auto& constraint = view.get<ecs::PointConstraintComponent>(entity);
+                    if (!constraint.enabled)
+                        continue;
+
+                    glm::vec3 anchor_a{};
+                    glm::vec3 anchor_b{};
+                    const ecs::TransformComponent* tfm_a = nullptr;
+                    const ecs::TransformComponent* tfm_b = nullptr;
+                    if (!resolve_anchor(constraint.entity_a, constraint.local_anchor_a, anchor_a, tfm_a)
+                        || !resolve_anchor(constraint.entity_b, constraint.local_anchor_b, anchor_b, tfm_b))
+                        continue;
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_line_color });
+                    renderer.push_line(anchor_a, anchor_b);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_anchor_a_color });
+                    renderer.push_point(anchor_a, settings.constraint_anchor_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_anchor_b_color });
+                    renderer.push_point(anchor_b, settings.constraint_anchor_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    const glm::vec3 anchor_mid = 0.5f * (anchor_a + anchor_b);
+                    renderer.push_states(
+                        ShapeRendering::Color4u{ settings.constraint_line_color },
+                        glm::translate(glm::mat4(1.0f), anchor_mid));
+                    renderer.push_sphere_wireframe(settings.constraint_anchor_radius, settings.constraint_anchor_radius);
+                    renderer.pop_states<glm::mat4, ShapeRendering::Color4u>();
+                }
+            }
+
+            // Hinge constraints.
+            {
+                auto view = registry.view<ecs::HingeConstraintComponent>();
+                for (const auto entity : view)
+                {
+                    const auto& constraint = view.get<ecs::HingeConstraintComponent>(entity);
+                    if (!constraint.enabled)
+                        continue;
+
+                    glm::vec3 anchor_a{};
+                    glm::vec3 anchor_b{};
+                    const ecs::TransformComponent* tfm_a = nullptr;
+                    const ecs::TransformComponent* tfm_b = nullptr;
+                    if (!resolve_anchor(constraint.entity_a, constraint.local_anchor_a, anchor_a, tfm_a)
+                        || !resolve_anchor(constraint.entity_b, constraint.local_anchor_b, anchor_b, tfm_b))
+                        continue;
+
+                    const glm::vec3 axis_a = safe_normalize(tfm_a->world_rotation_matrix * constraint.local_axis_a);
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_line_color });
+                    renderer.push_line(anchor_a, anchor_b);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_axis_color });
+                    renderer.push_line(
+                        anchor_a - axis_a * (settings.constraint_axis_length * 0.5f),
+                        anchor_a + axis_a * (settings.constraint_axis_length * 0.5f));
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_anchor_a_color });
+                    renderer.push_point(anchor_a, settings.constraint_anchor_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_anchor_b_color });
+                    renderer.push_point(anchor_b, settings.constraint_anchor_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    if (constraint.use_limits)
+                    {
+                        const glm::mat3 basis = basis_from_axis(axis_a);
+                        const glm::vec3 axis_u = basis[1];
+                        const glm::vec3 axis_v = basis[2];
+
+                        renderer.push_states(ShapeRendering::Color4u{ settings.constraint_limit_color });
+                        push_arc(renderer,
+                            anchor_a,
+                            axis_u,
+                            axis_v,
+                            settings.constraint_limit_radius,
+                            constraint.limit_min,
+                            constraint.limit_max,
+                            settings.constraint_limit_segments);
+
+                        const glm::vec3 dir_min =
+                            axis_u * std::cos(constraint.limit_min) + axis_v * std::sin(constraint.limit_min);
+                        const glm::vec3 dir_max =
+                            axis_u * std::cos(constraint.limit_max) + axis_v * std::sin(constraint.limit_max);
+                        renderer.push_line(anchor_a, anchor_a + dir_min * settings.constraint_limit_radius);
+                        renderer.push_line(anchor_a, anchor_a + dir_max * settings.constraint_limit_radius);
+                        renderer.pop_states<ShapeRendering::Color4u>();
+                    }
+                }
+            }
+
+            // Slider constraints.
+            {
+                auto view = registry.view<ecs::SliderConstraintComponent>();
+                for (const auto entity : view)
+                {
+                    const auto& constraint = view.get<ecs::SliderConstraintComponent>(entity);
+                    if (!constraint.enabled)
+                        continue;
+
+                    glm::vec3 anchor_a{};
+                    glm::vec3 anchor_b{};
+                    const ecs::TransformComponent* tfm_a = nullptr;
+                    const ecs::TransformComponent* tfm_b = nullptr;
+                    if (!resolve_anchor(constraint.entity_a, constraint.local_anchor_a, anchor_a, tfm_a)
+                        || !resolve_anchor(constraint.entity_b, constraint.local_anchor_b, anchor_b, tfm_b))
+                        continue;
+
+                    const glm::vec3 axis_a = safe_normalize(tfm_a->world_rotation_matrix * constraint.local_axis_a);
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_line_color });
+                    renderer.push_line(anchor_a, anchor_b);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_axis_color });
+                    renderer.push_line(
+                        anchor_a - axis_a * (settings.constraint_axis_length * 0.5f),
+                        anchor_a + axis_a * (settings.constraint_axis_length * 0.5f));
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_anchor_a_color });
+                    renderer.push_point(anchor_a, settings.constraint_anchor_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_anchor_b_color });
+                    renderer.push_point(anchor_b, settings.constraint_anchor_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    if (std::abs(constraint.linear_limit_max - constraint.linear_limit_min) > 1e-4f)
+                    {
+                        const glm::vec3 min_pos = anchor_a + axis_a * constraint.linear_limit_min;
+                        const glm::vec3 max_pos = anchor_a + axis_a * constraint.linear_limit_max;
+                        const glm::mat3 basis = basis_from_axis(axis_a);
+                        const glm::vec3 tick_dir = basis[1];
+
+                        renderer.push_states(ShapeRendering::Color4u{ settings.constraint_limit_color });
+                        renderer.push_line(min_pos, max_pos);
+                        push_limit_tick(renderer, min_pos, tick_dir, settings.constraint_linear_limit_tick);
+                        push_limit_tick(renderer, max_pos, tick_dir, settings.constraint_linear_limit_tick);
+                        renderer.pop_states<ShapeRendering::Color4u>();
+                    }
+
+                    if (std::abs(constraint.angular_limit_min) > 1e-4f
+                        || std::abs(constraint.angular_limit_max) > 1e-4f)
+                    {
+                        const glm::mat3 basis = basis_from_axis(axis_a);
+                        const glm::vec3 axis_u = basis[1];
+                        const glm::vec3 axis_v = basis[2];
+
+                        renderer.push_states(ShapeRendering::Color4u{ settings.constraint_limit_color });
+                        push_arc(renderer,
+                            anchor_a,
+                            axis_u,
+                            axis_v,
+                            settings.constraint_limit_radius,
+                            constraint.angular_limit_min,
+                            constraint.angular_limit_max,
+                            settings.constraint_limit_segments);
+                        renderer.pop_states<ShapeRendering::Color4u>();
+                    }
+                }
+            }
+
+            // 6DoF spring constraints.
+            {
+                auto view = registry.view<ecs::SixDofSpringConstraintComponent>();
+                for (const auto entity : view)
+                {
+                    const auto& constraint = view.get<ecs::SixDofSpringConstraintComponent>(entity);
+                    if (!constraint.enabled)
+                        continue;
+
+                    glm::vec3 anchor_a{};
+                    glm::vec3 anchor_b{};
+                    const ecs::TransformComponent* tfm_a = nullptr;
+                    const ecs::TransformComponent* tfm_b = nullptr;
+                    if (!resolve_anchor(constraint.entity_a, constraint.local_anchor_a, anchor_a, tfm_a)
+                        || !resolve_anchor(constraint.entity_b, constraint.local_anchor_b, anchor_b, tfm_b))
+                        continue;
+
+                    const glm::quat rot_a = tfm_a->world_rotation * constraint.local_rotation_a;
+                    const glm::quat rot_b = tfm_b->world_rotation * constraint.local_rotation_b;
+                    const glm::mat3 basis_a = glm::mat3_cast(rot_a);
+                    const glm::mat3 basis_b = glm::mat3_cast(rot_b);
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_line_color });
+                    renderer.push_line(anchor_a, anchor_b);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    {
+                        glm::mat4 frame_a(1.0f);
+                        frame_a[0] = glm::vec4(basis_a[0], 0.0f);
+                        frame_a[1] = glm::vec4(basis_a[1], 0.0f);
+                        frame_a[2] = glm::vec4(basis_a[2], 0.0f);
+                        frame_a[3] = glm::vec4(anchor_a, 1.0f);
+                        renderer.push_basis_basic(frame_a, settings.constraint_frame_axis_length);
+                    }
+
+                    {
+                        glm::mat4 frame_b(1.0f);
+                        frame_b[0] = glm::vec4(basis_b[0], 0.0f);
+                        frame_b[1] = glm::vec4(basis_b[1], 0.0f);
+                        frame_b[2] = glm::vec4(basis_b[2], 0.0f);
+                        frame_b[3] = glm::vec4(anchor_b, 1.0f);
+                        renderer.push_basis_basic(frame_b, settings.constraint_frame_axis_length);
+                    }
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_anchor_a_color });
+                    renderer.push_point(anchor_a, settings.constraint_anchor_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    renderer.push_states(ShapeRendering::Color4u{ settings.constraint_anchor_b_color });
+                    renderer.push_point(anchor_b, settings.constraint_anchor_point_size);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+
+                    const glm::vec3 linear_span = constraint.linear_limit_max - constraint.linear_limit_min;
+                    if (glm::dot(linear_span, linear_span) > 1e-6f)
+                    {
+                        const glm::vec3 min_local = glm::min(constraint.linear_limit_min, constraint.linear_limit_max);
+                        const glm::vec3 max_local = glm::max(constraint.linear_limit_min, constraint.linear_limit_max);
+                        renderer.push_states(ShapeRendering::Color4u{ settings.constraint_limit_color });
+                        push_oriented_box_wire(renderer, anchor_a, basis_a, min_local, max_local);
+                        renderer.pop_states<ShapeRendering::Color4u>();
+                    }
+
+                    const bool angular_active =
+                        glm::dot(constraint.angular_limit_min, constraint.angular_limit_min) > 1e-6f
+                        || glm::dot(constraint.angular_limit_max, constraint.angular_limit_max) > 1e-6f;
+                    if (angular_active)
+                    {
+                        renderer.push_states(ShapeRendering::Color4u{ settings.constraint_limit_color });
+
+                        if (std::abs(constraint.angular_limit_min.x) > 1e-4f
+                            || std::abs(constraint.angular_limit_max.x) > 1e-4f)
+                        {
+                            push_arc(renderer,
+                                anchor_a,
+                                basis_a[1],
+                                basis_a[2],
+                                settings.constraint_limit_radius,
+                                constraint.angular_limit_min.x,
+                                constraint.angular_limit_max.x,
+                                settings.constraint_limit_segments);
+                        }
+
+                        if (std::abs(constraint.angular_limit_min.y) > 1e-4f
+                            || std::abs(constraint.angular_limit_max.y) > 1e-4f)
+                        {
+                            push_arc(renderer,
+                                anchor_a,
+                                basis_a[2],
+                                basis_a[0],
+                                settings.constraint_limit_radius,
+                                constraint.angular_limit_min.y,
+                                constraint.angular_limit_max.y,
+                                settings.constraint_limit_segments);
+                        }
+
+                        if (std::abs(constraint.angular_limit_min.z) > 1e-4f
+                            || std::abs(constraint.angular_limit_max.z) > 1e-4f)
+                        {
+                            push_arc(renderer,
+                                anchor_a,
+                                basis_a[0],
+                                basis_a[1],
+                                settings.constraint_limit_radius,
+                                constraint.angular_limit_min.z,
+                                constraint.angular_limit_max.z,
+                                settings.constraint_limit_segments);
+                        }
+
+                        renderer.pop_states<ShapeRendering::Color4u>();
+                    }
+                }
+            }
+
+            renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
         }
 
         // --- Raycast debug -------------------------------------------------

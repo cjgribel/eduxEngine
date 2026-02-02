@@ -475,6 +475,9 @@ namespace eeng::ecs::systems
 
         ctx_ = &ctx;
 
+        // Bullet asserts if a rigid body is deleted while constraints still reference it.
+        destroy_all_constraints();
+
         if (auto* world = world_.world())
         {
             for (auto& [entity, runtime] : bodies_)
@@ -490,7 +493,6 @@ namespace eeng::ecs::systems
         current_contacts_.clear();
         previous_contacts_.clear();
         force_requests_.clear();
-        destroy_all_constraints();
         batch_sync_requested_ = true;
 
         auto* registry = eeng::try_get_registry_ptr(ctx, "PhysicsSystem");
@@ -525,6 +527,9 @@ namespace eeng::ecs::systems
         if (!initialized_)
             return;
 
+        // Bullet asserts if a rigid body is deleted while constraints still reference it.
+        destroy_all_constraints();
+
         // Remove bodies from the Bullet world before clearing storage.
         if (auto* world = world_.world())
         {
@@ -538,7 +543,6 @@ namespace eeng::ecs::systems
         bodies_.clear();
         dirty_entities_.clear();
         force_requests_.clear();
-        destroy_all_constraints();
         ctx_ = nullptr;
         world_.shutdown();
         initialized_ = false;
@@ -1244,26 +1248,14 @@ namespace eeng::ecs::systems
         const btVector3 pivot_a =
             it_a->second.com_local_inverse * to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter);
 
-        btRigidBody* body_b = nullptr;
-        btVector3 pivot_b(0.0f, 0.0f, 0.0f);
-        entt::entity entity_b = entt::null;
-
-        if (desc.use_world_point_b)
-        {
-            body_b = &btTypedConstraint::getFixedBody();
-            pivot_b = to_bt_vec3(desc.world_point_b, settings_.units_per_meter);
-        }
-        else
-        {
-            if (desc.entity_b == entt::null)
-                return 0;
-            auto it_b = bodies_.find(desc.entity_b);
-            if (it_b == bodies_.end() || !it_b->second.body)
-                return 0;
-            body_b = it_b->second.body.get();
-            pivot_b = it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
-            entity_b = desc.entity_b;
-        }
+        if (desc.entity_b == entt::null)
+            return 0;
+        auto it_b = bodies_.find(desc.entity_b);
+        if (it_b == bodies_.end() || !it_b->second.body)
+            return 0;
+        btRigidBody* body_b = it_b->second.body.get();
+        const btVector3 pivot_b =
+            it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
 
         auto constraint = std::make_unique<btPoint2PointConstraint>(
             *body_a, *body_b, pivot_a, pivot_b);
@@ -1274,7 +1266,7 @@ namespace eeng::ecs::systems
         constraints_.emplace(handle, ConstraintRuntime{
             ConstraintKind::Point,
             desc.entity_a,
-            entity_b,
+            desc.entity_b,
             desc.disable_collisions,
             std::move(constraint)
         });
@@ -1298,31 +1290,17 @@ namespace eeng::ecs::systems
             it_a->second.com_local_inverse.getBasis() * to_bt_dir(desc.local_axis_a),
             btVector3(0.0f, 1.0f, 0.0f));
 
-        btRigidBody* body_b = nullptr;
-        btVector3 pivot_b(0.0f, 0.0f, 0.0f);
-        btVector3 axis_b(0.0f, 1.0f, 0.0f);
-        entt::entity entity_b = entt::null;
-
-        if (desc.use_world_point_b)
-        {
-            body_b = &btTypedConstraint::getFixedBody();
-            pivot_b = to_bt_vec3(desc.world_anchor_b, settings_.units_per_meter);
-            axis_b = normalize_or_default(to_bt_dir(desc.world_axis_b), btVector3(0.0f, 1.0f, 0.0f));
-        }
-        else
-        {
-            if (desc.entity_b == entt::null)
-                return 0;
-            auto it_b = bodies_.find(desc.entity_b);
-            if (it_b == bodies_.end() || !it_b->second.body)
-                return 0;
-            body_b = it_b->second.body.get();
-            pivot_b = it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
-            axis_b = normalize_or_default(
-                it_b->second.com_local_inverse.getBasis() * to_bt_dir(desc.local_axis_b),
-                btVector3(0.0f, 1.0f, 0.0f));
-            entity_b = desc.entity_b;
-        }
+        if (desc.entity_b == entt::null)
+            return 0;
+        auto it_b = bodies_.find(desc.entity_b);
+        if (it_b == bodies_.end() || !it_b->second.body)
+            return 0;
+        btRigidBody* body_b = it_b->second.body.get();
+        const btVector3 pivot_b =
+            it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
+        const btVector3 axis_b = normalize_or_default(
+            it_b->second.com_local_inverse.getBasis() * to_bt_dir(desc.local_axis_b),
+            btVector3(0.0f, 1.0f, 0.0f));
 
         auto constraint = std::make_unique<btHingeConstraint>(
             *body_a, *body_b, pivot_a, pivot_b, axis_a, axis_b, true);
@@ -1339,7 +1317,7 @@ namespace eeng::ecs::systems
         constraints_.emplace(handle, ConstraintRuntime{
             ConstraintKind::Hinge,
             desc.entity_a,
-            entity_b,
+            desc.entity_b,
             desc.disable_collisions,
             std::move(constraint)
         });
@@ -1366,34 +1344,19 @@ namespace eeng::ecs::systems
         frame_a.setBasis(basis_a);
         frame_a = it_a->second.com_local_inverse * frame_a;
 
-        btRigidBody* body_b = nullptr;
+        if (desc.entity_b == entt::null)
+            return 0;
+        auto it_b = bodies_.find(desc.entity_b);
+        if (it_b == bodies_.end() || !it_b->second.body)
+            return 0;
+        btRigidBody* body_b = it_b->second.body.get();
         btTransform frame_b;
         frame_b.setIdentity();
-        entt::entity entity_b = entt::null;
-
-        if (desc.use_world_point_b)
-        {
-            body_b = &btTypedConstraint::getFixedBody();
-            const btVector3 pivot_b = to_bt_vec3(desc.world_anchor_b, settings_.units_per_meter);
-            const btMatrix3x3 basis_b = basis_from_axis(to_bt_dir(desc.world_axis_b));
-            frame_b.setOrigin(pivot_b);
-            frame_b.setBasis(basis_b);
-        }
-        else
-        {
-            if (desc.entity_b == entt::null)
-                return 0;
-            auto it_b = bodies_.find(desc.entity_b);
-            if (it_b == bodies_.end() || !it_b->second.body)
-                return 0;
-            body_b = it_b->second.body.get();
-            const btVector3 pivot_b = to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
-            const btMatrix3x3 basis_b = basis_from_axis(to_bt_dir(desc.local_axis_b));
-            frame_b.setOrigin(pivot_b);
-            frame_b.setBasis(basis_b);
-            frame_b = it_b->second.com_local_inverse * frame_b;
-            entity_b = desc.entity_b;
-        }
+        const btVector3 pivot_b = to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
+        const btMatrix3x3 basis_b = basis_from_axis(to_bt_dir(desc.local_axis_b));
+        frame_b.setOrigin(pivot_b);
+        frame_b.setBasis(basis_b);
+        frame_b = it_b->second.com_local_inverse * frame_b;
 
         auto constraint = std::make_unique<btSliderConstraint>(
             *body_a, *body_b, frame_a, frame_b, true);
@@ -1412,7 +1375,7 @@ namespace eeng::ecs::systems
         constraints_.emplace(handle, ConstraintRuntime{
             ConstraintKind::Slider,
             desc.entity_a,
-            entity_b,
+            desc.entity_b,
             desc.disable_collisions,
             std::move(constraint)
         });
@@ -1437,30 +1400,17 @@ namespace eeng::ecs::systems
         frame_a.setRotation(to_bt_quat(desc.local_rotation_a));
         frame_a = it_a->second.com_local_inverse * frame_a;
 
-        btRigidBody* body_b = nullptr;
+        if (desc.entity_b == entt::null)
+            return 0;
+        auto it_b = bodies_.find(desc.entity_b);
+        if (it_b == bodies_.end() || !it_b->second.body)
+            return 0;
+        btRigidBody* body_b = it_b->second.body.get();
         btTransform frame_b;
         frame_b.setIdentity();
-        entt::entity entity_b = entt::null;
-
-        if (desc.use_world_point_b)
-        {
-            body_b = &btTypedConstraint::getFixedBody();
-            frame_b.setOrigin(to_bt_vec3(desc.world_anchor_b, settings_.units_per_meter));
-            frame_b.setRotation(to_bt_quat(desc.world_rotation_b));
-        }
-        else
-        {
-            if (desc.entity_b == entt::null)
-                return 0;
-            auto it_b = bodies_.find(desc.entity_b);
-            if (it_b == bodies_.end() || !it_b->second.body)
-                return 0;
-            body_b = it_b->second.body.get();
-            frame_b.setOrigin(to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter));
-            frame_b.setRotation(to_bt_quat(desc.local_rotation_b));
-            frame_b = it_b->second.com_local_inverse * frame_b;
-            entity_b = desc.entity_b;
-        }
+        frame_b.setOrigin(to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter));
+        frame_b.setRotation(to_bt_quat(desc.local_rotation_b));
+        frame_b = it_b->second.com_local_inverse * frame_b;
 
         auto constraint = std::make_unique<btGeneric6DofSpring2Constraint>(
             *body_a, *body_b, frame_a, frame_b);
@@ -1504,7 +1454,7 @@ namespace eeng::ecs::systems
         constraints_.emplace(handle, ConstraintRuntime{
             ConstraintKind::SixDofSpring,
             desc.entity_a,
-            entity_b,
+            desc.entity_b,
             desc.disable_collisions,
             std::move(constraint)
         });
@@ -1517,8 +1467,7 @@ namespace eeng::ecs::systems
         if (it == constraints_.end() || it->second.kind != ConstraintKind::Point)
             return false;
 
-        const entt::entity expected_b = desc.use_world_point_b ? entt::null : desc.entity_b;
-        if (it->second.entity_a != desc.entity_a || it->second.entity_b != expected_b)
+        if (it->second.entity_a != desc.entity_a || it->second.entity_b != desc.entity_b)
             return false;
         if (it->second.disable_collisions != desc.disable_collisions)
             return false;
@@ -1535,19 +1484,12 @@ namespace eeng::ecs::systems
             it_a->second.com_local_inverse * to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter);
         constraint->setPivotA(pivot_a);
 
-        if (desc.use_world_point_b)
-        {
-            constraint->setPivotB(to_bt_vec3(desc.world_point_b, settings_.units_per_meter));
-        }
-        else
-        {
-            auto it_b = bodies_.find(desc.entity_b);
-            if (it_b == bodies_.end() || !it_b->second.body)
-                return false;
-            const btVector3 pivot_b =
-                it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
-            constraint->setPivotB(pivot_b);
-        }
+        auto it_b = bodies_.find(desc.entity_b);
+        if (it_b == bodies_.end() || !it_b->second.body)
+            return false;
+        const btVector3 pivot_b =
+            it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
+        constraint->setPivotB(pivot_b);
 
         return true;
     }
@@ -1558,8 +1500,7 @@ namespace eeng::ecs::systems
         if (it == constraints_.end() || it->second.kind != ConstraintKind::Hinge)
             return false;
 
-        const entt::entity expected_b = desc.use_world_point_b ? entt::null : desc.entity_b;
-        if (it->second.entity_a != desc.entity_a || it->second.entity_b != expected_b)
+        if (it->second.entity_a != desc.entity_a || it->second.entity_b != desc.entity_b)
             return false;
         if (it->second.disable_collisions != desc.disable_collisions)
             return false;
@@ -1582,8 +1523,7 @@ namespace eeng::ecs::systems
         if (it == constraints_.end() || it->second.kind != ConstraintKind::Slider)
             return false;
 
-        const entt::entity expected_b = desc.use_world_point_b ? entt::null : desc.entity_b;
-        if (it->second.entity_a != desc.entity_a || it->second.entity_b != expected_b)
+        if (it->second.entity_a != desc.entity_a || it->second.entity_b != desc.entity_b)
             return false;
         if (it->second.disable_collisions != desc.disable_collisions)
             return false;
@@ -1608,8 +1548,7 @@ namespace eeng::ecs::systems
         if (it == constraints_.end() || it->second.kind != ConstraintKind::SixDofSpring)
             return false;
 
-        const entt::entity expected_b = desc.use_world_point_b ? entt::null : desc.entity_b;
-        if (it->second.entity_a != desc.entity_a || it->second.entity_b != expected_b)
+        if (it->second.entity_a != desc.entity_a || it->second.entity_b != desc.entity_b)
             return false;
         if (it->second.disable_collisions != desc.disable_collisions)
             return false;

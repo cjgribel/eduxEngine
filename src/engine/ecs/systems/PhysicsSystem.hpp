@@ -98,10 +98,8 @@ namespace eeng::ecs::systems
         {
             entt::entity entity_a{ entt::null };
             entt::entity entity_b{ entt::null };
-            bool use_world_point_b = false;
             glm::vec3 local_anchor_a{ 0.0f };
             glm::vec3 local_anchor_b{ 0.0f };
-            glm::vec3 world_point_b{ 0.0f };
             bool disable_collisions = true;
         };
 
@@ -109,13 +107,10 @@ namespace eeng::ecs::systems
         {
             entt::entity entity_a{ entt::null };
             entt::entity entity_b{ entt::null };
-            bool use_world_point_b = false;
             glm::vec3 local_anchor_a{ 0.0f };
             glm::vec3 local_anchor_b{ 0.0f };
             glm::vec3 local_axis_a{ 0.0f, 1.0f, 0.0f };
             glm::vec3 local_axis_b{ 0.0f, 1.0f, 0.0f };
-            glm::vec3 world_anchor_b{ 0.0f };
-            glm::vec3 world_axis_b{ 0.0f, 1.0f, 0.0f };
             bool use_limits = false;
             float limit_min = 0.0f;
             float limit_max = 0.0f;
@@ -129,13 +124,10 @@ namespace eeng::ecs::systems
         {
             entt::entity entity_a{ entt::null };
             entt::entity entity_b{ entt::null };
-            bool use_world_point_b = false;
             glm::vec3 local_anchor_a{ 0.0f };
             glm::vec3 local_anchor_b{ 0.0f };
             glm::vec3 local_axis_a{ 1.0f, 0.0f, 0.0f };
             glm::vec3 local_axis_b{ 1.0f, 0.0f, 0.0f };
-            glm::vec3 world_anchor_b{ 0.0f };
-            glm::vec3 world_axis_b{ 1.0f, 0.0f, 0.0f };
             float linear_limit_min = 0.0f;
             float linear_limit_max = 0.0f;
             float angular_limit_min = 0.0f;
@@ -150,13 +142,10 @@ namespace eeng::ecs::systems
         {
             entt::entity entity_a{ entt::null };
             entt::entity entity_b{ entt::null };
-            bool use_world_point_b = false;
             glm::vec3 local_anchor_a{ 0.0f };
             glm::quat local_rotation_a{ 1.0f, 0.0f, 0.0f, 0.0f };
             glm::vec3 local_anchor_b{ 0.0f };
             glm::quat local_rotation_b{ 1.0f, 0.0f, 0.0f, 0.0f };
-            glm::vec3 world_anchor_b{ 0.0f };
-            glm::quat world_rotation_b{ 1.0f, 0.0f, 0.0f, 0.0f };
             glm::vec3 linear_limit_min{ 0.0f };
             glm::vec3 linear_limit_max{ 0.0f };
             glm::vec3 angular_limit_min{ 0.0f };
