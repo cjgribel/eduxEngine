@@ -224,19 +224,14 @@ namespace ShapeRendering {
         False = false
     };
 
-    enum class XRayMode : uint8_t
+    struct XRayState
     {
-        Off = 0,
-        On = 1
-    };
+        bool enabled = false;
+        float alpha = 1.0f;
 
-    struct XRayAlpha
-    {
-        float value = 0.35f;
-
-        bool operator == (const XRayAlpha& other) const
+        bool operator == (const XRayState& other) const
         {
-            return value == other.value;
+            return enabled == other.enabled && alpha == other.alpha;
         }
     };
 
@@ -277,7 +272,7 @@ namespace ShapeRendering {
         {
             GLenum topology = GL_LINES;
             DepthTest depth_test = DepthTest::True;
-            XRayMode xray_mode = XRayMode::Off;
+            bool xray_enabled = false;
             float xray_alpha = 1.0f;
 
             bool operator == (const SimpleLineBatch& dc) const
@@ -285,7 +280,7 @@ namespace ShapeRendering {
                 return
                     topology == dc.topology &&
                     depth_test == dc.depth_test &&
-                    xray_mode == dc.xray_mode &&
+                    xray_enabled == dc.xray_enabled &&
                     xray_alpha == dc.xray_alpha;
             }
         };
@@ -294,7 +289,7 @@ namespace ShapeRendering {
         {
             std::size_t operator () (const SimpleLineBatch& ldc) const
             {
-                return hash_combine(ldc.topology, ldc.depth_test, ldc.xray_mode, ldc.xray_alpha);
+                return hash_combine(ldc.topology, ldc.depth_test, ldc.xray_enabled, ldc.xray_alpha);
             }
         };
 
@@ -309,14 +304,14 @@ namespace ShapeRendering {
         {
             DepthTest depth_test = DepthTest::True;
             LineStyle style;
-            XRayMode xray_mode = XRayMode::Off;
+            bool xray_enabled = false;
             float xray_alpha = 1.0f;
 
             bool operator == (const LineBatch& other) const
             {
                 return depth_test == other.depth_test &&
                     style == other.style &&
-                    xray_mode == other.xray_mode &&
+                    xray_enabled == other.xray_enabled &&
                     xray_alpha == other.xray_alpha;
             }
         };
@@ -330,7 +325,7 @@ namespace ShapeRendering {
                     lb.style.dash_period_px,
                     lb.style.dash_ratio,
                     lb.style.dash_offset_px,
-                    lb.xray_mode,
+                    lb.xray_enabled,
                     lb.xray_alpha);
             }
         };
@@ -347,7 +342,7 @@ namespace ShapeRendering {
             GLenum topology = GL_TRIANGLES;
             DepthTest depth_test = DepthTest::True;
             BackfaceCull cull_face = BackfaceCull::True;
-            XRayMode xray_mode = XRayMode::Off;
+            bool xray_enabled = false;
             float xray_alpha = 1.0f;
 
             bool operator == (const PolygonBatch& dc) const
@@ -356,7 +351,7 @@ namespace ShapeRendering {
                     topology == dc.topology &&
                     depth_test == dc.depth_test &&
                     cull_face == dc.cull_face &&
-                    xray_mode == dc.xray_mode &&
+                    xray_enabled == dc.xray_enabled &&
                     xray_alpha == dc.xray_alpha;
             }
         };
@@ -365,7 +360,7 @@ namespace ShapeRendering {
         {
             std::size_t operator () (const PolygonBatch& pdc) const
             {
-                return hash_combine(pdc.topology, pdc.depth_test, pdc.cull_face, pdc.xray_mode, pdc.xray_alpha);
+                return hash_combine(pdc.topology, pdc.depth_test, pdc.cull_face, pdc.xray_enabled, pdc.xray_alpha);
             }
         };
 
@@ -389,14 +384,14 @@ namespace ShapeRendering {
         {
             unsigned size;
             DepthTest depth_test = DepthTest::True;
-            XRayMode xray_mode = XRayMode::Off;
+            bool xray_enabled = false;
             float xray_alpha = 1.0f;
 
             bool operator == (const PointBatch& pdc) const
             {
                 return depth_test == pdc.depth_test
                     && size == pdc.size
-                    && xray_mode == pdc.xray_mode
+                    && xray_enabled == pdc.xray_enabled
                     && xray_alpha == pdc.xray_alpha;
             }
         };
@@ -405,7 +400,7 @@ namespace ShapeRendering {
         {
             std::size_t operator () (const PointBatch& pdc) const
             {
-                return hash_combine(pdc.size, pdc.depth_test, pdc.xray_mode, pdc.xray_alpha);
+                return hash_combine(pdc.size, pdc.depth_test, pdc.xray_enabled, pdc.xray_alpha);
             }
         };
 
@@ -413,21 +408,71 @@ namespace ShapeRendering {
         GLuint point_vbo = 0;
         GLuint point_vao = 0;
 
-        StateStack<DepthTest, XRayMode, XRayAlpha, BackfaceCull, LineType, LineStyle, glm::mat4, Color4u> state_stack;
+        StateStack<DepthTest, XRayState, BackfaceCull, LineType, LineStyle, glm::mat4, Color4u> state_stack;
 
         bool initialized = false;
+
+        template<typename... Args>
+        auto get_states()
+        {
+            return state_stack.top<Args...>();
+        }
+
+        template<class T>
+        auto get_state_integral()
+        {
+            return to_integral(state_stack.top<T>());
+        }
+
+        XRayState xray_state()
+        {
+            return state_stack.top<XRayState>();
+        }
+
+        float xray_alpha_factor(const XRayState& state)
+        {
+            return state.enabled ? state.alpha : 1.0f;
+        }
+
+        PolygonBatch make_polygon_batch_from_state(GLenum topology)
+        {
+            const auto [depth_test, cull_face] = get_states<DepthTest, BackfaceCull>();
+            const auto state = xray_state();
+            return PolygonBatch{ topology, depth_test, cull_face, state.enabled, xray_alpha_factor(state) };
+        }
+
+        LineBatch make_line_batch_from_state()
+        {
+            const auto [depth_test, style] = get_states<DepthTest, LineStyle>();
+            const auto state = xray_state();
+            return LineBatch{ depth_test, style, state.enabled, xray_alpha_factor(state) };
+        }
+
+        SimpleLineBatch make_simple_line_batch_from_state(GLenum topology)
+        {
+            const auto depth_test = get_states<DepthTest>();
+            const auto state = xray_state();
+            return SimpleLineBatch{ topology, depth_test, state.enabled, xray_alpha_factor(state) };
+        }
+
+        PointBatch make_point_batch_from_state(unsigned size)
+        {
+            const auto depth_test = get_states<DepthTest>();
+            const auto state = xray_state();
+            return PointBatch{ size, depth_test, state.enabled, xray_alpha_factor(state) };
+        }
 
     public:
         void init();
 
         void push_xray(float alpha = 0.35f)
         {
-            push_states(XRayMode::On, XRayAlpha{ alpha });
+            push_states(XRayState{ true, alpha });
         }
 
         void pop_xray()
         {
-            pop_states<XRayMode, XRayAlpha>();
+            pop_states<XRayState>();
         }
 
         template<typename... Args>
@@ -440,18 +485,6 @@ namespace ShapeRendering {
         void pop_states()
         {
             state_stack.pop<Args...>();
-        }
-
-        template<typename... Args>
-        auto get_states()
-        {
-            return state_stack.top<Args...>();
-        }
-
-        template<class T>
-        auto get_state_integral()
-        {
-            return to_integral(state_stack.top<T>());
         }
 
         void push_quad(

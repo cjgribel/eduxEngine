@@ -216,6 +216,9 @@ namespace eeng::ecs::systems
         // --- Collider wireframes + labels ----------------------------------
         if (settings.show_colliders || settings.show_collider_labels)
         {
+            if (settings.show_colliders)
+                renderer.push_xray();
+
             auto view = registry.view<ecs::TransformComponent, ecs::ColliderComponent>();
             for (const auto entity : view)
             {
@@ -295,6 +298,9 @@ namespace eeng::ecs::systems
                     }
                 }
             }
+
+            if (settings.show_colliders)
+                renderer.pop_xray();
         }
 
         // --- RigidBody labels + COM/axes -----------------------------------
@@ -303,6 +309,13 @@ namespace eeng::ecs::systems
             || settings.show_rigidbody_axes
             || settings.show_rigidbody_offset)
         {
+            const bool show_rigidbody_geom =
+                settings.show_rigidbody_com
+                || settings.show_rigidbody_axes
+                || settings.show_rigidbody_offset;
+            if (show_rigidbody_geom)
+                renderer.push_xray();
+
             auto view = registry.view<ecs::TransformComponent, ecs::RigidBodyComponent>();
             for (const auto entity : view)
             {
@@ -323,13 +336,11 @@ namespace eeng::ecs::systems
 
                 if (settings.show_rigidbody_com)
                 {
-                    renderer.push_xray();
                     renderer.push_states(
                         ShapeRendering::Color4u{ settings.rigidbody_com_color },
                         glm::translate(glm::mat4(1.0f), com_pos));
                     renderer.push_sphere_wireframe(settings.rigidbody_com_radius, settings.rigidbody_com_radius);
                     renderer.pop_states<glm::mat4, ShapeRendering::Color4u>();
-                    renderer.pop_xray();
                 }
 
                 if (settings.show_rigidbody_axes)
@@ -380,11 +391,16 @@ namespace eeng::ecs::systems
                         settings.rigidbody_label_text);
                 }
             }
+
+            if (show_rigidbody_geom)
+                renderer.pop_xray();
         }
 
         // --- Spring-damper debug ------------------------------------------
         if (settings.show_springs)
         {
+            renderer.push_xray();
+
             auto view = registry.view<ecs::SpringDamperComponent>();
             for (const auto entity : view)
             {
@@ -468,6 +484,8 @@ namespace eeng::ecs::systems
                 renderer.pop_states<ShapeRendering::Color4u>();
                 renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
             }
+
+            renderer.pop_xray();
         }
 
         // --- Constraint debug ---------------------------------------------
