@@ -7,6 +7,7 @@
 #include "ShapeRenderer.hpp"
 #include "ecs/systems/AnimationGraphSystem.hpp"
 #include "ecs/systems/AnimationSystem.hpp"
+#include "ecs/systems/ConstraintSystem.hpp"
 #include "ecs/systems/DebugRenderSystem.hpp"
 #include "ecs/systems/PhysicsSystem.hpp"
 #include "ecs/systems/SpringDamperSystem.hpp"
@@ -47,6 +48,7 @@ namespace eeng::ecs
             physics_system_ = std::make_unique<systems::PhysicsSystem>();
             physics_system_->init(ctx);
 
+            constraint_system_ = std::make_unique<systems::ConstraintSystem>();
             spring_damper_system_ = std::make_unique<systems::SpringDamperSystem>();
 
             script_system_ = std::make_unique<systems::ScriptSystem>();
@@ -67,6 +69,8 @@ namespace eeng::ecs
                 animation_graph_system_->update(registry, ctx, delta_time);
             if (animation_system_)
                 animation_system_->update(registry, ctx, delta_time);
+            if (constraint_system_ && physics_system_)
+                constraint_system_->update(registry, ctx, *physics_system_, delta_time);
             if (spring_damper_system_ && physics_system_)
                 spring_damper_system_->update(registry, ctx, *physics_system_, delta_time);
             if (physics_system_)
@@ -178,6 +182,7 @@ namespace eeng::ecs
         std::unique_ptr<systems::AnimationGraphSystem> animation_graph_system_;
         std::unique_ptr<systems::TransformSystem> transform_system_;
         std::unique_ptr<systems::PhysicsSystem> physics_system_;
+        std::unique_ptr<systems::ConstraintSystem> constraint_system_;
         std::unique_ptr<systems::SpringDamperSystem> spring_damper_system_;
         std::unique_ptr<systems::ScriptSystem> script_system_;
         std::unique_ptr<systems::DebugRenderSystem> debug_render_system_;

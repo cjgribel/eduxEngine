@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -51,6 +52,8 @@ namespace eeng::ecs::systems
     class PhysicsSystem
     {
     public:
+        using ConstraintHandle = std::uint32_t;
+
         // Snapshot of physics runtime counters used by the monitor window.
         struct PhysicsStats
         {
@@ -89,6 +92,80 @@ namespace eeng::ecs::systems
             glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
             glm::vec3 linear_velocity{ 0.0f };
             glm::vec3 angular_velocity{ 0.0f };
+        };
+
+        struct PointConstraintDesc
+        {
+            entt::entity entity_a{ entt::null };
+            entt::entity entity_b{ entt::null };
+            bool use_world_point_b = false;
+            glm::vec3 local_anchor_a{ 0.0f };
+            glm::vec3 local_anchor_b{ 0.0f };
+            glm::vec3 world_point_b{ 0.0f };
+            bool disable_collisions = true;
+        };
+
+        struct HingeConstraintDesc
+        {
+            entt::entity entity_a{ entt::null };
+            entt::entity entity_b{ entt::null };
+            bool use_world_point_b = false;
+            glm::vec3 local_anchor_a{ 0.0f };
+            glm::vec3 local_anchor_b{ 0.0f };
+            glm::vec3 local_axis_a{ 0.0f, 1.0f, 0.0f };
+            glm::vec3 local_axis_b{ 0.0f, 1.0f, 0.0f };
+            glm::vec3 world_anchor_b{ 0.0f };
+            glm::vec3 world_axis_b{ 0.0f, 1.0f, 0.0f };
+            bool use_limits = false;
+            float limit_min = 0.0f;
+            float limit_max = 0.0f;
+            bool enable_motor = false;
+            float motor_target_velocity = 0.0f;
+            float motor_max_impulse = 0.0f;
+            bool disable_collisions = true;
+        };
+
+        struct SliderConstraintDesc
+        {
+            entt::entity entity_a{ entt::null };
+            entt::entity entity_b{ entt::null };
+            bool use_world_point_b = false;
+            glm::vec3 local_anchor_a{ 0.0f };
+            glm::vec3 local_anchor_b{ 0.0f };
+            glm::vec3 local_axis_a{ 1.0f, 0.0f, 0.0f };
+            glm::vec3 local_axis_b{ 1.0f, 0.0f, 0.0f };
+            glm::vec3 world_anchor_b{ 0.0f };
+            glm::vec3 world_axis_b{ 1.0f, 0.0f, 0.0f };
+            float linear_limit_min = 0.0f;
+            float linear_limit_max = 0.0f;
+            float angular_limit_min = 0.0f;
+            float angular_limit_max = 0.0f;
+            bool enable_linear_motor = false;
+            float linear_motor_target_velocity = 0.0f;
+            float linear_motor_max_force = 0.0f;
+            bool disable_collisions = true;
+        };
+
+        struct SixDofSpringConstraintDesc
+        {
+            entt::entity entity_a{ entt::null };
+            entt::entity entity_b{ entt::null };
+            bool use_world_point_b = false;
+            glm::vec3 local_anchor_a{ 0.0f };
+            glm::quat local_rotation_a{ 1.0f, 0.0f, 0.0f, 0.0f };
+            glm::vec3 local_anchor_b{ 0.0f };
+            glm::quat local_rotation_b{ 1.0f, 0.0f, 0.0f, 0.0f };
+            glm::vec3 world_anchor_b{ 0.0f };
+            glm::quat world_rotation_b{ 1.0f, 0.0f, 0.0f, 0.0f };
+            glm::vec3 linear_limit_min{ 0.0f };
+            glm::vec3 linear_limit_max{ 0.0f };
+            glm::vec3 angular_limit_min{ 0.0f };
+            glm::vec3 angular_limit_max{ 0.0f };
+            glm::vec3 linear_stiffness{ 0.0f };
+            glm::vec3 linear_damping{ 0.0f };
+            glm::vec3 angular_stiffness{ 0.0f };
+            glm::vec3 angular_damping{ 0.0f };
+            bool disable_collisions = true;
         };
 
         PhysicsSystem() = default;
@@ -131,6 +208,18 @@ namespace eeng::ecs::systems
             const glm::vec3& point_world);
 
         bool get_body_state(entt::entity entity, BodyState& out_state) const;
+
+        ConstraintHandle create_point_constraint(const PointConstraintDesc& desc);
+        ConstraintHandle create_hinge_constraint(const HingeConstraintDesc& desc);
+        ConstraintHandle create_slider_constraint(const SliderConstraintDesc& desc);
+        ConstraintHandle create_sixdof_spring_constraint(const SixDofSpringConstraintDesc& desc);
+
+        bool update_point_constraint(ConstraintHandle handle, const PointConstraintDesc& desc);
+        bool update_hinge_constraint(ConstraintHandle handle, const HingeConstraintDesc& desc);
+        bool update_slider_constraint(ConstraintHandle handle, const SliderConstraintDesc& desc);
+        bool update_sixdof_spring_constraint(ConstraintHandle handle, const SixDofSpringConstraintDesc& desc);
+
+        void destroy_constraint(ConstraintHandle handle);
 
     private:
         struct RaycastCallback;
@@ -236,6 +325,26 @@ namespace eeng::ecs::systems
             Type type = Type::ForceAtPoint;
         };
         std::vector<ForceRequest> force_requests_;
+
+        enum class ConstraintKind : std::uint8_t
+        {
+            Point,
+            Hinge,
+            Slider,
+            SixDofSpring
+        };
+
+        struct ConstraintRuntime
+        {
+            ConstraintKind kind{};
+            entt::entity entity_a{ entt::null };
+            entt::entity entity_b{ entt::null };
+            bool disable_collisions = true;
+            std::unique_ptr<btTypedConstraint> constraint;
+        };
+
+        std::unordered_map<ConstraintHandle, ConstraintRuntime> constraints_;
+        ConstraintHandle next_constraint_handle_ = 1;
         // Set when batch load/unload completes to force a structural sync on the next update.
         bool batch_sync_requested_ = false;
         bool initialized_ = false;
@@ -255,6 +364,8 @@ namespace eeng::ecs::systems
         void sync_transforms_to_bullet(entt::registry& registry);
         void sync_transforms_from_bullet(entt::registry& registry);
         void apply_force_requests();
+        void destroy_all_constraints();
+        void remove_constraints_for_entity(entt::entity entity);
         void clear_contact_events(entt::registry& registry);
         void emit_contact_events(entt::registry& registry, EngineContext& ctx);
         // Resolve collider metadata from a compound part id (defaults to index 0).

@@ -166,13 +166,11 @@ namespace eeng::ecs
         std::vector<CollisionEvent> events;
     };
 
-    // Spring-damper between two bodies or a body and a world point.
+    // Spring-damper between two entities (anchors without rigid bodies act as static points).
     struct SpringDamperComponent
     {
-        // Optional second body; when use_world_point_b is true, entity_b is ignored.
+        EntityRef entity_a{};
         EntityRef entity_b{};
-        bool use_world_point_b = false;
-        glm::vec3 world_point_b{ 0.0f };
 
         // Anchors in local space of each body.
         glm::vec3 local_anchor_a{ 0.0f };
@@ -185,14 +183,103 @@ namespace eeng::ecs
         float linear_damping = 0.0f;
         float rest_length = 0.0f;
 
-        // Optional angular spring parameters (entity-to-entity only).
+        // Optional angular spring parameters.
         bool enable_angular = false;
         float angular_stiffness = 0.0f;
         float angular_damping = 0.0f;
-        // When use_world_point_b is false: rest rotation from body A to body B.
-        // When use_world_point_b is true: target world rotation for body A.
+        // When both anchors are bodies: rest rotation from anchor A to anchor B.
+        // When only one anchor has a body: target world rotation for that body.
         glm::quat rest_rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
 
+        bool enabled = true;
+    };
+
+    struct PointConstraintComponent
+    {
+        // Optional second body; when use_world_point_b is true, entity_b is ignored.
+        EntityRef entity_b{};
+        bool use_world_point_b = false;
+        glm::vec3 world_point_b{ 0.0f };
+
+        glm::vec3 local_anchor_a{ 0.0f };
+        glm::vec3 local_anchor_b{ 0.0f };
+
+        bool disable_collisions = true;
+        bool enabled = true;
+    };
+
+    struct HingeConstraintComponent
+    {
+        EntityRef entity_b{};
+        bool use_world_point_b = false;
+        glm::vec3 world_anchor_b{ 0.0f };
+        glm::vec3 world_axis_b{ 0.0f, 1.0f, 0.0f };
+
+        glm::vec3 local_anchor_a{ 0.0f };
+        glm::vec3 local_anchor_b{ 0.0f };
+        glm::vec3 local_axis_a{ 0.0f, 1.0f, 0.0f };
+        glm::vec3 local_axis_b{ 0.0f, 1.0f, 0.0f };
+
+        bool use_limits = false;
+        float limit_min = 0.0f;
+        float limit_max = 0.0f;
+
+        bool enable_motor = false;
+        float motor_target_velocity = 0.0f;
+        float motor_max_impulse = 0.0f;
+
+        bool disable_collisions = true;
+        bool enabled = true;
+    };
+
+    struct SliderConstraintComponent
+    {
+        EntityRef entity_b{};
+        bool use_world_point_b = false;
+        glm::vec3 world_anchor_b{ 0.0f };
+        glm::vec3 world_axis_b{ 1.0f, 0.0f, 0.0f };
+
+        glm::vec3 local_anchor_a{ 0.0f };
+        glm::vec3 local_anchor_b{ 0.0f };
+        glm::vec3 local_axis_a{ 1.0f, 0.0f, 0.0f };
+        glm::vec3 local_axis_b{ 1.0f, 0.0f, 0.0f };
+
+        float linear_limit_min = 0.0f;
+        float linear_limit_max = 0.0f;
+        float angular_limit_min = 0.0f;
+        float angular_limit_max = 0.0f;
+
+        bool enable_linear_motor = false;
+        float linear_motor_target_velocity = 0.0f;
+        float linear_motor_max_force = 0.0f;
+
+        bool disable_collisions = true;
+        bool enabled = true;
+    };
+
+    struct SixDofSpringConstraintComponent
+    {
+        EntityRef entity_b{};
+        bool use_world_point_b = false;
+        glm::vec3 world_anchor_b{ 0.0f };
+        glm::quat world_rotation_b{ 1.0f, 0.0f, 0.0f, 0.0f };
+
+        glm::vec3 local_anchor_a{ 0.0f };
+        glm::quat local_rotation_a{ 1.0f, 0.0f, 0.0f, 0.0f };
+        glm::vec3 local_anchor_b{ 0.0f };
+        glm::quat local_rotation_b{ 1.0f, 0.0f, 0.0f, 0.0f };
+
+        glm::vec3 linear_limit_min{ 0.0f };
+        glm::vec3 linear_limit_max{ 0.0f };
+        glm::vec3 angular_limit_min{ 0.0f };
+        glm::vec3 angular_limit_max{ 0.0f };
+
+        glm::vec3 linear_stiffness{ 0.0f };
+        glm::vec3 linear_damping{ 0.0f };
+        glm::vec3 angular_stiffness{ 0.0f };
+        glm::vec3 angular_damping{ 0.0f };
+
+        bool disable_collisions = true;
         bool enabled = true;
     };
 
@@ -249,6 +336,26 @@ namespace eeng::ecs
         return "SpringDamperComponent";
     }
 
+    inline std::string to_string(const PointConstraintComponent&)
+    {
+        return "PointConstraintComponent";
+    }
+
+    inline std::string to_string(const HingeConstraintComponent&)
+    {
+        return "HingeConstraintComponent";
+    }
+
+    inline std::string to_string(const SliderConstraintComponent&)
+    {
+        return "SliderConstraintComponent";
+    }
+
+    inline std::string to_string(const SixDofSpringConstraintComponent&)
+    {
+        return "SixDofSpringConstraintComponent";
+    }
+
     inline std::string to_string(const PhysicsRaycastDebugComponent&)
     {
         return "PhysicsRaycastDebugComponent";
@@ -297,7 +404,44 @@ namespace eeng::ecs
     template<typename Visitor>
     void visit_entity_refs(SpringDamperComponent& spring, Visitor&& visitor)
     {
+        visitor(spring.entity_a);
         visitor(spring.entity_b);
+    }
+
+    template<typename Visitor>
+    void visit_asset_refs(PointConstraintComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_entity_refs(PointConstraintComponent& constraint, Visitor&& visitor)
+    {
+        visitor(constraint.entity_b);
+    }
+
+    template<typename Visitor>
+    void visit_asset_refs(HingeConstraintComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_entity_refs(HingeConstraintComponent& constraint, Visitor&& visitor)
+    {
+        visitor(constraint.entity_b);
+    }
+
+    template<typename Visitor>
+    void visit_asset_refs(SliderConstraintComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_entity_refs(SliderConstraintComponent& constraint, Visitor&& visitor)
+    {
+        visitor(constraint.entity_b);
+    }
+
+    template<typename Visitor>
+    void visit_asset_refs(SixDofSpringConstraintComponent&, Visitor&&) {}
+
+    template<typename Visitor>
+    void visit_entity_refs(SixDofSpringConstraintComponent& constraint, Visitor&& visitor)
+    {
+        visitor(constraint.entity_b);
     }
 
     template<typename Visitor>

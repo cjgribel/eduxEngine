@@ -100,6 +100,35 @@ namespace
         return btVector3(v.x, v.y, v.z);
     }
 
+    btVector3 to_bt_dir(const glm::vec3& v)
+    {
+        return btVector3(v.x, v.y, v.z);
+    }
+
+    btVector3 normalize_or_default(const btVector3& v, const btVector3& fallback)
+    {
+        const btScalar len2 = v.length2();
+        if (len2 <= btScalar(1e-12))
+            return fallback;
+        return v / btSqrt(len2);
+    }
+
+    btMatrix3x3 basis_from_axis(const btVector3& axis)
+    {
+        const btVector3 x = normalize_or_default(axis, btVector3(1.0f, 0.0f, 0.0f));
+        const btVector3 up = (btFabs(x.dot(btVector3(0.0f, 1.0f, 0.0f))) > btScalar(0.99))
+            ? btVector3(0.0f, 0.0f, 1.0f)
+            : btVector3(0.0f, 1.0f, 0.0f);
+        const btVector3 z = normalize_or_default(x.cross(up), btVector3(0.0f, 0.0f, 1.0f));
+        const btVector3 y = normalize_or_default(z.cross(x), btVector3(0.0f, 1.0f, 0.0f));
+
+        btMatrix3x3 basis;
+        basis[0] = x;
+        basis[1] = y;
+        basis[2] = z;
+        return basis;
+    }
+
     // Check if a Bullet quaternion is close to identity.
     bool is_identity_quat(const btQuaternion& q)
     {
@@ -461,6 +490,7 @@ namespace eeng::ecs::systems
         current_contacts_.clear();
         previous_contacts_.clear();
         force_requests_.clear();
+        destroy_all_constraints();
         batch_sync_requested_ = true;
 
         auto* registry = eeng::try_get_registry_ptr(ctx, "PhysicsSystem");
@@ -508,6 +538,7 @@ namespace eeng::ecs::systems
         bodies_.clear();
         dirty_entities_.clear();
         force_requests_.clear();
+        destroy_all_constraints();
         ctx_ = nullptr;
         world_.shutdown();
         initialized_ = false;
@@ -603,6 +634,7 @@ namespace eeng::ecs::systems
             if (!registry.valid(entity)
                 || !registry.all_of<ecs::TransformComponent, ecs::RigidBodyComponent, ecs::ColliderComponent>(entity))
             {
+                remove_constraints_for_entity(entity);
                 if (it->second.body)
                     world->removeRigidBody(it->second.body.get());
                 it = bodies_.erase(it);
@@ -632,6 +664,7 @@ namespace eeng::ecs::systems
                             scale_changed ? 1 : 0,
                             colliders_cleared ? 1 : 0);
                     }
+                    remove_constraints_for_entity(entity);
                     if (it->second.body)
                         world->removeRigidBody(it->second.body.get());
                     it = bodies_.erase(it);
@@ -963,6 +996,8 @@ namespace eeng::ecs::systems
         if (it == bodies_.end())
             return;
 
+        remove_constraints_for_entity(entity);
+
         if (auto* world = world_.world())
         {
             if (it->second.body)
@@ -1195,6 +1230,440 @@ namespace eeng::ecs::systems
         return true;
     }
 
+    PhysicsSystem::ConstraintHandle PhysicsSystem::create_point_constraint(const PointConstraintDesc& desc)
+    {
+        auto* world = world_.world();
+        if (!world)
+            return 0;
+
+        auto it_a = bodies_.find(desc.entity_a);
+        if (it_a == bodies_.end() || !it_a->second.body)
+            return 0;
+
+        btRigidBody* body_a = it_a->second.body.get();
+        const btVector3 pivot_a =
+            it_a->second.com_local_inverse * to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter);
+
+        btRigidBody* body_b = nullptr;
+        btVector3 pivot_b(0.0f, 0.0f, 0.0f);
+        entt::entity entity_b = entt::null;
+
+        if (desc.use_world_point_b)
+        {
+            body_b = &btTypedConstraint::getFixedBody();
+            pivot_b = to_bt_vec3(desc.world_point_b, settings_.units_per_meter);
+        }
+        else
+        {
+            if (desc.entity_b == entt::null)
+                return 0;
+            auto it_b = bodies_.find(desc.entity_b);
+            if (it_b == bodies_.end() || !it_b->second.body)
+                return 0;
+            body_b = it_b->second.body.get();
+            pivot_b = it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
+            entity_b = desc.entity_b;
+        }
+
+        auto constraint = std::make_unique<btPoint2PointConstraint>(
+            *body_a, *body_b, pivot_a, pivot_b);
+
+        world->addConstraint(constraint.get(), desc.disable_collisions);
+
+        const ConstraintHandle handle = next_constraint_handle_++;
+        constraints_.emplace(handle, ConstraintRuntime{
+            ConstraintKind::Point,
+            desc.entity_a,
+            entity_b,
+            desc.disable_collisions,
+            std::move(constraint)
+        });
+        return handle;
+    }
+
+    PhysicsSystem::ConstraintHandle PhysicsSystem::create_hinge_constraint(const HingeConstraintDesc& desc)
+    {
+        auto* world = world_.world();
+        if (!world)
+            return 0;
+
+        auto it_a = bodies_.find(desc.entity_a);
+        if (it_a == bodies_.end() || !it_a->second.body)
+            return 0;
+
+        btRigidBody* body_a = it_a->second.body.get();
+        const btVector3 pivot_a =
+            it_a->second.com_local_inverse * to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter);
+        const btVector3 axis_a = normalize_or_default(
+            it_a->second.com_local_inverse.getBasis() * to_bt_dir(desc.local_axis_a),
+            btVector3(0.0f, 1.0f, 0.0f));
+
+        btRigidBody* body_b = nullptr;
+        btVector3 pivot_b(0.0f, 0.0f, 0.0f);
+        btVector3 axis_b(0.0f, 1.0f, 0.0f);
+        entt::entity entity_b = entt::null;
+
+        if (desc.use_world_point_b)
+        {
+            body_b = &btTypedConstraint::getFixedBody();
+            pivot_b = to_bt_vec3(desc.world_anchor_b, settings_.units_per_meter);
+            axis_b = normalize_or_default(to_bt_dir(desc.world_axis_b), btVector3(0.0f, 1.0f, 0.0f));
+        }
+        else
+        {
+            if (desc.entity_b == entt::null)
+                return 0;
+            auto it_b = bodies_.find(desc.entity_b);
+            if (it_b == bodies_.end() || !it_b->second.body)
+                return 0;
+            body_b = it_b->second.body.get();
+            pivot_b = it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
+            axis_b = normalize_or_default(
+                it_b->second.com_local_inverse.getBasis() * to_bt_dir(desc.local_axis_b),
+                btVector3(0.0f, 1.0f, 0.0f));
+            entity_b = desc.entity_b;
+        }
+
+        auto constraint = std::make_unique<btHingeConstraint>(
+            *body_a, *body_b, pivot_a, pivot_b, axis_a, axis_b, true);
+
+        if (desc.use_limits)
+            constraint->setLimit(desc.limit_min, desc.limit_max);
+        constraint->enableMotor(desc.enable_motor);
+        constraint->setMotorTargetVelocity(desc.motor_target_velocity);
+        constraint->setMaxMotorImpulse(desc.motor_max_impulse);
+
+        world->addConstraint(constraint.get(), desc.disable_collisions);
+
+        const ConstraintHandle handle = next_constraint_handle_++;
+        constraints_.emplace(handle, ConstraintRuntime{
+            ConstraintKind::Hinge,
+            desc.entity_a,
+            entity_b,
+            desc.disable_collisions,
+            std::move(constraint)
+        });
+        return handle;
+    }
+
+    PhysicsSystem::ConstraintHandle PhysicsSystem::create_slider_constraint(const SliderConstraintDesc& desc)
+    {
+        auto* world = world_.world();
+        if (!world)
+            return 0;
+
+        auto it_a = bodies_.find(desc.entity_a);
+        if (it_a == bodies_.end() || !it_a->second.body)
+            return 0;
+
+        btRigidBody* body_a = it_a->second.body.get();
+
+        const btVector3 pivot_a = to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter);
+        const btMatrix3x3 basis_a = basis_from_axis(to_bt_dir(desc.local_axis_a));
+        btTransform frame_a;
+        frame_a.setIdentity();
+        frame_a.setOrigin(pivot_a);
+        frame_a.setBasis(basis_a);
+        frame_a = it_a->second.com_local_inverse * frame_a;
+
+        btRigidBody* body_b = nullptr;
+        btTransform frame_b;
+        frame_b.setIdentity();
+        entt::entity entity_b = entt::null;
+
+        if (desc.use_world_point_b)
+        {
+            body_b = &btTypedConstraint::getFixedBody();
+            const btVector3 pivot_b = to_bt_vec3(desc.world_anchor_b, settings_.units_per_meter);
+            const btMatrix3x3 basis_b = basis_from_axis(to_bt_dir(desc.world_axis_b));
+            frame_b.setOrigin(pivot_b);
+            frame_b.setBasis(basis_b);
+        }
+        else
+        {
+            if (desc.entity_b == entt::null)
+                return 0;
+            auto it_b = bodies_.find(desc.entity_b);
+            if (it_b == bodies_.end() || !it_b->second.body)
+                return 0;
+            body_b = it_b->second.body.get();
+            const btVector3 pivot_b = to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
+            const btMatrix3x3 basis_b = basis_from_axis(to_bt_dir(desc.local_axis_b));
+            frame_b.setOrigin(pivot_b);
+            frame_b.setBasis(basis_b);
+            frame_b = it_b->second.com_local_inverse * frame_b;
+            entity_b = desc.entity_b;
+        }
+
+        auto constraint = std::make_unique<btSliderConstraint>(
+            *body_a, *body_b, frame_a, frame_b, true);
+
+        constraint->setLowerLinLimit(desc.linear_limit_min * world_.meters_per_unit());
+        constraint->setUpperLinLimit(desc.linear_limit_max * world_.meters_per_unit());
+        constraint->setLowerAngLimit(desc.angular_limit_min);
+        constraint->setUpperAngLimit(desc.angular_limit_max);
+        constraint->setPoweredLinMotor(desc.enable_linear_motor);
+        constraint->setTargetLinMotorVelocity(desc.linear_motor_target_velocity * world_.meters_per_unit());
+        constraint->setMaxLinMotorForce(desc.linear_motor_max_force);
+
+        world->addConstraint(constraint.get(), desc.disable_collisions);
+
+        const ConstraintHandle handle = next_constraint_handle_++;
+        constraints_.emplace(handle, ConstraintRuntime{
+            ConstraintKind::Slider,
+            desc.entity_a,
+            entity_b,
+            desc.disable_collisions,
+            std::move(constraint)
+        });
+        return handle;
+    }
+
+    PhysicsSystem::ConstraintHandle PhysicsSystem::create_sixdof_spring_constraint(const SixDofSpringConstraintDesc& desc)
+    {
+        auto* world = world_.world();
+        if (!world)
+            return 0;
+
+        auto it_a = bodies_.find(desc.entity_a);
+        if (it_a == bodies_.end() || !it_a->second.body)
+            return 0;
+
+        btRigidBody* body_a = it_a->second.body.get();
+
+        btTransform frame_a;
+        frame_a.setIdentity();
+        frame_a.setOrigin(to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter));
+        frame_a.setRotation(to_bt_quat(desc.local_rotation_a));
+        frame_a = it_a->second.com_local_inverse * frame_a;
+
+        btRigidBody* body_b = nullptr;
+        btTransform frame_b;
+        frame_b.setIdentity();
+        entt::entity entity_b = entt::null;
+
+        if (desc.use_world_point_b)
+        {
+            body_b = &btTypedConstraint::getFixedBody();
+            frame_b.setOrigin(to_bt_vec3(desc.world_anchor_b, settings_.units_per_meter));
+            frame_b.setRotation(to_bt_quat(desc.world_rotation_b));
+        }
+        else
+        {
+            if (desc.entity_b == entt::null)
+                return 0;
+            auto it_b = bodies_.find(desc.entity_b);
+            if (it_b == bodies_.end() || !it_b->second.body)
+                return 0;
+            body_b = it_b->second.body.get();
+            frame_b.setOrigin(to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter));
+            frame_b.setRotation(to_bt_quat(desc.local_rotation_b));
+            frame_b = it_b->second.com_local_inverse * frame_b;
+            entity_b = desc.entity_b;
+        }
+
+        auto constraint = std::make_unique<btGeneric6DofSpring2Constraint>(
+            *body_a, *body_b, frame_a, frame_b);
+
+        const btVector3 linear_lower = to_bt_vec3(desc.linear_limit_min, settings_.units_per_meter);
+        const btVector3 linear_upper = to_bt_vec3(desc.linear_limit_max, settings_.units_per_meter);
+        constraint->setLinearLowerLimit(linear_lower);
+        constraint->setLinearUpperLimit(linear_upper);
+        constraint->setAngularLowerLimit(to_bt_vec3_raw(desc.angular_limit_min));
+        constraint->setAngularUpperLimit(to_bt_vec3_raw(desc.angular_limit_max));
+
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const float stiff = desc.linear_stiffness[axis];
+            const float damp = desc.linear_damping[axis];
+            const bool enable = (stiff != 0.0f || damp != 0.0f);
+            constraint->enableSpring(axis, enable);
+            if (enable)
+            {
+                constraint->setStiffness(axis, stiff);
+                constraint->setDamping(axis, damp);
+            }
+        }
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const float stiff = desc.angular_stiffness[axis];
+            const float damp = desc.angular_damping[axis];
+            const bool enable = (stiff != 0.0f || damp != 0.0f);
+            constraint->enableSpring(axis + 3, enable);
+            if (enable)
+            {
+                constraint->setStiffness(axis + 3, stiff);
+                constraint->setDamping(axis + 3, damp);
+            }
+        }
+        constraint->setEquilibriumPoint();
+
+        world->addConstraint(constraint.get(), desc.disable_collisions);
+
+        const ConstraintHandle handle = next_constraint_handle_++;
+        constraints_.emplace(handle, ConstraintRuntime{
+            ConstraintKind::SixDofSpring,
+            desc.entity_a,
+            entity_b,
+            desc.disable_collisions,
+            std::move(constraint)
+        });
+        return handle;
+    }
+
+    bool PhysicsSystem::update_point_constraint(ConstraintHandle handle, const PointConstraintDesc& desc)
+    {
+        auto it = constraints_.find(handle);
+        if (it == constraints_.end() || it->second.kind != ConstraintKind::Point)
+            return false;
+
+        const entt::entity expected_b = desc.use_world_point_b ? entt::null : desc.entity_b;
+        if (it->second.entity_a != desc.entity_a || it->second.entity_b != expected_b)
+            return false;
+        if (it->second.disable_collisions != desc.disable_collisions)
+            return false;
+
+        auto* constraint = static_cast<btPoint2PointConstraint*>(it->second.constraint.get());
+        if (!constraint)
+            return false;
+
+        auto it_a = bodies_.find(desc.entity_a);
+        if (it_a == bodies_.end() || !it_a->second.body)
+            return false;
+
+        const btVector3 pivot_a =
+            it_a->second.com_local_inverse * to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter);
+        constraint->setPivotA(pivot_a);
+
+        if (desc.use_world_point_b)
+        {
+            constraint->setPivotB(to_bt_vec3(desc.world_point_b, settings_.units_per_meter));
+        }
+        else
+        {
+            auto it_b = bodies_.find(desc.entity_b);
+            if (it_b == bodies_.end() || !it_b->second.body)
+                return false;
+            const btVector3 pivot_b =
+                it_b->second.com_local_inverse * to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter);
+            constraint->setPivotB(pivot_b);
+        }
+
+        return true;
+    }
+
+    bool PhysicsSystem::update_hinge_constraint(ConstraintHandle handle, const HingeConstraintDesc& desc)
+    {
+        auto it = constraints_.find(handle);
+        if (it == constraints_.end() || it->second.kind != ConstraintKind::Hinge)
+            return false;
+
+        const entt::entity expected_b = desc.use_world_point_b ? entt::null : desc.entity_b;
+        if (it->second.entity_a != desc.entity_a || it->second.entity_b != expected_b)
+            return false;
+        if (it->second.disable_collisions != desc.disable_collisions)
+            return false;
+
+        auto* constraint = static_cast<btHingeConstraint*>(it->second.constraint.get());
+        if (!constraint)
+            return false;
+
+        if (desc.use_limits)
+            constraint->setLimit(desc.limit_min, desc.limit_max);
+        constraint->enableMotor(desc.enable_motor);
+        constraint->setMotorTargetVelocity(desc.motor_target_velocity);
+        constraint->setMaxMotorImpulse(desc.motor_max_impulse);
+        return true;
+    }
+
+    bool PhysicsSystem::update_slider_constraint(ConstraintHandle handle, const SliderConstraintDesc& desc)
+    {
+        auto it = constraints_.find(handle);
+        if (it == constraints_.end() || it->second.kind != ConstraintKind::Slider)
+            return false;
+
+        const entt::entity expected_b = desc.use_world_point_b ? entt::null : desc.entity_b;
+        if (it->second.entity_a != desc.entity_a || it->second.entity_b != expected_b)
+            return false;
+        if (it->second.disable_collisions != desc.disable_collisions)
+            return false;
+
+        auto* constraint = static_cast<btSliderConstraint*>(it->second.constraint.get());
+        if (!constraint)
+            return false;
+
+        constraint->setLowerLinLimit(desc.linear_limit_min * world_.meters_per_unit());
+        constraint->setUpperLinLimit(desc.linear_limit_max * world_.meters_per_unit());
+        constraint->setLowerAngLimit(desc.angular_limit_min);
+        constraint->setUpperAngLimit(desc.angular_limit_max);
+        constraint->setPoweredLinMotor(desc.enable_linear_motor);
+        constraint->setTargetLinMotorVelocity(desc.linear_motor_target_velocity * world_.meters_per_unit());
+        constraint->setMaxLinMotorForce(desc.linear_motor_max_force);
+        return true;
+    }
+
+    bool PhysicsSystem::update_sixdof_spring_constraint(ConstraintHandle handle, const SixDofSpringConstraintDesc& desc)
+    {
+        auto it = constraints_.find(handle);
+        if (it == constraints_.end() || it->second.kind != ConstraintKind::SixDofSpring)
+            return false;
+
+        const entt::entity expected_b = desc.use_world_point_b ? entt::null : desc.entity_b;
+        if (it->second.entity_a != desc.entity_a || it->second.entity_b != expected_b)
+            return false;
+        if (it->second.disable_collisions != desc.disable_collisions)
+            return false;
+
+        auto* constraint = static_cast<btGeneric6DofSpring2Constraint*>(it->second.constraint.get());
+        if (!constraint)
+            return false;
+
+        constraint->setLinearLowerLimit(to_bt_vec3(desc.linear_limit_min, settings_.units_per_meter));
+        constraint->setLinearUpperLimit(to_bt_vec3(desc.linear_limit_max, settings_.units_per_meter));
+        constraint->setAngularLowerLimit(to_bt_vec3_raw(desc.angular_limit_min));
+        constraint->setAngularUpperLimit(to_bt_vec3_raw(desc.angular_limit_max));
+
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const float stiff = desc.linear_stiffness[axis];
+            const float damp = desc.linear_damping[axis];
+            const bool enable = (stiff != 0.0f || damp != 0.0f);
+            constraint->enableSpring(axis, enable);
+            if (enable)
+            {
+                constraint->setStiffness(axis, stiff);
+                constraint->setDamping(axis, damp);
+            }
+        }
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const float stiff = desc.angular_stiffness[axis];
+            const float damp = desc.angular_damping[axis];
+            const bool enable = (stiff != 0.0f || damp != 0.0f);
+            constraint->enableSpring(axis + 3, enable);
+            if (enable)
+            {
+                constraint->setStiffness(axis + 3, stiff);
+                constraint->setDamping(axis + 3, damp);
+            }
+        }
+        return true;
+    }
+
+    void PhysicsSystem::destroy_constraint(ConstraintHandle handle)
+    {
+        auto it = constraints_.find(handle);
+        if (it == constraints_.end())
+            return;
+
+        if (auto* world = world_.world())
+        {
+            if (it->second.constraint)
+                world->removeConstraint(it->second.constraint.get());
+        }
+        constraints_.erase(it);
+    }
+
     PhysicsSystem::BodyRuntime::ColliderRuntimeInfo
     PhysicsSystem::resolve_collider_info(
         const BodyRuntime& runtime,
@@ -1262,6 +1731,42 @@ namespace eeng::ecs::systems
         }
 
         force_requests_.clear();
+    }
+
+    void PhysicsSystem::destroy_all_constraints()
+    {
+        auto* world = world_.world();
+        if (world)
+        {
+            for (auto& [handle, runtime] : constraints_)
+            {
+                if (runtime.constraint)
+                    world->removeConstraint(runtime.constraint.get());
+            }
+        }
+        constraints_.clear();
+        next_constraint_handle_ = 1;
+    }
+
+    void PhysicsSystem::remove_constraints_for_entity(entt::entity entity)
+    {
+        if (constraints_.empty())
+            return;
+
+        auto* world = world_.world();
+        for (auto it = constraints_.begin(); it != constraints_.end();)
+        {
+            if (it->second.entity_a == entity || it->second.entity_b == entity)
+            {
+                if (world && it->second.constraint)
+                    world->removeConstraint(it->second.constraint.get());
+                it = constraints_.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
     }
 
     void PhysicsSystem::clear_contact_events(entt::registry& registry)

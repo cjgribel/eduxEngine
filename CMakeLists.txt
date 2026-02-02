@@ -297,6 +297,7 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/AnimationSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/AnimationGraphSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/TransformSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/ConstraintSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/DebugRenderSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/PhysicsSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/SpringDamperSystem.cpp

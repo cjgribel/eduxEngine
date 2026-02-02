@@ -365,6 +365,7 @@ namespace eeng::editor
         return modified;
     }
 
+
     // Inspector for the collider list (adds/removes + bulk generation).
     inline bool inspect_ColliderComponent(
         entt::meta_any& any,

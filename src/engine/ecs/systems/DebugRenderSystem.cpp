@@ -291,10 +291,9 @@ namespace eeng::ecs::systems
         // --- Spring-damper debug ------------------------------------------
         if (settings.show_springs)
         {
-            auto view = registry.view<ecs::TransformComponent, ecs::SpringDamperComponent>();
+            auto view = registry.view<ecs::SpringDamperComponent>();
             for (const auto entity : view)
             {
-                const auto& tfm_a = view.get<ecs::TransformComponent>(entity);
                 const auto& spring = view.get<ecs::SpringDamperComponent>(entity);
 
                 if (!spring.enabled)
@@ -305,32 +304,70 @@ namespace eeng::ecs::systems
                 if (!linear_active)
                     continue;
 
-                glm::vec3 anchor_b{};
-                if (spring.use_world_point_b)
+                struct AnchorInfo
                 {
-                    anchor_b = spring.world_point_b;
-                }
-                else
-                {
-                    if (!spring.entity_b.is_bound())
-                        continue;
-                    const entt::entity entity_b = static_cast<entt::entity>(spring.entity_b.entity);
-                    if (!registry.valid(entity_b))
-                        continue;
-                    const auto* tfm_b = registry.try_get<ecs::TransformComponent>(entity_b);
-                    if (!tfm_b)
-                        continue;
-                    anchor_b = glm::vec3(tfm_b->world_matrix * glm::vec4(spring.local_anchor_b, 1.0f));
-                }
+                    bool valid = false;
+                    bool has_body = false;
+                    entt::entity entity = entt::null;
+                    glm::vec3 anchor_world{ 0.0f };
+                };
 
-                const glm::vec3 anchor_a =
-                    glm::vec3(tfm_a.world_matrix * glm::vec4(spring.local_anchor_a, 1.0f));
+                auto resolve_anchor = [&](const ecs::EntityRef& entity_ref,
+                                          const glm::vec3& local_anchor,
+                                          ecs::SpringAnchorSpace anchor_space) -> AnchorInfo
+                {
+                    AnchorInfo info{};
+                    if (!entity_ref.is_bound())
+                        return info;
+
+                    const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
+                    info.entity = body_entity;
+
+                    if (!registry.valid(body_entity))
+                        return info;
+
+                    const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
+                    if (!tfm)
+                        return info;
+
+                    const auto* rb = registry.try_get<ecs::RigidBodyComponent>(body_entity);
+                    info.has_body = (rb != nullptr);
+
+                    if (rb && anchor_space == ecs::SpringAnchorSpace::Body)
+                    {
+                        const glm::mat4 com_world = rigidbody_com_world_transform(*tfm, *rb);
+                        info.anchor_world = glm::vec3(com_world * glm::vec4(local_anchor * tfm->scale, 1.0f));
+                    }
+                    else
+                    {
+                        info.anchor_world = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
+                    }
+
+                    info.valid = true;
+                    return info;
+                };
+
+                const AnchorInfo anchor_a = resolve_anchor(
+                    spring.entity_a,
+                    spring.local_anchor_a,
+                    spring.anchor_space_a);
+                const AnchorInfo anchor_b = resolve_anchor(
+                    spring.entity_b,
+                    spring.local_anchor_b,
+                    spring.anchor_space_b);
+
+                if (!anchor_a.valid || !anchor_b.valid)
+                    continue;
+
+                const bool same_body = anchor_a.has_body && anchor_b.has_body && anchor_a.entity == anchor_b.entity;
+                if ((!anchor_a.has_body && !anchor_b.has_body) || same_body)
+                    continue;
 
                 renderer.push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 3.0f });
                 renderer.push_states(ShapeRendering::Color4u{ settings.spring_color });
                 renderer.push_helix(
-                    anchor_a,
-                    anchor_b,
+                    anchor_a.anchor_world,
+                    anchor_b.anchor_world,
                     settings.spring_radius_outer,
                     settings.spring_radius_inner,
                     settings.spring_revs);

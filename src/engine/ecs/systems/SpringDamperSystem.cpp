@@ -18,10 +18,9 @@ namespace eeng::ecs::systems
         PhysicsSystem& physics_system,
         float)
     {
-        auto view = registry.view<ecs::TransformComponent, ecs::SpringDamperComponent>();
+        auto view = registry.view<ecs::SpringDamperComponent>();
         for (const auto entity : view)
         {
-            auto& tfm_a = view.get<ecs::TransformComponent>(entity);
             auto& spring = view.get<ecs::SpringDamperComponent>(entity);
 
             if (!spring.enabled)
@@ -35,99 +34,130 @@ namespace eeng::ecs::systems
             if (!linear_active && !angular_active)
                 continue;
 
-            PhysicsSystem::BodyState state_a{};
-            if (!physics_system.get_body_state(entity, state_a))
+            struct AnchorInfo
+            {
+                bool valid = false;
+                bool has_body = false;
+                entt::entity entity = entt::null;
+                PhysicsSystem::BodyState state{};
+                glm::vec3 anchor_world{ 0.0f };
+                glm::vec3 velocity{ 0.0f };
+            };
+
+            // Resolve an anchor bound to a rigid body into world space + velocity.
+            auto resolve_body_anchor = [&](entt::entity body_entity,
+                                           const glm::vec3& local_anchor,
+                                           ecs::SpringAnchorSpace anchor_space) -> AnchorInfo
+            {
+                AnchorInfo info{};
+                info.entity = body_entity;
+
+                if (!registry.valid(body_entity))
+                    return info;
+
+                const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
+                if (!tfm)
+                    return info;
+
+                info.has_body = physics_system.get_body_state(body_entity, info.state);
+
+                // If no rigid body exists, treat the anchor as a static point from the transform.
+                if (info.has_body && anchor_space == ecs::SpringAnchorSpace::Body)
+                    info.anchor_world = info.state.position + (info.state.rotation * (local_anchor * tfm->scale));
+                else
+                    info.anchor_world = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
+
+                if (info.has_body)
+                {
+                    const glm::vec3 rel = info.anchor_world - info.state.position;
+                    info.velocity = info.state.linear_velocity + glm::cross(info.state.angular_velocity, rel);
+                }
+                info.valid = true;
+                return info;
+            };
+
+            // Resolve an entity anchor into world space + velocity.
+            auto resolve_anchor = [&](const ecs::EntityRef& entity_ref,
+                                      const glm::vec3& local_anchor,
+                                      ecs::SpringAnchorSpace anchor_space) -> AnchorInfo
+            {
+                if (!entity_ref.is_bound())
+                    return {};
+                const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
+                return resolve_body_anchor(body_entity, local_anchor, anchor_space);
+            };
+
+            const AnchorInfo anchor_a = resolve_anchor(
+                spring.entity_a,
+                spring.local_anchor_a,
+                spring.anchor_space_a);
+            const AnchorInfo anchor_b = resolve_anchor(
+                spring.entity_b,
+                spring.local_anchor_b,
+                spring.anchor_space_b);
+
+            if (!anchor_a.valid || !anchor_b.valid)
                 continue;
 
-            entt::entity entity_b = entt::null;
-            PhysicsSystem::BodyState state_b{};
-            if (!spring.use_world_point_b)
-            {
-                if (!spring.entity_b.is_bound())
-                    continue;
+            // Self-self or same-body anchors should not inject internal forces.
+            const bool same_body = anchor_a.has_body && anchor_b.has_body && anchor_a.entity == anchor_b.entity;
 
-                entity_b = static_cast<entt::entity>(spring.entity_b.entity);
-                if (!registry.valid(entity_b))
-                    continue;
-
-                if (!physics_system.get_body_state(entity_b, state_b))
-                    continue;
-            }
-
-            const glm::vec3 anchor_a = (spring.anchor_space_a == ecs::SpringAnchorSpace::Body)
-                ? state_a.position + (state_a.rotation * (spring.local_anchor_a * tfm_a.scale))
-                : glm::vec3(tfm_a.world_matrix * glm::vec4(spring.local_anchor_a, 1.0f));
-            glm::vec3 anchor_b{};
-            if (spring.use_world_point_b)
-            {
-                anchor_b = spring.world_point_b;
-            }
-            else
-            {
-                const auto& tfm_b = registry.get<ecs::TransformComponent>(entity_b);
-                anchor_b = (spring.anchor_space_b == ecs::SpringAnchorSpace::Body)
-                    ? state_b.position + (state_b.rotation * (spring.local_anchor_b * tfm_b.scale))
-                    : glm::vec3(tfm_b.world_matrix * glm::vec4(spring.local_anchor_b, 1.0f));
-            }
-
-            const glm::vec3 rel_a = anchor_a - state_a.position;
-            const glm::vec3 vel_a = state_a.linear_velocity + glm::cross(state_a.angular_velocity, rel_a);
-
-            glm::vec3 vel_b(0.0f);
-            if (!spring.use_world_point_b)
-            {
-                const glm::vec3 rel_b = anchor_b - state_b.position;
-                vel_b = state_b.linear_velocity + glm::cross(state_b.angular_velocity, rel_b);
-            }
-
-            if (linear_active)
+            if (linear_active && (anchor_a.has_body || anchor_b.has_body) && !same_body)
             {
                 physics::LinearSpringDamper linear{
                     spring.linear_stiffness,
                     spring.linear_damping,
                     spring.rest_length
                 };
-                const glm::vec3 force = linear.compute_force(anchor_a, anchor_b, vel_a, vel_b);
+                const glm::vec3 force =
+                    linear.compute_force(anchor_a.anchor_world, anchor_b.anchor_world, anchor_a.velocity, anchor_b.velocity);
                 if (glm::dot(force, force) > 0.0f)
                 {
-                    physics_system.submit_force(entity, -force, anchor_a);
-                    if (!spring.use_world_point_b)
-                        physics_system.submit_force(entity_b, force, anchor_b);
+                    if (anchor_a.has_body)
+                        physics_system.submit_force(anchor_a.entity, -force, anchor_a.anchor_world);
+                    if (anchor_b.has_body)
+                        physics_system.submit_force(anchor_b.entity, force, anchor_b.anchor_world);
                 }
             }
 
-            if (angular_active && !spring.use_world_point_b)
+            if (angular_active)
             {
-                physics::AngularSpringDamper angular{
-                    spring.angular_stiffness,
-                    spring.angular_damping,
-                    spring.rest_rotation
-                };
-                const glm::vec3 torque = angular.compute_torque(
-                    state_a.rotation,
-                    state_b.rotation,
-                    state_a.angular_velocity,
-                    state_b.angular_velocity);
-                if (glm::dot(torque, torque) > 0.0f)
+                // Body-body: restore relative rotation between anchors.
+                if (anchor_a.has_body && anchor_b.has_body && !same_body)
                 {
-                    physics_system.submit_torque(entity, torque);
-                    physics_system.submit_torque(entity_b, -torque);
+                    physics::AngularSpringDamper angular{
+                        spring.angular_stiffness,
+                        spring.angular_damping,
+                        spring.rest_rotation
+                    };
+                    const glm::vec3 torque = angular.compute_torque(
+                        anchor_a.state.rotation,
+                        anchor_b.state.rotation,
+                        anchor_a.state.angular_velocity,
+                        anchor_b.state.angular_velocity);
+                    if (glm::dot(torque, torque) > 0.0f)
+                    {
+                        physics_system.submit_torque(anchor_a.entity, torque);
+                        physics_system.submit_torque(anchor_b.entity, -torque);
+                    }
                 }
-            }
-            else if (angular_active && spring.use_world_point_b)
-            {
-                physics::AngularSpringDamper angular{
-                    spring.angular_stiffness,
-                    spring.angular_damping,
-                    glm::quat(1.0f, 0.0f, 0.0f, 0.0f)
-                };
-                const glm::vec3 torque = angular.compute_torque(
-                    state_a.rotation,
-                    spring.rest_rotation,
-                    state_a.angular_velocity,
-                    glm::vec3(0.0f));
-                if (glm::dot(torque, torque) > 0.0f)
-                    physics_system.submit_torque(entity, torque);
+                // Body-world: drive the lone body anchor toward rest_rotation in world.
+                else if (anchor_a.has_body != anchor_b.has_body)
+                {
+                    const AnchorInfo& body_anchor = anchor_a.has_body ? anchor_a : anchor_b;
+                    physics::AngularSpringDamper angular{
+                        spring.angular_stiffness,
+                        spring.angular_damping,
+                        glm::quat(1.0f, 0.0f, 0.0f, 0.0f)
+                    };
+                    const glm::vec3 torque = angular.compute_torque(
+                        body_anchor.state.rotation,
+                        spring.rest_rotation,
+                        body_anchor.state.angular_velocity,
+                        glm::vec3(0.0f));
+                    if (glm::dot(torque, torque) > 0.0f)
+                        physics_system.submit_torque(body_anchor.entity, torque);
+                }
             }
         }
     }
