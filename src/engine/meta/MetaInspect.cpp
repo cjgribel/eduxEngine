@@ -135,6 +135,14 @@ namespace eeng::meta {
 #ifdef INSPECTION_DEBUG_PRINTS
         std::cout << "inspect_any " << get_meta_type_name(any.type()) << std::endl;
 #endif
+        auto show_meta_tooltip = [](const entt::meta_data& meta_data)
+        {
+            eeng::DataMetaInfo* info = meta_data.custom();
+            if (!info || info->tooltip.empty())
+                return;
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", info->tooltip.c_str());
+        };
 
         if (entt::meta_type meta_type = entt::resolve(any.type().id()); meta_type)
         {
@@ -232,7 +240,9 @@ namespace eeng::meta {
                     //     ImGui::SetNextItemOpen(!data_is_container);
                     // }
 
-                    if (inspector.begin_node(key_name.c_str()))
+                    const bool open = inspector.begin_node(key_name.c_str());
+                    show_meta_tooltip(meta_data);
+                    if (open)
                     {
                         // Push command meta path
                         cmdb.push_path_data(id, key_name);

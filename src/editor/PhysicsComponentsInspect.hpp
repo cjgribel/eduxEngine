@@ -10,6 +10,7 @@
 #include "editor/TypeInspect.hpp"
 #include "engineapi/EngineContextHelpers.hpp"
 #include "meta/MetaInspect.hpp"
+#include "meta/MetaInfo.h"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
 #include "physics/PhysicsGeometry.hpp"
@@ -25,6 +26,31 @@ namespace eeng::editor
     // Inspector-specific helpers for physics component UI.
     namespace detail
     {
+        inline void show_meta_tooltip(const entt::meta_type& meta_type,
+            const char* field_name,
+            ImGuiHoveredFlags flags = ImGuiHoveredFlags_DelayNormal)
+        {
+            if (!ImGui::IsItemHovered(flags))
+                return;
+            if (!meta_type)
+                return;
+            entt::meta_data meta_data = meta_type.data(entt::hashed_string{ field_name }.value());
+            if (!meta_data)
+                return;
+            auto* info = meta_data.custom<eeng::DataMetaInfo>();
+            if (!info || info->tooltip.empty())
+                return;
+            ImGui::SetTooltip("%s", info->tooltip.c_str());
+        }
+
+        template<typename T>
+        inline void show_meta_tooltip(
+            const char* field_name,
+            ImGuiHoveredFlags flags = ImGuiHoveredFlags_DelayNormal)
+        {
+            show_meta_tooltip(entt::resolve<T>(), field_name, flags);
+        }
+
         // Human-readable labels for collider types.
         inline const char* collider_type_label(ecs::ColliderType type)
         {
@@ -157,6 +183,9 @@ namespace eeng::editor
         inspector.begin_leaf("id");
         inspector.begin_disabled();
         modified |= inspect_type(desc->id, inspector);
+        detail::show_meta_tooltip<ecs::ColliderDesc>(
+            "id",
+            ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled);
         inspector.end_disabled();
         inspector.end_leaf();
 
@@ -185,11 +214,13 @@ namespace eeng::editor
             }
             ImGui::EndCombo();
         }
+        detail::show_meta_tooltip<ecs::ColliderDesc>("type");
         inspector.end_leaf();
 
         inspector.begin_leaf("local_position");
         auto pos_any = entt::forward_as_meta(desc->local_position);
         modified |= inspect_glmvec3(pos_any, inspector, ctx);
+        detail::show_meta_tooltip<ecs::ColliderDesc>("local_position");
         inspector.end_leaf();
 
         inspector.begin_leaf("local_rotation");
@@ -200,6 +231,7 @@ namespace eeng::editor
                 rotation_data[3], rotation_data[0], rotation_data[1], rotation_data[2]));
             modified = true;
         }
+        detail::show_meta_tooltip<ecs::ColliderDesc>("local_rotation");
         inspector.end_leaf();
 
         const bool is_box = desc->type == ecs::ColliderType::Box || desc->type == ecs::ColliderType::AABB;
@@ -212,6 +244,7 @@ namespace eeng::editor
             inspector.begin_leaf("half_extents");
             auto ext_any = entt::forward_as_meta(desc->half_extents);
             modified |= inspect_glmvec3(ext_any, inspector, ctx);
+            detail::show_meta_tooltip<ecs::ColliderDesc>("half_extents");
             inspector.end_leaf();
         }
 
@@ -219,6 +252,7 @@ namespace eeng::editor
         {
             inspector.begin_leaf("radius");
             modified |= inspect_type(desc->radius, inspector);
+            detail::show_meta_tooltip<ecs::ColliderDesc>("radius");
             inspector.end_leaf();
         }
 
@@ -226,6 +260,7 @@ namespace eeng::editor
         {
             inspector.begin_leaf("height");
             modified |= inspect_type(desc->height, inspector);
+            detail::show_meta_tooltip<ecs::ColliderDesc>("height");
             inspector.end_leaf();
         }
 
@@ -234,15 +269,18 @@ namespace eeng::editor
             inspector.begin_leaf("mesh_ref");
             auto ref_any = entt::forward_as_meta(desc->mesh_ref);
             modified |= inspect_AssetRef<assets::ModelDataAsset>(ref_any, inspector, ctx);
+            detail::show_meta_tooltip<ecs::ColliderDesc>("mesh_ref");
             inspector.end_leaf();
 
             inspector.begin_leaf("submesh_index");
             modified |= inspect_type(desc->submesh_index, inspector);
+            detail::show_meta_tooltip<ecs::ColliderDesc>("submesh_index");
             inspector.end_leaf();
         }
 
         inspector.begin_leaf("is_trigger");
         modified |= inspect_type(desc->is_trigger, inspector);
+        detail::show_meta_tooltip<ecs::ColliderDesc>("is_trigger");
         inspector.end_leaf();
 
         return modified;
@@ -264,10 +302,12 @@ namespace eeng::editor
             auto motion_any = entt::forward_as_meta(rb->motion);
             modified |= eeng::meta::inspect_enum_any(motion_any, inspector);
         }
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("motion");
         inspector.end_leaf();
 
         inspector.begin_leaf("auto_mass");
         modified |= inspect_type(rb->auto_mass, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("auto_mass");
         inspector.end_leaf();
 
         inspector.begin_leaf("mass");
@@ -280,6 +320,10 @@ namespace eeng::editor
                 ImGui::SetTooltip("Computed from density and collider volume.");
             inspector.end_disabled();
         }
+        else
+        {
+            detail::show_meta_tooltip<ecs::RigidBodyComponent>("mass");
+        }
         inspector.end_leaf();
 
         inspector.begin_leaf("density");
@@ -290,6 +334,7 @@ namespace eeng::editor
 
         inspector.begin_leaf("auto_inertia");
         modified |= inspect_type(rb->auto_inertia, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("auto_inertia");
         inspector.end_leaf();
 
         inspector.begin_leaf("inertia");
@@ -304,6 +349,10 @@ namespace eeng::editor
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                 ImGui::SetTooltip("Computed diagonal inertia in body axes.");
             inspector.end_disabled();
+        }
+        else
+        {
+            detail::show_meta_tooltip<ecs::RigidBodyComponent>("inertia");
         }
         inspector.end_leaf();
 
@@ -336,30 +385,37 @@ namespace eeng::editor
 
         inspector.begin_leaf("linear_damping");
         modified |= inspect_type(rb->linear_damping, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("linear_damping");
         inspector.end_leaf();
 
         inspector.begin_leaf("angular_damping");
         modified |= inspect_type(rb->angular_damping, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("angular_damping");
         inspector.end_leaf();
 
         inspector.begin_leaf("gravity_scale");
         modified |= inspect_type(rb->gravity_scale, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("gravity_scale");
         inspector.end_leaf();
 
         inspector.begin_leaf("allow_sleep");
         modified |= inspect_type(rb->allow_sleep, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("allow_sleep");
         inspector.end_leaf();
 
         inspector.begin_leaf("enable_ccd");
         modified |= inspect_type(rb->enable_ccd, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("enable_ccd");
         inspector.end_leaf();
 
         inspector.begin_leaf("ccd_swept_sphere_radius");
         modified |= inspect_type(rb->ccd_swept_sphere_radius, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("ccd_swept_sphere_radius");
         inspector.end_leaf();
 
         inspector.begin_leaf("ccd_motion_threshold");
         modified |= inspect_type(rb->ccd_motion_threshold, inspector);
+        detail::show_meta_tooltip<ecs::RigidBodyComponent>("ccd_motion_threshold");
         inspector.end_leaf();
 
         return modified;
