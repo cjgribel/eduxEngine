@@ -37,7 +37,7 @@ namespace eeng::editor
             entt::meta_data meta_data = meta_type.data(entt::hashed_string{ field_name }.value());
             if (!meta_data)
                 return;
-            auto* info = meta_data.custom<eeng::DataMetaInfo>();
+            eeng::DataMetaInfo* info = meta_data.custom();
             if (!info || info->tooltip.empty())
                 return;
             ImGui::SetTooltip("%s", info->tooltip.c_str());
