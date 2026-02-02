@@ -224,6 +224,22 @@ namespace ShapeRendering {
         False = false
     };
 
+    enum class XRayMode : uint8_t
+    {
+        Off = 0,
+        On = 1
+    };
+
+    struct XRayAlpha
+    {
+        float value = 0.35f;
+
+        bool operator == (const XRayAlpha& other) const
+        {
+            return value == other.value;
+        }
+    };
+
     enum class BackfaceCull : bool
     {
         True = true,
@@ -261,12 +277,16 @@ namespace ShapeRendering {
         {
             GLenum topology = GL_LINES;
             DepthTest depth_test = DepthTest::True;
+            XRayMode xray_mode = XRayMode::Off;
+            float xray_alpha = 1.0f;
 
             bool operator == (const SimpleLineBatch& dc) const
             {
                 return
                     topology == dc.topology &&
-                    depth_test == dc.depth_test;
+                    depth_test == dc.depth_test &&
+                    xray_mode == dc.xray_mode &&
+                    xray_alpha == dc.xray_alpha;
             }
         };
 
@@ -274,7 +294,7 @@ namespace ShapeRendering {
         {
             std::size_t operator () (const SimpleLineBatch& ldc) const
             {
-                return hash_combine(ldc.topology, ldc.depth_test);
+                return hash_combine(ldc.topology, ldc.depth_test, ldc.xray_mode, ldc.xray_alpha);
             }
         };
 
@@ -289,11 +309,15 @@ namespace ShapeRendering {
         {
             DepthTest depth_test = DepthTest::True;
             LineStyle style;
+            XRayMode xray_mode = XRayMode::Off;
+            float xray_alpha = 1.0f;
 
             bool operator == (const LineBatch& other) const
             {
                 return depth_test == other.depth_test &&
-                    style == other.style;
+                    style == other.style &&
+                    xray_mode == other.xray_mode &&
+                    xray_alpha == other.xray_alpha;
             }
         };
 
@@ -305,7 +329,9 @@ namespace ShapeRendering {
                     lb.style.thickness,
                     lb.style.dash_period_px,
                     lb.style.dash_ratio,
-                    lb.style.dash_offset_px);
+                    lb.style.dash_offset_px,
+                    lb.xray_mode,
+                    lb.xray_alpha);
             }
         };
 
@@ -321,13 +347,17 @@ namespace ShapeRendering {
             GLenum topology = GL_TRIANGLES;
             DepthTest depth_test = DepthTest::True;
             BackfaceCull cull_face = BackfaceCull::True;
+            XRayMode xray_mode = XRayMode::Off;
+            float xray_alpha = 1.0f;
 
             bool operator == (const PolygonBatch& dc) const
             {
                 return
                     topology == dc.topology &&
                     depth_test == dc.depth_test &&
-                    cull_face == dc.cull_face;
+                    cull_face == dc.cull_face &&
+                    xray_mode == dc.xray_mode &&
+                    xray_alpha == dc.xray_alpha;
             }
         };
 
@@ -335,7 +365,7 @@ namespace ShapeRendering {
         {
             std::size_t operator () (const PolygonBatch& pdc) const
             {
-                return hash_combine(pdc.topology, pdc.depth_test);
+                return hash_combine(pdc.topology, pdc.depth_test, pdc.cull_face, pdc.xray_mode, pdc.xray_alpha);
             }
         };
 
@@ -359,10 +389,15 @@ namespace ShapeRendering {
         {
             unsigned size;
             DepthTest depth_test = DepthTest::True;
+            XRayMode xray_mode = XRayMode::Off;
+            float xray_alpha = 1.0f;
 
             bool operator == (const PointBatch& pdc) const
             {
-                return depth_test == pdc.depth_test && size == pdc.size;
+                return depth_test == pdc.depth_test
+                    && size == pdc.size
+                    && xray_mode == pdc.xray_mode
+                    && xray_alpha == pdc.xray_alpha;
             }
         };
 
@@ -370,7 +405,7 @@ namespace ShapeRendering {
         {
             std::size_t operator () (const PointBatch& pdc) const
             {
-                return  std::hash<GLenum>{}(pdc.size);
+                return hash_combine(pdc.size, pdc.depth_test, pdc.xray_mode, pdc.xray_alpha);
             }
         };
 
@@ -378,12 +413,22 @@ namespace ShapeRendering {
         GLuint point_vbo = 0;
         GLuint point_vao = 0;
 
-        StateStack<DepthTest, BackfaceCull, LineType, LineStyle, glm::mat4, Color4u> state_stack;
+        StateStack<DepthTest, XRayMode, XRayAlpha, BackfaceCull, LineType, LineStyle, glm::mat4, Color4u> state_stack;
 
         bool initialized = false;
 
     public:
         void init();
+
+        void push_xray(float alpha = 0.35f)
+        {
+            push_states(XRayMode::On, XRayAlpha{ alpha });
+        }
+
+        void pop_xray()
+        {
+            pop_states<XRayMode, XRayAlpha>();
+        }
 
         template<typename... Args>
         void push_states(Args&&... args)

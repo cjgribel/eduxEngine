@@ -323,11 +323,13 @@ namespace eeng::ecs::systems
 
                 if (settings.show_rigidbody_com)
                 {
+                    renderer.push_xray();
                     renderer.push_states(
                         ShapeRendering::Color4u{ settings.rigidbody_com_color },
                         glm::translate(glm::mat4(1.0f), com_pos));
                     renderer.push_sphere_wireframe(settings.rigidbody_com_radius, settings.rigidbody_com_radius);
                     renderer.pop_states<glm::mat4, ShapeRendering::Color4u>();
+                    renderer.pop_xray();
                 }
 
                 if (settings.show_rigidbody_axes)
@@ -492,6 +494,7 @@ namespace eeng::ecs::systems
                 return true;
             };
 
+            renderer.push_xray();
             renderer.push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 2.0f });
 
             // Point constraints.
@@ -782,6 +785,7 @@ namespace eeng::ecs::systems
             }
 
             renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
+            renderer.pop_xray();
         }
 
         // --- Raycast debug -------------------------------------------------

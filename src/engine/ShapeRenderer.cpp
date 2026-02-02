@@ -543,7 +543,14 @@ namespace ShapeRendering {
         unitsphere_line_buffers.indices = unitspherewireframe_buffers.indices;
 
         // Default state
-        push_states(BackfaceCull::True, DepthTest::True, LineType::Simple, LineStyle{ 1.0f }, Color4u::White, glm::mat4{ 1.0f });
+        push_states(BackfaceCull::True,
+            DepthTest::True,
+            XRayMode::Off,
+            XRayAlpha{},
+            LineType::Simple,
+            LineStyle{ 1.0f },
+            Color4u::White,
+            glm::mat4{ 1.0f });
 
         const GLchar* poly_vshader =
             "#version 410 core\n"
@@ -565,6 +572,7 @@ namespace ShapeRendering {
         const GLchar* poly_fshader =
             "#version 410 core\n"
             "uniform float ambient_ratio;"
+            "uniform float alpha_multiplier;"
             ""
             "in vec3 pos, normal;"
             "in vec4 color;"
@@ -573,7 +581,7 @@ namespace ShapeRendering {
             "{"
             "   vec3 l = vec3(1000,1000,1000);"
             "   float lambert = ambient_ratio + (1.0-ambient_ratio) * dot(normal, normalize(l-pos));"
-            "   fragcolor = vec4(color.xyz*lambert, color.w);"
+            "   fragcolor = vec4(color.xyz*lambert, color.w * alpha_multiplier);"
             "}";
 
         const GLchar* simple_line_vshader =
@@ -591,11 +599,12 @@ namespace ShapeRendering {
 
         const GLchar* simple_line_fshader =
             "#version 410 core\n"
+            "uniform float alpha_multiplier;"
             "in vec4 color;"
             "out vec4 fragcolor;"
             "void main()"
             "{"
-            "   fragcolor = color;"
+            "   fragcolor = vec4(color.xyz, color.w * alpha_multiplier);"
             "}";
 
         const GLchar* thick_line_vshader =
@@ -635,6 +644,7 @@ namespace ShapeRendering {
             "uniform float dash_period;"
             "uniform float dash_ratio;"
             "uniform float dash_offset;"
+            "uniform float alpha_multiplier;"
             "in vec4 color;"
             "in float line_u;"
             "out vec4 fragcolor;"
@@ -645,7 +655,7 @@ namespace ShapeRendering {
             "       float t = (line_u + dash_offset) / dash_period;"
             "       if (fract(t) > dash_ratio) discard;"
             "   }"
-            "   fragcolor = color;"
+            "   fragcolor = vec4(color.xyz, color.w * alpha_multiplier);"
             "}";
 
         const GLchar* point_vshader =
@@ -663,12 +673,13 @@ namespace ShapeRendering {
 
         const GLchar* point_fshader =
             "#version 410 core\n"
+            "uniform float alpha_multiplier;"
             "in vec4 color;"
             "out vec4 fragcolor;"
             ""
             "void main()"
             "{"
-            "   fragcolor = color;"
+            "   fragcolor = vec4(color.xyz, color.w * alpha_multiplier);"
             "}";
 
         const GLuint poly_pos_location = 0;
@@ -839,6 +850,8 @@ namespace ShapeRendering {
         const glm::vec3& n)
     {
         const auto [color, depth_test, cull_face, M] = get_states<Color4u, DepthTest, BackfaceCull, glm::mat4>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
         const auto Mn = normal_transform(M);
         static const unsigned tri_indices[] = { 0, 1, 2, 0, 2, 3 };
 
@@ -854,7 +867,7 @@ namespace ShapeRendering {
             tri_indices + 6);
 
         polygon_hash.insert({
-            PolygonBatch {GL_TRIANGLES, depth_test, cull_face},
+            PolygonBatch {GL_TRIANGLES, depth_test, cull_face, xray_mode, xray_alpha},
             IndexRange {index_ofs, 6, (GLint)vertex_ofs}
             });
     }
@@ -867,6 +880,8 @@ namespace ShapeRendering {
     void ShapeRenderer::push_cube()
     {
         const auto [color, depth_test, cull_face, M] = get_states<Color4u, DepthTest, BackfaceCull, glm::mat4>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
         unsigned vertex_ofs = (unsigned)polygon_vertices.size();
         GLsizei index_ofs = (GLsizei)polygon_indices.size();
 
@@ -882,7 +897,7 @@ namespace ShapeRendering {
             unitcube.tris.end());
 
         polygon_hash.insert({
-            PolygonBatch {GL_TRIANGLES, depth_test, cull_face},
+            PolygonBatch {GL_TRIANGLES, depth_test, cull_face, xray_mode, xray_alpha},
             IndexRange {index_ofs, unitcube.tris.size(), (GLint)vertex_ofs}
             });
     }
@@ -931,7 +946,9 @@ namespace ShapeRendering {
         if (line_type == LineType::Thick)
         {
             const auto [color, depth_test, M, style] = get_states<Color4u, DepthTest, glm::mat4, LineStyle>();
-            const LineBatch batch{ depth_test, style };
+            const auto xray_mode = get_states<XRayMode>();
+            const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
+            const LineBatch batch{ depth_test, style, xray_mode, xray_alpha };
             auto& index_batch = line_hash[batch];
             append_thick_line_segment(line_vertices,
                 index_batch,
@@ -949,8 +966,10 @@ namespace ShapeRendering {
     void ShapeRenderer::push_simple_line(const glm::vec3& pos0, const glm::vec3& pos1)
     {
         const auto [color, depth_test, M] = get_states<Color4u, DepthTest, glm::mat4>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
 
-        const SimpleLineBatch ldc{ GL_LINES, depth_test };
+        const SimpleLineBatch ldc{ GL_LINES, depth_test, xray_mode, xray_alpha };
         unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
 
         simple_line_vertices.emplace_back(transform_pos(M, pos0), color);
@@ -969,7 +988,9 @@ namespace ShapeRendering {
         if (line_type == LineType::Thick)
         {
             const auto [depth_test, style] = get_states<DepthTest, LineStyle>();
-            const LineBatch batch{ depth_test, style };
+            const auto xray_mode = get_states<XRayMode>();
+            const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
+            const LineBatch batch{ depth_test, style, xray_mode, xray_alpha };
             auto& index_batch = line_hash[batch];
 
             for (int i = 0; i < nbr_vertices - 1; i++)
@@ -998,8 +1019,10 @@ namespace ShapeRendering {
         int max_vertices)
     {
         const auto& depth_test = get_states<DepthTest>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
 
-        const SimpleLineBatch ldc{ GL_LINES, depth_test };
+        const SimpleLineBatch ldc{ GL_LINES, depth_test, xray_mode, xray_alpha };
         unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
 
         for (int i = 0; i < nbr_vertices; i++)
@@ -1053,7 +1076,9 @@ namespace ShapeRendering {
         if (line_type == LineType::Thick)
         {
             const auto [color, depth_test, M, style] = get_states<Color4u, DepthTest, glm::mat4, LineStyle>();
-            const LineBatch batch{ depth_test, style };
+            const auto xray_mode = get_states<XRayMode>();
+            const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
+            const LineBatch batch{ depth_test, style, xray_mode, xray_alpha };
             auto& index_batch = line_hash[batch];
 
             for (int i = 0; i + 1 < nbr_indices; i += 2)
@@ -1075,8 +1100,10 @@ namespace ShapeRendering {
         size_t nbr_indices)
     {
         const auto [color, depth_test, M] = get_states<Color4u, DepthTest, glm::mat4>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
 
-        const SimpleLineBatch ldc{ GL_LINES, depth_test };
+        const SimpleLineBatch ldc{ GL_LINES, depth_test, xray_mode, xray_alpha };
         unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
 
         for (int i = 0; i < nbr_vertices; i++)
@@ -1093,7 +1120,9 @@ namespace ShapeRendering {
         if (line_type == LineType::Thick)
         {
             const auto [transform, color, depth_test, style] = get_states<glm::mat4, Color4u, DepthTest, LineStyle>();
-            const LineBatch batch{ depth_test, style };
+            const auto xray_mode = get_states<XRayMode>();
+            const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
+            const LineBatch batch{ depth_test, style, xray_mode, xray_alpha };
             auto& index_batch = line_hash[batch];
 
             assert(vertices);
@@ -1121,10 +1150,12 @@ namespace ShapeRendering {
         size_t nbr_vertices)
     {
         const auto [transform, color, depth_test] = get_states<glm::mat4, Color4u, DepthTest>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
 
         assert(vertices);
         assert(nbr_vertices > 0);
-        const SimpleLineBatch ldc{ GL_LINES, depth_test };
+        const SimpleLineBatch ldc{ GL_LINES, depth_test, xray_mode, xray_alpha };
         unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
 
         for (int i = 0; i < nbr_vertices; i++)
@@ -1195,6 +1226,8 @@ namespace ShapeRendering {
         bool flip_normals)
     {
         const auto [color, depth_test, cull_face, M] = get_states<Color4u, DepthTest, BackfaceCull, glm::mat4>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
         const auto vertex_ofs = polygon_vertices.size();
         GLsizei index_ofs = (GLsizei)polygon_indices.size();
 
@@ -1219,7 +1252,7 @@ namespace ShapeRendering {
                 std::swap(polygon_indices[i], polygon_indices[i + 1]);
 
         polygon_hash.insert({
-            PolygonBatch {GL_TRIANGLES, depth_test, cull_face},
+            PolygonBatch {GL_TRIANGLES, depth_test, cull_face, xray_mode, xray_alpha},
             IndexRange {index_ofs, (GLsizei)unitcone_buffers.indices.size(), (GLint)vertex_ofs}
             });
 
@@ -1250,6 +1283,8 @@ namespace ShapeRendering {
         float r)
     {
         const auto [color, depth_test, cull_face, M] = get_states<Color4u, DepthTest, BackfaceCull, glm::mat4>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
         const auto vertex_ofs = polygon_vertices.size();
         const auto index_ofs = polygon_indices.size();
 
@@ -1267,7 +1302,7 @@ namespace ShapeRendering {
             unitcylinder_buffers.indices.end());
 
         polygon_hash.insert({
-            PolygonBatch {GL_TRIANGLES, depth_test, cull_face},
+            PolygonBatch {GL_TRIANGLES, depth_test, cull_face, xray_mode, xray_alpha},
             IndexRange {(GLsizei)index_ofs, (GLsizei)unitcylinder_buffers.indices.size(), (GLint)vertex_ofs}
             });
 
@@ -1365,6 +1400,8 @@ namespace ShapeRendering {
     void ShapeRenderer::push_sphere(float h, float r)
     {
         const auto [color, depth_test, cull_face, M] = get_states<Color4u, DepthTest, BackfaceCull, glm::mat4>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
         const auto vertex_ofs = polygon_vertices.size();
         const auto index_ofs = polygon_indices.size();
 
@@ -1385,7 +1422,7 @@ namespace ShapeRendering {
             unitsphere_buffers.indices.end());
 
         polygon_hash.insert({
-            PolygonBatch {GL_TRIANGLES, depth_test, cull_face},
+            PolygonBatch {GL_TRIANGLES, depth_test, cull_face, xray_mode, xray_alpha},
             IndexRange {(GLsizei)index_ofs, (GLsizei)unitsphere_buffers.indices.size(), (GLint)vertex_ofs}
             });
 
@@ -1501,6 +1538,8 @@ namespace ShapeRendering {
             return;
 
         const auto [color, depth_test, cull_face, Mpos] = get_states<Color4u, DepthTest, BackfaceCull, glm::mat4>();
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
         std::vector<PolyVertex> vertices;
         std::vector<unsigned> indices;
 
@@ -1540,7 +1579,7 @@ namespace ShapeRendering {
         polygon_indices.insert(polygon_indices.end(), indices.begin(), indices.end());
 
         polygon_hash.insert({
-            PolygonBatch {GL_TRIANGLES, depth_test, cull_face},
+            PolygonBatch {GL_TRIANGLES, depth_test, cull_face, xray_mode, xray_alpha},
             IndexRange {index_ofs, (GLsizei)indices.size(), (GLint)vertex_ofs}
             });
     }
@@ -1632,14 +1671,18 @@ namespace ShapeRendering {
     void ShapeRenderer::push_point(const glm::vec3& p, unsigned size)
     {
         const auto [color, depth_test, M] = get_states<Color4u, DepthTest, glm::mat4>();
-        const PointBatch dc{ size, depth_test };
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
+        const PointBatch dc{ size, depth_test, xray_mode, xray_alpha };
         point_hash[dc].push_back(PointVertex{ transform_pos(M, p), color });
     }
 
     void ShapeRenderer::push_point_direct(const glm::vec3& p, unsigned size)
     {
         const auto [color, depth_test] = get_states<Color4u, DepthTest>();
-        const PointBatch dc{ size, depth_test };
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
+        const PointBatch dc{ size, depth_test, xray_mode, xray_alpha };
         point_hash[dc].push_back(PointVertex{ p, color });
     }
 
@@ -1648,7 +1691,9 @@ namespace ShapeRendering {
         unsigned size)
     {
         const auto& depth_test = get_states<DepthTest>();
-        const PointBatch dc{ size, depth_test };
+        const auto xray_mode = get_states<XRayMode>();
+        const float xray_alpha = (xray_mode == XRayMode::On) ? get_states<XRayAlpha>().value : 1.0f;
+        const PointBatch dc{ size, depth_test, xray_mode, xray_alpha };
 
         auto& point_vector = point_hash[dc];
         point_hash[dc].insert(point_vector.end(),
@@ -1692,6 +1737,8 @@ namespace ShapeRendering {
         GLboolean last_enable_blend = glIsEnabled(GL_BLEND);
         GLboolean last_enable_cull_face = glIsEnabled(GL_CULL_FACE);
         GLboolean last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
+        GLint last_depth_func = GL_LESS; glGetIntegerv(GL_DEPTH_FUNC, &last_depth_func);
+        GLboolean last_depth_mask = GL_TRUE; glGetBooleanv(GL_DEPTH_WRITEMASK, &last_depth_mask);
         //    GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
 
         glEnable(GL_BLEND);
@@ -1799,6 +1846,7 @@ namespace ShapeRendering {
             glUniform1f(
                 glGetUniformLocation(lambert_shader, "ambient_ratio"),
                 0.6);
+            const GLint alpha_loc = glGetUniformLocation(lambert_shader, "alpha_multiplier");
 
             CheckAndThrowGLErrors();
 
@@ -1815,11 +1863,8 @@ namespace ShapeRendering {
 
                 // TODO: keep track of state and only actually change GL state when needed
 
-                // Depth test
-                if (to_integral(dcgroup.depth_test))
-                    glEnable(GL_DEPTH_TEST);
-                else
-                    glDisable(GL_DEPTH_TEST);
+                const bool depth_enabled = to_integral(dcgroup.depth_test);
+                const bool use_xray = depth_enabled && (dcgroup.xray_mode == XRayMode::On);
 
                 // Face culling
                 if (to_integral(dcgroup.cull_face))
@@ -1843,12 +1888,33 @@ namespace ShapeRendering {
                     ++it;
                 }
                 int count = (int)start.size();
-                glMultiDrawElementsBaseVertex(dcgroup.topology, // GLenum mode
-                    &size[0],         // const GLsizei *count
-                    GL_UNSIGNED_INT,  // GLenum type
-                    &start[0],        // const void * const *indices
-                    count,            // GLsizei drawcount
-                    &ofs[0]);         // const GLint *basevertex
+
+                auto draw_batch = [&](GLenum depth_func, GLboolean depth_mask, float alpha_multiplier)
+                {
+                    if (depth_enabled)
+                    {
+                        glEnable(GL_DEPTH_TEST);
+                        glDepthFunc(depth_func);
+                        glDepthMask(depth_mask);
+                    }
+                    else
+                    {
+                        glDisable(GL_DEPTH_TEST);
+                        glDepthMask(depth_mask);
+                    }
+
+                    glUniform1f(alpha_loc, alpha_multiplier);
+                    glMultiDrawElementsBaseVertex(dcgroup.topology, // GLenum mode
+                        &size[0],         // const GLsizei *count
+                        GL_UNSIGNED_INT,  // GLenum type
+                        &start[0],        // const void * const *indices
+                        count,            // GLsizei drawcount
+                        &ofs[0]);         // const GLint *basevertex
+                };
+
+                draw_batch(last_depth_func, last_depth_mask, 1.0f);
+                if (use_xray)
+                    draw_batch(GL_GREATER, GL_FALSE, dcgroup.xray_alpha);
             }
 
             glBindVertexArray(0);
@@ -1886,6 +1952,7 @@ namespace ShapeRendering {
                 glGetUniformLocation(thick_line_shader, "viewport"),
                 (float)viewport[2],
                 (float)viewport[3]);
+            const GLint alpha_loc = glGetUniformLocation(thick_line_shader, "alpha_multiplier");
 
             for (auto& it : line_hash)
             {
@@ -1893,9 +1960,8 @@ namespace ShapeRendering {
                 if (!size) continue;
 
                 const LineBatch& batch = it.first;
-
-                if (to_integral(batch.depth_test)) glEnable(GL_DEPTH_TEST);
-                else                               glDisable(GL_DEPTH_TEST);
+                const bool depth_enabled = to_integral(batch.depth_test);
+                const bool use_xray = depth_enabled && (batch.xray_mode == XRayMode::On);
 
                 glUniform1f(
                     glGetUniformLocation(thick_line_shader, "line_thickness"),
@@ -1911,7 +1977,28 @@ namespace ShapeRendering {
                     batch.style.dash_offset_px);
 
                 glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned) * size, &it.second[0], GL_STREAM_DRAW);
-                glDrawElements(GL_TRIANGLES, size, GL_UNSIGNED_INT, BUFOFS(0));
+
+                auto draw_batch = [&](GLenum depth_func, GLboolean depth_mask, float alpha_multiplier)
+                {
+                    if (depth_enabled)
+                    {
+                        glEnable(GL_DEPTH_TEST);
+                        glDepthFunc(depth_func);
+                        glDepthMask(depth_mask);
+                    }
+                    else
+                    {
+                        glDisable(GL_DEPTH_TEST);
+                        glDepthMask(depth_mask);
+                    }
+
+                    glUniform1f(alpha_loc, alpha_multiplier);
+                    glDrawElements(GL_TRIANGLES, size, GL_UNSIGNED_INT, BUFOFS(0));
+                };
+
+                draw_batch(last_depth_func, last_depth_mask, 1.0f);
+                if (use_xray)
+                    draw_batch(GL_GREATER, GL_FALSE, batch.xray_alpha);
             }
             glBindVertexArray(0);
             glUseProgram(0);
@@ -1942,6 +2029,7 @@ namespace ShapeRendering {
                 1,
                 0,
                 glm::value_ptr(PROJ_VIEW));
+            const GLint alpha_loc = glGetUniformLocation(simple_line_shader, "alpha_multiplier");
 
             // lines v3 (unorderded_map with vectors)
 
@@ -1951,12 +2039,32 @@ namespace ShapeRendering {
                 if (!size) continue;
 
                 const SimpleLineBatch& dc = it.first;
-
-                if (to_integral(dc.depth_test)) glEnable(GL_DEPTH_TEST);
-                else                            glDisable(GL_DEPTH_TEST);
+                const bool depth_enabled = to_integral(dc.depth_test);
+                const bool use_xray = depth_enabled && (dc.xray_mode == XRayMode::On);
 
                 glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned) * size, &it.second[0], GL_STREAM_DRAW);
-                glDrawElements(dc.topology, size, GL_UNSIGNED_INT, BUFOFS(0));
+
+                auto draw_batch = [&](GLenum depth_func, GLboolean depth_mask, float alpha_multiplier)
+                {
+                    if (depth_enabled)
+                    {
+                        glEnable(GL_DEPTH_TEST);
+                        glDepthFunc(depth_func);
+                        glDepthMask(depth_mask);
+                    }
+                    else
+                    {
+                        glDisable(GL_DEPTH_TEST);
+                        glDepthMask(depth_mask);
+                    }
+
+                    glUniform1f(alpha_loc, alpha_multiplier);
+                    glDrawElements(dc.topology, size, GL_UNSIGNED_INT, BUFOFS(0));
+                };
+
+                draw_batch(last_depth_func, last_depth_mask, 1.0f);
+                if (use_xray)
+                    draw_batch(GL_GREATER, GL_FALSE, dc.xray_alpha);
             }
             glLineWidth(1);
             glBindVertexArray(0);
@@ -1980,6 +2088,7 @@ namespace ShapeRendering {
                 1,
                 0,
                 glm::value_ptr(PROJ_VIEW));
+            const GLint alpha_loc = glGetUniformLocation(point_shader, "alpha_multiplier");
 
             for (auto& it : point_hash)
             {
@@ -1987,14 +2096,33 @@ namespace ShapeRendering {
                 if (!size) continue;
 
                 const PointBatch& dc = it.first;
-                if (to_integral(dc.depth_test))
-                    glEnable(GL_DEPTH_TEST);
-                else
-                    glDisable(GL_DEPTH_TEST);
+                const bool depth_enabled = to_integral(dc.depth_test);
+                const bool use_xray = depth_enabled && (dc.xray_mode == XRayMode::On);
 
                 glBufferData(GL_ARRAY_BUFFER, sizeof(PointVertex) * size, &it.second[0], GL_STREAM_DRAW);
                 glPointSize(dc.size);
-                glDrawArrays(GL_POINTS, 0, size);
+
+                auto draw_batch = [&](GLenum depth_func, GLboolean depth_mask, float alpha_multiplier)
+                {
+                    if (depth_enabled)
+                    {
+                        glEnable(GL_DEPTH_TEST);
+                        glDepthFunc(depth_func);
+                        glDepthMask(depth_mask);
+                    }
+                    else
+                    {
+                        glDisable(GL_DEPTH_TEST);
+                        glDepthMask(depth_mask);
+                    }
+
+                    glUniform1f(alpha_loc, alpha_multiplier);
+                    glDrawArrays(GL_POINTS, 0, size);
+                };
+
+                draw_batch(last_depth_func, last_depth_mask, 1.0f);
+                if (use_xray)
+                    draw_batch(GL_GREATER, GL_FALSE, dc.xray_alpha);
             }
             CheckAndThrowGLErrors();
         }
@@ -2008,6 +2136,8 @@ namespace ShapeRendering {
         if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
         if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
         if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+        glDepthFunc(last_depth_func);
+        glDepthMask(last_depth_mask);
         //    if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
         glPointSize(last_poin_size);
 
