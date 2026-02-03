@@ -205,6 +205,7 @@ namespace eeng::ecs::systems
         void submit_impulse(entt::entity entity,
             const glm::vec3& impulse,
             const glm::vec3& point_world);
+        void wake_body(entt::entity entity);
 
         bool get_body_state(entt::entity entity, BodyState& out_state) const;
 

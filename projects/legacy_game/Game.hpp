@@ -176,7 +176,6 @@ private:
 
     // Pull the active editor camera matrices into local render state.
     void update_active_camera_state();
-
     // Placeholder for a future play-mode toggle that will swap in runtime cameras.
     bool play_mode = false;
 };

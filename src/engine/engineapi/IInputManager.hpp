@@ -26,6 +26,8 @@ namespace eeng {
             int x = 0, y = 0;
             bool leftButton = false;
             bool rightButton = false;
+            float scroll_x = 0.0f;
+            float scroll_y = 0.0f;
         };
 
         struct ControllerState 

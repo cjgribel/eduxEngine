@@ -1218,6 +1218,15 @@ namespace eeng::ecs::systems
         });
     }
 
+    void PhysicsSystem::wake_body(entt::entity entity)
+    {
+        auto it = bodies_.find(entity);
+        if (it == bodies_.end() || !it->second.body)
+            return;
+
+        it->second.body->activate(true);
+    }
+
     bool PhysicsSystem::get_body_state(entt::entity entity, BodyState& out_state) const
     {
         auto it = bodies_.find(entity);

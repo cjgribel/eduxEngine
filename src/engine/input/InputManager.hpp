@@ -25,6 +25,7 @@ namespace eeng {
 
         // Not part of IInputManager
         void HandleEvent(const void* event);
+        void ClearMouseScroll();
 
     private:
         struct Impl;

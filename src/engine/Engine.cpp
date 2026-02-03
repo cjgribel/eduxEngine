@@ -598,6 +598,9 @@ namespace eeng
 
     void Engine::process_events(bool& running)
     {
+        if (ctx && ctx->input_manager)
+            static_cast<InputManager&>(*ctx->input_manager).ClearMouseScroll();
+
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {

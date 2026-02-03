@@ -81,6 +81,19 @@ struct eeng::InputManager::Impl
             if (event.button.button == SDL_BUTTON_LEFT) mouseState.leftButton = false;
             if (event.button.button == SDL_BUTTON_RIGHT) mouseState.rightButton = false;
             break;
+        case SDL_MOUSEWHEEL:
+        {
+            float wheel_x = static_cast<float>(event.wheel.x);
+            float wheel_y = static_cast<float>(event.wheel.y);
+            if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+            {
+                wheel_x = -wheel_x;
+                wheel_y = -wheel_y;
+            }
+            mouseState.scroll_x += wheel_x;
+            mouseState.scroll_y += wheel_y;
+            break;
+        }
 
         case SDL_KEYDOWN:
         case SDL_KEYUP: {
@@ -144,6 +157,12 @@ struct eeng::InputManager::Impl
     {
         return static_cast<int>(controllers.size());
     }
+
+    void ClearMouseScroll()
+    {
+        mouseState.scroll_x = 0.0f;
+        mouseState.scroll_y = 0.0f;
+    }
 };
 
 // InputManager implementation
@@ -154,6 +173,11 @@ eeng::InputManager::~InputManager() = default; // { delete pImpl; }
 void eeng::InputManager::HandleEvent(const void* event) 
 {
     pImpl->HandleEvent(*reinterpret_cast<const SDL_Event*>(event));
+}
+
+void eeng::InputManager::ClearMouseScroll()
+{
+    pImpl->ClearMouseScroll();
 }
 
 bool eeng::InputManager::IsKeyPressed(Key key) const 

@@ -64,6 +64,7 @@ namespace eeng::editor
 
         constexpr float kStickDeadzone = 0.2f;
         constexpr float kMinDistance = 0.5f;
+        constexpr float kScrollSpeed = 1.0f;
 
         auto view = registry.view<ThirdPersonCameraComponent>();
         for (auto entity : view)
@@ -105,6 +106,12 @@ namespace eeng::editor
                 // Zoom by changing the orbit radius.
                 camera.distance += distance_axis * camera.move_speed * delta_time;
                 camera.distance = std::max(camera.distance, kMinDistance);
+
+                if (mouse.scroll_y != 0.0f)
+                {
+                    camera.distance -= mouse.scroll_y * kScrollSpeed;
+                    camera.distance = std::max(camera.distance, kMinDistance);
+                }
 
                 // Yaw is a rotation around the global Y axis (keeps orbit level).
                 camera.yaw += yaw_axis * camera.controller_look_speed * delta_time;

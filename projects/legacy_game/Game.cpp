@@ -196,6 +196,24 @@ void Game::update(
         vehicleControlSystem->update(registry, *ctx, deltaTime);
     }
 
+    update_active_camera_state();
+
+    // Keep camera matrices in sync for systems that run during update (e.g. gizmos).
+    if (matrices.windowSize.x > 0 && matrices.windowSize.y > 0)
+    {
+        const float aspectRatio = float(matrices.windowSize.x) / matrices.windowSize.y;
+        matrices.P = glm::perspective(
+            glm::radians(60.0f),
+            aspectRatio,
+            active_camera.near_plane,
+            active_camera.far_plane);
+        matrices.V = active_camera.model_to_view;
+        matrices.VP = glm_aux::create_viewport_matrix(0.0f, 0.0f,
+            static_cast<float>(matrices.windowSize.x),
+            static_cast<float>(matrices.windowSize.y),
+            0.0f, 1.0f);
+    }
+
     if (play_mode)
         runtime_pipeline_.update_play(*ctx, deltaTime);
     else
@@ -214,26 +232,8 @@ void Game::update(
         0.0f, { 0, 1, 0 },
         { 0.03f, 0.03f, 0.03f });
 
-    update_active_camera_state();
-
     // Build a view ray from the active camera (useful for debug/picking).
     view_ray = glm_aux::Ray(active_camera.position, active_camera.forward);
-
-    // Keep camera matrices in sync for systems that run during update (e.g. gizmos).
-    if (matrices.windowSize.x > 0 && matrices.windowSize.y > 0)
-    {
-        const float aspectRatio = float(matrices.windowSize.x) / matrices.windowSize.y;
-        matrices.P = glm::perspective(
-            glm::radians(60.0f),
-            aspectRatio,
-            active_camera.near_plane,
-            active_camera.far_plane);
-        matrices.V = active_camera.model_to_view;
-        matrices.VP = glm_aux::create_viewport_matrix(0.0f, 0.0f,
-            static_cast<float>(matrices.windowSize.x),
-            static_cast<float>(matrices.windowSize.y),
-            0.0f, 1.0f);
-    }
 
     // Intersect view ray with AABBs of other objects.
     glm_aux::intersect_ray_AABB(view_ray, character_aabb2.min, character_aabb2.max);
