@@ -31,6 +31,8 @@ namespace eeng::meta
         visit_asset_refs(*self_ptr, [&](auto& ref)
             {
                 // ref is AssetRef<SomeAssetType>&
+                if (!ref.guid.valid())
+                    return;
                 out.push_back(ref.guid);
 
                 // LogGlobals::log("[collect_asset_guids] %s", ref.guid.to_string().c_str());

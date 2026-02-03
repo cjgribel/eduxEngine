@@ -6,6 +6,7 @@
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
 #include "ecs/systems/MannequinPlayerControllerSystem.hpp"
+#include "ecs/systems/VehicleControlSystem.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "glmcommon.hpp"
 
@@ -84,6 +85,7 @@ public:
 private:
     /// @brief For rendering of GUI elements
     void renderUI();
+    void spawn_vehicle_rig_to_default_batch();
 
     // ENGINE API
     std::shared_ptr<eeng::EngineContext> ctx;
@@ -96,6 +98,7 @@ private:
     ShapeRendererPtr shapeRenderer;
 
     std::unique_ptr<eeng::ecs::systems::MannequinPlayerControllerSystem> playerControllerSystem;
+    std::unique_ptr<eeng::ecs::systems::VehicleControlSystem> vehicleControlSystem;
     eeng::ecs::RuntimePipeline runtime_pipeline_;
 
     // <-- ENGINE API
@@ -121,6 +124,8 @@ private:
     } active_camera;
 
     eeng::ecs::Entity player_entity;
+    eeng::ecs::Entity vehicle_rig_root;
+    int vehicle_spawn_count = 0;
     glm_aux::Ray view_ray;
 
     // Light properties

@@ -271,6 +271,19 @@ namespace eeng::ecs
         glm::vec3 angular_stiffness{ 0.0f };
         glm::vec3 angular_damping{ 0.0f };
 
+        // Motor/servo toggles use 0.0f (off) / 1.0f (on) per axis.
+        glm::vec3 linear_motor_enabled{ 0.0f };
+        glm::vec3 linear_motor_target_velocity{ 0.0f };
+        glm::vec3 linear_motor_max_force{ 0.0f };
+        glm::vec3 linear_servo_enabled{ 0.0f };
+        glm::vec3 linear_servo_target{ 0.0f };
+
+        glm::vec3 angular_motor_enabled{ 0.0f };
+        glm::vec3 angular_motor_target_velocity{ 0.0f };
+        glm::vec3 angular_motor_max_force{ 0.0f };
+        glm::vec3 angular_servo_enabled{ 0.0f };
+        glm::vec3 angular_servo_target{ 0.0f };
+
         bool disable_collisions = true;
         bool enabled = true;
     };

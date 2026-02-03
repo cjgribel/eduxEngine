@@ -253,6 +253,7 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/ThirdPersonCameraSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/FirstPersonCameraSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/EditorCameraSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/projects/legacy_game/ecs/systems/VehicleControlSystem.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -291,6 +292,7 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/TransformComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/HeaderComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/StickyNoteComponent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/VehicleRigBuilder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/CoreComponents.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/RenderSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/projects/legacy_game/ecs/systems/MannequinPlayerControllerSystem.cpp

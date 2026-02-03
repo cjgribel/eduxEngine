@@ -225,6 +225,16 @@ namespace eeng::ecs::systems
                 desc.linear_damping = comp.linear_damping;
                 desc.angular_stiffness = comp.angular_stiffness;
                 desc.angular_damping = comp.angular_damping;
+                desc.linear_motor_enabled = comp.linear_motor_enabled;
+                desc.linear_motor_target_velocity = comp.linear_motor_target_velocity;
+                desc.linear_motor_max_force = comp.linear_motor_max_force;
+                desc.linear_servo_enabled = comp.linear_servo_enabled;
+                desc.linear_servo_target = comp.linear_servo_target;
+                desc.angular_motor_enabled = comp.angular_motor_enabled;
+                desc.angular_motor_target_velocity = comp.angular_motor_target_velocity;
+                desc.angular_motor_max_force = comp.angular_motor_max_force;
+                desc.angular_servo_enabled = comp.angular_servo_enabled;
+                desc.angular_servo_target = comp.angular_servo_target;
 
                 const ConstraintKey key{ entity, ConstraintKind::SixDofSpring };
                 auto it = handles_.find(key);

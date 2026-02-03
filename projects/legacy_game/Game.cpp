@@ -10,7 +10,13 @@
 #include "ImGuiHelpers.hpp"
 #include "imgui.h"
 #include "LogMacros.h"
+#include "BatchRegistry.hpp"
 #include "ecs/TransformComponent.hpp"
+#include "ecs/VehicleRigBuilder.hpp"
+#include "ecs/VehicleControlComponent.hpp"
+#include "ecs/PhysicsComponents.hpp"
+#include "ecs/ModelComponent.hpp"
+#include "ecs/EntityManager.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <cstdio>
 #include <filesystem>
@@ -39,6 +45,7 @@ bool Game::init()
     playerControllerSystem = std::make_unique<eeng::ecs::systems::MannequinPlayerControllerSystem>();
     if (playerControllerSystem)
         playerControllerSystem->set_physics_system(runtime_pipeline_.physics_system());
+    vehicleControlSystem = std::make_unique<eeng::ecs::systems::VehicleControlSystem>();
 
     // Prefer project config asset root when running inside the editor.
     std::filesystem::path assets_root = "assets";
@@ -183,6 +190,10 @@ void Game::update(
     if (play_mode && playerControllerSystem)
     {
         playerControllerSystem->update(registry, *ctx, deltaTime);
+    }
+    if (play_mode && vehicleControlSystem)
+    {
+        vehicleControlSystem->update(registry, *ctx, deltaTime);
     }
 
     if (play_mode)
@@ -437,6 +448,159 @@ bool Game::get_editor_view(eeng::OverlayViewState& out) const
     return true;
 }
 
+void Game::spawn_vehicle_rig_to_default_batch()
+{
+    if (!ctx || !ctx->entity_manager || !ctx->batch_registry)
+    {
+        EENG_LOG_WARN(ctx, "Vehicle rig spawn skipped: missing entity manager or batch registry.");
+        return;
+    }
+
+    auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
+    eeng::BatchId default_id{};
+    if (!br.try_get_batch_id_by_name(eeng::BatchRegistry::kDefaultBatchName, default_id))
+    {
+        EENG_LOG_WARN(ctx, "Vehicle rig spawn skipped: default batch not found.");
+        return;
+    }
+    if (!br.is_batch_loaded(default_id))
+    {
+        EENG_LOG_WARN(ctx, "Vehicle rig spawn skipped: default batch not loaded.");
+        return;
+    }
+
+    auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
+    auto& registry = em.registry();
+
+    const int vehicle_index = vehicle_spawn_count++;
+    const std::string suffix = (vehicle_index > 0) ? ("_" + std::to_string(vehicle_index)) : "";
+    const std::string vehicle_prefix = "TestVehicle" + suffix;
+    const float x_offset = static_cast<float>(vehicle_index) * 6.0f;
+
+    const auto [chassis_guid, chassis_entity] = em.create_entity_live_parent(
+        "vehicle_rig",
+        vehicle_prefix + "_Chassis",
+        eeng::ecs::Entity::EntityNull,
+        eeng::ecs::Entity::EntityNull);
+    (void)chassis_guid;
+
+    auto& chassis_tfm = registry.emplace<eeng::ecs::TransformComponent>(chassis_entity);
+    chassis_tfm.set_position({ x_offset, 2.0f, 0.0f });
+    chassis_tfm.set_rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+
+    auto& chassis_rb = registry.emplace<eeng::ecs::RigidBodyComponent>(chassis_entity);
+    chassis_rb.motion = eeng::ecs::PhysicsMotionType::Dynamic;
+    chassis_rb.linear_damping = 0.2f;
+    chassis_rb.angular_damping = 0.4f;
+    chassis_rb.auto_mass = false;
+    chassis_rb.mass = 10.0f;
+
+    eeng::ecs::ColliderComponent chassis_colliders{};
+    eeng::ecs::ColliderDesc chassis_box{};
+    chassis_box.type = eeng::ecs::ColliderType::Box;
+    chassis_box.half_extents = { 1.6f, 0.35f, 1.0f };
+    chassis_colliders.colliders.push_back(chassis_box);
+    registry.emplace<eeng::ecs::ColliderComponent>(chassis_entity, std::move(chassis_colliders));
+
+    eeng::ecs::VehicleSpec spec{};
+    spec.chassis = em.get_entity_ref(chassis_entity);
+    spec.name_prefix = vehicle_prefix;
+    spec.chunk_tag = "vehicle_rig";
+    spec.use_knuckle = false;
+    spec.kinematic_knuckle = false;
+    spec.chassis_model_name = "carbody";
+    spec.wheel_model_name = "tyre";
+
+    const glm::vec3 mount_front_left{ 1.6f, 0.0f, 1.0f };
+    const glm::vec3 mount_front_right{ 1.6f, 0.0f, -1.0f };
+    const glm::vec3 mount_rear_left{ -1.6f, 0.0f, 1.0f };
+    const glm::vec3 mount_rear_right{ -1.6f, 0.0f, -1.0f };
+
+    auto make_wheel = [&](const glm::vec3& mount)
+    {
+        eeng::ecs::VehicleWheelSpec wheel{};
+        wheel.mount_local = mount;
+        wheel.suspension_axis = { 0.0f, -1.0f, 0.0f };
+        wheel.axle_axis = { 0.0f, 0.0f, 1.0f };
+        wheel.suspension_rest_length = 0.9f;
+        wheel.suspension_travel = 0.8f;
+        wheel.spring_k = 500.0f;
+        wheel.spring_d = 5.0f;
+        wheel.wheel_radius = 0.35f;
+        wheel.knuckle_radius = 0.15f;
+        wheel.steerable = false;
+        wheel.driven = false;
+        return wheel;
+    };
+
+    spec.wheels.push_back(make_wheel(mount_front_left));
+    spec.wheels.push_back(make_wheel(mount_front_right));
+    spec.wheels.push_back(make_wheel(mount_rear_left));
+    spec.wheels.push_back(make_wheel(mount_rear_right));
+
+    const auto rig = eeng::ecs::build_vehicle_rig(*ctx, spec);
+    if (!rig.root.is_bound())
+    {
+        EENG_LOG_WARN(ctx, "Vehicle rig spawn failed: rig root missing.");
+        return;
+    }
+
+    vehicle_rig_root = rig.root.entity;
+    auto& control = registry.emplace<eeng::ecs::VehicleControlComponent>(rig.root.entity);
+    control.steer_limit = spec.steer_limit;
+    control.steer_speed = 3.0f;
+    control.drive_velocity = spec.drive_motor_target_velocity;
+    control.drive_max_impulse = spec.drive_motor_max_impulse;
+
+    const auto apply_mass = [&](const eeng::ecs::EntityRef& ref, float mass)
+    {
+        if (!ref.is_bound())
+            return;
+        auto* rb = registry.try_get<eeng::ecs::RigidBodyComponent>(ref.entity);
+        if (!rb)
+            return;
+        rb->auto_mass = false;
+        rb->mass = mass;
+    };
+
+    for (const auto& wheel : rig.wheels)
+    {
+        apply_mass(wheel.wheel, 1.0f);
+        apply_mass(wheel.knuckle, 1.0f);
+    }
+
+    auto attach_entity = [&](const eeng::ecs::EntityRef& ref)
+    {
+        if (!ref.is_bound())
+            return;
+
+        eeng::BatchId existing{};
+        if (br.try_get_loaded_batch_for_entity(ref, existing))
+        {
+            if (existing != default_id)
+            {
+                EENG_LOG_WARN(ctx, "Vehicle rig entity already attached to another batch; skipping.");
+            }
+            return;
+        }
+
+        br.queue_attach_entity(default_id, ref, *ctx);
+    };
+
+    attach_entity(rig.root);
+    attach_entity(rig.chassis);
+    for (const auto& wheel : rig.wheels)
+    {
+        attach_entity(wheel.knuckle);
+        attach_entity(wheel.wheel);
+        attach_entity(wheel.suspension_slider);
+        attach_entity(wheel.suspension_spring);
+        attach_entity(wheel.suspension_6dof);
+        attach_entity(wheel.steering_hinge);
+        attach_entity(wheel.axle_hinge);
+    }
+}
+
 void Game::renderUI()
 {
     ImGui::Begin("Game Info");
@@ -507,6 +671,25 @@ void Game::renderUI()
     ImGui::SliderFloat("Animation speed", &characterAnimSpeed, 0.1f, 5.0f);
 
     ImGui::SliderFloat("Animation mix", &characterAnimBlend, 0.0f, 1.0f);
+
+    ImGui::Separator();
+    ImGui::Text("Vehicle Rig");
+
+    bool default_batch_loaded = false;
+    if (ctx && ctx->batch_registry)
+    {
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
+        eeng::BatchId default_id{};
+        if (br.try_get_batch_id_by_name(eeng::BatchRegistry::kDefaultBatchName, default_id))
+            default_batch_loaded = br.is_batch_loaded(default_id);
+    }
+
+    if (ImGui::Button("Spawn Test Vehicle (default batch)"))
+    {
+        spawn_vehicle_rig_to_default_batch();
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled(default_batch_loaded ? "default batch loaded" : "default batch not loaded");
 
     ImGui::End(); // end info window
 }

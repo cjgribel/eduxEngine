@@ -1,0 +1,16 @@
+// Created by Codex.
+// Licensed under the MIT License. See LICENSE file for details.
+
+#pragma once
+
+#include "EngineContext.hpp"
+#include <entt/entt.hpp>
+
+namespace eeng::ecs::systems
+{
+    class VehicleControlSystem
+    {
+    public:
+        void update(entt::registry& registry, EngineContext& ctx, float dt);
+    };
+} // namespace eeng::ecs::systems

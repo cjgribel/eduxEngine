@@ -1448,6 +1448,31 @@ namespace eeng::ecs::systems
         }
         constraint->setEquilibriumPoint();
 
+        const float meters_per_unit = world_.meters_per_unit();
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const bool enable = desc.linear_motor_enabled[axis] > 0.5f;
+            const bool servo = desc.linear_servo_enabled[axis] > 0.5f;
+            constraint->enableMotor(axis, enable);
+            constraint->setServo(axis, servo);
+            constraint->setTargetVelocity(axis, desc.linear_motor_target_velocity[axis] * meters_per_unit);
+            constraint->setMaxMotorForce(axis, desc.linear_motor_max_force[axis]);
+            if (servo)
+                constraint->setServoTarget(axis, desc.linear_servo_target[axis] * meters_per_unit);
+        }
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const int motor_axis = axis + 3;
+            const bool enable = desc.angular_motor_enabled[axis] > 0.5f;
+            const bool servo = desc.angular_servo_enabled[axis] > 0.5f;
+            constraint->enableMotor(motor_axis, enable);
+            constraint->setServo(motor_axis, servo);
+            constraint->setTargetVelocity(motor_axis, desc.angular_motor_target_velocity[axis]);
+            constraint->setMaxMotorForce(motor_axis, desc.angular_motor_max_force[axis]);
+            if (servo)
+                constraint->setServoTarget(motor_axis, desc.angular_servo_target[axis]);
+        }
+
         world->addConstraint(constraint.get(), desc.disable_collisions);
 
         const ConstraintHandle handle = next_constraint_handle_++;
@@ -1585,6 +1610,31 @@ namespace eeng::ecs::systems
                 constraint->setStiffness(axis + 3, stiff);
                 constraint->setDamping(axis + 3, damp);
             }
+        }
+
+        const float meters_per_unit = world_.meters_per_unit();
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const bool enable = desc.linear_motor_enabled[axis] > 0.5f;
+            const bool servo = desc.linear_servo_enabled[axis] > 0.5f;
+            constraint->enableMotor(axis, enable);
+            constraint->setServo(axis, servo);
+            constraint->setTargetVelocity(axis, desc.linear_motor_target_velocity[axis] * meters_per_unit);
+            constraint->setMaxMotorForce(axis, desc.linear_motor_max_force[axis]);
+            if (servo)
+                constraint->setServoTarget(axis, desc.linear_servo_target[axis] * meters_per_unit);
+        }
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const int motor_axis = axis + 3;
+            const bool enable = desc.angular_motor_enabled[axis] > 0.5f;
+            const bool servo = desc.angular_servo_enabled[axis] > 0.5f;
+            constraint->enableMotor(motor_axis, enable);
+            constraint->setServo(motor_axis, servo);
+            constraint->setTargetVelocity(motor_axis, desc.angular_motor_target_velocity[axis]);
+            constraint->setMaxMotorForce(motor_axis, desc.angular_motor_max_force[axis]);
+            if (servo)
+                constraint->setServoTarget(motor_axis, desc.angular_servo_target[axis]);
         }
         return true;
     }
