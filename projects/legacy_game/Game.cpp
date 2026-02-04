@@ -83,11 +83,11 @@ bool Game::init()
     // Remove root motion
     characterMesh->removeTranslationKeys("mixamorig:Hips");
 #endif
-#if 1
+#ifdef AMY_PATH
     // Amy 5.0.1 PACK FBX
-    characterMesh->load(asset_path("Amy/Ch46_nonPBR.fbx"));
-    characterMesh->load(asset_path("Amy/idle.fbx"), true);
-    characterMesh->load(asset_path("Amy/walking.fbx"), true);
+    characterMesh->load(AMY_PATH);
+    characterMesh->load(AMY_IDLE_PATH, true);
+    characterMesh->load(AMY_WALK_PATH, true);
     // Remove root motion
     characterMesh->removeTranslationKeys("mixamorig:Hips");
 #endif
@@ -177,6 +177,7 @@ void Game::update(
         glm_aux::R(time * 0.1f, { 0.0f, 1.0f, 0.0f }) *
         glm::vec4(100.0f, 100.0f, 100.0f, 1.0f));
 
+#ifdef AMY_PATH
     characterWorldMatrix2 = glm_aux::TRS(
         { -3, 0, 0 },
         time * glm::radians(50.0f), { 0, 1, 0 },
@@ -186,6 +187,7 @@ void Game::update(
         { 3, 0, 0 },
         time * glm::radians(50.0f) * 0, { 0, 1, 0 },
         { 0.03f, 0.03f, 0.03f });
+#endif
 
     if (play_mode && playerControllerSystem)
     {
@@ -219,6 +221,7 @@ void Game::update(
     else
         runtime_pipeline_.update_edit(*ctx, deltaTime);
 
+#ifdef AMY_PATH
     // Drive the main character instance from the player entity transform.
     glm::vec3 player_pos = glm::vec3(0.0f, 0.0f, 0.0f);
     if (player_entity.has_id() && registry.valid(player_entity))
@@ -231,13 +234,16 @@ void Game::update(
         player_pos,
         0.0f, { 0, 1, 0 },
         { 0.03f, 0.03f, 0.03f });
+#endif
 
     // Build a view ray from the active camera (useful for debug/picking).
     view_ray = glm_aux::Ray(active_camera.position, active_camera.forward);
 
     // Intersect view ray with AABBs of other objects.
+#ifdef AMY_PATH
     glm_aux::intersect_ray_AABB(view_ray, character_aabb2.min, character_aabb2.max);
     glm_aux::intersect_ray_AABB(view_ray, character_aabb3.min, character_aabb3.max);
+#endif
     glm_aux::intersect_ray_AABB(view_ray, horse_aabb.min, horse_aabb.max);
 
     // We can also compute a ray from the current mouse position,
@@ -322,6 +328,7 @@ void Game::render(
     forwardRenderer->renderMesh(horseMesh, horseWorldMatrix);
     horse_aabb = horseMesh->m_model_aabb.post_transform(horseWorldMatrix);
 
+#ifdef AMY_PATH
     // Character, instance 1
     characterMesh->animate(characterAnimIndex, time * characterAnimSpeed);
     forwardRenderer->renderMesh(characterMesh, characterWorldMatrix1);
@@ -337,6 +344,7 @@ void Game::render(
     characterMesh->animateBlend(1, 2, time, time, characterAnimBlend);
     forwardRenderer->renderMesh(characterMesh, characterWorldMatrix3);
     character_aabb3 = characterMesh->m_model_aabb.post_transform(characterWorldMatrix3);
+#endif
 
 #ifdef SPONZA_PATH
     forwardRenderer->renderMesh(sponzaMesh, glm::mat4{ 1.0f });
@@ -399,9 +407,11 @@ void Game::render(
 
     // Draw object bases
     {
+#ifdef AMY_PATH
         shapeRenderer->push_basis_basic(characterWorldMatrix1, 1.0f);
         shapeRenderer->push_basis_basic(characterWorldMatrix2, 1.0f);
         shapeRenderer->push_basis_basic(characterWorldMatrix3, 1.0f);
+#endif
         shapeRenderer->push_basis_basic(grassWorldMatrix, 1.0f);
         shapeRenderer->push_basis_basic(horseWorldMatrix, 1.0f);
     }
@@ -409,9 +419,11 @@ void Game::render(
     // Draw AABBs
     {
         shapeRenderer->push_states(ShapeRendering::Color4u{ 0xFFE61A80 });
+#ifdef AMY_PATH
         shapeRenderer->push_AABB(character_aabb1.min, character_aabb1.max);
         shapeRenderer->push_AABB(character_aabb2.min, character_aabb2.max);
         shapeRenderer->push_AABB(character_aabb3.min, character_aabb3.max);
+#endif
         shapeRenderer->push_AABB(horse_aabb.min, horse_aabb.max);
         shapeRenderer->push_AABB(grass_aabb.min, grass_aabb.max);
         shapeRenderer->pop_states<ShapeRendering::Color4u>();
@@ -626,6 +638,7 @@ void Game::renderUI()
     {
     }
 
+#ifdef AMY_PATH
     if (characterMesh)
     {
         // Combo (drop-down) for animation clip
@@ -684,6 +697,7 @@ void Game::renderUI()
     ImGui::SliderFloat("Animation speed", &characterAnimSpeed, 0.1f, 5.0f);
 
     ImGui::SliderFloat("Animation mix", &characterAnimBlend, 0.0f, 1.0f);
+#endif
 
     ImGui::Separator();
     ImGui::Text("Vehicle Rig");

@@ -34,6 +34,10 @@
 #define UE5QUINN_ANIM 0
 #endif
 
+// #define AMY_PATH "assets/Amy/Ch46_nonPBR.fbx"
+// #define AMY_IDLE_PATH "assets/Amy/idle.fbx"
+// #define AMY_WALK_PATH "assets/Amy/walking.fbx"
+
 /// @brief A Game may hold, update and render 3D geometry and GUI elements
 class Game : public eeng::IGameRuntime
 {
