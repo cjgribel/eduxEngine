@@ -154,6 +154,8 @@ namespace eeng::ecs::systems
             glm::vec3 linear_damping{ 0.0f };
             glm::vec3 angular_stiffness{ 0.0f };
             glm::vec3 angular_damping{ 0.0f };
+            glm::vec3 linear_equilibrium_enabled{ 0.0f };
+            glm::vec3 linear_equilibrium_target{ 0.0f };
             glm::vec3 linear_motor_enabled{ 0.0f };
             glm::vec3 linear_motor_target_velocity{ 0.0f };
             glm::vec3 linear_motor_max_force{ 0.0f };

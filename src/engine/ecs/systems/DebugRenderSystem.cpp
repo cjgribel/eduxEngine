@@ -758,8 +758,9 @@ namespace eeng::ecs::systems
                     {
                         renderer.push_states(ShapeRendering::Color4u{ settings.constraint_limit_color });
 
-                        if (std::abs(constraint.angular_limit_min.x) > 1e-4f
-                            || std::abs(constraint.angular_limit_max.x) > 1e-4f)
+                        if ((constraint.angular_limit_min.x <= constraint.angular_limit_max.x)
+                            && (std::abs(constraint.angular_limit_min.x) > 1e-4f
+                                || std::abs(constraint.angular_limit_max.x) > 1e-4f))
                         {
                             push_arc(renderer,
                                 anchor_a,
@@ -771,8 +772,9 @@ namespace eeng::ecs::systems
                                 settings.constraint_limit_segments);
                         }
 
-                        if (std::abs(constraint.angular_limit_min.y) > 1e-4f
-                            || std::abs(constraint.angular_limit_max.y) > 1e-4f)
+                        if ((constraint.angular_limit_min.y <= constraint.angular_limit_max.y)
+                            && (std::abs(constraint.angular_limit_min.y) > 1e-4f
+                                || std::abs(constraint.angular_limit_max.y) > 1e-4f))
                         {
                             push_arc(renderer,
                                 anchor_a,
@@ -784,8 +786,9 @@ namespace eeng::ecs::systems
                                 settings.constraint_limit_segments);
                         }
 
-                        if (std::abs(constraint.angular_limit_min.z) > 1e-4f
-                            || std::abs(constraint.angular_limit_max.z) > 1e-4f)
+                        if ((constraint.angular_limit_min.z <= constraint.angular_limit_max.z)
+                            && (std::abs(constraint.angular_limit_min.z) > 1e-4f
+                                || std::abs(constraint.angular_limit_max.z) > 1e-4f))
                         {
                             push_arc(renderer,
                                 anchor_a,

@@ -225,6 +225,8 @@ namespace eeng::ecs::systems
                 desc.linear_damping = comp.linear_damping;
                 desc.angular_stiffness = comp.angular_stiffness;
                 desc.angular_damping = comp.angular_damping;
+                desc.linear_equilibrium_enabled = comp.linear_equilibrium_enabled;
+                desc.linear_equilibrium_target = comp.linear_equilibrium_target;
                 desc.linear_motor_enabled = comp.linear_motor_enabled;
                 desc.linear_motor_target_velocity = comp.linear_motor_target_velocity;
                 desc.linear_motor_max_force = comp.linear_motor_max_force;

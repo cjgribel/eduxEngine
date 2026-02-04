@@ -1455,7 +1455,32 @@ namespace eeng::ecs::systems
                 constraint->setDamping(axis + 3, damp);
             }
         }
-        constraint->setEquilibriumPoint();
+        bool any_equilibrium = false;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            if (desc.linear_equilibrium_enabled[axis] > 0.5f)
+            {
+                any_equilibrium = true;
+                break;
+            }
+        }
+        if (any_equilibrium)
+        {
+            const float meters_per_unit = world_.meters_per_unit();
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                if (desc.linear_equilibrium_enabled[axis] > 0.5f)
+                {
+                    constraint->setEquilibriumPoint(
+                        axis,
+                        desc.linear_equilibrium_target[axis] * meters_per_unit);
+                }
+            }
+        }
+        else
+        {
+            constraint->setEquilibriumPoint();
+        }
 
         const float meters_per_unit = world_.meters_per_unit();
         for (int axis = 0; axis < 3; ++axis)
@@ -1622,6 +1647,15 @@ namespace eeng::ecs::systems
         }
 
         const float meters_per_unit = world_.meters_per_unit();
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            if (desc.linear_equilibrium_enabled[axis] > 0.5f)
+            {
+                constraint->setEquilibriumPoint(
+                    axis,
+                    desc.linear_equilibrium_target[axis] * meters_per_unit);
+            }
+        }
         for (int axis = 0; axis < 3; ++axis)
         {
             const bool enable = desc.linear_motor_enabled[axis] > 0.5f;

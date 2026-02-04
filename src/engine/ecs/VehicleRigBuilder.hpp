@@ -31,6 +31,20 @@ namespace eeng::ecs
         // Total suspension travel distance (symmetric around rest length).
         float suspension_travel = 0.5f;
 
+        // Optional 6DoF linear limit override in constraint frame (X/Y/Z).
+        bool sixdof_use_linear_limits = false;
+        glm::vec3 sixdof_linear_limit_min{ 0.0f };
+        glm::vec3 sixdof_linear_limit_max{ 0.0f };
+        // Optional per-axis equilibrium override (0/1 enabled flags).
+        glm::vec3 sixdof_linear_equilibrium_enabled{ 0.0f };
+        glm::vec3 sixdof_linear_equilibrium_target{ 0.0f };
+        // Optional 6DoF angular limit override (radians) in constraint frame.
+        bool sixdof_use_angular_limits = false;
+        glm::vec3 sixdof_angular_limit_min{ 0.0f };
+        glm::vec3 sixdof_angular_limit_max{ 0.0f };
+        // Optional 6DoF free angular axes (0/1). If enabled, min>max is applied.
+        glm::vec3 sixdof_free_angular_axes{ 0.0f };
+
         float spring_k = 15000.0f;
         float spring_d = 1500.0f;
 
@@ -59,6 +73,8 @@ namespace eeng::ecs
 
         // Create intermediate knuckle bodies between chassis and wheels.
         bool use_knuckle = true;
+        // Use split constraints (slider + spring + hinges) instead of 6DoF.
+        bool use_split_suspension_constraints = false;
         // Kinematic knuckle helps stability with large mass ratios, but disables suspension forces.
         bool kinematic_knuckle = false;
         bool disable_collisions = true;

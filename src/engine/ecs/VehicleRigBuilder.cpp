@@ -13,6 +13,7 @@
 #include "meta/MetaAux.h"
 
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/constants.hpp>
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -251,7 +252,13 @@ namespace eeng::ecs
             const glm::vec3 axis_world = chassis_rot * suspension_axis;
             const glm::vec3 wheel_world = mount_world + axis_world * rest_length;
 
-            const bool use_knuckle = spec.use_knuckle;
+            bool use_knuckle = spec.use_knuckle;
+            if (spec.use_split_suspension_constraints && !use_knuckle)
+            {
+                use_knuckle = true;
+                EENG_LOG_WARN(&ctx,
+                    "VehicleRigBuilder: enabling knuckle for split suspension constraints (wheel %zu).", i);
+            }
             const bool knuckle_is_kinematic = spec.kinematic_knuckle && use_knuckle;
 
             // --- Knuckle (optional) ---
@@ -317,8 +324,41 @@ namespace eeng::ecs
 
             if (use_knuckle)
             {
-                // --- Suspension slider ---
+                if (spec.use_split_suspension_constraints)
                 {
+                    // --- Suspension 6DoF (linear-only) ---
+                    const std::string name =
+                        prefix + "_Suspension6Dof_" + std::to_string(i);
+                    wheel_rig.suspension_6dof = create_entity(*em, chunk_tag, name, root_entity);
+
+                    ecs::SixDofSpringConstraintComponent sixdof{};
+                    sixdof.entity_a = chassis_ref;
+                    sixdof.entity_b = suspension_ref;
+                    sixdof.local_anchor_a = wheel_spec.mount_local + suspension_axis * rest_length;
+                    sixdof.local_anchor_b = suspension_anchor_b;
+
+                    const glm::quat frame_rot = make_constraint_frame(suspension_axis, axle_axis);
+                    sixdof.local_rotation_a = frame_rot;
+                    sixdof.local_rotation_b = frame_rot;
+
+                    sixdof.linear_limit_min = glm::vec3(-travel * 0.5f, 0.0f, 0.0f);
+                    sixdof.linear_limit_max = glm::vec3(travel * 0.5f, 0.0f, 0.0f);
+                    sixdof.angular_limit_min = glm::vec3(0.0f);
+                    sixdof.angular_limit_max = glm::vec3(0.0f);
+
+                    sixdof.linear_stiffness = glm::vec3(0.0f);
+                    sixdof.linear_damping = glm::vec3(0.0f);
+                    sixdof.angular_stiffness = glm::vec3(0.0f);
+                    sixdof.angular_damping = glm::vec3(0.0f);
+                    sixdof.disable_collisions = spec.disable_collisions;
+                    sixdof.enabled = !knuckle_is_kinematic;
+
+                    registry.emplace<ecs::SixDofSpringConstraintComponent>(
+                        wheel_rig.suspension_6dof.entity, sixdof);
+                }
+                else
+                {
+                    // --- Suspension slider ---
                     const std::string name =
                         prefix + "_SuspensionSlider_" + std::to_string(i);
                     wheel_rig.suspension_slider = create_entity(*em, chunk_tag, name, root_entity);
@@ -326,12 +366,12 @@ namespace eeng::ecs
                     ecs::SliderConstraintComponent slider{};
                     slider.entity_a = chassis_ref;
                     slider.entity_b = suspension_ref;
-                    slider.local_anchor_a = wheel_spec.mount_local;
+                    slider.local_anchor_a = wheel_spec.mount_local + suspension_axis * rest_length;
                     slider.local_anchor_b = suspension_anchor_b;
                     slider.local_axis_a = suspension_axis;
                     slider.local_axis_b = suspension_axis;
-                    slider.linear_limit_min = rest_length - travel * 0.5f;
-                    slider.linear_limit_max = rest_length + travel * 0.5f;
+                    slider.linear_limit_min = -travel * 0.5f;
+                    slider.linear_limit_max = travel * 0.5f;
                     slider.angular_limit_min = 0.0f;
                     slider.angular_limit_max = 0.0f;
                     slider.disable_collisions = spec.disable_collisions;
@@ -436,15 +476,55 @@ namespace eeng::ecs
                 sixdof.local_rotation_a = frame_rot;
                 sixdof.local_rotation_b = frame_rot;
 
-                sixdof.linear_limit_min = glm::vec3(rest_length - travel * 0.5f, 0.0f, 0.0f);
-                sixdof.linear_limit_max = glm::vec3(rest_length + travel * 0.5f, 0.0f, 0.0f);
+                const glm::vec3 default_min(rest_length - travel * 0.5f, 0.0f, 0.0f);
+                const glm::vec3 default_max(rest_length + travel * 0.5f, 0.0f, 0.0f);
+                if (wheel_spec.sixdof_use_linear_limits)
+                {
+                    sixdof.linear_limit_min = wheel_spec.sixdof_linear_limit_min;
+                    sixdof.linear_limit_max = wheel_spec.sixdof_linear_limit_max;
+                }
+                else
+                {
+                    sixdof.linear_limit_min = default_min;
+                    sixdof.linear_limit_max = default_max;
+                }
 
-                // Lock angular motion for now; only allow translation along suspension axis.
-                sixdof.angular_limit_min = glm::vec3(0.0f);
-                sixdof.angular_limit_max = glm::vec3(0.0f);
+                if (wheel_spec.sixdof_use_angular_limits)
+                {
+                    sixdof.angular_limit_min = wheel_spec.sixdof_angular_limit_min;
+                    sixdof.angular_limit_max = wheel_spec.sixdof_angular_limit_max;
+                    for (int axis = 0; axis < 3; ++axis)
+                    {
+                        if (wheel_spec.sixdof_free_angular_axes[axis] > 0.5f)
+                        {
+                            // Bullet treats lower > upper as a free axis.
+                            sixdof.angular_limit_min[axis] = 1.0f;
+                            sixdof.angular_limit_max[axis] = -1.0f;
+                        }
+                    }
+                }
+                else
+                {
+                    // Lock angular motion by default; only allow translation along suspension axis.
+                    sixdof.angular_limit_min = glm::vec3(0.0f);
+                    sixdof.angular_limit_max = glm::vec3(0.0f);
+                }
+
+                {
+                    const glm::mat3 basis = glm::mat3_cast(frame_rot);
+                    const glm::vec3 frame_y = basis[1];
+                    const glm::vec3 axle_axis_world = normalize_or_default(wheel_spec.axle_axis, glm::vec3(0.0f, 0.0f, 1.0f));
+                    const float align = std::abs(glm::dot(frame_y, axle_axis_world));
+                    if (align < 0.9f)
+                    {
+                        EENG_LOG_WARN(&ctx, "6DoF wheel axis misalignment: |dot(frameY, axle)| = %.3f", align);
+                    }
+                }
 
                 sixdof.linear_stiffness = glm::vec3(wheel_spec.spring_k, 0.0f, 0.0f);
                 sixdof.linear_damping = glm::vec3(wheel_spec.spring_d, 0.0f, 0.0f);
+                sixdof.linear_equilibrium_enabled = wheel_spec.sixdof_linear_equilibrium_enabled;
+                sixdof.linear_equilibrium_target = wheel_spec.sixdof_linear_equilibrium_target;
                 sixdof.angular_stiffness = glm::vec3(0.0f);
                 sixdof.angular_damping = glm::vec3(0.0f);
                 sixdof.disable_collisions = false;

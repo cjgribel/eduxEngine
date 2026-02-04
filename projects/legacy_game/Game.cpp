@@ -506,7 +506,8 @@ void Game::spawn_vehicle_rig_to_default_batch()
     spec.chassis = em.get_entity_ref(chassis_entity);
     spec.name_prefix = vehicle_prefix;
     spec.chunk_tag = "vehicle_rig";
-    spec.use_knuckle = false;
+    spec.use_knuckle = true;
+    spec.use_split_suspension_constraints = true;
     spec.kinematic_knuckle = false;
     spec.chassis_model_name = "carbody";
     spec.wheel_model_name = "tyre";
@@ -520,10 +521,22 @@ void Game::spawn_vehicle_rig_to_default_batch()
     {
         eeng::ecs::VehicleWheelSpec wheel{};
         wheel.mount_local = mount;
+        // Hard-coded axes for debugging.
         wheel.suspension_axis = { 0.0f, -1.0f, 0.0f };
         wheel.axle_axis = { 0.0f, 0.0f, 1.0f };
         wheel.suspension_rest_length = 0.9f;
         wheel.suspension_travel = 0.8f;
+        wheel.sixdof_use_linear_limits = true;
+        wheel.sixdof_linear_limit_min = { 1.0f, 0.0f, 0.0f };
+        wheel.sixdof_linear_limit_max = { 3.0f, 0.0f, 0.0f };
+        wheel.sixdof_linear_equilibrium_enabled = { 1.0f, 0.0f, 0.0f };
+        wheel.sixdof_linear_equilibrium_target = { 1.5f, 0.0f, 0.0f };
+        wheel.sixdof_use_angular_limits = true;
+        wheel.sixdof_angular_limit_min = { 0.0f, 0.0f, 0.0f };
+        wheel.sixdof_angular_limit_max = { 0.0f, 0.0f, 0.0f };
+        // Free rotation around the axle axis (constraint-frame Y).
+        wheel.sixdof_free_angular_axes = { 0.0f, 1.0f, 0.0f };
+
         wheel.spring_k = 500.0f;
         wheel.spring_d = 5.0f;
         wheel.wheel_radius = 0.35f;
