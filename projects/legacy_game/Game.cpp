@@ -12,16 +12,18 @@
 #include "LogMacros.h"
 #include "BatchRegistry.hpp"
 #include "ecs/TransformComponent.hpp"
-#include "ecs/VehicleRigBuilder.hpp"
-#include "ecs/VehicleControlComponent.hpp"
+#include "ecs/VehicleRig1Builder.hpp"
+#include "ecs/VehicleRig1ControlComponent.hpp"
+#include "ecs/VehicleRig1Component.hpp"
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/EntityManager.hpp"
 #include "engineapi/IInputManager.hpp"
 #include <glm/gtc/type_ptr.hpp>
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
-#include <iostream>
+#include <vector>
 
 
 
@@ -47,7 +49,7 @@ bool Game::init()
     playerControllerSystem = std::make_unique<eeng::ecs::systems::MannequinPlayerControllerSystem>();
     if (playerControllerSystem)
         playerControllerSystem->set_physics_system(runtime_pipeline_.physics_system());
-    vehicleControlSystem = std::make_unique<eeng::ecs::systems::VehicleControlSystem>();
+    vehicleRig1ControlSystem = std::make_unique<eeng::ecs::systems::VehicleRig1ControlSystem>();
 
     // Prefer project config asset root when running inside the editor.
     std::filesystem::path assets_root = "assets";
@@ -195,9 +197,9 @@ void Game::update(
     {
         playerControllerSystem->update(registry, *ctx, deltaTime);
     }
-    if (play_mode && vehicleControlSystem)
+    if (play_mode && vehicleRig1ControlSystem)
     {
-        vehicleControlSystem->update(registry, *ctx, deltaTime);
+        vehicleRig1ControlSystem->update(registry, *ctx, deltaTime);
     }
 
     update_active_camera_state();
@@ -462,11 +464,95 @@ bool Game::get_editor_view(eeng::OverlayViewState& out) const
     return true;
 }
 
-void Game::spawn_vehicle_rig_to_default_batch()
+void Game::destroy_vehicle_rig1()
 {
+    // Tear down any previously spawned VehicleRig1 rig so we can respawn cleanly.
+    if (!ctx || !ctx->entity_manager)
+        return;
+
+    if (!vehicle_rig1_root.guid.valid())
+        return;
+
+    auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
+    auto& registry = em.registry();
+
+    const auto root_opt = em.get_entity_from_guid(vehicle_rig1_root.guid);
+    if (!root_opt)
+    {
+        vehicle_rig1_root = {};
+        return;
+    }
+
+    const entt::entity root_entity = *root_opt;
+    if (!registry.valid(root_entity))
+    {
+        vehicle_rig1_root = {};
+        return;
+    }
+
+    std::vector<eeng::ecs::Entity> destroy_list;
+    auto push_entity_id = [&](const eeng::ecs::Entity& entity)
+    {
+        const entt::entity ent = static_cast<entt::entity>(entity);
+        if (!registry.valid(ent))
+            return;
+        if (std::find(destroy_list.begin(), destroy_list.end(), entity) == destroy_list.end())
+            destroy_list.push_back(entity);
+    };
+    auto push_entity_ref = [&](const eeng::ecs::EntityRef& ref)
+    {
+        if (!ref.is_bound())
+            return;
+        push_entity_id(ref.entity);
+    };
+
+    // Collect rig-linked entities.
+    if (auto* rig = registry.try_get<eeng::ecs::VehicleRig1RigComponent>(root_entity))
+    {
+        push_entity_ref(rig->chassis);
+        for (const auto& wheel : rig->wheels)
+        {
+            push_entity_ref(wheel.knuckle);
+            push_entity_ref(wheel.wheel);
+            push_entity_ref(wheel.suspension_6dof);
+            push_entity_ref(wheel.axle_hinge);
+        }
+    }
+
+    // Always destroy the root entity last.
+    push_entity_id(eeng::ecs::Entity(root_entity));
+
+    // Prefer batch-owned destruction when possible (it queues the removal on the batch thread).
+    if (ctx->batch_registry)
+    {
+        auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
+        for (const auto ent : destroy_list)
+        {
+            const auto ref = em.get_entity_ref(ent);
+            eeng::BatchId batch_id{};
+            if (br.try_get_loaded_batch_for_entity(ref, batch_id))
+                br.queue_destroy_entity(batch_id, ref, *ctx);
+            else
+                em.destroy_entity_now(ent);
+        }
+    }
+    else
+    {
+        for (const auto ent : destroy_list)
+            em.destroy_entity_now(ent);
+    }
+
+    vehicle_rig1_root = {};
+}
+
+void Game::spawn_vehicle_rig1_to_default_batch()
+{
+    // Hard reset any previous rig so spawn is repeatable.
+    destroy_vehicle_rig1();
+
     if (!ctx || !ctx->entity_manager || !ctx->batch_registry)
     {
-        EENG_LOG_WARN(ctx, "Vehicle rig spawn skipped: missing entity manager or batch registry.");
+        EENG_LOG_WARN(ctx, "VehicleRig1 spawn skipped: missing entity manager or batch registry.");
         return;
     }
 
@@ -474,32 +560,29 @@ void Game::spawn_vehicle_rig_to_default_batch()
     eeng::BatchId default_id{};
     if (!br.try_get_batch_id_by_name(eeng::BatchRegistry::kDefaultBatchName, default_id))
     {
-        EENG_LOG_WARN(ctx, "Vehicle rig spawn skipped: default batch not found.");
+        EENG_LOG_WARN(ctx, "VehicleRig1 spawn skipped: default batch not found.");
         return;
     }
     if (!br.is_batch_loaded(default_id))
     {
-        EENG_LOG_WARN(ctx, "Vehicle rig spawn skipped: default batch not loaded.");
+        EENG_LOG_WARN(ctx, "VehicleRig1 spawn skipped: default batch not loaded.");
         return;
     }
 
     auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
     auto& registry = em.registry();
 
-    const int vehicle_index = vehicle_spawn_count++;
-    const std::string suffix = (vehicle_index > 0) ? ("_" + std::to_string(vehicle_index)) : "";
-    const std::string vehicle_prefix = "TestVehicle" + suffix;
-    const float x_offset = static_cast<float>(vehicle_index) * 6.0f;
-
+    // --- Chassis ------------------------------------------------------------
+    const std::string vehicle_prefix = "VehicleRig1";
     const auto [chassis_guid, chassis_entity] = em.create_entity_live_parent(
-        "vehicle_rig",
+        "vehicle_rig1",
         vehicle_prefix + "_Chassis",
         eeng::ecs::Entity::EntityNull,
         eeng::ecs::Entity::EntityNull);
     (void)chassis_guid;
 
     auto& chassis_tfm = registry.emplace<eeng::ecs::TransformComponent>(chassis_entity);
-    chassis_tfm.set_position({ x_offset, 2.0f, 0.0f });
+    chassis_tfm.set_position({ 0.0f, 2.0f, 0.0f });
     chassis_tfm.set_rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
 
     auto& chassis_rb = registry.emplace<eeng::ecs::RigidBodyComponent>(chassis_entity);
@@ -516,13 +599,11 @@ void Game::spawn_vehicle_rig_to_default_batch()
     chassis_colliders.colliders.push_back(chassis_box);
     registry.emplace<eeng::ecs::ColliderComponent>(chassis_entity, std::move(chassis_colliders));
 
-    eeng::ecs::VehicleSpec spec{};
+    // --- VehicleRig1 spec ------------------------------------------------------
+    eeng::ecs::VehicleRig1Spec spec{};
     spec.chassis = em.get_entity_ref(chassis_entity);
     spec.name_prefix = vehicle_prefix;
-    spec.chunk_tag = "vehicle_rig";
-    spec.use_knuckle = true;
-    spec.use_split_suspension_constraints = true;
-    spec.kinematic_knuckle = false;
+    spec.chunk_tag = "vehicle_rig1";
     spec.chassis_model_name = "carbody";
     spec.wheel_model_name = "tyre";
 
@@ -533,30 +614,34 @@ void Game::spawn_vehicle_rig_to_default_batch()
 
     auto make_wheel = [&](const glm::vec3& mount, bool steerable, bool driven)
     {
-        eeng::ecs::VehicleWheelSpec wheel{};
+        eeng::ecs::VehicleRig1WheelSpec wheel{};
         wheel.mount_local = mount;
-        // Hard-coded axes for debugging.
+
+        // Hard-coded axes for the prototype.
         wheel.suspension_axis = { 0.0f, -1.0f, 0.0f };
         wheel.axle_axis = { 0.0f, 0.0f, 1.0f };
+
+        // Suspension: rest/travel define the default linear limits in the 6DoF frame.
         wheel.suspension_rest_length = 0.9f;
         wheel.suspension_travel = 0.8f;
-        wheel.sixdof_use_linear_limits = true;
-        wheel.sixdof_linear_limit_min = { 1.0f, 0.0f, 0.0f };
-        wheel.sixdof_linear_limit_max = { 3.0f, 0.0f, 0.0f };
-        wheel.sixdof_linear_equilibrium_enabled = { 1.0f, 0.0f, 0.0f };
-        wheel.sixdof_linear_equilibrium_target = { 1.5f, 0.0f, 0.0f };
-        wheel.sixdof_use_angular_limits = true;
-        wheel.sixdof_angular_limit_min = { 0.0f, 0.0f, 0.0f };
-        wheel.sixdof_angular_limit_max = { 0.0f, 0.0f, 0.0f };
-        // Free rotation around the axle axis (constraint-frame Y).
-        wheel.sixdof_free_angular_axes = { 0.0f, 1.0f, 0.0f };
+        wheel.use_linear_limits = true;
+        wheel.linear_limit_min = { 1.0f, 0.0f, 0.0f };
+        wheel.linear_limit_max = { 3.0f, 0.0f, 0.0f };
+        wheel.linear_equilibrium_enabled = { 1.0f, 0.0f, 0.0f };
+        wheel.linear_equilibrium_target = { 1.5f, 0.0f, 0.0f };
 
+        // Spring tuning (works in the 6DoF constraint).
         wheel.spring_k = 500.0f;
         wheel.spring_d = 5.0f;
+
+        // Collider sizes.
         wheel.wheel_radius = 0.35f;
         wheel.knuckle_radius = 0.15f;
+
+        // Per-wheel capability flags.
         wheel.steerable = steerable;
         wheel.driven = driven;
+
         // Flip drive direction for steerable wheels if needed (front wheels were observed reversed).
         wheel.drive_direction = steerable ? -1.0f : 1.0f;
         // Keep steering direction consistent for both front wheels.
@@ -569,22 +654,26 @@ void Game::spawn_vehicle_rig_to_default_batch()
     spec.wheels.push_back(make_wheel(mount_rear_left, false, false));
     spec.wheels.push_back(make_wheel(mount_rear_right, false, false));
 
-    const auto rig = eeng::ecs::build_vehicle_rig(*ctx, spec);
+    // --- Build rig ----------------------------------------------------------
+    const auto rig = eeng::ecs::build_vehicle_rig1(*ctx, spec);
     if (!rig.root.is_bound())
     {
-        EENG_LOG_WARN(ctx, "Vehicle rig spawn failed: rig root missing.");
+        EENG_LOG_WARN(ctx, "VehicleRig1 spawn failed: rig root missing.");
         return;
     }
 
-    vehicle_rig_root = rig.root;
-    auto& control = registry.emplace<eeng::ecs::VehicleControlComponent>(rig.root.entity);
+    vehicle_rig1_root = rig.root;
+
+    // --- Control component --------------------------------------------------
+    auto& control = registry.emplace<eeng::ecs::VehicleRig1ControlComponent>(rig.root.entity);
     control.steer_limit = spec.steer_limit;
     control.steer_speed = 6.0f;
+    control.steer_max_impulse = 2000.0f;
     control.drive_velocity = 10.0f;
     control.drive_max_impulse = 150.0f;
-    control.drive_max_impulse = spec.drive_motor_max_impulse;
-    control.steer_max_impulse = 2000.0f;
 
+    // --- Mass tuning --------------------------------------------------------
+    // Helper: override auto-mass so we can tune mass ratios explicitly.
     const auto apply_mass = [&](const eeng::ecs::EntityRef& ref, float mass)
     {
         if (!ref.is_bound())
@@ -602,6 +691,7 @@ void Game::spawn_vehicle_rig_to_default_batch()
         apply_mass(wheel.knuckle, 1.0f);
     }
 
+    // --- Attach entities to the default batch ------------------------------
     auto attach_entity = [&](const eeng::ecs::EntityRef& ref)
     {
         if (!ref.is_bound())
@@ -611,9 +701,7 @@ void Game::spawn_vehicle_rig_to_default_batch()
         if (br.try_get_loaded_batch_for_entity(ref, existing))
         {
             if (existing != default_id)
-            {
-                EENG_LOG_WARN(ctx, "Vehicle rig entity already attached to another batch; skipping.");
-            }
+                EENG_LOG_WARN(ctx, "VehicleRig1 entity already attached to another batch; skipping.");
             return;
         }
 
@@ -626,10 +714,7 @@ void Game::spawn_vehicle_rig_to_default_batch()
     {
         attach_entity(wheel.knuckle);
         attach_entity(wheel.wheel);
-        attach_entity(wheel.suspension_slider);
-        attach_entity(wheel.suspension_spring);
         attach_entity(wheel.suspension_6dof);
-        attach_entity(wheel.steering_hinge);
         attach_entity(wheel.axle_hinge);
     }
 }
@@ -708,7 +793,7 @@ void Game::renderUI()
 #endif
 
     ImGui::Separator();
-    ImGui::Text("Vehicle Rig");
+    ImGui::Text("VehicleRig1");
 
     bool default_batch_loaded = false;
     if (ctx && ctx->batch_registry)
@@ -719,169 +804,46 @@ void Game::renderUI()
             default_batch_loaded = br.is_batch_loaded(default_id);
     }
 
-    if (ImGui::Button("Spawn Test Vehicle (default batch)"))
+    if (ImGui::Button("Spawn / Respawn VehicleRig1 (default batch)"))
     {
-        spawn_vehicle_rig_to_default_batch();
+        spawn_vehicle_rig1_to_default_batch();
     }
     ImGui::SameLine();
     ImGui::TextDisabled(default_batch_loaded ? "default batch loaded" : "default batch not loaded");
 
-    ImGui::Separator();
-    ImGui::Text("Vehicle Rig Monitor");
-
-    const eeng::ecs::VehicleControlComponent* control = nullptr;
-    const eeng::ecs::VehicleRigComponent* rig = nullptr;
+    // --- VehicleRig1 monitor (compact) ---------------------------------------
+    const eeng::ecs::VehicleRig1ControlComponent* control = nullptr;
+    const eeng::ecs::VehicleRig1RigComponent* rig = nullptr;
     entt::entity control_entity = entt::null;
-    if (ctx && ctx->entity_manager && vehicle_rig_root.guid.valid())
+    if (ctx && ctx->entity_manager && vehicle_rig1_root.guid.valid())
     {
         auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
-        if (auto ent_opt = em.get_entity_from_guid(vehicle_rig_root.guid))
+        if (auto ent_opt = em.get_entity_from_guid(vehicle_rig1_root.guid))
         {
             control_entity = *ent_opt;
             auto& registry = ctx->entity_manager->registry();
             if (registry.valid(control_entity))
             {
-                control = registry.try_get<eeng::ecs::VehicleControlComponent>(control_entity);
-                rig = registry.try_get<eeng::ecs::VehicleRigComponent>(control_entity);
+                control = registry.try_get<eeng::ecs::VehicleRig1ControlComponent>(control_entity);
+                rig = registry.try_get<eeng::ecs::VehicleRig1RigComponent>(control_entity);
             }
         }
     }
 
     if (control)
     {
-        ImGui::Text("Input steer %.3f drive %.3f", control->steer_input, control->drive_input);
-        ImGui::Text("Target steer %.3f angle %.3f", control->steer_target, control->steer_angle);
-        ImGui::Text("Steer max impulse %.1f", control->steer_max_impulse);
-    }
-
-    if (rig && ctx && ctx->entity_manager)
-    {
-        auto& registry = ctx->entity_manager->registry();
-        const eeng::ecs::VehicleWheelLink* steer_wheel = nullptr;
-        for (const auto& wheel : rig->wheels)
-        {
-            if (wheel.steerable)
-            {
-                steer_wheel = &wheel;
-                break;
-            }
-        }
-
-        if (steer_wheel)
-        {
-            ImGui::Separator();
-            ImGui::Text("Steer Wheel Debug");
-            ImGui::Text("sixdof bound: %s",
-                steer_wheel->suspension_6dof.is_bound() ? "yes" : "no");
-
-            if (steer_wheel->suspension_6dof.is_bound())
-            {
-                if (auto* sixdof =
-                        registry.try_get<eeng::ecs::SixDofSpringConstraintComponent>(
-                            steer_wheel->suspension_6dof.entity))
-                {
-                    const bool a_bound = sixdof->entity_a.is_bound();
-                    const bool b_bound = sixdof->entity_b.is_bound();
-                    const bool a_valid = a_bound && registry.valid(
-                        static_cast<entt::entity>(sixdof->entity_a.entity));
-                    const bool b_valid = b_bound && registry.valid(
-                        static_cast<entt::entity>(sixdof->entity_b.entity));
-                    ImGui::Text("sixdof enabled: %s",
-                        sixdof->enabled ? "yes" : "no");
-                    ImGui::Text("sixdof A/B: %s/%s",
-                        a_valid ? "valid" : "invalid",
-                        b_valid ? "valid" : "invalid");
-                    ImGui::Text("ang lim x: %.3f .. %.3f",
-                        sixdof->angular_limit_min.x, sixdof->angular_limit_max.x);
-                    ImGui::Text("motor x: en %.1f servo %.1f",
-                        sixdof->angular_motor_enabled.x, sixdof->angular_servo_enabled.x);
-                    ImGui::Text("servo target x: %.3f", sixdof->angular_servo_target.x);
-                    ImGui::Text("motor max force x: %.1f", sixdof->angular_motor_max_force.x);
-
-                    static int steer_debug_frame = 0;
-                    if ((++steer_debug_frame % 60) == 0)
-                    {
-                        std::cout
-                            << "SteerDbg sixdof enabled=" << (sixdof->enabled ? 1 : 0)
-                            << " A=" << (a_valid ? "ok" : "bad")
-                            << " B=" << (b_valid ? "ok" : "bad")
-                            << " limX=[" << sixdof->angular_limit_min.x
-                            << ", " << sixdof->angular_limit_max.x << "]"
-                            << " motorX(en=" << sixdof->angular_motor_enabled.x
-                            << " servo=" << sixdof->angular_servo_enabled.x
-                            << " target=" << sixdof->angular_servo_target.x
-                            << " maxF=" << sixdof->angular_motor_max_force.x
-                            << ")\n";
-                    }
-                }
-                else
-                {
-                    ImGui::TextDisabled("sixdof component missing");
-                }
-            }
-        }
-    }
-    else
-    {
-        ImGui::TextDisabled("Input manager unavailable");
-    }
-
-    if (control)
-    {
-        ImGui::Text("Control entity: %u", static_cast<unsigned>(control_entity));
-        ImGui::Text("Control: %s", control->enabled ? "enabled" : "disabled");
-        ImGui::Text("Controller id: %d", control->controller_id);
-        ImGui::Text("Keyboard fallback: %s", control->use_keyboard_fallback ? "on" : "off");
-        ImGui::Text("Steer input/target/angle: %.2f / %.2f / %.2f",
-            control->steer_input, control->steer_target, control->steer_angle);
-        ImGui::Text("Drive input: %.2f", control->drive_input);
-        ImGui::Text("Drive vel/impulse: %.1f / %.1f",
-            control->drive_velocity, control->drive_max_impulse);
+        ImGui::Text("Input steer/drive: %.2f / %.2f", control->steer_input, control->drive_input);
+        ImGui::Text("Steer target/angle: %.2f / %.2f", control->steer_target, control->steer_angle);
+        ImGui::Text("Steer speed/impulse: %.1f / %.1f", control->steer_speed, control->steer_max_impulse);
+        ImGui::Text("Drive vel/impulse: %.1f / %.1f", control->drive_velocity, control->drive_max_impulse);
         ImGui::Text("Brake impulse: %.1f", control->brake_max_impulse);
+        ImGui::Text("Controller id: %d", control->controller_id);
         if (rig)
-        {
-            ImGui::Separator();
-            ImGui::Text("Rig Wheels");
-            int index = 0;
-            for (const auto& wheel : rig->wheels)
-            {
-                ImGui::Text("Wheel %d: steer=%s drive=%s",
-                    index,
-                    wheel.steerable ? "yes" : "no",
-                    wheel.driven ? "yes" : "no");
-                ImGui::Text("  knuckle=%s steer_hinge=%s axle_hinge=%s",
-                    wheel.knuckle.is_bound() ? "bound" : "none",
-                    wheel.steering_hinge.is_bound() ? "bound" : "none",
-                    wheel.axle_hinge.is_bound() ? "bound" : "none");
-
-                if (ctx && ctx->entity_manager && wheel.axle_hinge.is_bound())
-                {
-                    auto& registry = ctx->entity_manager->registry();
-                    if (auto* hinge = registry.try_get<eeng::ecs::HingeConstraintComponent>(wheel.axle_hinge.entity))
-                    {
-                        const bool a_is_knuckle = wheel.knuckle.is_bound()
-                            && hinge->entity_a.is_bound()
-                            && hinge->entity_a.entity == wheel.knuckle.entity;
-                        const bool b_is_knuckle = wheel.knuckle.is_bound()
-                            && hinge->entity_b.is_bound()
-                            && hinge->entity_b.entity == wheel.knuckle.entity;
-                        ImGui::Text("  axle_hinge A=%s B=%s (knuckle=%s)",
-                            hinge->entity_a.is_bound() ? "bound" : "none",
-                            hinge->entity_b.is_bound() ? "bound" : "none",
-                            (a_is_knuckle || b_is_knuckle) ? "yes" : "no");
-                    }
-                }
-                ++index;
-            }
-        }
+            ImGui::Text("Wheel count: %d", static_cast<int>(rig->wheels.size()));
     }
     else
     {
-        ImGui::TextDisabled("VehicleControlComponent not found");
-        if (!vehicle_rig_root.guid.valid())
-            ImGui::TextDisabled("Rig root guid missing");
-        else if (control_entity == entt::null)
-            ImGui::TextDisabled("Rig root not resolved in current world");
+        ImGui::TextDisabled("VehicleRig1 not spawned (or control missing)");
     }
 
     ImGui::End(); // end info window

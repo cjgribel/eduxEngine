@@ -17,7 +17,7 @@
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/CoreComponents.hpp"
 #include "ecs/MockComponents.hpp"
-#include "ecs/VehicleRigComponent.hpp"
+#include "ecs/VehicleRig1Component.hpp"
 #include "ecs/systems/TransformSystem.hpp"
 #include "mock/MockTypes.hpp"
 #include "mock/CopySignaller.hpp"
@@ -1269,84 +1269,69 @@ namespace eeng
                 ;
             register_component<ecs::SixDofSpringConstraintComponent>();
 
-            entt::meta_factory<eeng::ecs::VehicleWheelLink>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.VehicleWheelLink", .name = "VehicleWheelLink", .tooltip = "Vehicle wheel linkage state." })
+            entt::meta_factory<eeng::ecs::VehicleRig1WheelLink>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.VehicleRig1WheelLink", .name = "VehicleRig1WheelLink", .tooltip = "VehicleRig1 wheel linkage state." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::knuckle>("knuckle"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::knuckle>("knuckle"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "knuckle", "Knuckle", "Knuckle entity reference." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::wheel>("wheel"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::wheel>("wheel"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "wheel", "Wheel", "Wheel entity reference." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::suspension_slider>("suspension_slider"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "suspension_slider", "Suspension Slider", "Suspension slider constraint entity." })
-                .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::suspension_spring>("suspension_spring"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "suspension_spring", "Suspension Spring", "Suspension spring entity." })
-                .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::suspension_6dof>("suspension_6dof"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::suspension_6dof>("suspension_6dof"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "suspension_6dof", "Suspension 6DoF", "6DoF suspension constraint entity." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::steering_hinge>("steering_hinge"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "steering_hinge", "Steering Hinge", "Steering hinge constraint entity." })
-                .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::axle_hinge>("axle_hinge"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::axle_hinge>("axle_hinge"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "axle_hinge", "Axle Hinge", "Axle hinge constraint entity." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::steerable>("steerable"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::steerable>("steerable"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "steerable", "Steerable", "Steerable wheel flag." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::driven>("driven"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::driven>("driven"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "driven", "Driven", "Driven wheel flag." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::drive_direction>("drive_direction"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::drive_direction>("drive_direction"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "drive_direction", "Drive Direction", "Sign to flip drive motor direction." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::steer_direction>("steer_direction"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::steer_direction>("steer_direction"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "steer_direction", "Steer Direction", "Sign to flip steer motor direction." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::steer_neutral_angle>("steer_neutral_angle"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "steer_neutral_angle", "Steer Neutral Angle", "Reference angle used for steering recentre." })
-                .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::mount_local>("mount_local"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::mount_local>("mount_local"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "mount_local", "Mount Local", "Chassis-local mount position." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::suspension_axis>("suspension_axis"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::suspension_axis>("suspension_axis"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "suspension_axis", "Suspension Axis", "Chassis-local suspension axis." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::axle_axis>("axle_axis"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::axle_axis>("axle_axis"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "axle_axis", "Axle Axis", "Local axle axis." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::wheel_local_anchor>("wheel_local_anchor"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::wheel_local_anchor>("wheel_local_anchor"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "wheel_local_anchor", "Wheel Anchor", "Wheel-local anchor position." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::suspension_rest_length>("suspension_rest_length"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::suspension_rest_length>("suspension_rest_length"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "suspension_rest_length", "Rest Length", "Suspension rest length." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleWheelLink::suspension_travel>("suspension_travel"_hs)
+                .data<&eeng::ecs::VehicleRig1WheelLink::suspension_travel>("suspension_travel"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "suspension_travel", "Travel", "Suspension travel distance." })
                 .traits(MetaFlags::none)
                 ;
-            meta::register_type<eeng::ecs::VehicleWheelLink>();
-            warm_start_meta_type<eeng::ecs::VehicleWheelLink>();
+            meta::register_type<eeng::ecs::VehicleRig1WheelLink>();
+            warm_start_meta_type<eeng::ecs::VehicleRig1WheelLink>();
 
-            entt::meta_factory<eeng::ecs::VehicleRigComponent>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.VehicleRigComponent", .name = "VehicleRigComponent", .tooltip = "Vehicle rig linkage component." })
+            entt::meta_factory<eeng::ecs::VehicleRig1RigComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.VehicleRig1RigComponent", .name = "VehicleRig1RigComponent", .tooltip = "VehicleRig1 rig linkage component." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleRigComponent::chassis>("chassis"_hs)
+                .data<&eeng::ecs::VehicleRig1RigComponent::chassis>("chassis"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "chassis", "Chassis", "Chassis entity reference." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleRigComponent::kinematic_knuckle>("kinematic_knuckle"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "kinematic_knuckle", "Kinematic Knuckle", "True if knuckles are kinematic." })
-                .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleRigComponent::steer_axis>("steer_axis"_hs)
+                .data<&eeng::ecs::VehicleRig1RigComponent::steer_axis>("steer_axis"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "steer_axis", "Steer Axis", "Chassis-local steering axis." })
                 .traits(MetaFlags::none)
-                .data<&eeng::ecs::VehicleRigComponent::wheels>("wheels"_hs)
+                .data<&eeng::ecs::VehicleRig1RigComponent::wheels>("wheels"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "wheels", "Wheels", "Wheel linkage array." })
                 .traits(MetaFlags::none)
                 ;
-            register_component<ecs::VehicleRigComponent>();
+            register_component<ecs::VehicleRig1RigComponent>();
 
             entt::meta_factory<eeng::ecs::PhysicsRaycastDebugComponent>{}
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.PhysicsRaycastDebugComponent", .name = "PhysicsRaycastDebugComponent", .tooltip = "Debug-only raycast cache." })

@@ -8,7 +8,8 @@
 
 namespace eeng::ecs::systems
 {
-    class VehicleControlSystem
+    // VehicleRig1 prototype: input-to-motor/servo control system.
+    class VehicleRig1ControlSystem
     {
     public:
         void update(entt::registry& registry, EngineContext& ctx, float dt);

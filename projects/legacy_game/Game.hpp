@@ -6,7 +6,7 @@
 #include "RenderableMesh.hpp"
 #include "ForwardRenderer.hpp"
 #include "ecs/systems/MannequinPlayerControllerSystem.hpp"
-#include "ecs/systems/VehicleControlSystem.hpp"
+#include "ecs/systems/VehicleRig1ControlSystem.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "ecs/Entity.hpp"
 #include "glmcommon.hpp"
@@ -90,7 +90,8 @@ public:
 private:
     /// @brief For rendering of GUI elements
     void renderUI();
-    void spawn_vehicle_rig_to_default_batch();
+    void spawn_vehicle_rig1_to_default_batch();
+    void destroy_vehicle_rig1();
 
     // ENGINE API
     std::shared_ptr<eeng::EngineContext> ctx;
@@ -103,7 +104,7 @@ private:
     ShapeRendererPtr shapeRenderer;
 
     std::unique_ptr<eeng::ecs::systems::MannequinPlayerControllerSystem> playerControllerSystem;
-    std::unique_ptr<eeng::ecs::systems::VehicleControlSystem> vehicleControlSystem;
+    std::unique_ptr<eeng::ecs::systems::VehicleRig1ControlSystem> vehicleRig1ControlSystem;
     eeng::ecs::RuntimePipeline runtime_pipeline_;
 
     // <-- ENGINE API
@@ -129,8 +130,7 @@ private:
     } active_camera;
 
     eeng::ecs::Entity player_entity;
-    eeng::ecs::EntityRef vehicle_rig_root;
-    int vehicle_spawn_count = 0;
+    eeng::ecs::EntityRef vehicle_rig1_root;
     glm_aux::Ray view_ray;
 
     // Light properties

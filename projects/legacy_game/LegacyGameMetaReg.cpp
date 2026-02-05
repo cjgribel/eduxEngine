@@ -9,7 +9,7 @@
 #include "MetaInfo.h"
 #include "LogMacros.h"
 #include "ecs/MannequinPlayerControllerComponent.hpp"
-#include "ecs/VehicleControlComponent.hpp"
+#include "ecs/VehicleRig1ControlComponent.hpp"
 
 #include <entt/entt.hpp>
 #include <type_traits>
@@ -141,64 +141,64 @@ namespace eeng::legacy_game
             register_component<eeng::ecs::MannequinPlayerControllerComponent>();
         }
 
-        // --- VehicleControlComponent -------------------------------------
+        // --- VehicleRig1ControlComponent -------------------------------------
         {
-            entt::meta_factory<eeng::ecs::VehicleControlComponent>{}
+            entt::meta_factory<eeng::ecs::VehicleRig1ControlComponent>{}
             .custom<TypeMetaInfo>(TypeMetaInfo{
-                .id = "eeng.legacy_game.VehicleControlComponent",
-                .name = "VehicleControlComponent",
-                .tooltip = "Input-driven steering and drive control for vehicle rigs." })
+                .id = "eeng.legacy_game.VehicleRig1ControlComponent",
+                .name = "VehicleRig1ControlComponent",
+                .tooltip = "Input-driven steering and drive control for VehicleRig1." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::name>("name"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::name>("name"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Component name." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::enabled>("enabled"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::enabled>("enabled"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable vehicle input control." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::controller_id>("controller_id"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::controller_id>("controller_id"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "controller_id", "Controller Id", "Controller instance id (-1 = first connected)." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::use_keyboard_fallback>("use_keyboard_fallback"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::use_keyboard_fallback>("use_keyboard_fallback"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "use_keyboard_fallback", "Keyboard Fallback", "Use keyboard when no controller is active." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::stick_deadzone>("stick_deadzone"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::stick_deadzone>("stick_deadzone"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "stick_deadzone", "Stick Deadzone", "Deadzone for steering input." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::trigger_deadzone>("trigger_deadzone"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::trigger_deadzone>("trigger_deadzone"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "trigger_deadzone", "Trigger Deadzone", "Deadzone for controller triggers." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::steer_limit>("steer_limit"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::steer_limit>("steer_limit"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "steer_limit", "Steer Limit", "Max steering angle (radians)." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::steer_speed>("steer_speed"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::steer_speed>("steer_speed"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "steer_speed", "Steer Speed", "Steering speed (rad/s)." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::steer_max_impulse>("steer_max_impulse"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::steer_max_impulse>("steer_max_impulse"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "steer_max_impulse", "Steer Max Impulse", "Max motor impulse for steering hinge." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::drive_velocity>("drive_velocity"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::drive_velocity>("drive_velocity"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "drive_velocity", "Drive Velocity", "Target wheel angular velocity." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::drive_max_impulse>("drive_max_impulse"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::drive_max_impulse>("drive_max_impulse"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "drive_max_impulse", "Drive Max Impulse", "Max motor impulse for drive wheels." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::VehicleControlComponent::brake_max_impulse>("brake_max_impulse"_hs)
+                .data<&eeng::ecs::VehicleRig1ControlComponent::brake_max_impulse>("brake_max_impulse"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "brake_max_impulse", "Brake Max Impulse", "Max motor impulse when braking/coasting." })
                 .traits(MetaFlags::none)
                 ;
-            register_component<eeng::ecs::VehicleControlComponent>();
+            register_component<eeng::ecs::VehicleRig1ControlComponent>();
         }
     }
 }

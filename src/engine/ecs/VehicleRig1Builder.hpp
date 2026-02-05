@@ -5,7 +5,7 @@
 
 #include "EngineContext.hpp"
 #include "ecs/Entity.hpp"
-#include "ecs/VehicleRigComponent.hpp"
+#include "ecs/VehicleRig1Component.hpp"
 
 #include <glm/glm.hpp>
 #include <string>
@@ -13,17 +13,17 @@
 
 namespace eeng::ecs
 {
-    // Data-only spec for a vehicle rig. Keep this POD-like for future prefab/JSON use.
-    struct VehicleWheelSpec
+    // VehicleRig1 prototype: per-wheel setup data (POD-style for easy tweaking).
+    struct VehicleRig1WheelSpec
     {
-        // Chassis local mount position for this wheel (e.g. suspension top).
+        // Chassis-local mount position for this wheel (suspension top).
         glm::vec3 mount_local{ 0.0f };
-        // Suspension axis in chassis local space.
+        // Suspension axis in chassis local space (points along wheel travel).
         glm::vec3 suspension_axis{ 0.0f, -1.0f, 0.0f };
         // Wheel axle axis in wheel/knuckle local space.
         glm::vec3 axle_axis{ 0.0f, 0.0f, 1.0f };
 
-        // Local anchor on the wheel body (useful if origin is not the hub center).
+        // Wheel-local anchor (useful if origin is not the hub center).
         glm::vec3 wheel_local_anchor{ 0.0f };
 
         // Suspension rest length along suspension_axis (positive along the axis).
@@ -32,19 +32,16 @@ namespace eeng::ecs
         float suspension_travel = 0.5f;
 
         // Optional 6DoF linear limit override in constraint frame (X/Y/Z).
-        bool sixdof_use_linear_limits = false;
-        glm::vec3 sixdof_linear_limit_min{ 0.0f };
-        glm::vec3 sixdof_linear_limit_max{ 0.0f };
+        // X is the suspension axis in our frame setup.
+        bool use_linear_limits = false;
+        glm::vec3 linear_limit_min{ 0.0f };
+        glm::vec3 linear_limit_max{ 0.0f };
         // Optional per-axis equilibrium override (0/1 enabled flags).
-        glm::vec3 sixdof_linear_equilibrium_enabled{ 0.0f };
-        glm::vec3 sixdof_linear_equilibrium_target{ 0.0f };
-        // Optional 6DoF angular limit override (radians) in constraint frame.
-        bool sixdof_use_angular_limits = false;
-        glm::vec3 sixdof_angular_limit_min{ 0.0f };
-        glm::vec3 sixdof_angular_limit_max{ 0.0f };
-        // Optional 6DoF free angular axes (0/1). If enabled, min>max is applied.
-        glm::vec3 sixdof_free_angular_axes{ 0.0f };
+        // Note: X is the suspension axis in the constraint frame.
+        glm::vec3 linear_equilibrium_enabled{ 0.0f };
+        glm::vec3 linear_equilibrium_target{ 0.0f };
 
+        // Suspension spring/damper (6DoF spring on X).
         float spring_k = 15000.0f;
         float spring_d = 1500.0f;
 
@@ -54,6 +51,7 @@ namespace eeng::ecs
 
         bool steerable = false;
         bool driven = false;
+        // Optional sign flips to match art/axis conventions.
         float drive_direction = 1.0f;
         float steer_direction = 1.0f;
 
@@ -61,33 +59,25 @@ namespace eeng::ecs
         EntityRef wheel{};
     };
 
-    struct VehicleSpec
+    // VehicleRig1 prototype: full rig spec.
+    struct VehicleRig1Spec
     {
         // Required chassis entity ref (must resolve to a live entity).
         EntityRef chassis{};
         // Optional root entity for grouping (if unbound, a new root is created).
         EntityRef root{};
 
-        std::string name_prefix = "Vehicle";
-        std::string chunk_tag = "vehicle_rig";
-        std::vector<VehicleWheelSpec> wheels;
+        // Naming / grouping.
+        std::string name_prefix = "VehicleRig1";
+        std::string chunk_tag = "vehicle_rig1";
+        std::vector<VehicleRig1WheelSpec> wheels;
 
-        // Create intermediate knuckle bodies between chassis and wheels.
-        bool use_knuckle = true;
-        // Use split constraints (slider + spring + hinges) instead of 6DoF.
-        bool use_split_suspension_constraints = false;
-        // Kinematic knuckle helps stability with large mass ratios, but disables suspension forces.
-        bool kinematic_knuckle = false;
+        // Constraint tuning (disable collisions between constrained bodies).
         bool disable_collisions = true;
 
-        // Steering hinge axis in chassis local space.
+        // Steering axis in chassis local space.
         glm::vec3 steer_axis{ 0.0f, 1.0f, 0.0f };
-        float steer_limit = 0.8f;
-        float steer_motor_target_velocity = 2.5f;
-        float steer_motor_max_impulse = 250.0f;
-
-        float drive_motor_target_velocity = 25.0f;
-        float drive_motor_max_impulse = 750.0f;
+        float steer_limit = 0.8f; // radians
 
         // Optional model asset names (lookup via ResourceManager asset index).
         std::string chassis_model_name{};
@@ -95,7 +85,8 @@ namespace eeng::ecs
         std::string knuckle_model_name{};
     };
 
-    struct VehicleRig
+    // VehicleRig1 prototype: runtime rig handles.
+    struct VehicleRig1Rig
     {
         EntityRef root{};
         EntityRef chassis{};
@@ -104,16 +95,13 @@ namespace eeng::ecs
         {
             EntityRef knuckle{};
             EntityRef wheel{};
-            EntityRef suspension_slider{};
-            EntityRef suspension_spring{};
             EntityRef suspension_6dof{};
-            EntityRef steering_hinge{};
             EntityRef axle_hinge{};
         };
 
         std::vector<WheelRig> wheels;
     };
 
-    // Build a vehicle rig using the current ECS physics components.
-    VehicleRig build_vehicle_rig(EngineContext& ctx, const VehicleSpec& spec);
+    // Build the VehicleRig1 rig using a split suspension (6DoF + axle hinge).
+    VehicleRig1Rig build_vehicle_rig1(EngineContext& ctx, const VehicleRig1Spec& spec);
 } // namespace eeng::ecs
