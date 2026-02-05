@@ -8,6 +8,7 @@
 #include "ecs/systems/MannequinPlayerControllerSystem.hpp"
 #include "ecs/systems/VehicleControlSystem.hpp"
 #include "ecs/RuntimePipeline.hpp"
+#include "ecs/Entity.hpp"
 #include "glmcommon.hpp"
 
 // --> ENGINE API
@@ -128,7 +129,7 @@ private:
     } active_camera;
 
     eeng::ecs::Entity player_entity;
-    eeng::ecs::Entity vehicle_rig_root;
+    eeng::ecs::EntityRef vehicle_rig_root;
     int vehicle_spawn_count = 0;
     glm_aux::Ray view_ray;
 

@@ -8,18 +8,8 @@
 #include "glmcommon.hpp"
 #include "editor/ecs/FirstPersonCameraComponent.hpp"
 
-#include <cmath>
-
 namespace
 {
-    float apply_deadzone(float value, float deadzone)
-    {
-        // Treat small controller drift as zero.
-        if (std::fabs(value) <= deadzone)
-            return 0.0f;
-        return value;
-    }
-
     glm::vec3 keyboard_move_axes(const eeng::IInputManager& input)
     {
         using Key = eeng::IInputManager::Key;
@@ -46,11 +36,7 @@ namespace eeng::editor
         if (!input)
             return;
 
-        const bool has_controller = input->GetConnectedControllerCount() > 0;
-        const auto* controller = has_controller ? &input->GetControllerState(0) : nullptr;
         const auto mouse = input->GetMouseState();
-
-        constexpr float kStickDeadzone = 0.2f;
 
         auto view = registry.view<FirstPersonCameraComponent>();
         for (auto entity : view)
@@ -60,40 +46,21 @@ namespace eeng::editor
             if (camera.active)
             {
                 // Read movement/look input only for the active camera.
-                // Movement input: controller if present, otherwise WASD.
-                glm::vec3 move_axes{};
-                if (controller)
-                {
-                    move_axes.x = apply_deadzone(controller->axisLeftX, kStickDeadzone);
-                    move_axes.y = apply_deadzone(-controller->axisLeftY, kStickDeadzone);
-                }
-                else
-                {
-                    move_axes = keyboard_move_axes(*input);
-                }
+                // Movement input: keyboard only for editor cameras.
+                glm::vec3 move_axes = keyboard_move_axes(*input);
 
-                // Look input: controller right stick or mouse drag.
-                if (controller)
-                {
-                    camera.yaw += apply_deadzone(controller->axisRightX, kStickDeadzone) *
-                        camera.controller_look_speed * delta_time;
-                    camera.pitch += apply_deadzone(-controller->axisRightY, kStickDeadzone) *
-                        camera.controller_look_speed * delta_time;
-                }
-                else
-                {
-                    const glm::ivec2 mouse_xy{ mouse.x, mouse.y };
-                    glm::ivec2 mouse_xy_diff{ 0, 0 };
+                // Look input: mouse drag only for editor cameras.
+                const glm::ivec2 mouse_xy{ mouse.x, mouse.y };
+                glm::ivec2 mouse_xy_diff{ 0, 0 };
 
-                    // Compute drag delta in pixels while the left button is held.
-                    if (mouse.leftButton && camera.mouse_prev.x >= 0)
-                        mouse_xy_diff = camera.mouse_prev - mouse_xy;
+                // Compute drag delta in pixels while the left button is held.
+                if (mouse.leftButton && camera.mouse_prev.x >= 0)
+                    mouse_xy_diff = camera.mouse_prev - mouse_xy;
 
-                    camera.mouse_prev = mouse_xy;
+                camera.mouse_prev = mouse_xy;
 
-                    camera.yaw += static_cast<float>(mouse_xy_diff.x) * camera.mouse_sensitivity;
-                    camera.pitch += static_cast<float>(mouse_xy_diff.y) * camera.mouse_sensitivity;
-                }
+                camera.yaw += static_cast<float>(mouse_xy_diff.x) * camera.mouse_sensitivity;
+                camera.pitch += static_cast<float>(mouse_xy_diff.y) * camera.mouse_sensitivity;
 
                 // Clamp pitch to avoid gimbal lock when looking straight up/down.
                 camera.pitch = glm::clamp(camera.pitch, -glm::radians(89.0f), glm::radians(89.0f));

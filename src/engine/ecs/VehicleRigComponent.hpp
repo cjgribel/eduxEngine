@@ -23,6 +23,9 @@ namespace eeng::ecs
 
         bool steerable = false;
         bool driven = false;
+        float drive_direction = 1.0f;
+        float steer_direction = 1.0f;
+        float steer_neutral_angle = 0.0f;
 
         glm::vec3 mount_local{ 0.0f };
         glm::vec3 suspension_axis{ 0.0f, -1.0f, 0.0f };

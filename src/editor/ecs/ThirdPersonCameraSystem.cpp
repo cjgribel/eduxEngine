@@ -10,18 +10,9 @@
 #include "editor/ecs/ThirdPersonCameraComponent.hpp"
 
 #include <algorithm>
-#include <cmath>
 
 namespace
 {
-    float apply_deadzone(float value, float deadzone)
-    {
-        // Treat small controller drift as zero.
-        if (std::fabs(value) <= deadzone)
-            return 0.0f;
-        return value;
-    }
-
     struct KeyboardOrbitInput
     {
         float yaw = 0.0f;
@@ -58,11 +49,8 @@ namespace eeng::editor
         if (!input)
             return;
 
-        const bool has_controller = input->GetConnectedControllerCount() > 0;
-        const auto* controller = has_controller ? &input->GetControllerState(0) : nullptr;
         const auto mouse = input->GetMouseState();
 
-        constexpr float kStickDeadzone = 0.2f;
         constexpr float kMinDistance = 0.5f;
         constexpr float kScrollSpeed = 1.0f;
 
@@ -86,22 +74,14 @@ namespace eeng::editor
             if (camera.active)
             {
                 // Read orbit inputs only for the active camera.
-                // Orbit input: controller if present, otherwise keyboard.
+                // Orbit input: keyboard/mouse only (ignore controller for editor cameras).
                 float yaw_axis = 0.0f;
                 float distance_axis = 0.0f;
                 float pitch_axis = 0.0f;
-                if (controller)
-                {
-                    // Left stick Y zooms; right stick handles look (yaw/pitch) below.
-                    distance_axis = apply_deadzone(-controller->axisLeftY, kStickDeadzone);
-                }
-                else
-                {
-                    const auto axes = keyboard_orbit_axes(*input);
-                    yaw_axis = axes.yaw;
-                    distance_axis = axes.distance;
-                    pitch_axis = axes.pitch;
-                }
+                const auto axes = keyboard_orbit_axes(*input);
+                yaw_axis = axes.yaw;
+                distance_axis = axes.distance;
+                pitch_axis = axes.pitch;
 
                 // Zoom by changing the orbit radius.
                 camera.distance += distance_axis * camera.move_speed * delta_time;
@@ -119,28 +99,18 @@ namespace eeng::editor
                 // Pitch is a rotation around the camera's local X axis (tilt up/down).
                 camera.pitch += pitch_axis * camera.controller_look_speed * delta_time;
 
-                // Look input: controller right stick or mouse drag.
-                if (controller)
-                {
-                    camera.yaw += apply_deadzone(controller->axisRightX, kStickDeadzone) *
-                        camera.controller_look_speed * delta_time;
-                    camera.pitch += apply_deadzone(-controller->axisRightY, kStickDeadzone) *
-                        camera.controller_look_speed * delta_time;
-                }
-                else
-                {
-                    const glm::ivec2 mouse_xy{ mouse.x, mouse.y };
-                    glm::ivec2 mouse_xy_diff{ 0, 0 };
+                // Look input: mouse drag only for editor cameras.
+                const glm::ivec2 mouse_xy{ mouse.x, mouse.y };
+                glm::ivec2 mouse_xy_diff{ 0, 0 };
 
-                    // Compute drag delta in pixels while the left button is held.
-                    if (mouse.leftButton && camera.mouse_prev.x >= 0)
-                        mouse_xy_diff = camera.mouse_prev - mouse_xy;
+                // Compute drag delta in pixels while the left button is held.
+                if (mouse.leftButton && camera.mouse_prev.x >= 0)
+                    mouse_xy_diff = camera.mouse_prev - mouse_xy;
 
-                    camera.mouse_prev = mouse_xy;
+                camera.mouse_prev = mouse_xy;
 
-                    camera.yaw += static_cast<float>(mouse_xy_diff.x) * camera.mouse_sensitivity;
-                    camera.pitch += static_cast<float>(mouse_xy_diff.y) * camera.mouse_sensitivity;
-                }
+                camera.yaw += static_cast<float>(mouse_xy_diff.x) * camera.mouse_sensitivity;
+                camera.pitch += static_cast<float>(mouse_xy_diff.y) * camera.mouse_sensitivity;
 
                 // Clamp pitch to keep the camera above the horizon (no flip).
                 camera.pitch = glm::clamp(camera.pitch, -glm::radians(89.0f), 0.0f);

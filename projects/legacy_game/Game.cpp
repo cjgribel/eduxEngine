@@ -17,9 +17,11 @@
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/EntityManager.hpp"
+#include "engineapi/IInputManager.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <cstdio>
 #include <filesystem>
+#include <iostream>
 
 
 
@@ -529,7 +531,7 @@ void Game::spawn_vehicle_rig_to_default_batch()
     const glm::vec3 mount_rear_left{ -1.6f, 0.0f, 1.0f };
     const glm::vec3 mount_rear_right{ -1.6f, 0.0f, -1.0f };
 
-    auto make_wheel = [&](const glm::vec3& mount)
+    auto make_wheel = [&](const glm::vec3& mount, bool steerable, bool driven)
     {
         eeng::ecs::VehicleWheelSpec wheel{};
         wheel.mount_local = mount;
@@ -553,15 +555,19 @@ void Game::spawn_vehicle_rig_to_default_batch()
         wheel.spring_d = 5.0f;
         wheel.wheel_radius = 0.35f;
         wheel.knuckle_radius = 0.15f;
-        wheel.steerable = false;
-        wheel.driven = false;
+        wheel.steerable = steerable;
+        wheel.driven = driven;
+        // Flip drive direction for steerable wheels if needed (front wheels were observed reversed).
+        wheel.drive_direction = steerable ? -1.0f : 1.0f;
+        // Keep steering direction consistent for both front wheels.
+        wheel.steer_direction = 1.0f;
         return wheel;
     };
 
-    spec.wheels.push_back(make_wheel(mount_front_left));
-    spec.wheels.push_back(make_wheel(mount_front_right));
-    spec.wheels.push_back(make_wheel(mount_rear_left));
-    spec.wheels.push_back(make_wheel(mount_rear_right));
+    spec.wheels.push_back(make_wheel(mount_front_left, true, true));
+    spec.wheels.push_back(make_wheel(mount_front_right, true, true));
+    spec.wheels.push_back(make_wheel(mount_rear_left, false, false));
+    spec.wheels.push_back(make_wheel(mount_rear_right, false, false));
 
     const auto rig = eeng::ecs::build_vehicle_rig(*ctx, spec);
     if (!rig.root.is_bound())
@@ -570,12 +576,14 @@ void Game::spawn_vehicle_rig_to_default_batch()
         return;
     }
 
-    vehicle_rig_root = rig.root.entity;
+    vehicle_rig_root = rig.root;
     auto& control = registry.emplace<eeng::ecs::VehicleControlComponent>(rig.root.entity);
     control.steer_limit = spec.steer_limit;
-    control.steer_speed = 3.0f;
-    control.drive_velocity = spec.drive_motor_target_velocity;
+    control.steer_speed = 6.0f;
+    control.drive_velocity = 10.0f;
+    control.drive_max_impulse = 150.0f;
     control.drive_max_impulse = spec.drive_motor_max_impulse;
+    control.steer_max_impulse = 2000.0f;
 
     const auto apply_mass = [&](const eeng::ecs::EntityRef& ref, float mass)
     {
@@ -717,6 +725,164 @@ void Game::renderUI()
     }
     ImGui::SameLine();
     ImGui::TextDisabled(default_batch_loaded ? "default batch loaded" : "default batch not loaded");
+
+    ImGui::Separator();
+    ImGui::Text("Vehicle Rig Monitor");
+
+    const eeng::ecs::VehicleControlComponent* control = nullptr;
+    const eeng::ecs::VehicleRigComponent* rig = nullptr;
+    entt::entity control_entity = entt::null;
+    if (ctx && ctx->entity_manager && vehicle_rig_root.guid.valid())
+    {
+        auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
+        if (auto ent_opt = em.get_entity_from_guid(vehicle_rig_root.guid))
+        {
+            control_entity = *ent_opt;
+            auto& registry = ctx->entity_manager->registry();
+            if (registry.valid(control_entity))
+            {
+                control = registry.try_get<eeng::ecs::VehicleControlComponent>(control_entity);
+                rig = registry.try_get<eeng::ecs::VehicleRigComponent>(control_entity);
+            }
+        }
+    }
+
+    if (control)
+    {
+        ImGui::Text("Input steer %.3f drive %.3f", control->steer_input, control->drive_input);
+        ImGui::Text("Target steer %.3f angle %.3f", control->steer_target, control->steer_angle);
+        ImGui::Text("Steer max impulse %.1f", control->steer_max_impulse);
+    }
+
+    if (rig && ctx && ctx->entity_manager)
+    {
+        auto& registry = ctx->entity_manager->registry();
+        const eeng::ecs::VehicleWheelLink* steer_wheel = nullptr;
+        for (const auto& wheel : rig->wheels)
+        {
+            if (wheel.steerable)
+            {
+                steer_wheel = &wheel;
+                break;
+            }
+        }
+
+        if (steer_wheel)
+        {
+            ImGui::Separator();
+            ImGui::Text("Steer Wheel Debug");
+            ImGui::Text("sixdof bound: %s",
+                steer_wheel->suspension_6dof.is_bound() ? "yes" : "no");
+
+            if (steer_wheel->suspension_6dof.is_bound())
+            {
+                if (auto* sixdof =
+                        registry.try_get<eeng::ecs::SixDofSpringConstraintComponent>(
+                            steer_wheel->suspension_6dof.entity))
+                {
+                    const bool a_bound = sixdof->entity_a.is_bound();
+                    const bool b_bound = sixdof->entity_b.is_bound();
+                    const bool a_valid = a_bound && registry.valid(
+                        static_cast<entt::entity>(sixdof->entity_a.entity));
+                    const bool b_valid = b_bound && registry.valid(
+                        static_cast<entt::entity>(sixdof->entity_b.entity));
+                    ImGui::Text("sixdof enabled: %s",
+                        sixdof->enabled ? "yes" : "no");
+                    ImGui::Text("sixdof A/B: %s/%s",
+                        a_valid ? "valid" : "invalid",
+                        b_valid ? "valid" : "invalid");
+                    ImGui::Text("ang lim x: %.3f .. %.3f",
+                        sixdof->angular_limit_min.x, sixdof->angular_limit_max.x);
+                    ImGui::Text("motor x: en %.1f servo %.1f",
+                        sixdof->angular_motor_enabled.x, sixdof->angular_servo_enabled.x);
+                    ImGui::Text("servo target x: %.3f", sixdof->angular_servo_target.x);
+                    ImGui::Text("motor max force x: %.1f", sixdof->angular_motor_max_force.x);
+
+                    static int steer_debug_frame = 0;
+                    if ((++steer_debug_frame % 60) == 0)
+                    {
+                        std::cout
+                            << "SteerDbg sixdof enabled=" << (sixdof->enabled ? 1 : 0)
+                            << " A=" << (a_valid ? "ok" : "bad")
+                            << " B=" << (b_valid ? "ok" : "bad")
+                            << " limX=[" << sixdof->angular_limit_min.x
+                            << ", " << sixdof->angular_limit_max.x << "]"
+                            << " motorX(en=" << sixdof->angular_motor_enabled.x
+                            << " servo=" << sixdof->angular_servo_enabled.x
+                            << " target=" << sixdof->angular_servo_target.x
+                            << " maxF=" << sixdof->angular_motor_max_force.x
+                            << ")\n";
+                    }
+                }
+                else
+                {
+                    ImGui::TextDisabled("sixdof component missing");
+                }
+            }
+        }
+    }
+    else
+    {
+        ImGui::TextDisabled("Input manager unavailable");
+    }
+
+    if (control)
+    {
+        ImGui::Text("Control entity: %u", static_cast<unsigned>(control_entity));
+        ImGui::Text("Control: %s", control->enabled ? "enabled" : "disabled");
+        ImGui::Text("Controller id: %d", control->controller_id);
+        ImGui::Text("Keyboard fallback: %s", control->use_keyboard_fallback ? "on" : "off");
+        ImGui::Text("Steer input/target/angle: %.2f / %.2f / %.2f",
+            control->steer_input, control->steer_target, control->steer_angle);
+        ImGui::Text("Drive input: %.2f", control->drive_input);
+        ImGui::Text("Drive vel/impulse: %.1f / %.1f",
+            control->drive_velocity, control->drive_max_impulse);
+        ImGui::Text("Brake impulse: %.1f", control->brake_max_impulse);
+        if (rig)
+        {
+            ImGui::Separator();
+            ImGui::Text("Rig Wheels");
+            int index = 0;
+            for (const auto& wheel : rig->wheels)
+            {
+                ImGui::Text("Wheel %d: steer=%s drive=%s",
+                    index,
+                    wheel.steerable ? "yes" : "no",
+                    wheel.driven ? "yes" : "no");
+                ImGui::Text("  knuckle=%s steer_hinge=%s axle_hinge=%s",
+                    wheel.knuckle.is_bound() ? "bound" : "none",
+                    wheel.steering_hinge.is_bound() ? "bound" : "none",
+                    wheel.axle_hinge.is_bound() ? "bound" : "none");
+
+                if (ctx && ctx->entity_manager && wheel.axle_hinge.is_bound())
+                {
+                    auto& registry = ctx->entity_manager->registry();
+                    if (auto* hinge = registry.try_get<eeng::ecs::HingeConstraintComponent>(wheel.axle_hinge.entity))
+                    {
+                        const bool a_is_knuckle = wheel.knuckle.is_bound()
+                            && hinge->entity_a.is_bound()
+                            && hinge->entity_a.entity == wheel.knuckle.entity;
+                        const bool b_is_knuckle = wheel.knuckle.is_bound()
+                            && hinge->entity_b.is_bound()
+                            && hinge->entity_b.entity == wheel.knuckle.entity;
+                        ImGui::Text("  axle_hinge A=%s B=%s (knuckle=%s)",
+                            hinge->entity_a.is_bound() ? "bound" : "none",
+                            hinge->entity_b.is_bound() ? "bound" : "none",
+                            (a_is_knuckle || b_is_knuckle) ? "yes" : "no");
+                    }
+                }
+                ++index;
+            }
+        }
+    }
+    else
+    {
+        ImGui::TextDisabled("VehicleControlComponent not found");
+        if (!vehicle_rig_root.guid.valid())
+            ImGui::TextDisabled("Rig root guid missing");
+        else if (control_entity == entt::null)
+            ImGui::TextDisabled("Rig root not resolved in current world");
+    }
 
     ImGui::End(); // end info window
 }

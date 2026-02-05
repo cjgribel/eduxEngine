@@ -93,6 +93,19 @@ namespace eeng::ecs::systems
             return glm::mat3(x, y, z);
         }
 
+        void push_constraint_axis_arrow(
+            ShapeRendering::ShapeRenderer& renderer,
+            const DebugRenderSettings& settings,
+            const glm::vec3& from,
+            const glm::vec3& to)
+        {
+            ShapeRendering::ArrowDescriptor arrow_desc{};
+            arrow_desc.cone_fraction = settings.constraint_axis_arrow_cone_fraction;
+            arrow_desc.cone_radius = settings.constraint_axis_arrow_cone_radius;
+            arrow_desc.cylinder_radius = settings.constraint_axis_arrow_cylinder_radius;
+            renderer.push_arrow(from, to, arrow_desc);
+        }
+
         void push_arc(ShapeRendering::ShapeRenderer& renderer,
             const glm::vec3& center,
             const glm::vec3& axis_u,
@@ -516,6 +529,7 @@ namespace eeng::ecs::systems
             renderer.push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 2.0f });
 
             // Point constraints.
+            if (settings.show_constraint_points)
             {
                 auto view = registry.view<ecs::PointConstraintComponent>();
                 for (const auto entity : view)
@@ -554,6 +568,7 @@ namespace eeng::ecs::systems
             }
 
             // Hinge constraints.
+            if (settings.show_constraint_hinges)
             {
                 auto view = registry.view<ecs::HingeConstraintComponent>();
                 for (const auto entity : view)
@@ -577,7 +592,9 @@ namespace eeng::ecs::systems
                     renderer.pop_states<ShapeRendering::Color4u>();
 
                     renderer.push_states(ShapeRendering::Color4u{ settings.constraint_axis_color });
-                    renderer.push_line(
+                    push_constraint_axis_arrow(
+                        renderer,
+                        settings,
                         anchor_a - axis_a * (settings.constraint_axis_length * 0.5f),
                         anchor_a + axis_a * (settings.constraint_axis_length * 0.5f));
                     renderer.pop_states<ShapeRendering::Color4u>();
@@ -618,6 +635,7 @@ namespace eeng::ecs::systems
             }
 
             // Slider constraints.
+            if (settings.show_constraint_sliders)
             {
                 auto view = registry.view<ecs::SliderConstraintComponent>();
                 for (const auto entity : view)
@@ -641,7 +659,9 @@ namespace eeng::ecs::systems
                     renderer.pop_states<ShapeRendering::Color4u>();
 
                     renderer.push_states(ShapeRendering::Color4u{ settings.constraint_axis_color });
-                    renderer.push_line(
+                    push_constraint_axis_arrow(
+                        renderer,
+                        settings,
                         anchor_a - axis_a * (settings.constraint_axis_length * 0.5f),
                         anchor_a + axis_a * (settings.constraint_axis_length * 0.5f));
                     renderer.pop_states<ShapeRendering::Color4u>();
@@ -690,6 +710,7 @@ namespace eeng::ecs::systems
             }
 
             // 6DoF spring constraints.
+            if (settings.show_constraint_6dof)
             {
                 auto view = registry.view<ecs::SixDofSpringConstraintComponent>();
                 for (const auto entity : view)

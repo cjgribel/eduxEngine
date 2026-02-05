@@ -23,7 +23,7 @@ namespace eeng::ecs::systems
 {
     struct DebugRenderSettings
     {
-        bool show_transform_labels = true;
+        bool show_transform_labels = false; //
         std::uint32_t transform_label_bg = 0x80000000u;
         // Distinct label colors make it easier to spot component types.
         std::uint32_t transform_label_text = 0xffffffffu;
@@ -31,14 +31,14 @@ namespace eeng::ecs::systems
 
         // Collider wireframe + labels.
         bool show_colliders = true;
-        bool show_collider_labels = true;
+        bool show_collider_labels = false; //
         // Collider wireframes use the label text color to keep visuals consistent.
         std::uint32_t collider_label_bg = 0x80202020u;
         std::uint32_t collider_label_text = 0xff80ff80u;
         glm::vec3 collider_label_offset{ 0.0f, 0.15f, 0.0f };
 
         // RigidBody labels.
-        bool show_rigidbody_labels = true;
+        bool show_rigidbody_labels = false; //
         std::uint32_t rigidbody_label_bg = 0x80202040u;
         std::uint32_t rigidbody_label_text = 0xffffc080u;
         glm::vec3 rigidbody_label_offset{ 0.0f, 0.3f, 0.0f };
@@ -71,6 +71,10 @@ namespace eeng::ecs::systems
 
         // Constraint visualization.
         bool show_constraints = true;
+        bool show_constraint_hinges = true;
+        bool show_constraint_sliders = false; //
+        bool show_constraint_6dof = false; //
+        bool show_constraint_points = false; //
         std::uint32_t constraint_anchor_a_color = 0xff40ff40u;
         std::uint32_t constraint_anchor_b_color = 0xffff4040u;
         std::uint32_t constraint_line_color = 0xff909090u;
@@ -79,6 +83,9 @@ namespace eeng::ecs::systems
         float constraint_anchor_radius = 0.04f;
         unsigned constraint_anchor_point_size = 6;
         float constraint_axis_length = 0.4f;
+        float constraint_axis_arrow_cone_fraction = 0.35f;
+        float constraint_axis_arrow_cone_radius = 0.035f;
+        float constraint_axis_arrow_cylinder_radius = 0.014f;
         float constraint_limit_radius = 0.35f;
         float constraint_linear_limit_tick = 0.06f;
         int constraint_limit_segments = 24;

@@ -42,6 +42,26 @@ namespace eeng::ecs
             return glm::quat_cast(basis);
         }
 
+        float signed_angle_around_axis(
+            const glm::quat& from,
+            const glm::quat& to,
+            const glm::vec3& axis)
+        {
+            const glm::quat rel = glm::normalize(glm::inverse(from) * to);
+            glm::vec3 rel_axis(rel.x, rel.y, rel.z);
+            const float sin_half = glm::length(rel_axis);
+            if (sin_half <= 1e-6f)
+                return 0.0f;
+
+            rel_axis /= sin_half;
+            float angle = 2.0f * std::atan2(sin_half, rel.w);
+            if (angle > glm::pi<float>())
+                angle -= 2.0f * glm::pi<float>();
+
+            const float sign = (glm::dot(rel_axis, axis) >= 0.0f) ? 1.0f : -1.0f;
+            return angle * sign;
+        }
+
         ecs::Entity resolve_entity_ref(EntityManager& em, const ecs::EntityRef& ref)
         {
             if (ref.is_bound())
@@ -271,8 +291,9 @@ namespace eeng::ecs
                 ensure_transform(registry, wheel_rig.knuckle.entity, wheel_world, chassis_rot);
                 ensure_rigidbody(registry, wheel_rig.knuckle.entity,
                     knuckle_is_kinematic ? ecs::PhysicsMotionType::Kinematic : ecs::PhysicsMotionType::Dynamic);
+                const bool knuckle_trigger = spec.use_split_suspension_constraints || knuckle_is_kinematic;
                 ensure_collider_sphere(registry, wheel_rig.knuckle.entity,
-                    wheel_spec.knuckle_radius, knuckle_is_kinematic);
+                    wheel_spec.knuckle_radius, knuckle_trigger);
                 if (knuckle_model_ref.guid.valid())
                     ensure_model_component(registry, wheel_rig.knuckle.entity,
                         prefix + "_Knuckle", knuckle_model_ref);
@@ -343,8 +364,15 @@ namespace eeng::ecs
 
                     sixdof.linear_limit_min = glm::vec3(-travel * 0.5f, 0.0f, 0.0f);
                     sixdof.linear_limit_max = glm::vec3(travel * 0.5f, 0.0f, 0.0f);
+                    // Lock all angular axes by default (linear-only suspension).
                     sixdof.angular_limit_min = glm::vec3(0.0f);
                     sixdof.angular_limit_max = glm::vec3(0.0f);
+                    // For steerable wheels, allow steering around the suspension axis (X).
+                    if (wheel_spec.steerable)
+                    {
+                        sixdof.angular_limit_min.x = -spec.steer_limit;
+                        sixdof.angular_limit_max.x = spec.steer_limit;
+                    }
 
                     sixdof.linear_stiffness = glm::vec3(0.0f);
                     sixdof.linear_damping = glm::vec3(0.0f);
@@ -402,7 +430,8 @@ namespace eeng::ecs
                 }
 
                 // --- Steering hinge (chassis <-> knuckle) ---
-                if (wheel_spec.steerable && !knuckle_is_kinematic)
+                if (!spec.use_split_suspension_constraints
+                    && wheel_spec.steerable && !knuckle_is_kinematic)
                 {
                     const std::string name =
                         prefix + "_SteeringHinge_" + std::to_string(i);
@@ -451,9 +480,9 @@ namespace eeng::ecs
                     hinge.local_anchor_b = wheel_spec.wheel_local_anchor;
                     hinge.local_axis_a = axle_axis;
                     hinge.local_axis_b = axle_axis;
-                    hinge.enable_motor = wheel_spec.driven;
-                    hinge.motor_target_velocity = wheel_spec.drive_direction * spec.drive_motor_target_velocity;
-                    hinge.motor_max_impulse = spec.drive_motor_max_impulse;
+                    hinge.enable_motor = false;
+                    hinge.motor_target_velocity = 0.0f;
+                    hinge.motor_max_impulse = 0.0f;
                     hinge.disable_collisions = spec.disable_collisions;
                     registry.emplace<ecs::HingeConstraintComponent>(
                         wheel_rig.axle_hinge.entity, hinge);
@@ -544,12 +573,27 @@ namespace eeng::ecs
             link.axle_hinge = wheel_rig.axle_hinge;
             link.steerable = wheel_spec.steerable;
             link.driven = wheel_spec.driven;
+            link.drive_direction = wheel_spec.drive_direction;
+            link.steer_direction = wheel_spec.steer_direction;
             link.mount_local = wheel_spec.mount_local;
             link.suspension_axis = suspension_axis;
             link.axle_axis = axle_axis;
             link.wheel_local_anchor = wheel_spec.wheel_local_anchor;
             link.suspension_rest_length = wheel_spec.suspension_rest_length;
             link.suspension_travel = wheel_spec.suspension_travel;
+            link.steer_neutral_angle = 0.0f;
+            if (use_knuckle && wheel_rig.knuckle.is_bound())
+            {
+                if (const auto* knuckle_tfm = registry.try_get<ecs::TransformComponent>(wheel_rig.knuckle.entity))
+                {
+                    const glm::vec3 steer_axis_world =
+                        normalize_or_default(chassis_rot * steer_axis, glm::vec3(0.0f, 1.0f, 0.0f));
+                    link.steer_neutral_angle = signed_angle_around_axis(
+                        chassis_rot,
+                        knuckle_tfm->rotation,
+                        steer_axis_world);
+                }
+            }
             rig_component.wheels.push_back(link);
         }
 

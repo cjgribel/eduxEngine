@@ -55,6 +55,7 @@ namespace eeng::ecs
         bool steerable = false;
         bool driven = false;
         float drive_direction = 1.0f;
+        float steer_direction = 1.0f;
 
         // Optional pre-existing wheel entity (if bound, builder will reuse it).
         EntityRef wheel{};
