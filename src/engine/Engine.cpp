@@ -609,7 +609,8 @@ namespace eeng
             // Skip mouse events if ImGui is capturing mouse input.
             if ((event.type == SDL_MOUSEMOTION ||
                 event.type == SDL_MOUSEBUTTONDOWN ||
-                event.type == SDL_MOUSEBUTTONUP) &&
+                event.type == SDL_MOUSEBUTTONUP ||
+                event.type == SDL_MOUSEWHEEL) &&
                 imgui_backend::want_capture_mouse())
             {
                 continue;
@@ -1097,4 +1098,4 @@ namespace eeng
         }
     }
 
-    } // namespace eeng
+} // namespace eeng

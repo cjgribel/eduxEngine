@@ -414,6 +414,49 @@ namespace eeng::ecs::systems
         {
             renderer.push_xray();
 
+            struct AnchorInfo
+            {
+                bool valid = false;
+                bool has_body = false;
+                entt::entity entity = entt::null;
+                glm::vec3 anchor_world{ 0.0f };
+            };
+
+            auto resolve_anchor = [&](const ecs::EntityRef& entity_ref,
+                                      const glm::vec3& local_anchor,
+                                      ecs::SpringAnchorSpace anchor_space) -> AnchorInfo
+            {
+                AnchorInfo info{};
+                if (!entity_ref.is_bound())
+                    return info;
+
+                const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
+                info.entity = body_entity;
+
+                if (!registry.valid(body_entity))
+                    return info;
+
+                const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
+                if (!tfm)
+                    return info;
+
+                const auto* rb = registry.try_get<ecs::RigidBodyComponent>(body_entity);
+                info.has_body = (rb != nullptr);
+
+                if (rb && anchor_space == ecs::SpringAnchorSpace::Body)
+                {
+                    const glm::mat4 com_world = rigidbody_com_world_transform(*tfm, *rb);
+                    info.anchor_world = glm::vec3(com_world * glm::vec4(local_anchor * tfm->scale, 1.0f));
+                }
+                else
+                {
+                    info.anchor_world = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
+                }
+
+                info.valid = true;
+                return info;
+            };
+
             auto view = registry.view<ecs::SpringDamperComponent>();
             for (const auto entity : view)
             {
@@ -426,49 +469,6 @@ namespace eeng::ecs::systems
                     (spring.linear_stiffness != 0.0f || spring.linear_damping != 0.0f);
                 if (!linear_active)
                     continue;
-
-                struct AnchorInfo
-                {
-                    bool valid = false;
-                    bool has_body = false;
-                    entt::entity entity = entt::null;
-                    glm::vec3 anchor_world{ 0.0f };
-                };
-
-                auto resolve_anchor = [&](const ecs::EntityRef& entity_ref,
-                                          const glm::vec3& local_anchor,
-                                          ecs::SpringAnchorSpace anchor_space) -> AnchorInfo
-                {
-                    AnchorInfo info{};
-                    if (!entity_ref.is_bound())
-                        return info;
-
-                    const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
-                    info.entity = body_entity;
-
-                    if (!registry.valid(body_entity))
-                        return info;
-
-                    const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
-                    if (!tfm)
-                        return info;
-
-                    const auto* rb = registry.try_get<ecs::RigidBodyComponent>(body_entity);
-                    info.has_body = (rb != nullptr);
-
-                    if (rb && anchor_space == ecs::SpringAnchorSpace::Body)
-                    {
-                        const glm::mat4 com_world = rigidbody_com_world_transform(*tfm, *rb);
-                        info.anchor_world = glm::vec3(com_world * glm::vec4(local_anchor * tfm->scale, 1.0f));
-                    }
-                    else
-                    {
-                        info.anchor_world = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
-                    }
-
-                    info.valid = true;
-                    return info;
-                };
 
                 const AnchorInfo anchor_a = resolve_anchor(
                     spring.entity_a,
@@ -496,6 +496,50 @@ namespace eeng::ecs::systems
                     settings.spring_revs);
                 renderer.pop_states<ShapeRendering::Color4u>();
                 renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
+            }
+
+            // 6DoF spring visualization (linear springs only).
+            {
+                auto view = registry.view<ecs::SixDofSpringConstraintComponent>();
+                for (const auto entity : view)
+                {
+                    const auto& constraint = view.get<ecs::SixDofSpringConstraintComponent>(entity);
+                    if (!constraint.enabled)
+                        continue;
+
+                    const bool linear_active =
+                        (glm::dot(constraint.linear_stiffness, constraint.linear_stiffness) > 1e-6f)
+                        || (glm::dot(constraint.linear_damping, constraint.linear_damping) > 1e-6f);
+                    if (!linear_active)
+                        continue;
+
+                    const AnchorInfo anchor_a = resolve_anchor(
+                        constraint.entity_a,
+                        constraint.local_anchor_a,
+                        ecs::SpringAnchorSpace::Transform);
+                    const AnchorInfo anchor_b = resolve_anchor(
+                        constraint.entity_b,
+                        constraint.local_anchor_b,
+                        ecs::SpringAnchorSpace::Transform);
+
+                    if (!anchor_a.valid || !anchor_b.valid)
+                        continue;
+
+                    const bool same_body = anchor_a.has_body && anchor_b.has_body && anchor_a.entity == anchor_b.entity;
+                    if ((!anchor_a.has_body && !anchor_b.has_body) || same_body)
+                        continue;
+
+                    renderer.push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 3.0f });
+                    renderer.push_states(ShapeRendering::Color4u{ settings.spring_color });
+                    renderer.push_helix(
+                        anchor_a.anchor_world,
+                        anchor_b.anchor_world,
+                        settings.spring_radius_outer,
+                        settings.spring_radius_inner,
+                        settings.spring_revs);
+                    renderer.pop_states<ShapeRendering::Color4u>();
+                    renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
+                }
             }
 
             renderer.pop_xray();

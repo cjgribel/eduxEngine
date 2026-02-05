@@ -355,15 +355,25 @@ namespace eeng::ecs
                     ecs::SixDofSpringConstraintComponent sixdof{};
                     sixdof.entity_a = chassis_ref;
                     sixdof.entity_b = suspension_ref;
-                    sixdof.local_anchor_a = wheel_spec.mount_local + suspension_axis * rest_length;
+                    sixdof.local_anchor_a = wheel_spec.mount_local;
                     sixdof.local_anchor_b = suspension_anchor_b;
 
                     const glm::quat frame_rot = make_constraint_frame(suspension_axis, axle_axis);
                     sixdof.local_rotation_a = frame_rot;
                     sixdof.local_rotation_b = frame_rot;
 
-                    sixdof.linear_limit_min = glm::vec3(-travel * 0.5f, 0.0f, 0.0f);
-                    sixdof.linear_limit_max = glm::vec3(travel * 0.5f, 0.0f, 0.0f);
+                    const glm::vec3 default_min(rest_length - travel * 0.5f, 0.0f, 0.0f);
+                    const glm::vec3 default_max(rest_length + travel * 0.5f, 0.0f, 0.0f);
+                    if (wheel_spec.sixdof_use_linear_limits)
+                    {
+                        sixdof.linear_limit_min = wheel_spec.sixdof_linear_limit_min;
+                        sixdof.linear_limit_max = wheel_spec.sixdof_linear_limit_max;
+                    }
+                    else
+                    {
+                        sixdof.linear_limit_min = default_min;
+                        sixdof.linear_limit_max = default_max;
+                    }
                     // Lock all angular axes by default (linear-only suspension).
                     sixdof.angular_limit_min = glm::vec3(0.0f);
                     sixdof.angular_limit_max = glm::vec3(0.0f);
@@ -374,8 +384,17 @@ namespace eeng::ecs
                         sixdof.angular_limit_max.x = spec.steer_limit;
                     }
 
-                    sixdof.linear_stiffness = glm::vec3(0.0f);
-                    sixdof.linear_damping = glm::vec3(0.0f);
+                    sixdof.linear_stiffness = glm::vec3(wheel_spec.spring_k, 0.0f, 0.0f);
+                    sixdof.linear_damping = glm::vec3(wheel_spec.spring_d, 0.0f, 0.0f);
+                    sixdof.linear_equilibrium_enabled = wheel_spec.sixdof_linear_equilibrium_enabled;
+                    sixdof.linear_equilibrium_target = wheel_spec.sixdof_linear_equilibrium_target;
+                    if (sixdof.linear_equilibrium_enabled.x < 0.5f)
+                    {
+                        const float min_x = std::min(sixdof.linear_limit_min.x, sixdof.linear_limit_max.x);
+                        const float max_x = std::max(sixdof.linear_limit_min.x, sixdof.linear_limit_max.x);
+                        sixdof.linear_equilibrium_enabled.x = 1.0f;
+                        sixdof.linear_equilibrium_target.x = glm::clamp(rest_length, min_x, max_x);
+                    }
                     sixdof.angular_stiffness = glm::vec3(0.0f);
                     sixdof.angular_damping = glm::vec3(0.0f);
                     sixdof.disable_collisions = spec.disable_collisions;
@@ -406,27 +425,27 @@ namespace eeng::ecs
                     slider.enabled = !knuckle_is_kinematic;
                     registry.emplace<ecs::SliderConstraintComponent>(
                         wheel_rig.suspension_slider.entity, slider);
-                }
 
-                // --- Suspension spring ---
-                {
-                    const std::string name =
-                        prefix + "_SuspensionSpring_" + std::to_string(i);
-                    wheel_rig.suspension_spring = create_entity(*em, chunk_tag, name, root_entity);
+                    // --- Suspension spring ---
+                    {
+                        const std::string name =
+                            prefix + "_SuspensionSpring_" + std::to_string(i);
+                        wheel_rig.suspension_spring = create_entity(*em, chunk_tag, name, root_entity);
 
-                    ecs::SpringDamperComponent spring{};
-                    spring.entity_a = chassis_ref;
-                    spring.entity_b = suspension_ref;
-                    spring.local_anchor_a = wheel_spec.mount_local;
-                    spring.local_anchor_b = suspension_anchor_b;
-                    spring.anchor_space_a = ecs::SpringAnchorSpace::Transform;
-                    spring.anchor_space_b = ecs::SpringAnchorSpace::Transform;
-                    spring.linear_stiffness = wheel_spec.spring_k;
-                    spring.linear_damping = wheel_spec.spring_d;
-                    spring.rest_length = std::abs(rest_length);
-                    spring.enabled = !knuckle_is_kinematic;
-                    registry.emplace<ecs::SpringDamperComponent>(
-                        wheel_rig.suspension_spring.entity, spring);
+                        ecs::SpringDamperComponent spring{};
+                        spring.entity_a = chassis_ref;
+                        spring.entity_b = suspension_ref;
+                        spring.local_anchor_a = wheel_spec.mount_local;
+                        spring.local_anchor_b = suspension_anchor_b;
+                        spring.anchor_space_a = ecs::SpringAnchorSpace::Transform;
+                        spring.anchor_space_b = ecs::SpringAnchorSpace::Transform;
+                        spring.linear_stiffness = wheel_spec.spring_k;
+                        spring.linear_damping = wheel_spec.spring_d;
+                        spring.rest_length = std::abs(rest_length);
+                        spring.enabled = !knuckle_is_kinematic;
+                        registry.emplace<ecs::SpringDamperComponent>(
+                            wheel_rig.suspension_spring.entity, spring);
+                    }
                 }
 
                 // --- Steering hinge (chassis <-> knuckle) ---
