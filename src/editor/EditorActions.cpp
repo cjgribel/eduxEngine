@@ -341,6 +341,31 @@ namespace eeng::editor
         }
     }
 
+    void SceneActions::spawn_entity_branch_from_json(
+        EngineContext& ctx,
+        nlohmann::json branch_json,
+        const ecs::Entity& parent_entity,
+        bool remap_guids)
+    {
+        if (branch_json.is_null())
+            return;
+        if (!can_queue_action(ctx, "SpawnEntityBranch"))
+            return;
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+            return;
+
+        try_add_command(
+            ctx,
+            CommandFactory::Create<SpawnEntityBranchCommand>(
+                std::move(branch_json),
+                parent_entity,
+                ctx_wptr,
+                remap_guids),
+            "SpawnEntityBranch");
+    }
+
     void AssetActions::import_model(
         EngineContext& ctx,
         const std::filesystem::path& source_file,

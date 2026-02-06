@@ -175,6 +175,40 @@ namespace eeng::editor {
         std::string get_name() const override;
     };
 
+    // --- SpawnEntityBranchCommand ------------------------------------------
+
+    class SpawnEntityBranchCommand : public Command
+    {
+        nlohmann::json source_json{};
+        nlohmann::json branch_json{};
+        ecs::Entity parent_entity{};
+        Guid parent_guid{};
+        BatchId target_batch;
+        std::vector<std::shared_future<bool>> attach_futures{};
+        std::vector<std::shared_future<bool>> destroy_futures{};
+        EngineContextWeakPtr ctx;
+        std::string display_name;
+        enum class AsyncStage { None, Attach, Destroy };
+        AsyncStage async_stage{ AsyncStage::None };
+        bool remap_guids{ true };
+        bool prepared{ false };
+
+    public:
+        SpawnEntityBranchCommand(
+            nlohmann::json branch_json,
+            const ecs::Entity& parent_entity,
+            EngineContextWeakPtr ctx,
+            bool remap_guids = true);
+
+        CommandStatus execute() override;
+
+        CommandStatus undo() override;
+
+        CommandStatus update() override;
+
+        std::string get_name() const override;
+    };
+
     // --- ReparentEntityBranchCommand ----------------------------------------
 
     class ReparentEntityBranchCommand : public Command

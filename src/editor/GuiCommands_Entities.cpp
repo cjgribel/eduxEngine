@@ -1055,6 +1055,267 @@ namespace eeng::editor {
         return display_name;
     }
 
+    // --- SpawnEntityBranchCommand ------------------------------------------
+
+    SpawnEntityBranchCommand::SpawnEntityBranchCommand(
+        nlohmann::json branch_json,
+        const Entity& parent_entity,
+        EngineContextWeakPtr ctx,
+        bool remap_guids) :
+        source_json(std::move(branch_json)),
+        parent_entity(parent_entity),
+        ctx(std::move(ctx)),
+        remap_guids(remap_guids)
+    {
+        display_name = "Spawn Entity Branch";
+    }
+
+    CommandStatus SpawnEntityBranchCommand::execute()
+    {
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
+            return CommandStatus::Done;
+
+        if (async_stage != AsyncStage::None)
+            return update();
+
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        auto registry_sp = em->registry_wptr().lock();
+        if (!registry_sp)
+            return CommandStatus::Done;
+
+        if (!prepared)
+        {
+            if (source_json.is_null())
+                return CommandStatus::Done;
+
+            branch_json = source_json;
+            if (branch_json.is_object())
+            {
+                nlohmann::json array = nlohmann::json::array();
+                array.push_back(branch_json);
+                branch_json = std::move(array);
+            }
+
+            if (!branch_json.is_array() || branch_json.empty())
+                return CommandStatus::Done;
+
+            if (!parent_guid.valid() && parent_entity.has_id()
+                && em->entity_valid(parent_entity)
+                && em->scene_graph().contains(parent_entity))
+            {
+                parent_guid = em->get_entity_guid(parent_entity);
+            }
+
+            ecs::Entity parent_current{};
+            if (parent_guid.valid())
+            {
+                if (auto parent_opt = em->get_entity_from_guid(parent_guid); parent_opt && parent_opt->has_id())
+                    parent_current = *parent_opt;
+            }
+            else if (parent_entity.has_id() && em->entity_valid(parent_entity)
+                && em->scene_graph().contains(parent_entity))
+            {
+                parent_current = parent_entity;
+            }
+
+            if (!target_batch.valid())
+            {
+                ecs::EntityRef parent_ref{};
+                if (!resolve_batch_for_new_entity(
+                        parent_current,
+                        *ctx_sp,
+                        target_batch,
+                        parent_ref,
+                        "SpawnEntityBranch"))
+                {
+                    return CommandStatus::Failed;
+                }
+                if (parent_ref.guid.valid())
+                    parent_guid = parent_ref.guid;
+            }
+
+            if (remap_guids)
+            {
+                std::unordered_map<Guid, Guid> guid_map;
+                guid_map.reserve(branch_json.size());
+
+                for (auto& entity_json : branch_json)
+                {
+                    const Guid old_guid = guid_from_json(entity_json);
+                    const Guid new_guid = Guid::generate();
+                    if (old_guid.valid())
+                        guid_map.emplace(old_guid, new_guid);
+                    update_entity_guid_in_json(entity_json, new_guid);
+                }
+
+                for (std::size_t i = 0; i < branch_json.size(); ++i)
+                {
+                    auto& entity_json = branch_json[i];
+                    Guid new_parent_guid = Guid::invalid();
+                    if (i == 0)
+                    {
+                        new_parent_guid = parent_guid;
+                    }
+                    else
+                    {
+                        const Guid old_parent_guid = parent_guid_from_json(entity_json);
+                        if (old_parent_guid.valid())
+                        {
+                            if (auto it = guid_map.find(old_parent_guid); it != guid_map.end())
+                                new_parent_guid = it->second;
+                            else
+                                new_parent_guid = old_parent_guid;
+                        }
+                    }
+                    update_parent_guid_in_json(entity_json, new_parent_guid);
+                }
+            }
+            else
+            {
+                update_parent_guid_in_json(branch_json.front(), parent_guid);
+            }
+
+            prepared = true;
+        }
+
+        std::vector<Entity> created_entities;
+        created_entities.reserve(branch_json.size());
+
+        for (const auto& entity_json : branch_json)
+        {
+            auto er = meta::deserialize_entity_for_undo(
+                entity_json,
+                *ctx_sp);
+            created_entities.push_back(er.entity);
+        }
+
+        em->register_entities_from_deserialization(created_entities);
+
+        if (!target_batch.valid())
+        {
+            EENG_LOG(ctx_sp.get(), "SpawnEntityBranch failed: missing target batch.");
+            return CommandStatus::Failed;
+        }
+
+        attach_futures.clear();
+        attach_futures.reserve(created_entities.size());
+
+        for (auto entity : created_entities)
+        {
+            bind_refs_for_entity(entity, *ctx_sp);
+            std::shared_future<bool> future{};
+            if (!queue_attach_entity_to_batch(
+                    entity,
+                    target_batch,
+                    *ctx_sp,
+                    future,
+                    "SpawnEntityBranch"))
+            {
+                return CommandStatus::Failed;
+            }
+            attach_futures.push_back(std::move(future));
+        }
+
+        async_stage = AsyncStage::Attach;
+        return update();
+    }
+
+    CommandStatus SpawnEntityBranchCommand::undo()
+    {
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
+            return CommandStatus::Done;
+
+        if (async_stage != AsyncStage::None)
+            return update();
+
+        if (branch_json.is_null() || !branch_json.is_array())
+            return CommandStatus::Done;
+
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        destroy_futures.clear();
+        for (auto it = branch_json.rbegin(); it != branch_json.rend(); ++it)
+        {
+            const auto guid = guid_from_json(*it);
+            if (!guid.valid())
+                continue;
+
+            auto entity_opt = em->get_entity_from_guid(guid);
+            if (!entity_opt || !entity_opt->has_id())
+                continue;
+            mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
+            std::shared_future<bool> future{};
+            if (!queue_destroy_entity_in_batch(
+                    *entity_opt,
+                    *ctx_sp,
+                    future,
+                    "SpawnEntityBranch undo"))
+            {
+                return CommandStatus::Failed;
+            }
+            destroy_futures.push_back(std::move(future));
+        }
+
+        async_stage = AsyncStage::Destroy;
+        return update();
+    }
+
+    CommandStatus SpawnEntityBranchCommand::update()
+    {
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
+            return CommandStatus::Done;
+
+        if (async_stage == AsyncStage::Attach)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_futures(attach_futures, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
+        if (async_stage == AsyncStage::Destroy)
+        {
+            bool in_flight = true;
+            auto status = poll_bool_futures(destroy_futures, in_flight);
+            if (status == CommandStatus::Failed)
+            {
+                async_stage = AsyncStage::None;
+                return status;
+            }
+            if (status != CommandStatus::Done)
+                return status;
+
+            async_stage = AsyncStage::None;
+            return CommandStatus::Done;
+        }
+
+        return CommandStatus::Done;
+    }
+
+    std::string SpawnEntityBranchCommand::get_name() const
+    {
+        return display_name;
+    }
+
     // --- ReparentEntityBranchCommand --------------------------------------------
 
     ReparentEntityBranchCommand::ReparentEntityBranchCommand(

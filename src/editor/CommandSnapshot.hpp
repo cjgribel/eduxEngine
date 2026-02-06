@@ -21,4 +21,5 @@ namespace eeng::editor
     bool update_entity_guid_in_json(nlohmann::json& entity_json, const Guid& guid);
     bool update_parent_guid_in_json(nlohmann::json& entity_json, const Guid& parent_guid);
     Guid guid_from_json(const nlohmann::json& entity_json);
+    Guid parent_guid_from_json(const nlohmann::json& entity_json);
 }

@@ -240,4 +240,53 @@ namespace eeng::editor
             return Guid::invalid();
         return Guid{ entity_json["entity_guid"].get<Guid::underlying_type>() };
     }
+
+    Guid parent_guid_from_json(const nlohmann::json& entity_json)
+    {
+        const auto& keys = header_keys();
+        if (!entity_json.contains("components"))
+            return Guid::invalid();
+
+        const auto components_it = entity_json.find("components");
+        if (components_it == entity_json.end() || !components_it->is_object())
+            return Guid::invalid();
+
+        auto read_parent_guid = [&](const nlohmann::json& parent_json) -> Guid
+        {
+            if (!parent_json.is_object())
+                return Guid::invalid();
+
+            if (!keys.entityref_guid_key.empty() && parent_json.contains(keys.entityref_guid_key))
+                return Guid{ parent_json[keys.entityref_guid_key].get<Guid::underlying_type>() };
+            if (parent_json.contains("Guid"))
+                return Guid{ parent_json["Guid"].get<Guid::underlying_type>() };
+            if (parent_json.contains("guid"))
+                return Guid{ parent_json["guid"].get<Guid::underlying_type>() };
+            return Guid::invalid();
+        };
+
+        if (!keys.type_id.empty() && !keys.parent_key.empty())
+        {
+            auto it = components_it->find(keys.type_id);
+            if (it != components_it->end() && it.value().is_object())
+            {
+                auto& header_json = it.value();
+                if (header_json.contains(keys.parent_key))
+                    return read_parent_guid(header_json[keys.parent_key]);
+            }
+        }
+
+        for (auto& [comp_name, comp_json] : components_it->items())
+        {
+            if (!comp_json.is_object())
+                continue;
+
+            if (comp_json.contains("Parent Entity"))
+                return read_parent_guid(comp_json["Parent Entity"]);
+            if (comp_json.contains("parent_entity"))
+                return read_parent_guid(comp_json["parent_entity"]);
+        }
+
+        return Guid::invalid();
+    }
 }

@@ -6,11 +6,16 @@
 #include "EventQueue.h"
 #include "engineapi/PlayModePolicy.hpp"
 #include "editor/EditorActions.hpp"
+#include "editor/ProjectConfig.hpp"
+#include "ecs/EntityManager.hpp"
+#include "meta/MetaSerialize.hpp"
 // #include "ecs/EntityManager.hpp"
 #include "engineapi/SelectionManager.hpp"
 #include "editor/ecs/FirstPersonCameraComponent.hpp"
 #include "editor/ecs/ThirdPersonCameraComponent.hpp"
 // #include "ecs/HeaderComponent.hpp"
+#include <filesystem>
+#include <fstream>
 #include <entt/entt.hpp>
 #include <vector>
 
@@ -34,6 +39,7 @@ namespace eeng::gui
         void draw()
         {
             draw_scene_actions_row();
+            draw_prefab_panel();
         }
 
         void draw_mode_row()
@@ -260,8 +266,162 @@ namespace eeng::gui
             }
             if (!has_selection) ImGui::EndDisabled();
 
+            ImGui::SameLine();
+
+            // Save selection as prefab (single entity root).
+            const bool can_save_prefab = has_selection && !has_multi_selection;
+            if (!can_save_prefab) ImGui::BeginDisabled();
+            if (ImGui::Button("Save Prefab"))
+            {
+                ImGui::OpenPopup("Save Prefab");
+            }
+            if (!can_save_prefab) ImGui::EndDisabled();
+
+            if (ImGui::BeginPopupModal("Save Prefab", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                static char prefab_name[128] = "NewPrefab";
+                ImGui::InputText("File name", prefab_name, sizeof(prefab_name));
+
+                const auto prefab_root = get_prefab_root();
+                const bool valid_root = !prefab_root.empty();
+                if (!valid_root)
+                    ImGui::TextDisabled("Prefabs folder not available.");
+                else
+                    ImGui::TextDisabled("Target: %s", prefab_root.string().c_str());
+
+                bool saved = false;
+                if (ImGui::Button("Save") && can_save_prefab && valid_root)
+                {
+                    const auto entity = entity_selection.last();
+                    const std::string filename = std::string(prefab_name) + ".json";
+                    saved = save_prefab_from_entity(
+                        prefab_root / filename,
+                        entity);
+                    if (saved)
+                        ImGui::CloseCurrentPopup();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel"))
+                    ImGui::CloseCurrentPopup();
+
+                ImGui::EndPopup();
+            }
+
             if (!allow_edit_actions)
                 ImGui::EndDisabled();
+        }
+
+        std::filesystem::path get_prefab_root() const
+        {
+            if (!ctx.project_config)
+                return {};
+
+            const auto root = ctx.project_config->project_root;
+            if (root.empty())
+                return {};
+
+            return root / "prefabs";
+        }
+
+        bool save_prefab_from_entity(const std::filesystem::path& path, const ecs::Entity& root_entity)
+        {
+            if (!ctx.entity_manager)
+                return false;
+
+            auto& em = static_cast<eeng::EntityManager&>(*ctx.entity_manager);
+            auto registry_sp = em.registry_wptr().lock();
+            if (!registry_sp)
+                return false;
+
+            auto& scenegraph = em.scene_graph();
+            if (!root_entity.has_id() || !em.entity_valid(root_entity) || !scenegraph.contains(root_entity))
+                return false;
+
+            const auto branch = scenegraph.get_branch_topdown(root_entity);
+            nlohmann::json branch_json = nlohmann::json::array();
+            for (const auto& entity : branch)
+            {
+                branch_json.push_back(meta::serialize_entity_for_file(
+                    em.get_entity_ref(entity),
+                    registry_sp));
+            }
+
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+            std::ofstream output(path);
+            if (!output)
+                return false;
+
+            output << branch_json.dump(2);
+            return static_cast<bool>(output);
+        }
+
+        bool load_prefab_json(const std::filesystem::path& path, nlohmann::json& out_json) const
+        {
+            std::ifstream input(path);
+            if (!input)
+                return false;
+            try
+            {
+                input >> out_json;
+            }
+            catch (...)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        void draw_prefab_panel()
+        {
+            if (ImGui::CollapsingHeader("Prefabs", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const auto prefab_root = get_prefab_root();
+                if (prefab_root.empty() || !std::filesystem::exists(prefab_root))
+                {
+                    ImGui::TextDisabled("Prefabs folder not found.");
+                    return;
+                }
+
+                static bool spawn_under_selection = true;
+                ImGui::Checkbox("Spawn under selected entity", &spawn_under_selection);
+
+                const bool has_selection = ctx.entity_selection && !ctx.entity_selection->empty();
+                const bool can_spawn = static_cast<bool>(ctx.command_queue)
+                    && !(ctx.services && ctx.services->play_mode_active.load(std::memory_order_relaxed));
+
+                if (!can_spawn)
+                    ImGui::BeginDisabled();
+
+                for (const auto& entry : std::filesystem::directory_iterator(prefab_root))
+                {
+                    if (!entry.is_regular_file())
+                        continue;
+                    const auto& path = entry.path();
+                    if (path.extension() != ".json")
+                        continue;
+
+                    const std::string label = path.filename().string();
+                    if (ImGui::Selectable(label.c_str()))
+                    {
+                        nlohmann::json prefab_json;
+                        if (load_prefab_json(path, prefab_json))
+                        {
+                            ecs::Entity parent{};
+                            if (spawn_under_selection && has_selection)
+                                parent = ctx.entity_selection->last();
+                            editor::SceneActions::spawn_entity_branch_from_json(
+                                ctx,
+                                std::move(prefab_json),
+                                parent,
+                                true);
+                        }
+                    }
+                }
+
+                if (!can_spawn)
+                    ImGui::EndDisabled();
+            }
         }
     };
 

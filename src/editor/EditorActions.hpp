@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <entt/entt.hpp>
+#include <nlohmann/json.hpp>
 #include "EngineContext.hpp"
 
 namespace eeng::assets
@@ -28,6 +29,11 @@ namespace eeng::editor
         static void unparent_entities(EngineContext& ctx, const std::deque<ecs::Entity>& selection);
         static void add_components(EngineContext& ctx, const std::deque<ecs::Entity>& selection, entt::id_type comp_id);
         static void remove_components(EngineContext& ctx, const std::deque<ecs::Entity>& selection, entt::id_type comp_id);
+        static void spawn_entity_branch_from_json(
+            EngineContext& ctx,
+            nlohmann::json branch_json,
+            const ecs::Entity& parent_entity = ecs::Entity{},
+            bool remap_guids = true);
     };
 
     struct BatchActions
