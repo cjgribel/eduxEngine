@@ -7,6 +7,7 @@
 #include "ForwardRenderer.hpp"
 #include "ecs/systems/MannequinPlayerControllerSystem.hpp"
 #include "ecs/systems/VehicleRig1ControlSystem.hpp"
+#include "ecs/VehicleRig1Builder.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "ecs/Entity.hpp"
 #include "glmcommon.hpp"
@@ -92,6 +93,9 @@ private:
     void renderUI();
     void spawn_vehicle_rig1_to_default_batch();
     void destroy_vehicle_rig1();
+    void ensure_vehicle_rig1_config();
+    void reset_vehicle_rig1_config();
+    void bake_vehicle_rig1_root_transform();
 
     // ENGINE API
     std::shared_ptr<eeng::EngineContext> ctx;
@@ -132,6 +136,16 @@ private:
     eeng::ecs::Entity player_entity;
     eeng::ecs::EntityRef vehicle_rig1_root;
     glm_aux::Ray view_ray;
+
+    // VehicleRig1 cached spawn config (editable in UI).
+    eeng::ecs::VehicleRig1Spec vehicle_rig1_spec_{};
+    bool vehicle_rig1_spec_initialized_ = false;
+    glm::vec3 vehicle_rig1_spawn_pos_{ 0.0f, 2.0f, 0.0f };
+    float vehicle_rig1_control_steer_speed_ = 6.0f;
+    float vehicle_rig1_control_steer_max_impulse_ = 2000.0f;
+    float vehicle_rig1_control_drive_velocity_ = 10.0f;
+    float vehicle_rig1_control_drive_max_impulse_ = 150.0f;
+    float vehicle_rig1_control_brake_max_impulse_ = 200.0f;
 
     // Light properties
     struct PointLight

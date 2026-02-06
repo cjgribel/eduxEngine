@@ -216,6 +216,11 @@ namespace eeng::ecs
             rig.root = em->get_entity_ref(root_entity);
         }
 
+        // Ensure the rig root has a transform so the entire rig can be moved as a group later.
+        // We keep it at identity here so existing local transforms remain valid.
+        if (rig.root.is_bound())
+            ensure_transform(registry, rig.root.entity, glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+
         const auto* chassis_tfm = registry.try_get<ecs::TransformComponent>(chassis_entity);
         const glm::vec3 chassis_pos = chassis_tfm ? chassis_tfm->position : glm::vec3(0.0f);
         const glm::quat chassis_rot = chassis_tfm ? chassis_tfm->rotation : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
