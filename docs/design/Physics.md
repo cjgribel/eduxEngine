@@ -1,5 +1,6 @@
 # Physics
 
+
 ## Overview
 - Bullet integration with ECS (RigidBody + Collider + Transform).
 - Colliders can be offset; COM/principal axes are computed from colliders while the Transform stays as the authoring pivot.
@@ -25,6 +26,14 @@
 - Build Bullet body in that principal-axes frame; sync to/from Transform via `com_local` and its inverse.
 - Cache computed `mass`/`inertia`/`com_local_*` for inspector + debug drawing.
 
+## Constraints (Current Setup)
+- Constraint components live on manager entities and reference `entity_a` + `entity_b` (both must be bound and have Transform + RigidBody).
+- ConstraintSystem scans the registry each frame, creates or updates Bullet constraints via PhysicsSystem, and destroys stale ones (handle map per constraint entity).
+- Anchors/axes are authored in each entity's local space (scaled by Transform); PhysicsSystem converts them into the body COM frame via `com_local_inverse`.
+- Supported types: point-to-point, hinge, slider, and 6DoF spring; motors/limits/springs are component fields.
+- Debug rendering visualizes anchors, axes, and limits; x-ray pass is opt-in per draw call.
+- World-point constraints are not supported yet (both entity refs must be bound).
+
 ## TODO
 
 ### Now
@@ -34,6 +43,8 @@
 - [x] Edit-mode rebuild of COM/inertia for immediate authoring feedback.
 - [x] RigidBody inspector shows computed mass/inertia/COM (read-only when auto).
 - [x] SpringDamper anchors support Transform or Body (COM/principal axes) space.
+- [x] Constraint components create/update/destroy Bullet constraints each frame.
+- [x] Constraint debug overlay shows anchors, axes, and limits (x-ray ready).
 - [ ] Validate convex hull mass properties with real assets (compare COM/inertia against expectations).
 - [ ] Consider warn-once policy for convex hull fallback logging.
 
@@ -41,6 +52,7 @@
 - [ ] Ragdoll prototype: mapping component (bone index + body entity + local offsets).
 - [ ] Blend window for animation-driven -> physics-driven ragdoll transitions.
 - [ ] Per-collider density/weighting (instead of uniform density).
+- [ ] World-point constraints (allow unbound entity refs for static anchors).
 
 ### Later
 - [ ] (Optimization) BodyRuntime allocations -> RigidBodyRuntimePool
