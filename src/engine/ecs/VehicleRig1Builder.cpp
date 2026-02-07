@@ -11,6 +11,8 @@
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/TransformComponent.hpp"
 #include "meta/MetaAux.h"
+#include "meta/MetaSerialize.hpp"
+#include "ecs/EntityManager.hpp"
 
 #include <glm/gtc/quaternion.hpp>
 #include <algorithm>
@@ -423,5 +425,79 @@ namespace eeng::ecs
             registry.emplace_or_replace<ecs::VehicleRig1RigComponent>(rig.root.entity, rig_component);
 
         return rig;
+    }
+
+    nlohmann::json build_vehicle_rig1_prefab_json(
+        EngineContext& ctx,
+        const VehicleRig1Spec& rig_spec,
+        const VehicleRig1ChassisSpec& chassis_spec)
+    {
+        // Build the rig in a scratch world so we can serialize it as a prefab.
+        EngineContext scratch_ctx(
+            std::make_unique<EntityManager>(),
+            ctx.resource_manager,
+            std::unique_ptr<IBatchRegistry>{},
+            std::unique_ptr<IGuiManager>{},
+            std::unique_ptr<IInputManager>{},
+            ctx.log_manager);
+        scratch_ctx.project_config = ctx.project_config;
+
+        auto& em = static_cast<EntityManager&>(*scratch_ctx.entity_manager);
+        auto& registry = em.registry();
+
+        const std::string prefix = rig_spec.name_prefix.empty() ? "VehicleRig1" : rig_spec.name_prefix;
+        const std::string chunk_tag = rig_spec.chunk_tag.empty() ? "vehicle_rig1" : rig_spec.chunk_tag;
+
+        // --- Chassis (created in scratch registry) -------------------------
+        const auto [chassis_guid, chassis_entity] = em.create_entity_live_parent(
+            chunk_tag,
+            prefix + "_Chassis",
+            ecs::Entity::EntityNull,
+            ecs::Entity::EntityNull);
+        (void)chassis_guid;
+
+        auto& chassis_tfm = registry.emplace<ecs::TransformComponent>(chassis_entity);
+        chassis_tfm.set_position(chassis_spec.position);
+        chassis_tfm.set_rotation(chassis_spec.rotation);
+
+        auto& chassis_rb = registry.emplace<ecs::RigidBodyComponent>(chassis_entity);
+        chassis_rb.motion = ecs::PhysicsMotionType::Dynamic;
+        chassis_rb.linear_damping = chassis_spec.linear_damping;
+        chassis_rb.angular_damping = chassis_spec.angular_damping;
+        chassis_rb.auto_mass = chassis_spec.auto_mass;
+        chassis_rb.mass = chassis_spec.mass;
+
+        ecs::ColliderComponent chassis_colliders{};
+        ecs::ColliderDesc chassis_box{};
+        chassis_box.type = ecs::ColliderType::Box;
+        chassis_box.half_extents = chassis_spec.half_extents;
+        chassis_colliders.colliders.push_back(chassis_box);
+        registry.emplace<ecs::ColliderComponent>(chassis_entity, std::move(chassis_colliders));
+
+        // --- Build rig ------------------------------------------------------
+        VehicleRig1Spec spec = rig_spec;
+        spec.chassis = em.get_entity_ref(chassis_entity);
+        spec.root = {};
+
+        const auto rig = build_vehicle_rig1(scratch_ctx, spec);
+        if (!rig.root.is_bound())
+            return nlohmann::json{};
+
+        auto registry_sp = em.registry_wptr().lock();
+        if (!registry_sp)
+            return nlohmann::json{};
+
+        auto& scenegraph = em.scene_graph();
+        const auto branch = scenegraph.get_branch_topdown(rig.root.entity);
+
+        nlohmann::json branch_json = nlohmann::json::array();
+        for (const auto& entity : branch)
+        {
+            branch_json.push_back(meta::serialize_entity_for_file(
+                em.get_entity_ref(entity),
+                registry_sp));
+        }
+
+        return branch_json;
     }
 } // namespace eeng::ecs

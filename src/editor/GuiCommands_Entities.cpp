@@ -1,5 +1,6 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
+
 // Table of contents:
 // - CreateEntityCommand: create an entity in a batch and serialize for undo/redo.
 // - DestroyEntityCommand: destroy a single entity and restore from snapshot on undo.
@@ -1090,6 +1091,7 @@ namespace eeng::editor {
 
         if (!prepared)
         {
+            // First execution: normalize JSON to an array and prepare GUID/parent mapping.
             if (source_json.is_null())
                 return CommandStatus::Done;
 
@@ -1104,6 +1106,7 @@ namespace eeng::editor {
             if (!branch_json.is_array() || branch_json.empty())
                 return CommandStatus::Done;
 
+            // Resolve parent GUID and target batch (policy uses selection/default batch).
             if (!parent_guid.valid() && parent_entity.has_id()
                 && em->entity_valid(parent_entity)
                 && em->scene_graph().contains(parent_entity))
@@ -1139,11 +1142,15 @@ namespace eeng::editor {
                     parent_guid = parent_ref.guid;
             }
 
+// remap_guids: 
+
             if (remap_guids)
             {
+                // Remap all entity GUIDs to avoid collisions, then fix parent GUIDs.
                 std::unordered_map<Guid, Guid> guid_map;
                 guid_map.reserve(branch_json.size());
 
+                // First pass: generate new GUIDs and update entity JSON.
                 for (auto& entity_json : branch_json)
                 {
                     const Guid old_guid = guid_from_json(entity_json);
@@ -1153,12 +1160,14 @@ namespace eeng::editor {
                     update_entity_guid_in_json(entity_json, new_guid);
                 }
 
+                // Second pass: update parent GUIDs based on mapping.
                 for (std::size_t i = 0; i < branch_json.size(); ++i)
                 {
                     auto& entity_json = branch_json[i];
                     Guid new_parent_guid = Guid::invalid();
                     if (i == 0)
                     {
+                        // Root is parented under the requested parent.
                         new_parent_guid = parent_guid;
                     }
                     else
@@ -1177,12 +1186,14 @@ namespace eeng::editor {
             }
             else
             {
+                // Keep GUIDs as-is; only ensure root parent points at target parent.
                 update_parent_guid_in_json(branch_json.front(), parent_guid);
             }
 
             prepared = true;
         }
 
+        // Deserialize entities into the registry (unregistered), then register as a branch.
         std::vector<Entity> created_entities;
         created_entities.reserve(branch_json.size());
 
@@ -1202,6 +1213,7 @@ namespace eeng::editor {
             return CommandStatus::Failed;
         }
 
+        // Attach new entities to batch and bind references.
         attach_futures.clear();
         attach_futures.reserve(created_entities.size());
 
@@ -1242,6 +1254,7 @@ namespace eeng::editor {
         if (!em)
             return CommandStatus::Done;
 
+        // Undo = destroy all spawned entities by their (remapped) GUIDs.
         destroy_futures.clear();
         for (auto it = branch_json.rbegin(); it != branch_json.rend(); ++it)
         {
@@ -1276,6 +1289,7 @@ namespace eeng::editor {
         if (!ctx_sp)
             return CommandStatus::Done;
 
+        // Async attach/destroy batches.
         if (async_stage == AsyncStage::Attach)
         {
             bool in_flight = true;

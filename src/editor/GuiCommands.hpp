@@ -177,12 +177,16 @@ namespace eeng::editor {
 
     // --- SpawnEntityBranchCommand ------------------------------------------
 
+    // Spawn a serialized entity branch (prefab-style) with undo/redo support.
+    // - execute(): deserializes branch JSON into live entities and attaches to batch.
+    // - undo(): destroys spawned entities by GUID.
+    // - redo(): replays the stored JSON (same GUID mapping) to recreate the branch.
     class SpawnEntityBranchCommand : public Command
     {
-        nlohmann::json source_json{};
-        nlohmann::json branch_json{};
-        ecs::Entity parent_entity{};
-        Guid parent_guid{};
+        nlohmann::json source_json{};       ///< Original input JSON (single entity or array?)
+        nlohmann::json branch_json{};       ///< Normalized array of entity JSON, with updated GUIDs and parent references.
+        ecs::Entity parent_entity{};        ///< Parent entity to attach the spawned branch to.
+        Guid parent_guid{};                 ///< GUID of the parent entity.
         BatchId target_batch;
         std::vector<std::shared_future<bool>> attach_futures{};
         std::vector<std::shared_future<bool>> destroy_futures{};
@@ -190,7 +194,7 @@ namespace eeng::editor {
         std::string display_name;
         enum class AsyncStage { None, Attach, Destroy };
         AsyncStage async_stage{ AsyncStage::None };
-        bool remap_guids{ true };
+        bool remap_guids{ true };           ///< Whether to remap GUIDs during spawn.
         bool prepared{ false };
 
     public:

@@ -8,6 +8,7 @@
 #include "ecs/VehicleRig1Component.hpp"
 
 #include <glm/glm.hpp>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -85,6 +86,18 @@ namespace eeng::ecs
         std::string knuckle_model_name{};
     };
 
+    // VehicleRig1 prototype: chassis spawn data (used by prefab generation).
+    struct VehicleRig1ChassisSpec
+    {
+        glm::vec3 position{ 0.0f, 2.0f, 0.0f };
+        glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+        glm::vec3 half_extents{ 1.6f, 0.35f, 1.0f };
+        float mass = 10.0f;
+        float linear_damping = 0.2f;
+        float angular_damping = 0.4f;
+        bool auto_mass = false;
+    };
+
     // VehicleRig1 prototype: runtime rig handles.
     struct VehicleRig1Rig
     {
@@ -104,4 +117,10 @@ namespace eeng::ecs
 
     // Build the VehicleRig1 rig using a split suspension (6DoF + axle hinge).
     VehicleRig1Rig build_vehicle_rig1(EngineContext& ctx, const VehicleRig1Spec& spec);
+
+    // Generate a prefab JSON (top-down entity array) for VehicleRig1 using a scratch registry.
+    nlohmann::json build_vehicle_rig1_prefab_json(
+        EngineContext& ctx,
+        const VehicleRig1Spec& rig_spec,
+        const VehicleRig1ChassisSpec& chassis_spec);
 } // namespace eeng::ecs
