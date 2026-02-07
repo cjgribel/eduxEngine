@@ -18,7 +18,11 @@
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/EntityManager.hpp"
+#include "editor/EditorActions.hpp"
 #include "engineapi/IInputManager.hpp"
+#include "meta/MetaAux.h"
+#include "meta/MetaSerialize.hpp"
+#include <entt/entt.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 #include <cstdio>
@@ -539,278 +543,50 @@ void Game::reset_vehicle_rig1_config()
     vehicle_rig1_spec_.wheels.push_back(make_wheel(mount_rear_right, false, false));
 }
 
-void Game::bake_vehicle_rig1_root_transform()
+void Game::spawn_vehicle_rig1_from_prefab()
 {
-    if (!ctx || !ctx->entity_manager || !vehicle_rig1_root.guid.valid())
+    if (!ctx)
         return;
 
-    auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
-    auto& registry = em.registry();
-    const auto root_opt = em.get_entity_from_guid(vehicle_rig1_root.guid);
-    if (!root_opt)
-        return;
-
-    const entt::entity root_entity = *root_opt;
-    if (!registry.valid(root_entity))
-        return;
-
-    auto* rig = registry.try_get<eeng::ecs::VehicleRig1RigComponent>(root_entity);
-    auto* root_tfm = registry.try_get<eeng::ecs::TransformComponent>(root_entity);
-    if (!rig || !root_tfm)
-        return;
-
-    const glm::vec3 delta_pos = root_tfm->position;
-    const glm::quat delta_rot = root_tfm->rotation;
-    const glm::vec3 delta_scale = root_tfm->scale;
-
-    const bool has_translation = glm::dot(delta_pos, delta_pos) > 1e-8f;
-    const bool has_rotation = glm::dot(glm::vec3(delta_rot.x, delta_rot.y, delta_rot.z),
-        glm::vec3(delta_rot.x, delta_rot.y, delta_rot.z)) > 1e-8f;
-    const bool has_scale = glm::dot(delta_scale - glm::vec3(1.0f),
-        delta_scale - glm::vec3(1.0f)) > 1e-8f;
-    if (!has_translation && !has_rotation && !has_scale)
-        return;
-
-    auto apply_delta = [&](const eeng::ecs::EntityRef& ref)
-    {
-        if (!ref.is_bound())
-            return;
-        auto* tfm = registry.try_get<eeng::ecs::TransformComponent>(ref.entity);
-        if (!tfm)
-            return;
-
-        // Bake root transform into the child local transform.
-        tfm->set_position(delta_pos + (delta_rot * tfm->position));
-        tfm->set_rotation(delta_rot * tfm->rotation);
-        if (has_scale)
-            tfm->set_scale(delta_scale * tfm->scale);
-    };
-
-    apply_delta(rig->chassis);
-    for (const auto& wheel : rig->wheels)
-    {
-        apply_delta(wheel.knuckle);
-        apply_delta(wheel.wheel);
-        apply_delta(wheel.suspension_6dof);
-        apply_delta(wheel.axle_hinge);
-    }
-
-    // Reset root to identity so physics runs in world space.
-    root_tfm->set_position({ 0.0f, 0.0f, 0.0f });
-    root_tfm->set_rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
-    root_tfm->set_scale({ 1.0f, 1.0f, 1.0f });
-}
-
-void Game::destroy_vehicle_rig1()
-{
-    // Tear down any previously spawned VehicleRig1 rig so we can respawn cleanly.
-    if (!ctx || !ctx->entity_manager)
-        return;
-
-    if (!vehicle_rig1_root.guid.valid())
-        return;
-
-    auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
-    auto& registry = em.registry();
-
-    const auto root_opt = em.get_entity_from_guid(vehicle_rig1_root.guid);
-    if (!root_opt)
-    {
-        vehicle_rig1_root = {};
-        return;
-    }
-
-    const entt::entity root_entity = *root_opt;
-    if (!registry.valid(root_entity))
-    {
-        vehicle_rig1_root = {};
-        return;
-    }
-
-    std::vector<eeng::ecs::Entity> destroy_list;
-    auto push_entity_id = [&](const eeng::ecs::Entity& entity)
-    {
-        const entt::entity ent = static_cast<entt::entity>(entity);
-        if (!registry.valid(ent))
-            return;
-        if (std::find(destroy_list.begin(), destroy_list.end(), entity) == destroy_list.end())
-            destroy_list.push_back(entity);
-    };
-    auto push_entity_ref = [&](const eeng::ecs::EntityRef& ref)
-    {
-        if (!ref.is_bound())
-            return;
-        push_entity_id(ref.entity);
-    };
-
-    // Collect rig-linked entities.
-    if (auto* rig = registry.try_get<eeng::ecs::VehicleRig1RigComponent>(root_entity))
-    {
-        push_entity_ref(rig->chassis);
-        for (const auto& wheel : rig->wheels)
-        {
-            push_entity_ref(wheel.knuckle);
-            push_entity_ref(wheel.wheel);
-            push_entity_ref(wheel.suspension_6dof);
-            push_entity_ref(wheel.axle_hinge);
-        }
-    }
-
-    // Always destroy the root entity last.
-    push_entity_id(eeng::ecs::Entity(root_entity));
-
-    // Prefer batch-owned destruction when possible (it queues the removal on the batch thread).
-    if (ctx->batch_registry)
-    {
-        auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
-        for (const auto ent : destroy_list)
-        {
-            const auto ref = em.get_entity_ref(ent);
-            eeng::BatchId batch_id{};
-            if (br.try_get_loaded_batch_for_entity(ref, batch_id))
-                br.queue_destroy_entity(batch_id, ref, *ctx);
-            else
-                em.destroy_entity_now(ent);
-        }
-    }
-    else
-    {
-        for (const auto ent : destroy_list)
-            em.destroy_entity_now(ent);
-    }
-
-    vehicle_rig1_root = {};
-}
-
-void Game::spawn_vehicle_rig1_to_default_batch()
-{
-    // Hard reset any previous rig so spawn is repeatable.
-    destroy_vehicle_rig1();
     ensure_vehicle_rig1_config();
 
-    if (!ctx || !ctx->entity_manager || !ctx->batch_registry)
+    eeng::ecs::VehicleRig1ChassisSpec chassis_spec{};
+    chassis_spec.position = vehicle_rig1_spawn_pos_;
+    chassis_spec.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+    nlohmann::json prefab_json = eeng::ecs::build_vehicle_rig1_prefab_json(
+        *ctx,
+        vehicle_rig1_spec_,
+        chassis_spec);
+    if (!prefab_json.is_array() || prefab_json.empty())
     {
-        EENG_LOG_WARN(ctx, "VehicleRig1 spawn skipped: missing entity manager or batch registry.");
+        EENG_LOG_WARN(ctx, "VehicleRig1 prefab build failed: empty JSON.");
         return;
     }
 
-    auto& br = static_cast<eeng::BatchRegistry&>(*ctx->batch_registry);
-    eeng::BatchId default_id{};
-    if (!br.try_get_batch_id_by_name(eeng::BatchRegistry::kDefaultBatchName, default_id))
-    {
-        EENG_LOG_WARN(ctx, "VehicleRig1 spawn skipped: default batch not found.");
-        return;
-    }
-    if (!br.is_batch_loaded(default_id))
-    {
-        EENG_LOG_WARN(ctx, "VehicleRig1 spawn skipped: default batch not loaded.");
-        return;
-    }
-
-    auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
-    auto& registry = em.registry();
-
-    // --- Chassis ------------------------------------------------------------
-    const std::string vehicle_prefix =
-        vehicle_rig1_spec_.name_prefix.empty() ? "VehicleRig1" : vehicle_rig1_spec_.name_prefix;
-    const std::string chunk_tag =
-        vehicle_rig1_spec_.chunk_tag.empty() ? "vehicle_rig1" : vehicle_rig1_spec_.chunk_tag;
-    const auto [chassis_guid, chassis_entity] = em.create_entity_live_parent(
-        chunk_tag,
-        vehicle_prefix + "_Chassis",
-        eeng::ecs::Entity::EntityNull,
-        eeng::ecs::Entity::EntityNull);
-    (void)chassis_guid;
-
-    auto& chassis_tfm = registry.emplace<eeng::ecs::TransformComponent>(chassis_entity);
-    chassis_tfm.set_position(vehicle_rig1_spawn_pos_);
-    chassis_tfm.set_rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
-
-    auto& chassis_rb = registry.emplace<eeng::ecs::RigidBodyComponent>(chassis_entity);
-    chassis_rb.motion = eeng::ecs::PhysicsMotionType::Dynamic;
-    chassis_rb.linear_damping = 0.2f;
-    chassis_rb.angular_damping = 0.4f;
-    chassis_rb.auto_mass = false;
-    chassis_rb.mass = 10.0f;
-
-    eeng::ecs::ColliderComponent chassis_colliders{};
-    eeng::ecs::ColliderDesc chassis_box{};
-    chassis_box.type = eeng::ecs::ColliderType::Box;
-    chassis_box.half_extents = { 1.6f, 0.35f, 1.0f };
-    chassis_colliders.colliders.push_back(chassis_box);
-    registry.emplace<eeng::ecs::ColliderComponent>(chassis_entity, std::move(chassis_colliders));
-
-    // --- VehicleRig1 spec ------------------------------------------------------
-    eeng::ecs::VehicleRig1Spec spec = vehicle_rig1_spec_;
-    spec.chassis = em.get_entity_ref(chassis_entity);
-    spec.name_prefix = vehicle_prefix;
-    spec.chunk_tag = chunk_tag;
-    spec.root = {};
-
-    // --- Build rig ----------------------------------------------------------
-    const auto rig = eeng::ecs::build_vehicle_rig1(*ctx, spec);
-    if (!rig.root.is_bound())
-    {
-        EENG_LOG_WARN(ctx, "VehicleRig1 spawn failed: rig root missing.");
-        return;
-    }
-
-    vehicle_rig1_root = rig.root;
-
-    // --- Control component --------------------------------------------------
-    auto& control = registry.emplace<eeng::ecs::VehicleRig1ControlComponent>(rig.root.entity);
-    control.steer_limit = spec.steer_limit;
+    // Inject control component on the rig root before spawning.
+    eeng::ecs::VehicleRig1ControlComponent control{};
+    control.steer_limit = vehicle_rig1_spec_.steer_limit;
     control.steer_speed = vehicle_rig1_control_steer_speed_;
     control.steer_max_impulse = vehicle_rig1_control_steer_max_impulse_;
     control.drive_velocity = vehicle_rig1_control_drive_velocity_;
     control.drive_max_impulse = vehicle_rig1_control_drive_max_impulse_;
     control.brake_max_impulse = vehicle_rig1_control_brake_max_impulse_;
 
-    // --- Mass tuning --------------------------------------------------------
-    // Helper: override auto-mass so we can tune mass ratios explicitly.
-    const auto apply_mass = [&](const eeng::ecs::EntityRef& ref, float mass)
-    {
-        if (!ref.is_bound())
-            return;
-        auto* rb = registry.try_get<eeng::ecs::RigidBodyComponent>(ref.entity);
-        if (!rb)
-            return;
-        rb->auto_mass = false;
-        rb->mass = mass;
-    };
+    const auto control_type = eeng::meta::get_meta_type_id_string<eeng::ecs::VehicleRig1ControlComponent>();
+    auto& root_json = prefab_json.front();
+    if (!root_json.contains("components") || !root_json["components"].is_object())
+        root_json["components"] = nlohmann::json::object();
+    root_json["components"][control_type] = eeng::meta::serialize_any(
+        entt::forward_as_meta(control),
+        eeng::meta::SerializationPurpose::file);
 
-    for (const auto& wheel : rig.wheels)
-    {
-        apply_mass(wheel.wheel, 1.0f);
-        apply_mass(wheel.knuckle, 1.0f);
-    }
-
-    // --- Attach entities to the default batch ------------------------------
-    auto attach_entity = [&](const eeng::ecs::EntityRef& ref)
-    {
-        if (!ref.is_bound())
-            return;
-
-        eeng::BatchId existing{};
-        if (br.try_get_loaded_batch_for_entity(ref, existing))
-        {
-            if (existing != default_id)
-                EENG_LOG_WARN(ctx, "VehicleRig1 entity already attached to another batch; skipping.");
-            return;
-        }
-
-        br.queue_attach_entity(default_id, ref, *ctx);
-    };
-
-    attach_entity(rig.root);
-    attach_entity(rig.chassis);
-    for (const auto& wheel : rig.wheels)
-    {
-        attach_entity(wheel.knuckle);
-        attach_entity(wheel.wheel);
-        attach_entity(wheel.suspension_6dof);
-        attach_entity(wheel.axle_hinge);
-    }
+    // Spawn via command so undo/redo works.
+    eeng::editor::SceneActions::spawn_entity_branch_from_json(
+        *ctx,
+        std::move(prefab_json),
+        eeng::ecs::Entity{},
+        true);
 }
 
 void Game::renderUI()
@@ -900,16 +676,12 @@ void Game::renderUI()
                 default_batch_loaded = br.is_batch_loaded(default_id);
         }
 
-        if (ImGui::TreeNodeEx("Spawn / Respawn", ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::TreeNodeEx("Spawn", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::DragFloat3("Spawn position", &vehicle_rig1_spawn_pos_.x, 0.05f);
 
-            if (ImGui::Button("Spawn / Respawn VehicleRig1 (default batch)"))
-                spawn_vehicle_rig1_to_default_batch();
-
-            ImGui::SameLine();
-            if (ImGui::Button("Destroy VehicleRig1"))
-                destroy_vehicle_rig1();
+            if (ImGui::Button("Spawn VehicleRig1"))
+                spawn_vehicle_rig1_from_prefab();
 
             ImGui::SameLine();
             if (ImGui::Button("Reset Config"))
@@ -917,9 +689,6 @@ void Game::renderUI()
 
             ImGui::SameLine();
             ImGui::TextDisabled(default_batch_loaded ? "default batch loaded" : "default batch not loaded");
-
-            if (ImGui::Button("Bake Root Transform"))
-                bake_vehicle_rig1_root_transform();
             ImGui::TreePop();
         }
 
@@ -990,24 +759,23 @@ void Game::renderUI()
         {
             const eeng::ecs::VehicleRig1ControlComponent* control = nullptr;
             const eeng::ecs::VehicleRig1RigComponent* rig = nullptr;
-            entt::entity control_entity = entt::null;
-            if (ctx && ctx->entity_manager && vehicle_rig1_root.guid.valid())
+            int rig_count = 0;
+            if (ctx && ctx->entity_manager)
             {
-                auto& em = static_cast<eeng::EntityManager&>(*ctx->entity_manager);
-                if (auto ent_opt = em.get_entity_from_guid(vehicle_rig1_root.guid))
+                auto& registry = ctx->entity_manager->registry();
+                auto view = registry.view<eeng::ecs::VehicleRig1ControlComponent, eeng::ecs::VehicleRig1RigComponent>();
+                rig_count = static_cast<int>(view.size_hint());
+                if (auto it = view.begin(); it != view.end())
                 {
-                    control_entity = *ent_opt;
-                    auto& registry = ctx->entity_manager->registry();
-                    if (registry.valid(control_entity))
-                    {
-                        control = registry.try_get<eeng::ecs::VehicleRig1ControlComponent>(control_entity);
-                        rig = registry.try_get<eeng::ecs::VehicleRig1RigComponent>(control_entity);
-                    }
+                    const entt::entity control_entity = *it;
+                    control = registry.try_get<eeng::ecs::VehicleRig1ControlComponent>(control_entity);
+                    rig = registry.try_get<eeng::ecs::VehicleRig1RigComponent>(control_entity);
                 }
             }
 
             if (control)
             {
+                ImGui::Text("Active rigs: %d", rig_count);
                 ImGui::Text("Input steer/drive: %.2f / %.2f", control->steer_input, control->drive_input);
                 ImGui::Text("Steer target/angle: %.2f / %.2f", control->steer_target, control->steer_angle);
                 ImGui::Text("Steer speed/impulse: %.1f / %.1f", control->steer_speed, control->steer_max_impulse);

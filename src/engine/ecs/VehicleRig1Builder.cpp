@@ -392,6 +392,8 @@ namespace eeng::ecs
                 hinge.local_anchor_b = wheel_spec.wheel_local_anchor;
                 hinge.local_axis_a = axle_axis;
                 hinge.local_axis_b = axle_axis;
+                // Axle should spin freely; do not enable limits.
+                hinge.use_limits = false;
                 // Motor parameters are set by the control system.
                 hinge.enable_motor = false;
                 hinge.motor_target_velocity = 0.0f;
@@ -436,9 +438,9 @@ namespace eeng::ecs
         EngineContext scratch_ctx(
             std::make_unique<EntityManager>(),
             ctx.resource_manager,
-            std::unique_ptr<IBatchRegistry>{},
-            std::unique_ptr<IGuiManager>{},
-            std::unique_ptr<IInputManager>{},
+            std::unique_ptr<eeng::IBatchRegistry>{},
+            std::unique_ptr<eeng::IGuiManager>{},
+            std::unique_ptr<eeng::IInputManager>{},
             ctx.log_manager);
         scratch_ctx.project_config = ctx.project_config;
 
@@ -482,6 +484,23 @@ namespace eeng::ecs
         const auto rig = build_vehicle_rig1(scratch_ctx, spec);
         if (!rig.root.is_bound())
             return nlohmann::json{};
+
+        // Match the old prototype: force lightweight wheel/knuckle masses.
+        auto apply_mass = [&](const ecs::EntityRef& ref, float mass)
+        {
+            if (!ref.is_bound())
+                return;
+            if (auto* rb = registry.try_get<ecs::RigidBodyComponent>(ref.entity))
+            {
+                rb->auto_mass = false;
+                rb->mass = mass;
+            }
+        };
+        for (const auto& wheel : rig.wheels)
+        {
+            apply_mass(wheel.wheel, 1.0f);
+            apply_mass(wheel.knuckle, 1.0f);
+        }
 
         auto registry_sp = em.registry_wptr().lock();
         if (!registry_sp)

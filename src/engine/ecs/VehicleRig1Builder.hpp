@@ -8,6 +8,7 @@
 #include "ecs/VehicleRig1Component.hpp"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>

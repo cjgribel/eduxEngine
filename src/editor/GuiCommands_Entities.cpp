@@ -9,6 +9,7 @@
 // - CopyEntityBranchCommand: clone an entity branch into the same batch.
 // - ReparentEntityBranchCommand: reparent a branch and sync batch membership.
 
+#include <functional>
 #include <unordered_map>
 #include <utility>
 #include "GuiCommands.hpp"
@@ -547,7 +548,8 @@ namespace eeng::editor {
 
         for (const auto& entity_json : branch_json)
         {
-            auto er = meta::deserialize_entity_for_undo(
+            // Prefab/branch JSON is file-serialized; keep deserialization consistent.
+            auto er = meta::deserialize_entity_for_file(
                 entity_json,
                 *ctx_sp);
             created_entities.push_back(er.entity);
@@ -1159,6 +1161,39 @@ namespace eeng::editor {
                         guid_map.emplace(old_guid, new_guid);
                     update_entity_guid_in_json(entity_json, new_guid);
                 }
+
+                auto remap_guid_value = [&](nlohmann::json& value)
+                {
+                    if (!value.is_number_unsigned())
+                        return;
+                    const Guid old_guid{ value.get<Guid::underlying_type>() };
+                    if (!old_guid.valid())
+                        return;
+                    if (auto it = guid_map.find(old_guid); it != guid_map.end())
+                        value = it->second.raw();
+                };
+
+                std::function<void(nlohmann::json&)> remap_guid_fields = [&](nlohmann::json& json)
+                {
+                    if (json.is_object())
+                    {
+                        for (auto& [key, value] : json.items())
+                        {
+                            if (key == "Guid" || key == "guid")
+                                remap_guid_value(value);
+                            else
+                                remap_guid_fields(value);
+                        }
+                    }
+                    else if (json.is_array())
+                    {
+                        for (auto& value : json)
+                            remap_guid_fields(value);
+                    }
+                };
+
+                // Update all entity-reference GUID fields inside component payloads.
+                remap_guid_fields(branch_json);
 
                 // Second pass: update parent GUIDs based on mapping.
                 for (std::size_t i = 0; i < branch_json.size(); ++i)

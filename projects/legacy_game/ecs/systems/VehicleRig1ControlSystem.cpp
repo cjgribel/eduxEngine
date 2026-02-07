@@ -173,6 +173,9 @@ namespace eeng::ecs::systems
                     if (!hinge)
                         continue;
 
+                    // Axle should be free; never use hinge limits here.
+                    hinge->use_limits = false;
+
                     const float drive_sign = (std::abs(wheel.drive_direction) < 1e-3f)
                         ? 1.0f
                         : (wheel.drive_direction > 0.0f ? 1.0f : -1.0f);
@@ -192,6 +195,7 @@ namespace eeng::ecs::systems
                     // Ensure non-driven wheels do not keep a motor enabled.
                     if (auto* hinge = registry.try_get<ecs::HingeConstraintComponent>(wheel.axle_hinge.entity))
                     {
+                        hinge->use_limits = false;
                         hinge->enable_motor = false;
                         hinge->motor_target_velocity = 0.0f;
                         hinge->motor_max_impulse = 0.0f;

@@ -91,11 +91,9 @@ public:
 private:
     /// @brief For rendering of GUI elements
     void renderUI();
-    void spawn_vehicle_rig1_to_default_batch();
-    void destroy_vehicle_rig1();
     void ensure_vehicle_rig1_config();
     void reset_vehicle_rig1_config();
-    void bake_vehicle_rig1_root_transform();
+    void spawn_vehicle_rig1_from_prefab();
 
     // ENGINE API
     std::shared_ptr<eeng::EngineContext> ctx;
@@ -134,7 +132,6 @@ private:
     } active_camera;
 
     eeng::ecs::Entity player_entity;
-    eeng::ecs::EntityRef vehicle_rig1_root;
     glm_aux::Ray view_ray;
 
     // VehicleRig1 cached spawn config (editable in UI).
