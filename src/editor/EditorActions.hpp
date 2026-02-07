@@ -34,6 +34,7 @@ namespace eeng::editor
             nlohmann::json branch_json,
             const ecs::Entity& parent_entity = ecs::Entity{},
             bool remap_guids = true);
+        static void bake_transform_branch(EngineContext& ctx, const ecs::Entity& root_entity);
     };
 
     struct BatchActions

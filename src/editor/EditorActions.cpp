@@ -366,6 +366,25 @@ namespace eeng::editor
             "SpawnEntityBranch");
     }
 
+    void SceneActions::bake_transform_branch(EngineContext& ctx, const ecs::Entity& root_entity)
+    {
+        if (!root_entity.has_id())
+            return;
+        if (!can_queue_action(ctx, "BakeTransformBranch"))
+            return;
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+            return;
+
+        try_add_command(
+            ctx,
+            CommandFactory::Create<BakeTransformBranchCommand>(
+                root_entity,
+                ctx_wptr),
+            "BakeTransformBranch");
+    }
+
     void AssetActions::import_model(
         EngineContext& ctx,
         const std::filesystem::path& source_file,

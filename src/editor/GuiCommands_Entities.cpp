@@ -7,6 +7,7 @@
 // - DestroyEntityBranchCommand: destroy a branch and restore it on undo.
 // - CopyEntityCommand: clone one entity into the same batch.
 // - CopyEntityBranchCommand: clone an entity branch into the same batch.
+// - BakeTransformBranchCommand: bake root transform into direct children.
 // - ReparentEntityBranchCommand: reparent a branch and sync batch membership.
 
 #include <functional>
@@ -20,10 +21,12 @@
 #include "editor/CommandContext.hpp"
 #include "editor/CommandEntityHelpers.hpp"
 #include "editor/CommandSnapshot.hpp"
+#include "ecs/TransformComponent.hpp"
 #include "ecs/EntityBatchPolicy.hpp"
 #include "ecs/EntityManager.hpp"
 #include "engineapi/SelectionManager.hpp"
 #include "LogMacros.h"
+#include "VecTree.h"
 
 namespace eeng::editor {
     using eeng::BatchId;
@@ -1361,6 +1364,189 @@ namespace eeng::editor {
     }
 
     std::string SpawnEntityBranchCommand::get_name() const
+    {
+        return display_name;
+    }
+
+    // --- BakeTransformBranchCommand -----------------------------------------
+
+    BakeTransformBranchCommand::BakeTransformBranchCommand(
+        const Entity& root_entity,
+        EngineContextWeakPtr ctx) :
+        root_entity(root_entity),
+        ctx(std::move(ctx)),
+        display_name("Bake Transform Branch")
+    {
+    }
+
+    CommandStatus BakeTransformBranchCommand::execute()
+    {
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
+            return CommandStatus::Done;
+
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        auto& registry = em->registry();
+        auto& scenegraph = em->scene_graph();
+
+        if (prepared)
+        {
+            for (const auto& snap : after)
+            {
+                auto entity_opt = em->get_entity_from_guid(snap.guid);
+                if (!entity_opt || !entity_opt->has_id())
+                    continue;
+                auto* tfm = registry.try_get<ecs::TransformComponent>(*entity_opt);
+                if (!tfm)
+                    continue;
+                tfm->set_position(snap.position);
+                tfm->set_rotation(snap.rotation);
+                tfm->set_scale(snap.scale);
+                mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
+            }
+            return CommandStatus::Done;
+        }
+
+        Entity root_current{};
+        if (root_guid.valid())
+        {
+            root_current = resolve_entity_from_guid(*em, root_guid);
+        }
+        else
+        {
+            if (!try_capture_guid(*em, root_entity, root_guid))
+                return CommandStatus::Done;
+            root_current = root_entity;
+        }
+
+        if (!root_current.has_id() || !scenegraph.contains(root_current))
+            return CommandStatus::Done;
+
+        auto* root_tfm = registry.try_get<ecs::TransformComponent>(root_current);
+        if (!root_tfm)
+            return CommandStatus::Done;
+
+        std::vector<Entity> children;
+        scenegraph.get_tree().traverse_children(
+            root_current,
+            [&](const Entity& child, size_t, size_t)
+            {
+                children.push_back(child);
+            });
+
+        if (children.empty())
+            return CommandStatus::Done;
+
+        const glm::vec3 delta_pos = root_tfm->position;
+        const glm::quat delta_rot = root_tfm->rotation;
+        const glm::vec3 delta_scale = root_tfm->scale;
+
+        const bool has_translation = glm::dot(delta_pos, delta_pos) > 1e-8f;
+        const glm::vec3 delta_rot_v(delta_rot.x, delta_rot.y, delta_rot.z);
+        const bool has_rotation = glm::dot(delta_rot_v, delta_rot_v) > 1e-8f;
+        const glm::vec3 scale_delta = delta_scale - glm::vec3(1.0f);
+        const bool has_scale = glm::dot(scale_delta, scale_delta) > 1e-8f;
+
+        if (!has_translation && !has_rotation && !has_scale)
+            return CommandStatus::Done;
+
+        before.clear();
+        before.reserve(children.size() + 1);
+
+        before.push_back({
+            root_guid,
+            root_tfm->position,
+            root_tfm->rotation,
+            root_tfm->scale
+        });
+
+        for (const auto& child : children)
+        {
+            auto* tfm = registry.try_get<ecs::TransformComponent>(child);
+            if (!tfm)
+                continue;
+
+            Guid child_guid{};
+            if (!try_capture_guid(*em, child, child_guid))
+                continue;
+
+            before.push_back({
+                child_guid,
+                tfm->position,
+                tfm->rotation,
+                tfm->scale
+            });
+
+            const glm::vec3 local_pos = has_scale ? (delta_scale * tfm->position) : tfm->position;
+            tfm->set_position(delta_pos + (delta_rot * local_pos));
+            tfm->set_rotation(delta_rot * tfm->rotation);
+            if (has_scale)
+                tfm->set_scale(delta_scale * tfm->scale);
+
+            mark_batch_dirty_for_entity(child, *ctx_sp);
+        }
+
+        root_tfm->set_position(glm::vec3(0.0f));
+        root_tfm->set_rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+        root_tfm->set_scale(glm::vec3(1.0f));
+        mark_batch_dirty_for_entity(root_current, *ctx_sp);
+
+        after.clear();
+        after.reserve(before.size());
+        for (const auto& snap : before)
+        {
+            auto entity_opt = em->get_entity_from_guid(snap.guid);
+            if (!entity_opt || !entity_opt->has_id())
+                continue;
+            auto* tfm = registry.try_get<ecs::TransformComponent>(*entity_opt);
+            if (!tfm)
+                continue;
+            after.push_back({
+                snap.guid,
+                tfm->position,
+                tfm->rotation,
+                tfm->scale
+            });
+        }
+
+        prepared = true;
+        return CommandStatus::Done;
+    }
+
+    CommandStatus BakeTransformBranchCommand::undo()
+    {
+        CommandContext cmd_ctx{ ctx };
+        auto ctx_sp = cmd_ctx.lock();
+        if (!ctx_sp)
+            return CommandStatus::Done;
+
+        auto* em = cmd_ctx.entity_manager(*ctx_sp);
+        if (!em)
+            return CommandStatus::Done;
+
+        auto& registry = em->registry();
+        for (const auto& snap : before)
+        {
+            auto entity_opt = em->get_entity_from_guid(snap.guid);
+            if (!entity_opt || !entity_opt->has_id())
+                continue;
+            auto* tfm = registry.try_get<ecs::TransformComponent>(*entity_opt);
+            if (!tfm)
+                continue;
+            tfm->set_position(snap.position);
+            tfm->set_rotation(snap.rotation);
+            tfm->set_scale(snap.scale);
+            mark_batch_dirty_for_entity(*entity_opt, *ctx_sp);
+        }
+
+        return CommandStatus::Done;
+    }
+
+    std::string BakeTransformBranchCommand::get_name() const
     {
         return display_name;
     }

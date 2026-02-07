@@ -13,6 +13,7 @@
 #include "MetaAux.h"
 #include "BatchRegistry.hpp"
 #include "ecs/EntityManager.hpp"
+#include "ecs/TransformComponent.hpp"
 //#include "FileManager.hpp"
 // #include "ecs/HeaderComponent.hpp"
 
@@ -47,6 +48,9 @@ namespace eeng::gui
             }
 
             auto& entity_selection = *ctx.entity_selection;
+            const bool has_selection = !entity_selection.empty();
+            const auto& selection = entity_selection.get_all();
+            const int selection_count = static_cast<int>(selection.size());
 
             ecs::Entity selected_entity;
             if (!entity_selection.empty())
@@ -155,6 +159,41 @@ namespace eeng::gui
             ImGui::EndDisabled();
             ImGui::Separator();
 
+            // --- Transform tools -------------------------------------------
+            ImGui::TextUnformatted("Transform");
+            bool can_bake = selected_entity_valid && (selection_count == 1);
+            if (can_bake)
+            {
+                can_bake = registry_sp->all_of<ecs::TransformComponent>(selected_entity);
+            }
+
+            if (can_bake && ctx.entity_manager)
+            {
+                auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
+                if (!em.scene_graph().contains(selected_entity))
+                {
+                    can_bake = false;
+                }
+                else
+                {
+                    can_bake = em.scene_graph().get_nbr_children(selected_entity) > 0;
+                }
+            }
+
+            ImGui::BeginDisabled(!can_bake);
+            if (ImGui::Button("Bake Transform Branch"))
+            {
+                editor::SceneActions::bake_transform_branch(ctx, selected_entity);
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+            {
+                ImGui::SetTooltip(
+                    "Push this entity's local transform into its direct children,\n"
+                    "then reset the local transform to identity. Undoable.");
+            }
+            ImGui::Separator();
+
             // --- Add / Remove Component ------------------------------------
 
             struct ComponentItem
@@ -212,10 +251,6 @@ namespace eeng::gui
 
             static entt::id_type selected_comp_id{};
             static ImGuiTextFilter comp_filter;
-
-            const bool has_selection = !entity_selection.empty();
-            const auto& selection = entity_selection.get_all();
-            const int selection_count = static_cast<int>(selection.size());
 
             ImGui::TextUnformatted("Add/Remove Component");
 

@@ -18,6 +18,8 @@
 #include <atomic>
 #include <filesystem>
 #include <future>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <entt/fwd.hpp>
 #include <vector>
 
@@ -210,6 +212,38 @@ namespace eeng::editor {
 
         CommandStatus update() override;
 
+        std::string get_name() const override;
+    };
+
+    // --- BakeTransformBranchCommand -----------------------------------------
+
+    // Bake a root transform into its direct children, then reset the root.
+    // This is a "freeze transform" style command with undo/redo support.
+    class BakeTransformBranchCommand : public Command
+    {
+        struct TransformSnapshot
+        {
+            Guid guid{};
+            glm::vec3 position{ 0.0f };
+            glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+            glm::vec3 scale{ 1.0f };
+        };
+
+        ecs::Entity root_entity;
+        Guid root_guid;
+        std::vector<TransformSnapshot> before{};
+        std::vector<TransformSnapshot> after{};
+        EngineContextWeakPtr ctx;
+        std::string display_name;
+        bool prepared{ false };
+
+    public:
+        BakeTransformBranchCommand(
+            const ecs::Entity& root_entity,
+            EngineContextWeakPtr ctx);
+
+        CommandStatus execute() override;
+        CommandStatus undo() override;
         std::string get_name() const override;
     };
 
