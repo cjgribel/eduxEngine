@@ -121,6 +121,20 @@ namespace eeng::ecs
             registry.emplace<ecs::RigidBodyComponent>(entity, rb);
         }
 
+        void apply_mass_override(
+            entt::registry& registry,
+            const ecs::EntityRef& ref,
+            float mass)
+        {
+            if (!ref.is_bound() || mass <= 0.0f)
+                return;
+            if (auto* rb = registry.try_get<ecs::RigidBodyComponent>(ref.entity))
+            {
+                rb->auto_mass = false;
+                rb->mass = mass;
+            }
+        }
+
         AssetRef<assets::GpuModelAsset> resolve_model_ref(
             EngineContext& ctx,
             std::string_view name)
@@ -276,6 +290,7 @@ namespace eeng::ecs
                 ensure_transform(registry, wheel_rig.knuckle.entity, wheel_world, chassis_rot);
                 ensure_rigidbody(registry, wheel_rig.knuckle.entity, ecs::PhysicsMotionType::Dynamic);
                 ensure_collider_sphere(registry, wheel_rig.knuckle.entity, wheel_spec.knuckle_radius, true);
+                apply_mass_override(registry, wheel_rig.knuckle, wheel_spec.knuckle_mass);
                 if (knuckle_model_ref.guid.valid())
                     ensure_model_component(registry, wheel_rig.knuckle.entity,
                         prefix + "_Knuckle", knuckle_model_ref);
@@ -294,6 +309,7 @@ namespace eeng::ecs
                     ensure_transform(registry, wheel_entity, wheel_world, chassis_rot);
                     ensure_rigidbody(registry, wheel_entity, ecs::PhysicsMotionType::Dynamic);
                     ensure_collider_sphere(registry, wheel_entity, wheel_spec.wheel_radius, false);
+                    apply_mass_override(registry, wheel_rig.wheel, wheel_spec.wheel_mass);
                     if (wheel_model_ref.guid.valid())
                         ensure_model_component(registry, wheel_entity, prefix + "_Wheel", wheel_model_ref);
                 }
@@ -484,23 +500,6 @@ namespace eeng::ecs
         const auto rig = build_vehicle_rig1(scratch_ctx, spec);
         if (!rig.root.is_bound())
             return nlohmann::json{};
-
-        // Match the old prototype: force lightweight wheel/knuckle masses.
-        auto apply_mass = [&](const ecs::EntityRef& ref, float mass)
-        {
-            if (!ref.is_bound())
-                return;
-            if (auto* rb = registry.try_get<ecs::RigidBodyComponent>(ref.entity))
-            {
-                rb->auto_mass = false;
-                rb->mass = mass;
-            }
-        };
-        for (const auto& wheel : rig.wheels)
-        {
-            apply_mass(wheel.wheel, 1.0f);
-            apply_mass(wheel.knuckle, 1.0f);
-        }
 
         auto registry_sp = em.registry_wptr().lock();
         if (!registry_sp)
