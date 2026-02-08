@@ -16,6 +16,7 @@
 
 #include "EngineContextHelpers.hpp"
 #include "editor/AnimationGraphComponentInspect.hpp"
+#include "ecs/systems/DebugRenderSystem.hpp"
 
 #include "ThreadPool.hpp" // remove?
 #include "MainThreadQueue.hpp"
@@ -46,6 +47,7 @@ namespace eeng
     {
         const bool is_playing = ctx.services
             && ctx.services->play_mode_active.load(std::memory_order_relaxed);
+        draw_main_menu(ctx);
         draw_editor_controls(ctx);
         if (is_playing)
             return;
@@ -73,6 +75,158 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowAnimationGraphVisualizer))
             draw_animation_graph_visualizer(ctx);
+    }
+
+    void GuiManager::draw_main_menu(EngineContext& ctx) const
+    {
+        if (!ImGui::BeginMainMenuBar())
+            return;
+
+        auto toggle_gui_flag = [&](GuiFlags flag, const char* label)
+        {
+            if (!ctx.gui_manager)
+                return;
+            bool enabled = ctx.gui_manager->is_flag_enabled(flag);
+            if (ImGui::MenuItem(label, nullptr, &enabled))
+                ctx.gui_manager->set_flag(flag, enabled);
+        };
+
+        if (ImGui::BeginMenu("File"))
+        {
+            ImGui::BeginDisabled();
+            ImGui::MenuItem("New Scene", "Ctrl+N");
+            ImGui::MenuItem("Open Project", "Ctrl+O");
+            ImGui::Separator();
+            ImGui::MenuItem("Save", "Ctrl+S");
+            ImGui::MenuItem("Save All", "Ctrl+Shift+S");
+            ImGui::MenuItem("Export Build");
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Edit"))
+        {
+            ImGui::BeginDisabled();
+            ImGui::MenuItem("Undo", "Ctrl+Z");
+            ImGui::MenuItem("Redo", "Ctrl+Y");
+            ImGui::Separator();
+            ImGui::MenuItem("Cut", "Ctrl+X");
+            ImGui::MenuItem("Copy", "Ctrl+C");
+            ImGui::MenuItem("Paste", "Ctrl+V");
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Scene"))
+        {
+            const bool is_playing = ctx.services
+                && ctx.services->play_mode_active.load(std::memory_order_relaxed);
+            const char* play_label = is_playing ? "Stop Play" : "Play";
+            if (ImGui::MenuItem(play_label, "F5"))
+            {
+                if (ctx.event_queue)
+                    ctx.event_queue->dispatch(TogglePlayModeEvent{});
+            }
+
+            ImGui::BeginDisabled();
+            ImGui::MenuItem("Reload Scene");
+            ImGui::MenuItem("Rebuild Lighting");
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Assets"))
+        {
+            ImGui::BeginDisabled();
+            ImGui::MenuItem("Import Asset");
+            ImGui::MenuItem("Rebuild Asset Index");
+            ImGui::MenuItem("Validate References");
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("View"))
+        {
+            if (ImGui::MenuItem("Maximize/Restore"))
+            {
+                if (ctx.event_queue)
+                    ctx.event_queue->dispatch(ToggleWindowMaximizeEvent{});
+            }
+
+            if (ImGui::BeginMenu("Resolution"))
+            {
+                auto set_resolution = [&](const char* label, int width, int height)
+                {
+                    if (ImGui::MenuItem(label))
+                    {
+                        if (ctx.event_queue)
+                            ctx.event_queue->dispatch(SetWindowSizeEvent{ width, height, true, true });
+                    }
+                };
+
+                set_resolution("1280 x 720", 1280, 720);
+                set_resolution("1600 x 900", 1600, 900);
+                set_resolution("1920 x 1080", 1920, 1080);
+                set_resolution("2560 x 1440", 2560, 1440);
+                set_resolution("3840 x 2160", 3840, 2160);
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Debug Rendering"))
+            {
+                auto* debug_settings = ctx.services ? ctx.services->debug_render_settings : nullptr;
+                if (!debug_settings)
+                {
+                    ImGui::TextDisabled("Debug renderer unavailable.");
+                }
+                else
+                {
+                    ImGui::MenuItem("Colliders", nullptr, &debug_settings->show_colliders);
+                    ImGui::MenuItem("Collider Labels", nullptr, &debug_settings->show_collider_labels);
+                    ImGui::MenuItem("RigidBody Axes", nullptr, &debug_settings->show_rigidbody_axes);
+                    ImGui::MenuItem("Raycasts", nullptr, &debug_settings->show_raycast_debug);
+                    ImGui::MenuItem("Constraints", nullptr, &debug_settings->show_constraints);
+                    ImGui::MenuItem("Springs", nullptr, &debug_settings->show_springs);
+                    ImGui::MenuItem("Demo Shapes", nullptr, &debug_settings->show_demo_shapes);
+                }
+                ImGui::EndMenu();
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Tools"))
+        {
+            toggle_gui_flag(GuiFlags::ShowProfiler, "Profiler");
+            toggle_gui_flag(GuiFlags::ShowBatchRegistry, "Batch Registry");
+            toggle_gui_flag(GuiFlags::ShowTaskMonitor, "Task Monitor");
+            toggle_gui_flag(GuiFlags::ShowCommandQueue, "Command Queue");
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Window"))
+        {
+            toggle_gui_flag(GuiFlags::ShowSceneGraph, "Scene Graph");
+            toggle_gui_flag(GuiFlags::ShowResourceBrowser, "Resource Browser");
+            toggle_gui_flag(GuiFlags::ShowStorageWindow, "Storage");
+            toggle_gui_flag(GuiFlags::ShowAnimationGraphVisualizer, "Animation Graph");
+            toggle_gui_flag(GuiFlags::ShowEngineInfo, "Engine Info");
+            toggle_gui_flag(GuiFlags::ShowLogWindow, "Log");
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Help"))
+        {
+            ImGui::BeginDisabled();
+            ImGui::MenuItem("Documentation");
+            ImGui::MenuItem("Report Issue");
+            ImGui::Separator();
+            ImGui::MenuItem("About");
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMainMenuBar();
     }
 
     void GuiManager::draw_profiler(EngineContext& ctx) const

@@ -90,7 +90,8 @@ namespace eeng::gui
                     current_index = total;
             }
 
-            if (ImGui::BeginChild("CommandQueueList", ImVec2(0.0f, 0.0f), true))
+            const bool list_open = ImGui::BeginChild("CommandQueueList", ImVec2(0.0f, 0.0f), true);
+            if (list_open)
             {
                 if (total == 0)
                 {
@@ -113,8 +114,8 @@ namespace eeng::gui
                         ImGui::TextColored(color, "%s %zu: %s", marker, i, name.c_str());
                     }
                 }
-                ImGui::EndChild();
             }
+            ImGui::EndChild();
         }
     };
 } // namespace eeng::gui

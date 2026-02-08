@@ -33,6 +33,11 @@ namespace ShapeRendering
     class ShapeRenderer;
 }
 
+namespace eeng::ecs::systems
+{
+    struct DebugRenderSettings;
+}
+
 namespace eeng
 {
     struct EngineContext;
@@ -62,6 +67,14 @@ namespace eeng
     struct ResourceTaskCompletedEvent { TaskResult result; };
     struct SetPlayModeEvent { bool enabled; };
     struct TogglePlayModeEvent { };
+    struct SetWindowSizeEvent
+    {
+        int width = 0;
+        int height = 0;
+        bool center = true;
+        bool restore_if_maximized = true;
+    };
+    struct ToggleWindowMaximizeEvent { };
 
     enum class BatchTaskType : uint8_t
     {
@@ -193,6 +206,8 @@ namespace eeng
         std::shared_ptr<OverlayViewState>       overlay_view_state;
         // Core debug renderer shared across engine/editor/game.
         std::shared_ptr<::ShapeRendering::ShapeRenderer> shape_renderer;
+        // Optional hook to share debug render settings between game runtime and editor UI.
+        ecs::systems::DebugRenderSettings* debug_render_settings = nullptr;
         // Optional editor overlay hook (e.g. gizmo rendering) for shared renderers.
         EditorRenderHook                         editor_render_hook;
         std::unique_ptr<MainThreadQueue>        main_thread_queue;

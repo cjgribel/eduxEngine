@@ -16,7 +16,11 @@ namespace eeng::reference_game
     bool ReferenceGame::init()
     {
         if (ctx_)
+        {
             runtime_pipeline_.init(*ctx_);
+            if (ctx_->services)
+                ctx_->services->debug_render_settings = runtime_pipeline_.debug_render_settings();
+        }
         return true;
     }
 
@@ -87,6 +91,11 @@ namespace eeng::reference_game
 
     void ReferenceGame::destroy()
     {
+        if (ctx_ && ctx_->services
+            && ctx_->services->debug_render_settings == runtime_pipeline_.debug_render_settings())
+        {
+            ctx_->services->debug_render_settings = nullptr;
+        }
         runtime_pipeline_.shutdown();
     }
 

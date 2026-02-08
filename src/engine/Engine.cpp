@@ -224,6 +224,8 @@ namespace eeng
         ctx->event_queue->register_callback([&](const SetMinFrameTimeEvent& event) { this->on_set_min_frametime(event); });
         ctx->event_queue->register_callback([&](const SetPlayModeEvent& event) { this->on_set_play_mode(event); });
         ctx->event_queue->register_callback([&](const TogglePlayModeEvent& event) { this->on_toggle_play_mode(event); });
+        ctx->event_queue->register_callback([&](const SetWindowSizeEvent& event) { this->on_set_window_size(event); });
+        ctx->event_queue->register_callback([&](const ToggleWindowMaximizeEvent& event) { this->on_toggle_window_maximize(event); });
         ctx->event_queue->register_callback([&](const ResourceTaskCompletedEvent& event) { this->on_resource_task_completed(event); });
         ctx->event_queue->register_callback([&](const BatchTaskCompletedEvent& event) { this->on_batch_task_completed(event); });
 
@@ -548,7 +550,7 @@ namespace eeng
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
             width, height,
-            SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+            SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
         if (!window_)
         {
             std::cerr << "Failed to create SDL window: " << SDL_GetError() << std::endl;
@@ -605,6 +607,15 @@ namespace eeng
         while (SDL_PollEvent(&event))
         {
             imgui_backend::process_event(&event);
+
+            if (event.type == SDL_WINDOWEVENT)
+            {
+                if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED
+                    || event.window.event == SDL_WINDOWEVENT_RESIZED)
+                {
+                    update_window_size_from_sdl();
+                }
+            }
 
             // Skip mouse events if ImGui is capturing mouse input.
             if ((event.type == SDL_MOUSEMOTION ||
@@ -873,6 +884,14 @@ namespace eeng
         imgui_backend::end_frame();
     }
 
+    void Engine::update_window_size_from_sdl()
+    {
+        if (!window_)
+            return;
+
+        SDL_GetWindowSize(window_, &window_width, &window_height);
+    }
+
     void Engine::on_set_vsync(const SetVsyncEvent& e)
     {
         vsync = e.enabled;
@@ -903,6 +922,40 @@ namespace eeng
     {
         (void)e;
         set_mode(mode_ == EngineMode::Play ? EngineMode::Edit : EngineMode::Play);
+    }
+
+    void Engine::on_set_window_size(const SetWindowSizeEvent& e)
+    {
+        if (!window_ || e.width <= 0 || e.height <= 0)
+            return;
+
+        if (e.restore_if_maximized)
+        {
+            const Uint32 flags = SDL_GetWindowFlags(window_);
+            if (flags & SDL_WINDOW_MAXIMIZED)
+                SDL_RestoreWindow(window_);
+        }
+
+        SDL_SetWindowSize(window_, e.width, e.height);
+        if (e.center)
+            SDL_SetWindowPosition(window_, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+
+        update_window_size_from_sdl();
+    }
+
+    void Engine::on_toggle_window_maximize(const ToggleWindowMaximizeEvent& e)
+    {
+        (void)e;
+        if (!window_)
+            return;
+
+        const Uint32 flags = SDL_GetWindowFlags(window_);
+        if (flags & SDL_WINDOW_MAXIMIZED)
+            SDL_RestoreWindow(window_);
+        else
+            SDL_MaximizeWindow(window_);
+
+        update_window_size_from_sdl();
     }
 
     void Engine::on_resource_task_completed(const ResourceTaskCompletedEvent& e)

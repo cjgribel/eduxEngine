@@ -157,6 +157,14 @@ namespace eeng::ecs
 
         systems::PhysicsSystem* physics_system() { return physics_system_.get(); }
         const systems::PhysicsSystem* physics_system() const { return physics_system_.get(); }
+        systems::DebugRenderSettings* debug_render_settings()
+        {
+            return debug_render_system_ ? &debug_render_system_->settings : nullptr;
+        }
+        const systems::DebugRenderSettings* debug_render_settings() const
+        {
+            return debug_render_system_ ? &debug_render_system_->settings : nullptr;
+        }
 
     private:
         void update_common(EngineContext& ctx, float delta_time)

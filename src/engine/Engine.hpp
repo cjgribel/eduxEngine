@@ -161,6 +161,10 @@ namespace eeng
         void on_toggle_play_mode(const TogglePlayModeEvent& e);
         void on_resource_task_completed(const ResourceTaskCompletedEvent& e);
         void on_batch_task_completed(const BatchTaskCompletedEvent& e);
+        void on_set_window_size(const SetWindowSizeEvent& e);
+        void on_toggle_window_maximize(const ToggleWindowMaximizeEvent& e);
+
+        void update_window_size_from_sdl();
 
     };
 

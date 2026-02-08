@@ -35,6 +35,7 @@ namespace eeng
         void draw_scene_graph(EngineContext& ctx) const;
         void draw_animation_graph_visualizer(EngineContext& ctx) const;
         void draw_editor_controls(EngineContext& ctx) const;
+        void draw_main_menu(EngineContext& ctx) const;
 
         std::unordered_map<GuiFlags, bool> flags;
     };

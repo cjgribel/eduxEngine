@@ -50,6 +50,8 @@ bool Game::init()
     }
 
     runtime_pipeline_.init(*ctx);
+    if (ctx && ctx->services)
+        ctx->services->debug_render_settings = runtime_pipeline_.debug_render_settings();
     playerControllerSystem = std::make_unique<eeng::ecs::systems::MannequinPlayerControllerSystem>();
     if (playerControllerSystem)
         playerControllerSystem->set_physics_system(runtime_pipeline_.physics_system());
@@ -835,6 +837,11 @@ void Game::renderUI()
 
 void Game::destroy()
 {
+    if (ctx && ctx->services
+        && ctx->services->debug_render_settings == runtime_pipeline_.debug_render_settings())
+    {
+        ctx->services->debug_render_settings = nullptr;
+    }
     runtime_pipeline_.shutdown();
 }
 
