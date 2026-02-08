@@ -6,7 +6,11 @@
 #include "ImGuiHelpers.hpp"
 #include "ShapeRenderer.hpp"
 #include "glmcommon.hpp"
+#include "EngineContextHelpers.hpp"
+#include "hash_combine.h"
+#include "assets/types/ModelAssets.hpp"
 #include "ecs/HeaderComponent.hpp"
+#include "ecs/ModelComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/TransformComponent.hpp"
 
@@ -15,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -190,7 +195,6 @@ namespace eeng::ecs::systems
         const glm::mat4& VP_PROJ_V,
         int window_height) const
     {
-        (void)ctx; // Reserved for future debug render hooks.
         // --- Transform labels ------------------------------------------------
         if (settings.show_transform_labels)
         {
@@ -386,8 +390,8 @@ namespace eeng::ecs::systems
 
                 const glm::vec3 label_pos = com_pos + settings.rigidbody_label_offset;
 
-                if (settings.show_rigidbody_labels)
-                {
+        if (settings.show_rigidbody_labels)
+        {
                     char label[128];
                     std::snprintf(label, sizeof(label), "RB %s", motion_type_label(rb.motion));
 
@@ -407,6 +411,171 @@ namespace eeng::ecs::systems
 
             if (show_rigidbody_geom)
                 renderer.pop_xray();
+        }
+
+        // --- Skeleton debug -------------------------------------------------
+        if (settings.show_skeleton
+            || settings.show_skeleton_nodes
+            || settings.show_skeleton_axes
+            || settings.show_skeleton_labels)
+        {
+            auto rm = eeng::try_get_resource_manager(ctx, "DebugRenderSystem");
+            if (rm)
+            {
+                renderer.push_states(ShapeRendering::DepthTest::False);
+
+                auto view = registry.view<ecs::ModelComponent, ecs::TransformComponent>();
+                for (auto [entity, model, transform] : view.each())
+                {
+                    if (!model.model_ref.is_bound())
+                        continue;
+
+                    assets::GpuModelAsset gpu_model{};
+                    bool gpu_ready = false;
+                    const bool gpu_read = eeng::try_read_asset_ref(
+                        *rm,
+                        model.model_ref,
+                        ctx,
+                        "DebugRenderSystem",
+                        "Missing GpuModelAsset for skeleton debug:",
+                        [&](const assets::GpuModelAsset& gpu)
+                        {
+                            gpu_model = gpu;
+                            gpu_ready = (gpu.state == assets::GpuLoadState::Ready);
+                        });
+                    if (!gpu_read || !gpu_ready)
+                        continue;
+
+                    eeng::try_read_asset(
+                        *rm,
+                        gpu_model.model_ref.handle,
+                        gpu_model.model_ref.guid,
+                        ctx,
+                        "DebugRenderSystem",
+                        "Missing ModelDataAsset for skeleton debug:",
+                        [&](const assets::ModelDataAsset& cpu_model)
+                        {
+                            const size_t node_count = cpu_model.nodetree.size();
+                            if (node_count == 0)
+                                return;
+
+                            const glm::mat4* node_globals = nullptr;
+                            std::vector<glm::mat4> bind_globals;
+                            if (model.node_global_matrices.size() == node_count)
+                            {
+                                node_globals = model.node_global_matrices.data();
+                            }
+                            else
+                            {
+                                bind_globals.assign(node_count, glm::mat4(1.0f));
+                                cpu_model.nodetree.traverse_depthfirst(
+                                    [&](const assets::SkeletonNode* node,
+                                        const assets::SkeletonNode* parent,
+                                        size_t node_index,
+                                        size_t parent_index)
+                                    {
+                                        if (!node)
+                                            return;
+                                        glm::mat4 local = node->local_bind_tfm;
+                                        if (parent)
+                                            local = bind_globals[parent_index] * local;
+                                        bind_globals[node_index] = local;
+                                    });
+                                node_globals = bind_globals.data();
+                            }
+
+                            const glm::mat4 world = transform.world_matrix;
+                            const auto* header = registry.try_get<ecs::HeaderComponent>(entity);
+                            const size_t entity_hash = (header && header->guid.valid())
+                                ? std::hash<eeng::Guid>{}(header->guid)
+                                : static_cast<size_t>(entt::to_integral(entity));
+
+                            cpu_model.nodetree.traverse_depthfirst(
+                                [&](const assets::SkeletonNode* node,
+                                    const assets::SkeletonNode* parent,
+                                    size_t node_index,
+                                    size_t parent_index)
+                                {
+                                    if (!node)
+                                        return;
+
+                                    const bool is_bone = node->bone_index != assets::null_index;
+                                    if (settings.show_skeleton_bones_only && !is_bone)
+                                        return;
+
+                                    const glm::mat4 node_world = world * node_globals[node_index];
+                                    const glm::vec3 node_pos(node_world[3]);
+
+                                    if (parent && settings.show_skeleton)
+                                    {
+                                        const bool parent_is_bone = parent->bone_index != assets::null_index;
+                                        if (!settings.show_skeleton_bones_only || (is_bone && parent_is_bone))
+                                        {
+                                            const glm::mat4 parent_world = world * node_globals[parent_index];
+                                            const glm::vec3 parent_pos(parent_world[3]);
+                                            const std::uint32_t line_color = (is_bone && parent_is_bone)
+                                                ? settings.skeleton_bone_line_color
+                                                : settings.skeleton_line_color;
+                                            renderer.push_states(ShapeRendering::Color4u{ line_color });
+                                            renderer.push_line(parent_pos, node_pos);
+                                            renderer.pop_states<ShapeRendering::Color4u>();
+                                        }
+                                    }
+
+                                    if (settings.show_skeleton_nodes)
+                                    {
+                                        const std::uint32_t point_color = is_bone
+                                            ? settings.skeleton_bone_point_color
+                                            : settings.skeleton_node_point_color;
+                                        renderer.push_states(ShapeRendering::Color4u{ point_color });
+                                        renderer.push_point(node_pos, settings.skeleton_point_size);
+                                        renderer.pop_states<ShapeRendering::Color4u>();
+                                    }
+
+                                    if (settings.show_skeleton_axes)
+                                    {
+                                        renderer.push_basis_basic(node_world, settings.skeleton_axis_length);
+                                    }
+
+                                    if (settings.show_skeleton_labels)
+                                    {
+                                        char label[256];
+                                        if (node->bone_index != assets::null_index)
+                                        {
+                                            std::snprintf(label, sizeof(label), "%zu_%s (bone %d)",
+                                                node_index,
+                                                node->name.c_str(),
+                                                node->bone_index);
+                                        }
+                                        else
+                                        {
+                                            std::snprintf(label, sizeof(label), "%zu_%s",
+                                                node_index,
+                                                node->name.c_str());
+                                        }
+
+                                        const std::uint32_t label_bg = (node->bone_index != assets::null_index)
+                                            ? settings.skeleton_bone_label_bg_color
+                                            : settings.skeleton_node_label_bg_color;
+                                        const size_t label_hash = hash_combine(entity_hash, node_index);
+                                        const std::string window_name =
+                                            "SkeletonNodeLabel##" + std::to_string(label_hash);
+
+                                        eeng::gui::ImGuiPrintTextAt(
+                                            node_pos,
+                                            VP_PROJ_V,
+                                            window_height,
+                                            label,
+                                            window_name.c_str(),
+                                            label_bg,
+                                            settings.skeleton_label_text_color);
+                                    }
+                                });
+                        });
+                }
+
+                renderer.pop_states<ShapeRendering::DepthTest>();
+            }
         }
 
         // --- Spring-damper debug ------------------------------------------

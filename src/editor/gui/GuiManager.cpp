@@ -196,6 +196,16 @@ namespace eeng
                     ImGui::MenuItem("Constraint Anchor Points", nullptr, &debug_settings->show_constraint_points);
                     ImGui::MenuItem("Springs", nullptr, &debug_settings->show_springs);
                     ImGui::MenuItem("Demo Shapes", nullptr, &debug_settings->show_demo_shapes);
+
+                    if (ImGui::BeginMenu("Skeleton"))
+                    {
+                        ImGui::MenuItem("Lines", nullptr, &debug_settings->show_skeleton);
+                        ImGui::MenuItem("Nodes", nullptr, &debug_settings->show_skeleton_nodes);
+                        ImGui::MenuItem("Axes", nullptr, &debug_settings->show_skeleton_axes);
+                        ImGui::MenuItem("Labels", nullptr, &debug_settings->show_skeleton_labels);
+                        ImGui::MenuItem("Bones Only", nullptr, &debug_settings->show_skeleton_bones_only);
+                        ImGui::EndMenu();
+                    }
                 }
                 ImGui::EndMenu();
             }

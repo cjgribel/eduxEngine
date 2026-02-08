@@ -94,6 +94,22 @@ namespace eeng::ecs::systems
         // ShapeRenderer demo overlay (debug visualization).
         bool show_demo_shapes = true;
         glm::vec3 demo_shape_offset{ 0.0f, 0.0f, -5.0f };
+
+        // Skeleton debug overlays.
+        bool show_skeleton = false; // parent-child links
+        bool show_skeleton_nodes = false;
+        bool show_skeleton_axes = false;
+        bool show_skeleton_labels = false;
+        bool show_skeleton_bones_only = false;
+        std::uint32_t skeleton_line_color = 0xffff8080u;
+        std::uint32_t skeleton_bone_line_color = 0xff00ffffu;
+        std::uint32_t skeleton_node_point_color = 0xffff8080u;
+        std::uint32_t skeleton_bone_point_color = 0xff00ffffu;
+        std::uint32_t skeleton_label_text_color = 0xff000000u;
+        std::uint32_t skeleton_node_label_bg_color = 0x40ffffffu;
+        std::uint32_t skeleton_bone_label_bg_color = 0x4000ffffu;
+        unsigned skeleton_point_size = 4;
+        float skeleton_axis_length = 0.2f;
     };
 
     class DebugRenderSystem
