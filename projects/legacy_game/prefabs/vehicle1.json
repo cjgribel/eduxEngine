@@ -1,0 +1,2236 @@
+[
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 626903640556475674,
+        "Name": "VehicleRig1_Rig",
+        "Parent Entity": {
+          "Guid": 0
+        }
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "eeng.ecs.VehicleRig1RigComponent": {
+        "Chassis": {
+          "Guid": 14555815800865435559
+        },
+        "Steer Axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "Wheels": [
+          {
+            "Axle Axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Axle Hinge": {
+              "Guid": 687489078808892039
+            },
+            "Drive Direction": -1.0,
+            "Driven": true,
+            "Knuckle": {
+              "Guid": 11330587848818166398
+            },
+            "Mount Local": [
+              1.600000023841858,
+              0.0,
+              1.0
+            ],
+            "Rest Length": 0.8999999761581421,
+            "Steer Direction": 1.0,
+            "Steerable": true,
+            "Suspension 6DoF": {
+              "Guid": 14896956023938347534
+            },
+            "Suspension Axis": [
+              0.0,
+              -1.0,
+              0.0
+            ],
+            "Travel": 0.800000011920929,
+            "Wheel": {
+              "Guid": 7811888949423788917
+            },
+            "Wheel Anchor": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "Axle Axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Axle Hinge": {
+              "Guid": 1777411435621994383
+            },
+            "Drive Direction": -1.0,
+            "Driven": true,
+            "Knuckle": {
+              "Guid": 9506655933896292865
+            },
+            "Mount Local": [
+              1.600000023841858,
+              0.0,
+              -1.0
+            ],
+            "Rest Length": 0.8999999761581421,
+            "Steer Direction": 1.0,
+            "Steerable": true,
+            "Suspension 6DoF": {
+              "Guid": 13383637416448931854
+            },
+            "Suspension Axis": [
+              0.0,
+              -1.0,
+              0.0
+            ],
+            "Travel": 0.800000011920929,
+            "Wheel": {
+              "Guid": 14736693689343775678
+            },
+            "Wheel Anchor": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "Axle Axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Axle Hinge": {
+              "Guid": 16909958285310837291
+            },
+            "Drive Direction": 1.0,
+            "Driven": false,
+            "Knuckle": {
+              "Guid": 16469400261107955099
+            },
+            "Mount Local": [
+              -1.600000023841858,
+              0.0,
+              1.0
+            ],
+            "Rest Length": 0.8999999761581421,
+            "Steer Direction": 1.0,
+            "Steerable": false,
+            "Suspension 6DoF": {
+              "Guid": 10571760324487029418
+            },
+            "Suspension Axis": [
+              0.0,
+              -1.0,
+              0.0
+            ],
+            "Travel": 0.800000011920929,
+            "Wheel": {
+              "Guid": 8549126472779937123
+            },
+            "Wheel Anchor": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "Axle Axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Axle Hinge": {
+              "Guid": 7517710766600853018
+            },
+            "Drive Direction": 1.0,
+            "Driven": false,
+            "Knuckle": {
+              "Guid": 14706827957068036706
+            },
+            "Mount Local": [
+              -1.600000023841858,
+              0.0,
+              -1.0
+            ],
+            "Rest Length": 0.8999999761581421,
+            "Steer Direction": 1.0,
+            "Steerable": false,
+            "Suspension 6DoF": {
+              "Guid": 10518367177471573443
+            },
+            "Suspension Axis": [
+              0.0,
+              -1.0,
+              0.0
+            ],
+            "Travel": 0.800000011920929,
+            "Wheel": {
+              "Guid": 16012796036428914360
+            },
+            "Wheel Anchor": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      },
+      "eeng.legacy_game.VehicleRig1ControlComponent": {
+        "Brake Max Impulse": 200.0,
+        "Controller Id": -1,
+        "Drive Max Impulse": 150.0,
+        "Drive Velocity": 10.0,
+        "Enabled": true,
+        "Keyboard Fallback": true,
+        "Name": "VehicleRig1Control",
+        "Steer Limit": 0.800000011920929,
+        "Steer Max Impulse": 2000.0,
+        "Steer Speed": 6.0,
+        "Stick Deadzone": 0.10000000149011612,
+        "Trigger Deadzone": 0.05000000074505806
+      }
+    },
+    "entity_guid": 626903640556475674
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              1.600000023841858,
+              0.3499999940395355,
+              1.0
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": false,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.5,
+            "Submesh Index": -1,
+            "Type": "Box"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 14555815800865435559,
+        "Name": "VehicleRig1_Chassis",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.4000000059604645,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          3.741666555404663,
+          11.866667747497559,
+          8.941667556762695
+        ],
+        "Linear Damping": 0.20000000298023224,
+        "Mass": 10.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          1.0
+        ],
+        "Position": [
+          0.0,
+          2.0,
+          0.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 14555815800865435559
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": true,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.15000000596046448,
+            "Submesh Index": -1,
+            "Type": "Sphere"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 11330587848818166398,
+        "Name": "VehicleRig1_Knuckle_0",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.0,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          0.009000000543892384,
+          0.009000000543892384,
+          0.009000000543892384
+        ],
+        "Linear Damping": 0.0,
+        "Mass": 1.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.600000023841858,
+          1.100000023841858,
+          1.0,
+          1.0
+        ],
+        "Position": [
+          1.600000023841858,
+          1.100000023841858,
+          1.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.600000023841858,
+          1.100000023841858,
+          1.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 11330587848818166398
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": false,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.3499999940395355,
+            "Submesh Index": -1,
+            "Type": "Sphere"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 7811888949423788917,
+        "Name": "VehicleRig1_Wheel_0",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.0,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          0.04899999499320984,
+          0.04899999499320984,
+          0.04899999499320984
+        ],
+        "Linear Damping": 0.0,
+        "Mass": 1.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.600000023841858,
+          1.100000023841858,
+          1.0,
+          1.0
+        ],
+        "Position": [
+          1.600000023841858,
+          1.100000023841858,
+          1.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.600000023841858,
+          1.100000023841858,
+          1.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 7811888949423788917
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 14896956023938347534,
+        "Name": "VehicleRig1_Suspension6Dof_0",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.SixDofSpringConstraintComponent": {
+        "Angular Damping": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Max": [
+          0.800000011920929,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Min": [
+          -0.800000011920929,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Stiffness": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Disable Collisions": true,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 14555815800865435559
+        },
+        "Entity B": {
+          "Guid": 11330587848818166398
+        },
+        "Linear Damping": [
+          5.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Enabled": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Target": [
+          1.5,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Max": [
+          3.0,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Min": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Stiffness": [
+          500.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor A": [
+          1.600000023841858,
+          0.0,
+          1.0
+        ],
+        "Local Anchor B": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Rotation A": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ],
+        "Local Rotation B": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "entity_guid": 14896956023938347534
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 687489078808892039,
+        "Name": "VehicleRig1_AxleHinge_0",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.HingeConstraintComponent": {
+        "Disable Collisions": true,
+        "Enable Motor": false,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 11330587848818166398
+        },
+        "Entity B": {
+          "Guid": 7811888949423788917
+        },
+        "Limit Max": 0.0,
+        "Limit Min": 0.0,
+        "Local Anchor A": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor B": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Axis A": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Local Axis B": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Motor Max Impulse": 0.0,
+        "Motor Target Velocity": 0.0,
+        "Use Limits": false
+      }
+    },
+    "entity_guid": 687489078808892039
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": true,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.15000000596046448,
+            "Submesh Index": -1,
+            "Type": "Sphere"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 9506655933896292865,
+        "Name": "VehicleRig1_Knuckle_1",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.0,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          0.009000000543892384,
+          0.009000000543892384,
+          0.009000000543892384
+        ],
+        "Linear Damping": 0.0,
+        "Mass": 1.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.600000023841858,
+          1.100000023841858,
+          -1.0,
+          1.0
+        ],
+        "Position": [
+          1.600000023841858,
+          1.100000023841858,
+          -1.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.600000023841858,
+          1.100000023841858,
+          -1.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 9506655933896292865
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": false,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.3499999940395355,
+            "Submesh Index": -1,
+            "Type": "Sphere"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 14736693689343775678,
+        "Name": "VehicleRig1_Wheel_1",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.0,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          0.04899999499320984,
+          0.04899999499320984,
+          0.04899999499320984
+        ],
+        "Linear Damping": 0.0,
+        "Mass": 1.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.600000023841858,
+          1.100000023841858,
+          -1.0,
+          1.0
+        ],
+        "Position": [
+          1.600000023841858,
+          1.100000023841858,
+          -1.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.600000023841858,
+          1.100000023841858,
+          -1.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 14736693689343775678
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 13383637416448931854,
+        "Name": "VehicleRig1_Suspension6Dof_1",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.SixDofSpringConstraintComponent": {
+        "Angular Damping": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Max": [
+          0.800000011920929,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Min": [
+          -0.800000011920929,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Stiffness": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Disable Collisions": true,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 14555815800865435559
+        },
+        "Entity B": {
+          "Guid": 9506655933896292865
+        },
+        "Linear Damping": [
+          5.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Enabled": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Target": [
+          1.5,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Max": [
+          3.0,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Min": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Stiffness": [
+          500.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor A": [
+          1.600000023841858,
+          0.0,
+          -1.0
+        ],
+        "Local Anchor B": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Rotation A": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ],
+        "Local Rotation B": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "entity_guid": 13383637416448931854
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 1777411435621994383,
+        "Name": "VehicleRig1_AxleHinge_1",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.HingeConstraintComponent": {
+        "Disable Collisions": true,
+        "Enable Motor": false,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 9506655933896292865
+        },
+        "Entity B": {
+          "Guid": 14736693689343775678
+        },
+        "Limit Max": 0.0,
+        "Limit Min": 0.0,
+        "Local Anchor A": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor B": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Axis A": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Local Axis B": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Motor Max Impulse": 0.0,
+        "Motor Target Velocity": 0.0,
+        "Use Limits": false
+      }
+    },
+    "entity_guid": 1777411435621994383
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": true,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.15000000596046448,
+            "Submesh Index": -1,
+            "Type": "Sphere"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 16469400261107955099,
+        "Name": "VehicleRig1_Knuckle_2",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.0,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          0.009000000543892384,
+          0.009000000543892384,
+          0.009000000543892384
+        ],
+        "Linear Damping": 0.0,
+        "Mass": 1.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.600000023841858,
+          1.100000023841858,
+          1.0,
+          1.0
+        ],
+        "Position": [
+          -1.600000023841858,
+          1.100000023841858,
+          1.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.600000023841858,
+          1.100000023841858,
+          1.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 16469400261107955099
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": false,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.3499999940395355,
+            "Submesh Index": -1,
+            "Type": "Sphere"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 8549126472779937123,
+        "Name": "VehicleRig1_Wheel_2",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.0,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          0.04899999499320984,
+          0.04899999499320984,
+          0.04899999499320984
+        ],
+        "Linear Damping": 0.0,
+        "Mass": 1.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.600000023841858,
+          1.100000023841858,
+          1.0,
+          1.0
+        ],
+        "Position": [
+          -1.600000023841858,
+          1.100000023841858,
+          1.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.600000023841858,
+          1.100000023841858,
+          1.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 8549126472779937123
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 10571760324487029418,
+        "Name": "VehicleRig1_Suspension6Dof_2",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.SixDofSpringConstraintComponent": {
+        "Angular Damping": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Max": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Min": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Stiffness": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Disable Collisions": true,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 14555815800865435559
+        },
+        "Entity B": {
+          "Guid": 16469400261107955099
+        },
+        "Linear Damping": [
+          5.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Enabled": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Target": [
+          1.5,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Max": [
+          3.0,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Min": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Stiffness": [
+          500.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor A": [
+          -1.600000023841858,
+          0.0,
+          1.0
+        ],
+        "Local Anchor B": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Rotation A": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ],
+        "Local Rotation B": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "entity_guid": 10571760324487029418
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 16909958285310837291,
+        "Name": "VehicleRig1_AxleHinge_2",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.HingeConstraintComponent": {
+        "Disable Collisions": true,
+        "Enable Motor": false,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 16469400261107955099
+        },
+        "Entity B": {
+          "Guid": 8549126472779937123
+        },
+        "Limit Max": 0.0,
+        "Limit Min": 0.0,
+        "Local Anchor A": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor B": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Axis A": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Local Axis B": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Motor Max Impulse": 0.0,
+        "Motor Target Velocity": 0.0,
+        "Use Limits": false
+      }
+    },
+    "entity_guid": 16909958285310837291
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": true,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.15000000596046448,
+            "Submesh Index": -1,
+            "Type": "Sphere"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 14706827957068036706,
+        "Name": "VehicleRig1_Knuckle_3",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.0,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          0.009000000543892384,
+          0.009000000543892384,
+          0.009000000543892384
+        ],
+        "Linear Damping": 0.0,
+        "Mass": 1.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.600000023841858,
+          1.100000023841858,
+          -1.0,
+          1.0
+        ],
+        "Position": [
+          -1.600000023841858,
+          1.100000023841858,
+          -1.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.600000023841858,
+          1.100000023841858,
+          -1.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 14706827957068036706
+  },
+  {
+    "components": {
+      "eeng.ecs.ColliderComponent": {
+        "Colliders": [
+          {
+            "Half Extents": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "Height": 1.0,
+            "Id": 0,
+            "Is Trigger": false,
+            "Local Position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "Local Rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Mesh Ref": {
+              "Guid": 0
+            },
+            "Radius": 0.3499999940395355,
+            "Submesh Index": -1,
+            "Type": "Sphere"
+          }
+        ]
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 16012796036428914360,
+        "Name": "VehicleRig1_Wheel_3",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.RigidBodyComponent": {
+        "Allow Sleep": true,
+        "Angular Damping": 0.0,
+        "Auto Inertia": true,
+        "Auto Mass": false,
+        "CCD Radius": 0.0,
+        "CCD Threshold": 0.0,
+        "Density": 1.0,
+        "Enable CCD": false,
+        "Gravity Scale": 1.0,
+        "Inertia": [
+          0.04899999499320984,
+          0.04899999499320984,
+          0.04899999499320984
+        ],
+        "Linear Damping": 0.0,
+        "Mass": 1.0,
+        "Motion": "Dynamic"
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.600000023841858,
+          1.100000023841858,
+          -1.0,
+          1.0
+        ],
+        "Position": [
+          -1.600000023841858,
+          1.100000023841858,
+          -1.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.600000023841858,
+          1.100000023841858,
+          -1.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 16012796036428914360
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 10518367177471573443,
+        "Name": "VehicleRig1_Suspension6Dof_3",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.SixDofSpringConstraintComponent": {
+        "Angular Damping": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Max": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Min": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Stiffness": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Disable Collisions": true,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 14555815800865435559
+        },
+        "Entity B": {
+          "Guid": 14706827957068036706
+        },
+        "Linear Damping": [
+          5.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Enabled": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Target": [
+          1.5,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Max": [
+          3.0,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Min": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Stiffness": [
+          500.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor A": [
+          -1.600000023841858,
+          0.0,
+          -1.0
+        ],
+        "Local Anchor B": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Rotation A": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ],
+        "Local Rotation B": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "entity_guid": 10518367177471573443
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 7517710766600853018,
+        "Name": "VehicleRig1_AxleHinge_3",
+        "Parent Entity": {
+          "Guid": 626903640556475674
+        }
+      },
+      "eeng.ecs.HingeConstraintComponent": {
+        "Disable Collisions": true,
+        "Enable Motor": false,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 14706827957068036706
+        },
+        "Entity B": {
+          "Guid": 16012796036428914360
+        },
+        "Limit Max": 0.0,
+        "Limit Min": 0.0,
+        "Local Anchor A": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor B": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Axis A": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Local Axis B": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Motor Max Impulse": 0.0,
+        "Motor Target Velocity": 0.0,
+        "Use Limits": false
+      }
+    },
+    "entity_guid": 7517710766600853018
+  }
+]
