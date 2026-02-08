@@ -181,11 +181,19 @@ namespace eeng
                 }
                 else
                 {
+                    ImGui::MenuItem("Transform Labels", nullptr, &debug_settings->show_transform_labels);
                     ImGui::MenuItem("Colliders", nullptr, &debug_settings->show_colliders);
                     ImGui::MenuItem("Collider Labels", nullptr, &debug_settings->show_collider_labels);
+                    ImGui::MenuItem("RigidBody Labels", nullptr, &debug_settings->show_rigidbody_labels);
+                    ImGui::MenuItem("RigidBody COM", nullptr, &debug_settings->show_rigidbody_com);
                     ImGui::MenuItem("RigidBody Axes", nullptr, &debug_settings->show_rigidbody_axes);
+                    ImGui::MenuItem("RigidBody Offset Frame", nullptr, &debug_settings->show_rigidbody_offset);
                     ImGui::MenuItem("Raycasts", nullptr, &debug_settings->show_raycast_debug);
                     ImGui::MenuItem("Constraints", nullptr, &debug_settings->show_constraints);
+                    ImGui::MenuItem("Constraint Hinges", nullptr, &debug_settings->show_constraint_hinges);
+                    ImGui::MenuItem("Constraint Sliders", nullptr, &debug_settings->show_constraint_sliders);
+                    ImGui::MenuItem("Constraint 6DoF", nullptr, &debug_settings->show_constraint_6dof);
+                    ImGui::MenuItem("Constraint Anchor Points", nullptr, &debug_settings->show_constraint_points);
                     ImGui::MenuItem("Springs", nullptr, &debug_settings->show_springs);
                     ImGui::MenuItem("Demo Shapes", nullptr, &debug_settings->show_demo_shapes);
                 }
