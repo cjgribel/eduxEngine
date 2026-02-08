@@ -818,7 +818,11 @@ namespace eeng
 
         scene_splitter.draw_handle(pane_avail.y);
 
-        if (ImGui::BeginChild("InspectorRegion", ImVec2(0.0f, scene_splitter.bottom_height), true))
+        if (ImGui::BeginChild(
+                "InspectorRegion",
+                ImVec2(0.0f, scene_splitter.bottom_height),
+                true,
+                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
         {
             gui::EntityInspectorWidget inspector{ ctx };
             inspector.draw();

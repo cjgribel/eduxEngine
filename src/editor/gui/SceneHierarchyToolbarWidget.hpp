@@ -14,6 +14,7 @@
 #include "editor/ecs/FirstPersonCameraComponent.hpp"
 #include "editor/ecs/ThirdPersonCameraComponent.hpp"
 // #include "ecs/HeaderComponent.hpp"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <entt/entt.hpp>
@@ -39,7 +40,7 @@ namespace eeng::gui
         void draw()
         {
             draw_scene_actions_row();
-            draw_prefab_panel();
+            draw_prefab_row();
         }
 
         void draw_mode_row()
@@ -372,27 +373,17 @@ namespace eeng::gui
             return true;
         }
 
-        void draw_prefab_panel()
+        void draw_prefab_row()
         {
-            if (ImGui::CollapsingHeader("Prefabs", ImGuiTreeNodeFlags_DefaultOpen))
+            const auto prefab_root = get_prefab_root();
+            const bool has_prefab_root = !prefab_root.empty() && std::filesystem::exists(prefab_root);
+
+            static std::filesystem::path selected_prefab_path{};
+            static std::string selected_prefab_label{};
+            std::vector<std::filesystem::path> prefab_files;
+
+            if (has_prefab_root)
             {
-                const auto prefab_root = get_prefab_root();
-                if (prefab_root.empty() || !std::filesystem::exists(prefab_root))
-                {
-                    ImGui::TextDisabled("Prefabs folder not found.");
-                    return;
-                }
-
-                static bool spawn_under_selection = true;
-                ImGui::Checkbox("Spawn under selected entity", &spawn_under_selection);
-
-                const bool has_selection = ctx.entity_selection && !ctx.entity_selection->empty();
-                const bool can_spawn = static_cast<bool>(ctx.command_queue)
-                    && !(ctx.services && ctx.services->play_mode_active.load(std::memory_order_relaxed));
-
-                if (!can_spawn)
-                    ImGui::BeginDisabled();
-
                 for (const auto& entry : std::filesystem::directory_iterator(prefab_root))
                 {
                     if (!entry.is_regular_file())
@@ -400,28 +391,80 @@ namespace eeng::gui
                     const auto& path = entry.path();
                     if (path.extension() != ".json")
                         continue;
+                    prefab_files.push_back(path);
+                }
+                std::sort(prefab_files.begin(), prefab_files.end());
+            }
 
-                    const std::string label = path.filename().string();
-                    if (ImGui::Selectable(label.c_str()))
+            if (!selected_prefab_path.empty())
+            {
+                const auto it = std::find(prefab_files.begin(), prefab_files.end(), selected_prefab_path);
+                if (it == prefab_files.end())
+                {
+                    selected_prefab_path.clear();
+                    selected_prefab_label.clear();
+                }
+            }
+
+            ImGui::TextUnformatted("Prefab");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(220.0f);
+            const char* preview = selected_prefab_label.empty() ? "(none)" : selected_prefab_label.c_str();
+            if (ImGui::BeginCombo("##PrefabCombo", preview))
+            {
+                if (prefab_files.empty())
+                {
+                    ImGui::TextDisabled("(no prefabs)");
+                }
+                else
+                {
+                    for (const auto& path : prefab_files)
                     {
-                        nlohmann::json prefab_json;
-                        if (load_prefab_json(path, prefab_json))
+                        const std::string label = path.filename().string();
+                        const bool is_selected = (path == selected_prefab_path);
+                        if (ImGui::Selectable(label.c_str(), is_selected))
                         {
-                            ecs::Entity parent{};
-                            if (spawn_under_selection && has_selection)
-                                parent = ctx.entity_selection->last();
-                            editor::SceneActions::spawn_entity_branch_from_json(
-                                ctx,
-                                std::move(prefab_json),
-                                parent,
-                                true);
+                            selected_prefab_path = path;
+                            selected_prefab_label = label;
                         }
+                        if (is_selected)
+                            ImGui::SetItemDefaultFocus();
                     }
                 }
-
-                if (!can_spawn)
-                    ImGui::EndDisabled();
+                ImGui::EndCombo();
             }
+
+            static bool spawn_under_selection = true;
+            const bool has_selection = ctx.entity_selection && !ctx.entity_selection->empty();
+            const bool can_spawn = static_cast<bool>(ctx.command_queue)
+                && !(ctx.services && ctx.services->play_mode_active.load(std::memory_order_relaxed));
+
+            ImGui::SameLine();
+            const bool can_spawn_prefab = can_spawn && !selected_prefab_path.empty();
+            if (!can_spawn_prefab)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Spawn"))
+            {
+                nlohmann::json prefab_json;
+                if (load_prefab_json(selected_prefab_path, prefab_json))
+                {
+                    ecs::Entity parent{};
+                    if (spawn_under_selection && has_selection)
+                        parent = ctx.entity_selection->last();
+                    editor::SceneActions::spawn_entity_branch_from_json(
+                        ctx,
+                        std::move(prefab_json),
+                        parent,
+                        true);
+                }
+            }
+            if (!can_spawn_prefab)
+                ImGui::EndDisabled();
+
+            ImGui::SameLine();
+            ImGui::Checkbox("Under selection", &spawn_under_selection);
+            if (!has_prefab_root)
+                ImGui::TextDisabled("Prefabs folder not found.");
         }
     };
 

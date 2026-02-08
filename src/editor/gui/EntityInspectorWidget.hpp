@@ -7,11 +7,9 @@
 #include "editor/InspectorState.hpp"
 #include "engineapi/SelectionManager.hpp"
 #include "editor/EditorActions.hpp"
-#include "util/EventQueue.h"
 #include "meta/MetaInspect.hpp"      // for eeng::meta::inspect_entity
 #include "MetaLiterals.h"
 #include "MetaAux.h"
-#include "BatchRegistry.hpp"
 #include "ecs/EntityManager.hpp"
 #include "ecs/TransformComponent.hpp"
 //#include "FileManager.hpp"
@@ -27,11 +25,9 @@ namespace eeng::gui
     struct EntityInspectorWidget
     {
         EngineContext& ctx;
-        EventQueue& event_queue;
 
         EntityInspectorWidget(EngineContext& ctx)
             : ctx(ctx)
-            , event_queue(*ctx.event_queue)
         {
         }
 
@@ -62,111 +58,11 @@ namespace eeng::gui
                 selected_entity.has_id()&
                 registry_sp->valid(selected_entity);
 
-            // Batch info (lookup from loaded batches; unloaded membership is unknown here).
-            ImGui::TextUnformatted("Batch");
-            ImGui::SameLine();
-            {
-                std::string label = "(no selection)";
-
-                if (!entity_selection.empty())
-                {
-                    if (!ctx.batch_registry || !ctx.entity_manager)
-                    {
-                        label = "(no batch registry)";
-                    }
-                    else
-                    {
-                        auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
-                        auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
-                        const auto batches = br.list();
-
-                        std::vector<BatchId> seen_batches;
-                        int unresolved = 0;
-
-                        for (const auto& entity : entity_selection.get_all())
-                        {
-                            if (!entity.has_id() || !registry_sp->valid(entity))
-                            {
-                                ++unresolved;
-                                continue;
-                            }
-
-                            const auto entity_ref = em.get_entity_ref(entity);
-                            if (!entity_ref.guid.valid())
-                            {
-                                ++unresolved;
-                                continue;
-                            }
-
-                            bool found = false;
-                            for (const auto* batch : batches)
-                            {
-                                if (!batch || batch->state != BatchInfo::State::Loaded)
-                                    continue;
-
-                                const auto& live = batch->live;
-                                const auto it = std::find_if(live.begin(), live.end(),
-                                    [&](const ecs::EntityRef& er)
-                                    {
-                                        return er.guid == entity_ref.guid;
-                                    });
-
-                                if (it != live.end())
-                                {
-                                    found = true;
-                                    if (std::find(seen_batches.begin(), seen_batches.end(), batch->id) == seen_batches.end())
-                                        seen_batches.push_back(batch->id);
-                                }
-                            }
-
-                            if (!found)
-                                ++unresolved;
-                        }
-
-                        if (seen_batches.size() == 1 && unresolved == 0)
-                        {
-                            const auto batch_id = seen_batches.front();
-                            const BatchInfo* info = nullptr;
-                            for (const auto* batch : batches)
-                            {
-                                if (batch && batch->id == batch_id)
-                                {
-                                    info = batch;
-                                    break;
-                                }
-                            }
-                            if (info && !info->name.empty())
-                                label = info->name;
-                            else
-                                label = batch_id.to_string();
-                        }
-                        else if (seen_batches.empty())
-                        {
-                            label = "(unknown/unloaded)";
-                        }
-                        else
-                        {
-                            label = "Mixed";
-                        }
-                    }
-                }
-
-                ImGui::TextDisabled("%s", label.c_str());
-            }
-            ImGui::SameLine();
-            ImGui::BeginDisabled();
-            ImGui::Button("Go to batch");
-            ImGui::EndDisabled();
-            ImGui::Separator();
-
-            // --- Transform tools -------------------------------------------
-            ImGui::TextUnformatted("Transform");
             bool can_bake = selected_entity_valid && (selection_count == 1);
             if (can_bake)
             {
                 can_bake = registry_sp->all_of<ecs::TransformComponent>(selected_entity);
             }
-
             if (can_bake && ctx.entity_manager)
             {
                 auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
@@ -181,7 +77,7 @@ namespace eeng::gui
             }
 
             ImGui::BeginDisabled(!can_bake);
-            if (ImGui::Button("Bake Transform Branch"))
+            if (ImGui::Button("Bake Transform"))
             {
                 editor::SceneActions::bake_transform_branch(ctx, selected_entity);
             }
@@ -192,6 +88,21 @@ namespace eeng::gui
                     "Push this entity's local transform into its direct children,\n"
                     "then reset the local transform to identity. Undoable.");
             }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Components..."))
+            {
+                ImGui::OpenPopup("component_picker_popup");
+            }
+
+            ImGui::SameLine();
+            ImGui::BeginDisabled(); // TODO: script components are not wired yet.
+            ImGui::Button("Add Behavior");
+            ImGui::SameLine();
+            ImGui::Button("Remove Behavior");
+            ImGui::EndDisabled();
+
             ImGui::Separator();
 
             // --- Add / Remove Component ------------------------------------
@@ -251,13 +162,6 @@ namespace eeng::gui
 
             static entt::id_type selected_comp_id{};
             static ImGuiTextFilter comp_filter;
-
-            ImGui::TextUnformatted("Add/Remove Component");
-
-            if (ImGui::Button("Components..."))
-            {
-                ImGui::OpenPopup("component_picker_popup");
-            }
 
             if (ImGui::BeginPopup("component_picker_popup"))
             {
@@ -349,77 +253,9 @@ namespace eeng::gui
                 ImGui::EndPopup();
             }
 
-            // --- Add / Remove Behavior ------------------------------------
-            ImGui::BeginDisabled(); // TODO: script components are not wired yet.
-            ImGui::TextUnformatted("Add/Remove Behavior");
-            // Scripts combo (unchanged, just using ctx selection)
-            static std::string selected_script_path;
-#if 0
-            auto all_scripts = FileManager::GetFilesInFolder(script_dir, "lua");
-            {
-                const char* preview = selected_script_path.empty()
-                    ? ""
-                    : selected_script_path.c_str();
-
-                if (ImGui::BeginCombo("##addscriptcombo", preview))
-                {
-                    for (auto& script_path : all_scripts)
-                    {
-                        bool is_selected = (script_path == selected_script_path);
-
-                        if (ImGui::Selectable(script_path.c_str(), is_selected))
-                        {
-                            selected_script_path = script_path;
-                        }
-
-                        if (is_selected)
-                        {
-                            ImGui::SetItemDefaultFocus();
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-            }
-#endif
-
-            // Add script
-            ImGui::SameLine();
-            if (ImGui::Button("Add##addscript") &&
-                !selected_script_path.empty() &&
-                !entity_selection.empty())
-            {
-#if 0
-                AddScriptToEntitySelectionEvent event{
-                    selected_script_path,
-                    entity_selection
-                };
-                event_queue.enqueue_event(event);
-#endif
-            }
-
-            // Remove script (disabled)
-            ImGui::SameLine();
-            ImGui::BeginDisabled();
-            if (ImGui::Button("Remove##removescript") &&
-                !selected_script_path.empty() &&
-                !entity_selection.empty())
-            {
-#if 0
-                RemoveScriptFromEntitySelectionEvent event{
-                    selected_script_path,
-                    entity_selection
-                };
-                event_queue.enqueue_event(event);
-#endif
-            }
-            ImGui::EndDisabled();
-
-            ImGui::EndDisabled();
-
             // --- Component inspector --------------------------------------
-            // ImGui::SetNextItemOpen(true);
-            // if (ImGui::TreeNode("Components"))
-            // {
+            if (ImGui::BeginChild("InspectorTableRegion", ImVec2(0.0f, 0.0f), true))
+            {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
                 const ImGuiTableFlags flags =
                     ImGuiTableFlags_BordersV |
@@ -450,9 +286,9 @@ namespace eeng::gui
                     ImGui::EndTable();
                 }
 
-                // ImGui::TreePop();
                 ImGui::PopStyleVar();
-            // }
+            }
+            ImGui::EndChild();
 
             return mod;
         }
