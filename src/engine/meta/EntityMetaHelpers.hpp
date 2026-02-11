@@ -84,7 +84,7 @@ namespace eeng::meta
     }
 
     // 'bind_component_entity_refs'
-    // Not relevant for Asset types (assets not reference entities)
+    // Not relevant for Asset types (assets do not reference entities)
     template<typename T>
     // void bind_entity_refs(T& self, /*EntityManager& em,*/ EngineContext& ctx)
     void bind_entity_refs(entt::meta_any& any, EngineContext& ctx)
@@ -96,6 +96,14 @@ namespace eeng::meta
 
         visit_entity_refs(*self_ptr, [&](ecs::EntityRef& ref)
             {
+                // Backfill GUID from a live entity handle if missing.
+                if (!ref.guid.valid() && ref.entity.has_id())
+                {
+                    ecs::EntityRef resolved{};
+                    if (em.try_get_entity_ref(ref.entity, resolved))
+                        ref.guid = resolved.guid;
+                }
+
                 const Guid guid = ref.guid;
                 if (!guid.valid())
                 {

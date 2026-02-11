@@ -416,6 +416,11 @@ namespace eeng::gui
                 editor::AssetActions::import_animation_graph_mock(ctx);
             }
             ImGui::SameLine();
+            if (ImGui::Button("Import Graph (Piston)"))
+            {
+                editor::AssetActions::import_animation_graph_piston(ctx);
+            }
+            ImGui::SameLine();
             if (!unimport_enabled) ImGui::BeginDisabled();
             if (ImGui::Button("Unimport"))
             {

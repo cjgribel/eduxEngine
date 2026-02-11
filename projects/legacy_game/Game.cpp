@@ -15,10 +15,14 @@
 #include "ecs/VehicleRig1Builder.hpp"
 #include "ecs/VehicleRig1ControlComponent.hpp"
 #include "ecs/VehicleRig1Component.hpp"
+#include "ecs/PistonConstraintDriveComponent.hpp"
+#include "ecs/PistonInputComponent.hpp"
+#include "ecs/PistonAnimSyncComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/EntityManager.hpp"
 #include "editor/EditorActions.hpp"
+#include "editor/EntityPickerPopup.hpp"
 #include "engineapi/IInputManager.hpp"
 #include "meta/MetaAux.h"
 #include "meta/MetaSerialize.hpp"
@@ -56,6 +60,7 @@ bool Game::init()
     if (playerControllerSystem)
         playerControllerSystem->set_physics_system(runtime_pipeline_.physics_system());
     vehicleRig1ControlSystem = std::make_unique<eeng::ecs::systems::VehicleRig1ControlSystem>();
+    pistonInputSystem = std::make_unique<eeng::ecs::systems::PistonInputSystem>();
 
     // Prefer project config asset root when running inside the editor.
     std::filesystem::path assets_root = "assets";
@@ -206,6 +211,10 @@ void Game::update(
     if (play_mode && vehicleRig1ControlSystem)
     {
         vehicleRig1ControlSystem->update(registry, *ctx, deltaTime);
+    }
+    if (play_mode && pistonInputSystem)
+    {
+        pistonInputSystem->update(registry, *ctx, deltaTime);
     }
 
     update_active_camera_state();
@@ -588,7 +597,78 @@ void Game::spawn_vehicle_rig1_from_prefab()
         *ctx,
         std::move(prefab_json),
         eeng::ecs::Entity{},
-        true);
+        false);
+}
+
+void Game::ensure_piston_rig_config()
+{
+    if (piston_rig_spec_initialized_)
+        return;
+
+    reset_piston_rig_config();
+}
+
+void Game::reset_piston_rig_config()
+{
+    piston_rig_spec_initialized_ = true;
+    piston_rig_spec_ = {};
+    piston_rig_spec_.name_prefix = "Piston";
+    piston_rig_spec_.chunk_tag = "piston_rig";
+    piston_rig_spec_.position = { 0.0f, 2.0f, 0.0f };
+    piston_rig_spec_.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    piston_rig_spec_.anchor_local_a = { 0.0f, 0.0f, 0.0f };
+    piston_rig_spec_.anchor_local_b = { 1.0f, 0.0f, 0.0f };
+    piston_rig_spec_.use_sockets = true;
+    piston_rig_spec_.axis_local = { 1.0f, 0.0f, 0.0f };
+    piston_rig_spec_.disable_collisions = true;
+    piston_rig_spec_.stroke_min = 0.0f;
+    piston_rig_spec_.stroke_max = 1.0f;
+    piston_rig_spec_.max_force = 2000.0f;
+    piston_rig_spec_.max_velocity = 1.0f;
+    piston_rig_spec_.mode = 0;
+    piston_rig_spec_.target_extension = 0.0f;
+    piston_rig_spec_.lock_when_idle = true;
+}
+
+void Game::spawn_piston_rig_from_prefab()
+{
+    if (!ctx)
+        return;
+
+    ensure_piston_rig_config();
+
+    nlohmann::json prefab_json = eeng::ecs::build_piston_rig_prefab_json(
+        *ctx,
+        piston_rig_spec_);
+    if (!prefab_json.is_array() || prefab_json.empty())
+    {
+        EENG_LOG_WARN(ctx, "Piston rig prefab build failed: empty JSON.");
+        return;
+    }
+
+    // Inject piston input + animation sync on the rig root before spawning.
+    eeng::ecs::PistonInputComponent input{};
+    eeng::ecs::PistonAnimSyncComponent anim_sync{};
+
+    auto& root_json = prefab_json.front();
+    if (!root_json.contains("components") || !root_json["components"].is_object())
+        root_json["components"] = nlohmann::json::object();
+
+    const auto input_type = eeng::meta::get_meta_type_id_string<eeng::ecs::PistonInputComponent>();
+    root_json["components"][input_type] = eeng::meta::serialize_any(
+        entt::forward_as_meta(input),
+        eeng::meta::SerializationPurpose::file);
+
+    const auto sync_type = eeng::meta::get_meta_type_id_string<eeng::ecs::PistonAnimSyncComponent>();
+    root_json["components"][sync_type] = eeng::meta::serialize_any(
+        entt::forward_as_meta(anim_sync),
+        eeng::meta::SerializationPurpose::file);
+
+    eeng::editor::SceneActions::spawn_entity_branch_from_json(
+        *ctx,
+        std::move(prefab_json),
+        eeng::ecs::Entity{},
+        false);
 }
 
 void Game::renderUI()
@@ -596,6 +676,11 @@ void Game::renderUI()
     ImGui::Begin("Game Info");
 
     ImGui::Text("Drawcall count %i", drawcallCount);
+    const auto add_tooltip = [](const char* text)
+    {
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+            ImGui::SetTooltip("%s", text);
+    };
 
     if (ImGui::ColorEdit3("Light color",
         glm::value_ptr(pointlight.color),
@@ -668,11 +753,6 @@ void Game::renderUI()
     if (ImGui::CollapsingHeader("VehicleRig1 Rig", ImGuiTreeNodeFlags_DefaultOpen))
     {
         ensure_vehicle_rig1_config();
-        const auto add_tooltip = [](const char* text)
-        {
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-                ImGui::SetTooltip("%s", text);
-        };
 
         bool default_batch_loaded = false;
         if (ctx && ctx->batch_registry)
@@ -802,7 +882,9 @@ void Game::renderUI()
             {
                 auto& registry = ctx->entity_manager->registry();
                 auto view = registry.view<eeng::ecs::VehicleRig1ControlComponent, eeng::ecs::VehicleRig1RigComponent>();
-                rig_count = static_cast<int>(view.size_hint());
+                rig_count = 0;
+                for (auto it = view.begin(); it != view.end(); ++it)
+                    ++rig_count;
                 if (auto it = view.begin(); it != view.end())
                 {
                     const entt::entity control_entity = *it;
@@ -826,6 +908,151 @@ void Game::renderUI()
             else
             {
                 ImGui::TextDisabled("VehicleRig1 not spawned (or control missing)");
+            }
+
+            ImGui::TreePop();
+        }
+    }
+
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Piston Rig", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ensure_piston_rig_config();
+
+        if (ImGui::TreeNodeEx("Spawn", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::DragFloat3("Position", &piston_rig_spec_.position.x, 0.05f);
+            add_tooltip("World-space position for the piston rig root.");
+
+            if (ImGui::Button("Spawn Piston Rig"))
+                spawn_piston_rig_from_prefab();
+
+            ImGui::SameLine();
+            if (ImGui::Button("Reset Config"))
+                reset_piston_rig_config();
+
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Rig Config"))
+        {
+            ImGui::TextDisabled("Name prefix: %s", piston_rig_spec_.name_prefix.c_str());
+            ImGui::TextDisabled("Chunk tag: %s", piston_rig_spec_.chunk_tag.c_str());
+            ImGui::TextDisabled("Constraint: 6DoF distance (axis from anchors)");
+
+            if (ctx && ctx->entity_manager)
+            {
+                if (auto* em = dynamic_cast<eeng::EntityManager*>(ctx->entity_manager.get()))
+                {
+                    auto draw_entity_picker = [&](const char* label, eeng::ecs::EntityRef& ref, const char* popup_id)
+                    {
+                        ImGui::TextUnformatted(label);
+                        ImGui::SameLine();
+                        const std::string current_label = eeng::editor::detail::make_entity_label(*em, ref);
+                        if (ImGui::Button(current_label.c_str()))
+                            ImGui::OpenPopup(popup_id);
+                        if (eeng::editor::entity_picker_popup(popup_id, ref, *em))
+                        {
+                        }
+                    };
+
+                    draw_entity_picker("Body A", piston_rig_spec_.body_a, "piston_body_a_picker");
+                    draw_entity_picker("Body B", piston_rig_spec_.body_b, "piston_body_b_picker");
+                }
+            }
+
+            ImGui::DragFloat3("Anchor A local", &piston_rig_spec_.anchor_local_a.x, 0.02f);
+            add_tooltip("Anchor offset: root-local when sockets are off, target-local when sockets are on.");
+            ImGui::DragFloat3("Anchor B local", &piston_rig_spec_.anchor_local_b.x, 0.02f);
+            add_tooltip("Anchor offset: root-local when sockets are off, target-local when sockets are on.");
+            ImGui::DragFloat3("Axis local", &piston_rig_spec_.axis_local.x, 0.02f);
+            add_tooltip("Root-local axis used by the drive and alignment.");
+
+            ImGui::Checkbox("Use sockets", &piston_rig_spec_.use_sockets);
+            add_tooltip("Attach anchor entities via sockets instead of reparenting.");
+
+            ImGui::Checkbox("Disable collisions", &piston_rig_spec_.disable_collisions);
+            add_tooltip("Disable collision response between constrained bodies.");
+
+            ImGui::DragFloat("Stroke min", &piston_rig_spec_.stroke_min, 0.01f, -10.0f, 10.0f);
+            add_tooltip("Minimum extension along the axis.");
+            ImGui::DragFloat("Stroke max", &piston_rig_spec_.stroke_max, 0.01f, -10.0f, 10.0f);
+            add_tooltip("Maximum extension along the axis.");
+
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Drive Config"))
+        {
+            ImGui::DragFloat("Max force", &piston_rig_spec_.max_force, 10.0f, 0.0f, 100000.0f);
+            add_tooltip("Max motor impulse/force.");
+            ImGui::DragFloat("Max velocity", &piston_rig_spec_.max_velocity, 0.1f, 0.0f, 1000.0f);
+            add_tooltip("Max linear velocity (units/sec).");
+
+            static const char* kModes[] = { "Hold", "Extend", "Contract", "Position" };
+            ImGui::Combo("Mode", &piston_rig_spec_.mode, kModes, IM_ARRAYSIZE(kModes));
+            add_tooltip("Hold locks at current extension, Extend/Contract drives to limits.");
+
+            if (piston_rig_spec_.mode == 3)
+            {
+                ImGui::DragFloat("Target extension", &piston_rig_spec_.target_extension, 0.01f, 0.0f, 1.0f);
+                add_tooltip("Normalized [0,1] position within the stroke.");
+            }
+
+            ImGui::Checkbox("Lock when idle", &piston_rig_spec_.lock_when_idle);
+            add_tooltip("Keep constraint locked when not driving.");
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Live Control (Play)"))
+        {
+            eeng::ecs::PistonConstraintDriveComponent* live = nullptr;
+            int rig_count = 0;
+            if (ctx && ctx->entity_manager)
+            {
+                auto& registry = ctx->entity_manager->registry();
+                auto view = registry.view<eeng::ecs::PistonConstraintDriveComponent>();
+                rig_count = 0;
+                for (auto it = view.begin(); it != view.end(); ++it)
+                    ++rig_count;
+                if (auto it = view.begin(); it != view.end())
+                {
+                    const entt::entity drive_entity = *it;
+                    live = registry.try_get<eeng::ecs::PistonConstraintDriveComponent>(drive_entity);
+                }
+            }
+
+            if (!live)
+            {
+                ImGui::TextDisabled("No piston rigs found.");
+            }
+            else
+            {
+                ImGui::Text("Active rigs: %d (editing first)", rig_count);
+                ImGui::Text("Current pos/ext: %.3f / %.3f", live->current_position, live->current_extension);
+
+                ImGui::DragFloat("Stroke min##piston_live", &live->stroke_min, 0.01f, -10.0f, 10.0f);
+                add_tooltip("Minimum extension along the axis.");
+                ImGui::DragFloat("Stroke max##piston_live", &live->stroke_max, 0.01f, -10.0f, 10.0f);
+                add_tooltip("Maximum extension along the axis.");
+
+                ImGui::DragFloat("Max force##piston_live", &live->max_force, 10.0f, 0.0f, 100000.0f);
+                add_tooltip("Max motor impulse/force.");
+                ImGui::DragFloat("Max velocity##piston_live", &live->max_velocity, 0.1f, 0.0f, 1000.0f);
+                add_tooltip("Max linear velocity (units/sec).");
+
+                static const char* kLiveModes[] = { "Hold", "Extend", "Contract", "Position" };
+                ImGui::Combo("Mode##piston_live", &live->mode, kLiveModes, IM_ARRAYSIZE(kLiveModes));
+                add_tooltip("Hold locks at current extension, Extend/Contract drives to limits.");
+
+                if (live->mode == 3)
+                {
+                    ImGui::DragFloat("Target extension##piston_live", &live->target_extension, 0.01f, 0.0f, 1.0f);
+                    add_tooltip("Normalized [0,1] position within the stroke.");
+                }
+
+                ImGui::Checkbox("Lock when idle##piston_live", &live->lock_when_idle);
+                add_tooltip("Keep constraint locked when not driving.");
             }
 
             ImGui::TreePop();

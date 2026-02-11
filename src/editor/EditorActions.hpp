@@ -67,6 +67,12 @@ namespace eeng::editor
             std::string graph_name = "UE_Mannequin",
             std::string clip_name = "idle");
 
+        /// @brief Create a piston animation graph template (single clip scrub).
+        static void import_animation_graph_piston(
+            EngineContext& ctx,
+            std::string graph_name = "PistonGraph",
+            std::string clip_name = "Piston");
+
         /// @brief Queue an undoable unimport by GUID (serialized on RM strand).
         static void unimport_assets(
             EngineContext& ctx,

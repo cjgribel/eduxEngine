@@ -828,6 +828,91 @@ namespace eeng::editor
             ctx);
     }
 
+    void AssetActions::import_animation_graph_piston(
+        EngineContext& ctx,
+        std::string graph_name,
+        std::string clip_name)
+    {
+        if (!can_queue_action(ctx, "ImportAnimationGraphPiston"))
+            return;
+
+        if (graph_name.empty() || clip_name.empty())
+        {
+            EENG_LOG_WARN(&ctx, "Piston animation graph import skipped: missing name or clip.");
+            return;
+        }
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+            return;
+
+        auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+        const auto& assets_root = rm.assets_root();
+        if (assets_root.empty())
+        {
+            EENG_LOG_WARN(&ctx, "Piston animation graph import skipped: assets root not set.");
+            return;
+        }
+
+        assets::AnimationGraphAsset graph{};
+        graph.version = 1;
+        graph.name = graph_name;
+
+        assets::AnimGraphLayer layer{};
+        layer.name = "Base";
+        layer.weight = 1.0f;
+        layer.blend_mode = assets::AnimGraphBlendMode::Override;
+        layer.entry_state = "Piston";
+
+        assets::AnimGraphState state{};
+        state.id = "Piston";
+        state.type = assets::AnimGraphStateType::Clip;
+        state.clip = clip_name;
+        state.playback = assets::AnimGraphPlaybackMode::Clamp;
+        state.speed = 0.0f; // Driven externally via state_time.
+        layer.states.push_back(std::move(state));
+
+        graph.layers.push_back(std::move(layer));
+
+        AssetMetaData meta{};
+        meta.guid = Guid::generate();
+        meta.guid_parent = Guid::invalid();
+        meta.name = graph_name;
+        meta.type_id = "assets.AnimationGraphAsset";
+
+        const auto graph_dir = assets_root / "graphs";
+        const auto asset_path = graph_dir / (graph_name + ".json");
+        const auto meta_path = graph_dir / (graph_name + ".meta.json");
+
+        rm.queue_import_job(
+            [graph = std::move(graph), meta = std::move(meta), asset_path, meta_path, assets_root]
+            (ResourceManager& rm, EngineContext& ctx) mutable -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Import;
+                try
+                {
+                    std::filesystem::create_directories(asset_path.parent_path());
+                    if (std::filesystem::exists(asset_path) || std::filesystem::exists(meta_path))
+                        throw std::runtime_error("Animation graph already exists: " + asset_path.string());
+
+                    rm.import(graph, asset_path.string(), meta, meta_path.string());
+                    rm.scan_assets_async(assets_root, ctx);
+                    res.add_result(meta.guid, true, "Import ok");
+                }
+                catch (const std::exception& ex)
+                {
+                    res.add_result(meta.guid, false, ex.what());
+                }
+                catch (...)
+                {
+                    res.add_result(meta.guid, false, "unknown exception in import job");
+                }
+                return res;
+            },
+            ctx);
+    }
+
     void AssetActions::unimport_assets(EngineContext& ctx, std::vector<Guid> roots)
     {
         if (roots.empty())

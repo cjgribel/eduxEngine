@@ -10,6 +10,7 @@
 #include "LogMacros.h"
 #include "ecs/MannequinPlayerControllerComponent.hpp"
 #include "ecs/VehicleRig1ControlComponent.hpp"
+#include "ecs/PistonInputComponent.hpp"
 
 #include <entt/entt.hpp>
 #include <type_traits>
@@ -199,6 +200,46 @@ namespace eeng::legacy_game
                 .traits(MetaFlags::none)
                 ;
             register_component<eeng::ecs::VehicleRig1ControlComponent>();
+        }
+
+        // --- PistonInputComponent ------------------------------------------
+        {
+            entt::meta_factory<eeng::ecs::PistonInputComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{
+                .id = "eeng.legacy_game.PistonInputComponent",
+                .name = "PistonInputComponent",
+                .tooltip = "Input-driven extend/contract control for piston rigs." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::PistonInputComponent::name>("name"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Component name." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::PistonInputComponent::enabled>("enabled"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable piston input control." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::PistonInputComponent::controller_id>("controller_id"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "controller_id", "Controller Id", "Controller instance id (-1 = first connected)." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::PistonInputComponent::use_keyboard_fallback>("use_keyboard_fallback"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "use_keyboard_fallback", "Keyboard Fallback", "Use keyboard when no controller is active." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::PistonInputComponent::trigger_deadzone>("trigger_deadzone"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "trigger_deadzone", "Trigger Deadzone", "Deadzone for controller triggers." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::PistonInputComponent::input_deadzone>("input_deadzone"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "input_deadzone", "Input Deadzone", "Deadzone for extend/contract input." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::PistonInputComponent::drive_input>("drive_input"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "drive_input", "Drive Input", "Last sampled input (debug)." })
+                .traits(MetaFlags::readonly_inspection)
+                ;
+            register_component<eeng::ecs::PistonInputComponent>();
         }
     }
 }

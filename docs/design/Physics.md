@@ -27,12 +27,21 @@
 - Cache computed `mass`/`inertia`/`com_local_*` for inspector + debug drawing.
 
 ## Constraints (Current Setup)
-- Constraint components live on manager entities and reference `entity_a` + `entity_b` (both must be bound and have Transform + RigidBody).
+- Constraint components live on manager entities and reference `entity_a` + `entity_b` (both must be bound).
 - ConstraintSystem scans the registry each frame, creates or updates Bullet constraints via PhysicsSystem, and destroys stale ones (handle map per constraint entity).
-- Anchors/axes are authored in each entity's local space (scaled by Transform); PhysicsSystem converts them into the body COM frame via `com_local_inverse`.
+- Constraint creation requires both sides to have Transform + RigidBody; missing bodies are ignored.
+- Anchors are authored in each entity's local space (scaled by Transform); axes are authored as unit directions in local space. PhysicsSystem converts anchors/frames into the body COM frame via `com_local_inverse`.
 - Supported types: point-to-point, hinge, slider, and 6DoF spring; motors/limits/springs are component fields.
 - Debug rendering visualizes anchors, axes, and limits; x-ray pass is opt-in per draw call.
 - World-point constraints are not supported yet (both entity refs must be bound).
+
+### Piston Rig (Distance Constraint)
+- Piston rigs always use a 6DoF constraint driven by two anchor entities.
+- Each frame, the constraint frame X axis is recomputed from anchor A -> B (distance-constraint behavior).
+- Linear limits constrain only X (stroke range); Y/Z are effectively free; angular limits are wide open (ball-joint feel).
+- The drive motor applies force along X; all other motion is unconstrained.
+- Optional: `PistonAnimSyncComponent` scrubs a clip on a target AnimationGraphComponent using the current extension.
+- If `PistonAnimSyncComponent.target` is unbound, the system auto-finds the first descendant with `AnimationGraphComponent` + `ModelComponent` and binds it (play mode). Leave `clip_name` empty to use the graph’s clip.
 
 ## TODO
 
@@ -53,6 +62,7 @@
 - [ ] Blend window for animation-driven -> physics-driven ragdoll transitions.
 - [ ] Per-collider density/weighting (instead of uniform density).
 - [ ] World-point constraints (allow unbound entity refs for static anchors).
+- [ ] Split animation evaluation into pre/post-physics phases to support animation-driven physics (kinematic/root motion) alongside physics-driven visuals.
 
 ### Later
 - [ ] (Optimization) BodyRuntime allocations -> RigidBodyRuntimePool

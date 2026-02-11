@@ -91,6 +91,15 @@ namespace eeng::ecs::systems
         int constraint_limit_segments = 24;
         float constraint_frame_axis_length = 0.25f;
 
+        // Two-anchor alignment visualization.
+        bool show_two_anchor_align = true;
+        std::uint32_t two_anchor_line_color = 0xff9090ffu;
+        std::uint32_t two_anchor_anchor_a_color = 0xff40ff40u;
+        std::uint32_t two_anchor_anchor_b_color = 0xffff4040u;
+        std::uint32_t two_anchor_up_color = 0xffffff40u;
+        float two_anchor_up_length = 0.25f;
+        unsigned two_anchor_point_size = 6;
+
         // ShapeRenderer demo overlay (debug visualization).
         bool show_demo_shapes = true;
         glm::vec3 demo_shape_offset{ 0.0f, 0.0f, -5.0f };

@@ -1591,6 +1591,29 @@ namespace eeng::ecs::systems
         if (!constraint)
             return false;
 
+        auto it_a = bodies_.find(desc.entity_a);
+        if (it_a == bodies_.end() || !it_a->second.body)
+            return false;
+        auto it_b = bodies_.find(desc.entity_b);
+        if (it_b == bodies_.end() || !it_b->second.body)
+            return false;
+
+        {
+            btTransform frame_a;
+            frame_a.setIdentity();
+            frame_a.setOrigin(to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter));
+            frame_a.setBasis(basis_from_axis(to_bt_dir(desc.local_axis_a)));
+            frame_a = it_a->second.com_local_inverse * frame_a;
+
+            btTransform frame_b;
+            frame_b.setIdentity();
+            frame_b.setOrigin(to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter));
+            frame_b.setBasis(basis_from_axis(to_bt_dir(desc.local_axis_b)));
+            frame_b = it_b->second.com_local_inverse * frame_b;
+
+            constraint->setFrames(frame_a, frame_b);
+        }
+
         constraint->setLowerLinLimit(desc.linear_limit_min * world_.meters_per_unit());
         constraint->setUpperLinLimit(desc.linear_limit_max * world_.meters_per_unit());
         constraint->setLowerAngLimit(desc.angular_limit_min);
@@ -1598,6 +1621,12 @@ namespace eeng::ecs::systems
         constraint->setPoweredLinMotor(desc.enable_linear_motor);
         constraint->setTargetLinMotorVelocity(desc.linear_motor_target_velocity * world_.meters_per_unit());
         constraint->setMaxLinMotorForce(desc.linear_motor_max_force);
+
+        if (desc.enable_linear_motor && desc.linear_motor_max_force > 0.0f)
+        {
+            it_a->second.body->activate(true);
+            it_b->second.body->activate(true);
+        }
         return true;
     }
 
@@ -1615,6 +1644,29 @@ namespace eeng::ecs::systems
         auto* constraint = static_cast<btGeneric6DofSpring2Constraint*>(it->second.constraint.get());
         if (!constraint)
             return false;
+
+        auto it_a = bodies_.find(desc.entity_a);
+        if (it_a == bodies_.end() || !it_a->second.body)
+            return false;
+        auto it_b = bodies_.find(desc.entity_b);
+        if (it_b == bodies_.end() || !it_b->second.body)
+            return false;
+
+        {
+            btTransform frame_a;
+            frame_a.setIdentity();
+            frame_a.setOrigin(to_bt_vec3(desc.local_anchor_a, settings_.units_per_meter));
+            frame_a.setRotation(to_bt_quat(desc.local_rotation_a));
+            frame_a = it_a->second.com_local_inverse * frame_a;
+
+            btTransform frame_b;
+            frame_b.setIdentity();
+            frame_b.setOrigin(to_bt_vec3(desc.local_anchor_b, settings_.units_per_meter));
+            frame_b.setRotation(to_bt_quat(desc.local_rotation_b));
+            frame_b = it_b->second.com_local_inverse * frame_b;
+
+            constraint->setFrames(frame_a, frame_b);
+        }
 
         constraint->setLinearLowerLimit(to_bt_vec3(desc.linear_limit_min, settings_.units_per_meter));
         constraint->setLinearUpperLimit(to_bt_vec3(desc.linear_limit_max, settings_.units_per_meter));
@@ -1678,6 +1730,27 @@ namespace eeng::ecs::systems
             constraint->setMaxMotorForce(motor_axis, desc.angular_motor_max_force[axis]);
             if (servo)
                 constraint->setServoTarget(motor_axis, desc.angular_servo_target[axis]);
+        }
+
+        bool wake_bodies = false;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const bool enable = desc.linear_motor_enabled[axis] > 0.5f
+                || desc.linear_servo_enabled[axis] > 0.5f
+                || desc.angular_motor_enabled[axis] > 0.5f
+                || desc.angular_servo_enabled[axis] > 0.5f;
+            const bool has_force = desc.linear_motor_max_force[axis] > 0.0f
+                || desc.angular_motor_max_force[axis] > 0.0f;
+            if (enable && has_force)
+            {
+                wake_bodies = true;
+                break;
+            }
+        }
+        if (wake_bodies)
+        {
+            it_a->second.body->activate(true);
+            it_b->second.body->activate(true);
         }
         return true;
     }

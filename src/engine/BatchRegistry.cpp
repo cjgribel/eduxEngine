@@ -536,6 +536,14 @@ namespace eeng
             if (!registry_sptr)
                 return nlohmann::json::array();
 
+            // Pre-snapshot bind: upgrade any live-only EntityRefs to GUIDs before serialization.
+            for (const auto& er : snapshot_info.live)
+            {
+                if (!er.is_bound())
+                    continue;
+                eeng::meta::bind_entity_refs_for_entity(er.entity, ctx);
+            }
+
             for (const auto& er : snapshot_info.live)
             {
                 if (!er.is_bound())

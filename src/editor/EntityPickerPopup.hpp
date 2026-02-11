@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ecs/EntityManager.hpp"
+#include "ecs/HeaderComponent.hpp"
 #include "Guid.h"
 
 #include <algorithm>

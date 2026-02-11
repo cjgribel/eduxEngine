@@ -254,6 +254,7 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/FirstPersonCameraSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ecs/EditorCameraSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/projects/legacy_game/ecs/systems/VehicleRig1ControlSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/projects/legacy_game/ecs/systems/PistonInputSystem.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -293,13 +294,18 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/HeaderComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/StickyNoteComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/VehicleRig1Builder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/PistonRigBuilder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/CoreComponents.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/RenderSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/projects/legacy_game/ecs/systems/MannequinPlayerControllerSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/AnimationSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/AnimationGraphSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/TransformSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/TransformSocketSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/ConstraintSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/PistonConstraintDriveSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/PistonAnimSyncSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/TwoAnchorAlignSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/MousePointConstraintSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/DebugRenderSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/PhysicsSystem.cpp

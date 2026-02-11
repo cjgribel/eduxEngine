@@ -12,6 +12,7 @@
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
+#include "ecs/TwoAnchorAlignComponent.hpp"
 #include "ecs/TransformComponent.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -158,9 +159,9 @@ namespace eeng::ecs::systems
             const glm::vec3& max_local)
         {
             const auto to_world = [&](float x, float y, float z)
-            {
-                return center + basis * glm::vec3(x, y, z);
-            };
+                {
+                    return center + basis * glm::vec3(x, y, z);
+                };
 
             const glm::vec3 c000 = to_world(min_local.x, min_local.y, min_local.z);
             const glm::vec3 c100 = to_world(max_local.x, min_local.y, min_local.z);
@@ -390,8 +391,8 @@ namespace eeng::ecs::systems
 
                 const glm::vec3 label_pos = com_pos + settings.rigidbody_label_offset;
 
-        if (settings.show_rigidbody_labels)
-        {
+                if (settings.show_rigidbody_labels)
+                {
                     char label[128];
                     std::snprintf(label, sizeof(label), "RB %s", motion_type_label(rb.motion));
 
@@ -592,39 +593,39 @@ namespace eeng::ecs::systems
             };
 
             auto resolve_anchor = [&](const ecs::EntityRef& entity_ref,
-                                      const glm::vec3& local_anchor,
-                                      ecs::SpringAnchorSpace anchor_space) -> AnchorInfo
-            {
-                AnchorInfo info{};
-                if (!entity_ref.is_bound())
-                    return info;
-
-                const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
-                info.entity = body_entity;
-
-                if (!registry.valid(body_entity))
-                    return info;
-
-                const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
-                if (!tfm)
-                    return info;
-
-                const auto* rb = registry.try_get<ecs::RigidBodyComponent>(body_entity);
-                info.has_body = (rb != nullptr);
-
-                if (rb && anchor_space == ecs::SpringAnchorSpace::Body)
+                const glm::vec3& local_anchor,
+                ecs::SpringAnchorSpace anchor_space) -> AnchorInfo
                 {
-                    const glm::mat4 com_world = rigidbody_com_world_transform(*tfm, *rb);
-                    info.anchor_world = glm::vec3(com_world * glm::vec4(local_anchor * tfm->scale, 1.0f));
-                }
-                else
-                {
-                    info.anchor_world = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
-                }
+                    AnchorInfo info{};
+                    if (!entity_ref.is_bound())
+                        return info;
 
-                info.valid = true;
-                return info;
-            };
+                    const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
+                    info.entity = body_entity;
+
+                    if (!registry.valid(body_entity))
+                        return info;
+
+                    const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
+                    if (!tfm)
+                        return info;
+
+                    const auto* rb = registry.try_get<ecs::RigidBodyComponent>(body_entity);
+                    info.has_body = (rb != nullptr);
+
+                    if (rb && anchor_space == ecs::SpringAnchorSpace::Body)
+                    {
+                        const glm::mat4 com_world = rigidbody_com_world_transform(*tfm, *rb);
+                        info.anchor_world = glm::vec3(com_world * glm::vec4(local_anchor * tfm->scale, 1.0f));
+                    }
+                    else
+                    {
+                        info.anchor_world = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
+                    }
+
+                    info.valid = true;
+                    return info;
+                };
 
             auto view = registry.view<ecs::SpringDamperComponent>();
             for (const auto entity : view)
@@ -718,25 +719,25 @@ namespace eeng::ecs::systems
         if (settings.show_constraints)
         {
             auto resolve_anchor = [&](const ecs::EntityRef& entity_ref,
-                                      const glm::vec3& local_anchor,
-                                      glm::vec3& out_anchor,
-                                      const ecs::TransformComponent*& out_tfm) -> bool
-            {
-                if (!entity_ref.is_bound())
-                    return false;
+                const glm::vec3& local_anchor,
+                glm::vec3& out_anchor,
+                const ecs::TransformComponent*& out_tfm) -> bool
+                {
+                    if (!entity_ref.is_bound())
+                        return false;
 
-                const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
-                if (!registry.valid(body_entity))
-                    return false;
+                    const entt::entity body_entity = static_cast<entt::entity>(entity_ref.entity);
+                    if (!registry.valid(body_entity))
+                        return false;
 
-                const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
-                if (!tfm)
-                    return false;
+                    const auto* tfm = registry.try_get<ecs::TransformComponent>(body_entity);
+                    if (!tfm)
+                        return false;
 
-                out_anchor = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
-                out_tfm = tfm;
-                return true;
-            };
+                    out_anchor = glm::vec3(tfm->world_matrix * glm::vec4(local_anchor, 1.0f));
+                    out_tfm = tfm;
+                    return true;
+                };
 
             renderer.push_xray();
             renderer.push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 2.0f });
@@ -1037,6 +1038,83 @@ namespace eeng::ecs::systems
                         renderer.pop_states<ShapeRendering::Color4u>();
                     }
                 }
+            }
+
+            renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();
+            renderer.pop_xray();
+        }
+
+        // --- Two-anchor alignment debug -----------------------------------
+        if (settings.show_two_anchor_align)
+        {
+            renderer.push_xray();
+            renderer.push_states(ShapeRendering::LineType::Thick, ShapeRendering::LineStyle{ 3.0f });
+
+            auto view = registry.view<ecs::TwoAnchorAlignComponent>();
+            for (const auto entity : view)
+            {
+                const auto& align = view.get<ecs::TwoAnchorAlignComponent>(entity);
+                if (!align.enabled)
+                    continue;
+
+                if (!align.anchor_a.is_bound() || !align.anchor_b.is_bound())
+                    continue;
+
+                const entt::entity anchor_a_entity = static_cast<entt::entity>(align.anchor_a.entity);
+                const entt::entity anchor_b_entity = static_cast<entt::entity>(align.anchor_b.entity);
+                if (!registry.valid(anchor_a_entity) || !registry.valid(anchor_b_entity))
+                    continue;
+
+                const auto* tfm_a = registry.try_get<ecs::TransformComponent>(anchor_a_entity);
+                const auto* tfm_b = registry.try_get<ecs::TransformComponent>(anchor_b_entity);
+                if (!tfm_a || !tfm_b)
+                    continue;
+
+                const glm::vec3 anchor_a = glm::vec3(tfm_a->world_matrix[3]);
+                const glm::vec3 anchor_b = glm::vec3(tfm_b->world_matrix[3]);
+                const glm::vec3 delta = anchor_b - anchor_a;
+                const glm::vec3 forward = safe_normalize(delta);
+                if (glm::dot(forward, forward) <= 1e-6f)
+                    continue;
+
+                renderer.push_states(ShapeRendering::Color4u{ settings.two_anchor_line_color });
+                renderer.push_line(anchor_a, anchor_b);
+                renderer.pop_states<ShapeRendering::Color4u>();
+
+                renderer.push_states(ShapeRendering::Color4u{ settings.two_anchor_anchor_a_color });
+                renderer.push_point(anchor_a, settings.two_anchor_point_size);
+                renderer.pop_states<ShapeRendering::Color4u>();
+
+                renderer.push_states(ShapeRendering::Color4u{ settings.two_anchor_anchor_b_color });
+                renderer.push_point(anchor_b, settings.two_anchor_point_size);
+                renderer.pop_states<ShapeRendering::Color4u>();
+
+                glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+                if (align.up_reference.is_bound())
+                {
+                    const entt::entity up_entity = static_cast<entt::entity>(align.up_reference.entity);
+                    if (registry.valid(up_entity))
+                    {
+                        if (const auto* tfm_up = registry.try_get<ecs::TransformComponent>(up_entity))
+                        {
+                            const glm::vec3 up_axis = safe_normalize(align.up_axis_ref);
+                            if (glm::dot(up_axis, up_axis) > 1e-6f)
+                                up = safe_normalize(tfm_up->world_rotation_matrix * up_axis);
+                        }
+                    }
+                }
+
+                if (glm::abs(glm::dot(up, forward)) > 0.99f)
+                {
+                    up = safe_normalize(glm::cross(forward, glm::vec3(0.0f, 0.0f, 1.0f)));
+                    if (glm::dot(up, up) <= 1e-6f)
+                        up = glm::vec3(0.0f, 1.0f, 0.0f);
+                }
+
+                const glm::vec3 mid = 0.5f * (anchor_a + anchor_b);
+                renderer.push_states(ShapeRendering::Color4u{ settings.two_anchor_up_color });
+                renderer.push_line(mid, mid + up * settings.two_anchor_up_length);
+                renderer.pop_states<ShapeRendering::Color4u>();
             }
 
             renderer.pop_states<ShapeRendering::LineType, ShapeRendering::LineStyle>();

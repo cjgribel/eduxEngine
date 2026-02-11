@@ -7,7 +7,9 @@
 #include "ForwardRenderer.hpp"
 #include "ecs/systems/MannequinPlayerControllerSystem.hpp"
 #include "ecs/systems/VehicleRig1ControlSystem.hpp"
+#include "ecs/systems/PistonInputSystem.hpp"
 #include "ecs/VehicleRig1Builder.hpp"
+#include "ecs/PistonRigBuilder.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "ecs/Entity.hpp"
 #include "glmcommon.hpp"
@@ -94,6 +96,9 @@ private:
     void ensure_vehicle_rig1_config();
     void reset_vehicle_rig1_config();
     void spawn_vehicle_rig1_from_prefab();
+    void ensure_piston_rig_config();
+    void reset_piston_rig_config();
+    void spawn_piston_rig_from_prefab();
 
     // ENGINE API
     std::shared_ptr<eeng::EngineContext> ctx;
@@ -107,6 +112,7 @@ private:
 
     std::unique_ptr<eeng::ecs::systems::MannequinPlayerControllerSystem> playerControllerSystem;
     std::unique_ptr<eeng::ecs::systems::VehicleRig1ControlSystem> vehicleRig1ControlSystem;
+    std::unique_ptr<eeng::ecs::systems::PistonInputSystem> pistonInputSystem;
     eeng::ecs::RuntimePipeline runtime_pipeline_;
 
     // <-- ENGINE API
@@ -143,6 +149,10 @@ private:
     float vehicle_rig1_control_drive_velocity_ = 10.0f;
     float vehicle_rig1_control_drive_max_impulse_ = 150.0f;
     float vehicle_rig1_control_brake_max_impulse_ = 200.0f;
+
+    // Piston rig cached spawn config (editable in UI).
+    eeng::ecs::PistonRigSpec piston_rig_spec_{};
+    bool piston_rig_spec_initialized_ = false;
 
     // Light properties
     struct PointLight
