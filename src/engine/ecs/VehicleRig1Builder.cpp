@@ -11,6 +11,7 @@
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/TransformComponent.hpp"
 #include "meta/MetaAux.h"
+#include "meta/EntityMetaHelpers.hpp"
 #include "meta/MetaSerialize.hpp"
 #include "ecs/EntityManager.hpp"
 
@@ -43,20 +44,6 @@ namespace eeng::ecs
 
             const glm::mat3 basis(x, y, z);
             return glm::quat_cast(basis);
-        }
-
-        // Resolve an EntityRef (entity or GUID) into a live entity.
-        ecs::Entity resolve_entity_ref(EntityManager& em, const ecs::EntityRef& ref)
-        {
-            if (ref.is_bound())
-                return ref.entity;
-            if (ref.guid.valid())
-            {
-                auto ent_opt = em.get_entity_from_guid(ref.guid);
-                if (ent_opt)
-                    return *ent_opt;
-            }
-            return ecs::Entity::EntityNull;
         }
 
         // Create a named entity parented under `parent`, returning a bound EntityRef.
@@ -193,7 +180,7 @@ namespace eeng::ecs
         if (!em)
             return rig;
 
-        ecs::Entity chassis_entity = resolve_entity_ref(*em, spec.chassis);
+        ecs::Entity chassis_entity = eeng::meta::resolve_entity(*em, spec.chassis);
         if (!chassis_entity.has_id())
         {
             EENG_LOG_WARN(&ctx, "VehicleRig1Builder: Missing or unresolved chassis entity.");
@@ -206,7 +193,7 @@ namespace eeng::ecs
         const std::string prefix = spec.name_prefix.empty() ? "VehicleRig1" : spec.name_prefix;
         const std::string chunk_tag = spec.chunk_tag.empty() ? "vehicle_rig1" : spec.chunk_tag;
 
-        ecs::Entity root_entity = resolve_entity_ref(*em, spec.root);
+        ecs::Entity root_entity = eeng::meta::resolve_entity(*em, spec.root);
         if (root_entity.has_id() && !em->entity_valid(root_entity))
             root_entity = ecs::Entity::EntityNull;
         if (!root_entity.has_id())
@@ -298,7 +285,7 @@ namespace eeng::ecs
 
             // --- Wheel (reuse if provided, otherwise create a dynamic sphere) ---
             {
-                ecs::Entity wheel_entity = resolve_entity_ref(*em, wheel_spec.wheel);
+                ecs::Entity wheel_entity = eeng::meta::resolve_entity(*em, wheel_spec.wheel);
                 if (!wheel_entity.has_id())
                 {
                     const std::string wheel_name =

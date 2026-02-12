@@ -12,6 +12,7 @@
 #include "ecs/TransformComponent.hpp"
 #include "ecs/TransformSocketComponent.hpp"
 #include "ecs/TwoAnchorAlignComponent.hpp"
+#include "meta/EntityMetaHelpers.hpp"
 #include "meta/MetaSerialize.hpp"
 
 #include <algorithm>
@@ -22,23 +23,6 @@ namespace eeng::ecs
 {
     namespace
     {
-        ecs::EntityRef resolve_entity_ref_with_guid(EntityManager& em, const ecs::EntityRef& ref)
-        {
-            if (ref.guid.valid())
-            {
-                if (ref.is_bound() && em.entity_valid(ref.entity))
-                    return ref;
-                if (auto ent_opt = em.get_entity_from_guid(ref.guid); ent_opt && em.entity_valid(*ent_opt))
-                    return ecs::EntityRef{ ref.guid, *ent_opt };
-                return ecs::EntityRef{ ref.guid };
-            }
-
-            if (ref.is_bound() && em.entity_valid(ref.entity))
-                return em.get_entity_ref(ref.entity);
-
-            return {};
-        }
-
         bool has_ref_target(const ecs::EntityRef& ref)
         {
             return ref.is_bound() || ref.guid.valid();
@@ -92,8 +76,8 @@ namespace eeng::ecs
         const std::string prefix = spec.name_prefix.empty() ? "Piston" : spec.name_prefix;
         const std::string chunk_tag = spec.chunk_tag.empty() ? "piston_rig" : spec.chunk_tag;
 
-        const ecs::EntityRef body_a_ref = resolve_entity_ref_with_guid(*em, spec.body_a);
-        const ecs::EntityRef body_b_ref = resolve_entity_ref_with_guid(*em, spec.body_b);
+        const ecs::EntityRef body_a_ref = eeng::meta::resolve_entity_ref(*em, spec.body_a);
+        const ecs::EntityRef body_b_ref = eeng::meta::resolve_entity_ref(*em, spec.body_b);
 
         ecs::Entity root_entity = spec.root.is_bound() ? spec.root.entity : ecs::Entity::EntityNull;
         if (root_entity.has_id() && !em->entity_valid(root_entity))
@@ -196,8 +180,8 @@ namespace eeng::ecs
         PistonRigSpec resolved_spec = spec;
         if (auto* em_live = eeng::try_get_entity_manager_ptr(ctx, "PistonRigBuilder"))
         {
-            resolved_spec.body_a = resolve_entity_ref_with_guid(*em_live, resolved_spec.body_a);
-            resolved_spec.body_b = resolve_entity_ref_with_guid(*em_live, resolved_spec.body_b);
+            resolved_spec.body_a = eeng::meta::resolve_entity_ref(*em_live, resolved_spec.body_a);
+            resolved_spec.body_b = eeng::meta::resolve_entity_ref(*em_live, resolved_spec.body_b);
         }
 
         // Build the rig in a scratch world so we can serialize it as a prefab.

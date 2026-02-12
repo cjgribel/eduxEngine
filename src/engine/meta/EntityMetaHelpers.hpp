@@ -17,6 +17,28 @@
 // REGISTERED to Comp types (later maybe also Asset types, if wired through the same system)
 namespace eeng::meta
 {
+    // Resolve an EntityRef to a live entity if possible. If GUID is present, it wins.
+    // If only a live entity handle exists, try to backfill GUID via EntityManager.
+    inline ecs::EntityRef resolve_entity_ref(EntityManager& em, const ecs::EntityRef& ref)
+    {
+        if (ref.guid.valid())
+        {
+            if (auto ent_opt = em.get_entity_from_guid(ref.guid); ent_opt && em.entity_valid(*ent_opt))
+                return ecs::EntityRef{ ref.guid, *ent_opt };
+            return ecs::EntityRef{ ref.guid };
+        }
+
+        if (ref.is_bound() && em.entity_valid(ref.entity))
+            return em.get_entity_ref(ref.entity);
+
+        return {};
+    }
+
+    inline ecs::Entity resolve_entity(EntityManager& em, const ecs::EntityRef& ref)
+    {
+        const auto resolved = resolve_entity_ref(em, ref);
+        return resolved.is_bound() ? resolved.entity : ecs::Entity{};
+    }
 
     // any is a component type (later: or possibly an asset type)
     template<typename T>
