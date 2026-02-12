@@ -8,6 +8,7 @@
 #include "editor/EditorActions.hpp"
 #include "editor/ProjectConfig.hpp"
 #include "ecs/EntityManager.hpp"
+#include "meta/EntityMetaHelpers.hpp"
 #include "meta/MetaSerialize.hpp"
 // #include "ecs/EntityManager.hpp"
 #include "engineapi/SelectionManager.hpp"
@@ -342,6 +343,9 @@ namespace eeng::gui
             nlohmann::json branch_json = nlohmann::json::array();
             for (const auto& entity : branch)
             {
+                // Pre-prefab bind: upgrade live-only EntityRefs to GUIDs so external links
+                // survive prefab serialization (e.g., constraint targets outside the branch).
+                eeng::meta::bind_entity_refs_for_entity(entity, ctx);
                 branch_json.push_back(meta::serialize_entity_for_file(
                     em.get_entity_ref(entity),
                     registry_sp));
