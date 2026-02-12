@@ -43,6 +43,12 @@
 - Optional: `PistonAnimSyncComponent` scrubs a clip on a target AnimationGraphComponent using the current extension.
 - If `PistonAnimSyncComponent.target` is unbound, the system auto-finds the first descendant with `AnimationGraphComponent` + `ModelComponent` and binds it (play mode). Leave `clip_name` empty to use the graph’s clip.
 
+### Rig Pattern (Reusable Template)
+- Define a `RigSpec` and a builder that creates a consistent entity tree (root, anchors, constraints, visuals).
+- Put runtime behavior in systems (physics drive, alignment, sockets, animation sync), not in the builder.
+- Add a small config UI for authoring and spawn; keep live controls optional.
+- Serialize to prefab; ensure EntityRef GUIDs are bound before save/load.
+
 ## TODO
 
 ### Now
