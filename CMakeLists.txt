@@ -326,6 +326,8 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandSnapshot.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/CommandSanityChecks.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/EditorActions.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/content_generators/MannequinGraph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/content_generators/PistonGraph.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/MetaFieldAssign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GLMInspect.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ProjectConfig.cpp
