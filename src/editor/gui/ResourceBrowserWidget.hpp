@@ -399,7 +399,10 @@ namespace eeng::gui
                 !unimport_has_non_root;
             if (busy) ImGui::BeginDisabled();
 
-            if (ImGui::Button("Import..."))
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Import");
+            ImGui::SameLine();
+            if (ImGui::Button("Model..."))
             {
                 IGFD::FileDialogConfig config;
                 const auto& assets_root = resource_manager.assets_root();
@@ -410,19 +413,25 @@ namespace eeng::gui
                     detail::kModelImportFilters,
                     config);
             }
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Generate");
             ImGui::SameLine();
-            if (ImGui::Button("Import Graph (Mock)"))
+            if (ImGui::Button("Mannequin Graph"))
             {
                 editor::AssetActions::import_animation_graph_mock(ctx);
             }
             ImGui::SameLine();
-            if (ImGui::Button("Import Graph (Piston)"))
+            if (ImGui::Button("Piston Graph"))
             {
                 editor::AssetActions::import_animation_graph_piston(ctx);
             }
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Unimport");
             ImGui::SameLine();
             if (!unimport_enabled) ImGui::BeginDisabled();
-            if (ImGui::Button("Unimport"))
+            if (ImGui::Button("Unimport selected"))
             {
                 if (!unimport_enabled)
                 {
@@ -451,31 +460,34 @@ namespace eeng::gui
                         ImGui::SetTooltip("Only dependency-tree roots can be unimported.");
                 }
             }
-            ImGui::SameLine();
 
             static auto batch_id1 = Guid::generate();
             static auto batch_id2 = Guid::generate();
 
-            if (ImGui::Button("Load (Batch 1)"))
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Virtual Load/Unload");
+            ImGui::SameLine();
+            if (ImGui::Button("VLoad A"))
             {
                 EENG_LOG(&ctx, "GUI load batch (1) %s", batch_id1.to_string().c_str());
                 auto to_reload = detail::compute_selected_bottomup_closure(ctx);
                 resource_manager.load_and_bind_async(to_reload, batch_id1, ctx);
             }
             ImGui::SameLine();
-            if (ImGui::Button("Unload (Batch 1)"))
+            if (ImGui::Button("VUnload A"))
             {
                 auto to_reload = detail::compute_selected_bottomup_closure(ctx);
                 resource_manager.unbind_and_unload_async(to_reload, batch_id1, ctx);
             }
 
-            if (ImGui::Button("Load (Batch 2)"))
+            ImGui::SameLine();
+            if (ImGui::Button("VLoad B"))
             {
                 auto to_reload = detail::compute_selected_bottomup_closure(ctx);
                 resource_manager.load_and_bind_async(to_reload, batch_id2, ctx);
             }
             ImGui::SameLine();
-            if (ImGui::Button("Unload (Batch 2)"))
+            if (ImGui::Button("VUnload B"))
             {
                 auto to_reload = detail::compute_selected_bottomup_closure(ctx);
                 resource_manager.unbind_and_unload_async(to_reload, batch_id2, ctx);
@@ -637,7 +649,7 @@ namespace eeng::gui
                     resource_manager.storage().read(*h_opt, [&](const mock::Mesh& mesh) {
                         ImGui::TextDisabled("%f, %f, %f", mesh.vertices[0], mesh.vertices[1], mesh.vertices[2]);
                         ImGui::Separator();
-                    });
+                        });
                 }
             }
 
@@ -663,7 +675,7 @@ namespace eeng::gui
                             meta::inspect_any(any, insp, cmd_builder, ctx);
                             insp.end_node();
                         }
-                    });
+                        });
                 }
 
                 ImGui::EndTable();
