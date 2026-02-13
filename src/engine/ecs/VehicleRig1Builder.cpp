@@ -16,6 +16,7 @@
 #include "ecs/EntityManager.hpp"
 
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -91,6 +92,38 @@ namespace eeng::ecs
             desc.type = ecs::ColliderType::Sphere;
             desc.radius = std::max(0.0f, radius);
             desc.is_trigger = is_trigger;
+            colliders.colliders.push_back(desc);
+            registry.emplace<ecs::ColliderComponent>(entity, std::move(colliders));
+        }
+
+        void ensure_wheel_collider(
+            entt::registry& registry,
+            const ecs::Entity& entity,
+            const VehicleRig1WheelSpec& wheel_spec,
+            const glm::vec3& axle_axis_local)
+        {
+            if (registry.all_of<ecs::ColliderComponent>(entity))
+                return;
+
+            ecs::ColliderComponent colliders{};
+            ecs::ColliderDesc desc{};
+            desc.is_trigger = false;
+
+            if (wheel_spec.wheel_collider_type == WheelColliderType::Capsule)
+            {
+                desc.type = ecs::ColliderType::Capsule;
+                desc.radius = std::max(0.0f, wheel_spec.wheel_radius);
+                desc.height = std::max(0.0f, wheel_spec.wheel_width);
+
+                const glm::vec3 axis = normalize_or_default(axle_axis_local, glm::vec3(0.0f, 0.0f, 1.0f));
+                desc.local_rotation = glm::rotation(glm::vec3(0.0f, 0.0f, 1.0f), axis);
+            }
+            else
+            {
+                desc.type = ecs::ColliderType::Sphere;
+                desc.radius = std::max(0.0f, wheel_spec.wheel_radius);
+            }
+
             colliders.colliders.push_back(desc);
             registry.emplace<ecs::ColliderComponent>(entity, std::move(colliders));
         }
@@ -253,6 +286,13 @@ namespace eeng::ecs
             const auto& wheel_spec = spec.wheels[i];
             VehicleRig1Rig::WheelRig wheel_rig{};
 
+            const glm::vec3 mount_local = wheel_spec.mount_override
+                ? wheel_spec.mount_local
+                : glm::vec3(
+                    spec.chassis_half_extents.x * wheel_spec.mount_sign.x,
+                    0.0f,
+                    spec.chassis_half_extents.z * wheel_spec.mount_sign.y);
+
             // --- Axes and core geometry ---
             const glm::vec3 suspension_axis =
                 normalize_or_default(wheel_spec.suspension_axis, glm::vec3(0.0f, -1.0f, 0.0f));
@@ -263,7 +303,7 @@ namespace eeng::ecs
             const float rest_length = wheel_spec.suspension_rest_length;
 
             // World-space placement for the prototype wheel/knuckle bodies.
-            const glm::vec3 mount_world = chassis_pos + (chassis_rot * wheel_spec.mount_local);
+            const glm::vec3 mount_world = chassis_pos + (chassis_rot * mount_local);
             const glm::vec3 axis_world = chassis_rot * suspension_axis;
             const glm::vec3 wheel_world = mount_world + axis_world * rest_length;
 
@@ -295,7 +335,7 @@ namespace eeng::ecs
 
                     ensure_transform(registry, wheel_entity, wheel_world, chassis_rot);
                     ensure_rigidbody(registry, wheel_entity, ecs::PhysicsMotionType::Dynamic);
-                    ensure_collider_sphere(registry, wheel_entity, wheel_spec.wheel_radius, false);
+                    ensure_wheel_collider(registry, wheel_entity, wheel_spec, axle_axis);
                     apply_mass_override(registry, wheel_rig.wheel, wheel_spec.wheel_mass);
                     if (wheel_model_ref.guid.valid())
                         ensure_model_component(registry, wheel_entity, prefix + "_Wheel", wheel_model_ref);
@@ -329,7 +369,7 @@ namespace eeng::ecs
                 ecs::SixDofSpringConstraintComponent sixdof{};
                 sixdof.entity_a = chassis_ref;
                 sixdof.entity_b = knuckle_ref;
-                sixdof.local_anchor_a = wheel_spec.mount_local;
+                sixdof.local_anchor_a = mount_local;
                 sixdof.local_anchor_b = glm::vec3(0.0f);
 
                 // Frame X = suspension axis, Y ~= axle axis (so Z completes the basis).
@@ -417,7 +457,7 @@ namespace eeng::ecs
             link.driven = wheel_spec.driven;
             link.drive_direction = wheel_spec.drive_direction;
             link.steer_direction = wheel_spec.steer_direction;
-            link.mount_local = wheel_spec.mount_local;
+            link.mount_local = mount_local;
             link.suspension_axis = suspension_axis;
             link.axle_axis = axle_axis;
             link.wheel_local_anchor = wheel_spec.wheel_local_anchor;

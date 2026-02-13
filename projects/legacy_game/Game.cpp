@@ -505,16 +505,13 @@ void Game::reset_vehicle_rig1_config()
     vehicle_rig1_spec_.disable_collisions = true;
     vehicle_rig1_spec_.chassis_model_name = "carbody";
     vehicle_rig1_spec_.wheel_model_name = "tyre";
+    vehicle_rig1_spec_.chassis_half_extents = { 1.6f, 0.35f, 1.0f };
 
-    const glm::vec3 mount_front_left{ 1.6f, 0.0f, 1.0f };
-    const glm::vec3 mount_front_right{ 1.6f, 0.0f, -1.0f };
-    const glm::vec3 mount_rear_left{ -1.6f, 0.0f, 1.0f };
-    const glm::vec3 mount_rear_right{ -1.6f, 0.0f, -1.0f };
-
-    auto make_wheel = [&](const glm::vec3& mount, bool steerable, bool driven)
+    auto make_wheel = [&](const glm::vec2& mount_sign, bool steerable, bool driven)
     {
         eeng::ecs::VehicleRig1WheelSpec wheel{};
-        wheel.mount_local = mount;
+        wheel.mount_override = false;
+        wheel.mount_sign = mount_sign;
 
         // Hard-coded axes for the prototype.
         wheel.suspension_axis = { 0.0f, -1.0f, 0.0f };
@@ -534,7 +531,9 @@ void Game::reset_vehicle_rig1_config()
         wheel.spring_d = 5.0f;
 
         // Collider sizes.
+        wheel.wheel_collider_type = eeng::ecs::WheelColliderType::Sphere;
         wheel.wheel_radius = 0.35f;
+        wheel.wheel_width = 0.25f;
         wheel.knuckle_radius = 0.15f;
 
         // Per-wheel capability flags.
@@ -548,10 +547,10 @@ void Game::reset_vehicle_rig1_config()
         return wheel;
     };
 
-    vehicle_rig1_spec_.wheels.push_back(make_wheel(mount_front_left, true, true));
-    vehicle_rig1_spec_.wheels.push_back(make_wheel(mount_front_right, true, true));
-    vehicle_rig1_spec_.wheels.push_back(make_wheel(mount_rear_left, false, false));
-    vehicle_rig1_spec_.wheels.push_back(make_wheel(mount_rear_right, false, false));
+    vehicle_rig1_spec_.wheels.push_back(make_wheel({ 1.0f, 1.0f }, true, true));
+    vehicle_rig1_spec_.wheels.push_back(make_wheel({ 1.0f, -1.0f }, true, true));
+    vehicle_rig1_spec_.wheels.push_back(make_wheel({ -1.0f, 1.0f }, false, false));
+    vehicle_rig1_spec_.wheels.push_back(make_wheel({ -1.0f, -1.0f }, false, false));
 }
 
 void Game::spawn_vehicle_rig1_from_prefab()
@@ -564,6 +563,7 @@ void Game::spawn_vehicle_rig1_from_prefab()
     eeng::ecs::VehicleRig1ChassisSpec chassis_spec{};
     chassis_spec.position = vehicle_rig1_spawn_pos_;
     chassis_spec.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    chassis_spec.half_extents = vehicle_rig1_spec_.chassis_half_extents;
 
     nlohmann::json prefab_json = eeng::ecs::build_vehicle_rig1_prefab_json(
         *ctx,
@@ -785,6 +785,14 @@ void Game::renderUI()
             ImGui::TextDisabled("Name prefix: %s", vehicle_rig1_spec_.name_prefix.c_str());
             ImGui::TextDisabled("Chunk tag: %s", vehicle_rig1_spec_.chunk_tag.c_str());
 
+            glm::vec3 chassis_size = vehicle_rig1_spec_.chassis_half_extents * 2.0f;
+            if (ImGui::DragFloat3("Chassis size", &chassis_size.x, 0.05f, 0.05f, 20.0f))
+            {
+                chassis_size = glm::max(chassis_size, glm::vec3(0.05f));
+                vehicle_rig1_spec_.chassis_half_extents = chassis_size * 0.5f;
+            }
+            add_tooltip("Chassis collider size in world units (width, height, length).");
+
             ImGui::DragFloat3("Steer axis", &vehicle_rig1_spec_.steer_axis.x, 0.01f);
             add_tooltip("Chassis-local steering axis for the 6DoF constraint frame.");
             ImGui::DragFloat("Steer limit", &vehicle_rig1_spec_.steer_limit, 0.01f, 0.0f, 3.14f);
@@ -799,8 +807,27 @@ void Game::renderUI()
                 const std::string label = "Wheel " + std::to_string(i);
                 if (ImGui::TreeNode(label.c_str()))
                 {
-                    ImGui::DragFloat3("Mount local", &wheel.mount_local.x, 0.02f);
-                    add_tooltip("Chassis-local mount position for this wheel/suspension.");
+                    ImGui::Checkbox("Override mount", &wheel.mount_override);
+                    add_tooltip("Use a custom mount position instead of deriving from chassis size.");
+                    if (wheel.mount_override)
+                    {
+                        ImGui::DragFloat3("Mount local", &wheel.mount_local.x, 0.02f);
+                        add_tooltip("Chassis-local mount position for this wheel/suspension.");
+                    }
+                    else
+                    {
+                        ImGui::DragFloat2("Mount sign", &wheel.mount_sign.x, 0.1f, -1.0f, 1.0f);
+                        add_tooltip("Sign used to place the wheel from chassis size (X/Z).");
+                        const glm::vec3 derived_mount{
+                            vehicle_rig1_spec_.chassis_half_extents.x * wheel.mount_sign.x,
+                            0.0f,
+                            vehicle_rig1_spec_.chassis_half_extents.z * wheel.mount_sign.y
+                        };
+                        ImGui::TextDisabled("Derived mount: (%.2f, %.2f, %.2f)",
+                            derived_mount.x,
+                            derived_mount.y,
+                            derived_mount.z);
+                    }
                     ImGui::DragFloat3("Suspension axis", &wheel.suspension_axis.x, 0.02f);
                     add_tooltip("Chassis-local axis for suspension travel (6DoF frame X).");
                     ImGui::DragFloat3("Axle axis", &wheel.axle_axis.x, 0.02f);
@@ -834,6 +861,15 @@ void Game::renderUI()
 
                     ImGui::DragFloat("Wheel radius", &wheel.wheel_radius, 0.01f, 0.05f, 5.0f);
                     add_tooltip("Radius for autogenerated wheel collider.");
+                    int collider_choice = static_cast<int>(wheel.wheel_collider_type);
+                    if (ImGui::Combo("Wheel collider", &collider_choice, "Sphere\0Capsule\0"))
+                        wheel.wheel_collider_type = static_cast<eeng::ecs::WheelColliderType>(collider_choice);
+                    add_tooltip("Collider type used for autogenerated wheels.");
+                    if (wheel.wheel_collider_type == eeng::ecs::WheelColliderType::Capsule)
+                    {
+                        ImGui::DragFloat("Wheel width", &wheel.wheel_width, 0.01f, 0.0f, 5.0f);
+                        add_tooltip("Capsule height (wheel width) along the axle axis.");
+                    }
                     ImGui::DragFloat("Knuckle radius", &wheel.knuckle_radius, 0.01f, 0.05f, 5.0f);
                     add_tooltip("Radius for autogenerated knuckle trigger collider.");
                     ImGui::DragFloat("Wheel mass", &wheel.wheel_mass, 0.1f, 0.0f, 100.0f);
