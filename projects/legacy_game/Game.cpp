@@ -18,6 +18,7 @@
 #include "ecs/PistonConstraintDriveComponent.hpp"
 #include "ecs/PistonInputComponent.hpp"
 #include "ecs/PistonAnimSyncComponent.hpp"
+#include "misc/cpp/imgui_stdlib.h"
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/EntityManager.hpp"
@@ -621,6 +622,7 @@ void Game::reset_piston_rig_config()
     piston_rig_spec_.use_sockets = true;
     piston_rig_spec_.axis_local = { 1.0f, 0.0f, 0.0f };
     piston_rig_spec_.disable_collisions = true;
+    piston_rig_spec_.anim_clip_name = "Piston";
     piston_rig_spec_.stroke_min = 0.0f;
     piston_rig_spec_.stroke_max = 1.0f;
     piston_rig_spec_.max_force = 2000.0f;
@@ -649,6 +651,7 @@ void Game::spawn_piston_rig_from_prefab()
     // Inject piston input + animation sync on the rig root before spawning.
     eeng::ecs::PistonInputComponent input{};
     eeng::ecs::PistonAnimSyncComponent anim_sync{};
+    anim_sync.clip_name = piston_rig_spec_.anim_clip_name;
 
     auto& root_json = prefab_json.front();
     if (!root_json.contains("components") || !root_json["components"].is_object())
@@ -1009,6 +1012,9 @@ void Game::renderUI()
 
             ImGui::Checkbox("Disable collisions", &piston_rig_spec_.disable_collisions);
             add_tooltip("Disable collision response between constrained bodies.");
+
+            ImGui::InputText("Anim clip", &piston_rig_spec_.anim_clip_name);
+            add_tooltip("Optional clip override for PistonAnimSync (empty = graph clip).");
 
             ImGui::DragFloat("Stroke min", &piston_rig_spec_.stroke_min, 0.01f, -10.0f, 10.0f);
             add_tooltip("Minimum extension along the axis.");

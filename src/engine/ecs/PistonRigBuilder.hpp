@@ -40,6 +40,10 @@ namespace eeng::ecs
 
         bool disable_collisions = true;
 
+        // Optional animation clip override for PistonAnimSyncComponent.
+        // Empty = use clip name from the AnimationGraph.
+        std::string anim_clip_name{};
+
         // Drive defaults.
         float stroke_min = 0.0f;
         float stroke_max = 1.0f;
