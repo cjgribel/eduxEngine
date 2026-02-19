@@ -935,6 +935,12 @@ namespace eeng::ecs::systems
 
         runtime.body = std::make_unique<btRigidBody>(info);
 
+        if (const auto* material = registry.try_get<ecs::PhysicsMaterialComponent>(entity))
+        {
+            runtime.body->setFriction(material->material.friction);
+            runtime.body->setRestitution(material->material.restitution);
+        }
+
         runtime.body->setDamping(rb.linear_damping, rb.angular_damping);
 
         if (!rb.allow_sleep || is_kinematic)
@@ -2094,12 +2100,14 @@ namespace eeng::ecs::systems
         const entt::id_type collider_id = entt::type_hash<ecs::ColliderComponent>::value();
         const entt::id_type transform_id = entt::type_hash<ecs::TransformComponent>::value();
         const entt::id_type filter_id = entt::type_hash<ecs::CollisionFilterComponent>::value();
+        const entt::id_type material_id = entt::type_hash<ecs::PhysicsMaterialComponent>::value();
 
         const bool is_rb = (event.target.component_id == rb_id);
         const bool is_collider = (event.target.component_id == collider_id);
         const bool is_transform = (event.target.component_id == transform_id);
         const bool is_filter = (event.target.component_id == filter_id);
-        if (!is_rb && !is_collider && !is_transform && !is_filter)
+        const bool is_material = (event.target.component_id == material_id);
+        if (!is_rb && !is_collider && !is_transform && !is_filter && !is_material)
             return;
 
         // Only scale edits require collider rebuilds; position/rotation do not.
@@ -2133,6 +2141,20 @@ namespace eeng::ecs::systems
 
         if (!registry || !registry->valid(*entity_opt))
             return;
+
+        if (is_material)
+        {
+            auto body_it = bodies_.find(*entity_opt);
+            if (body_it != bodies_.end() && body_it->second.body)
+            {
+                if (const auto* material = registry->try_get<ecs::PhysicsMaterialComponent>(*entity_opt))
+                {
+                    body_it->second.body->setFriction(material->material.friction);
+                    body_it->second.body->setRestitution(material->material.restitution);
+                }
+                return;
+            }
+        }
 
         // Store in the local dirty set; rebuild happens on the next PhysicsSystem update.
         // RigidBody/Collider edits always dirty; Transform edits are filtered above.
