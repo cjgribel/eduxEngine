@@ -128,17 +128,34 @@ namespace eeng::ecs
             registry.emplace<ecs::ColliderComponent>(entity, std::move(colliders));
         }
 
+        void ensure_rigidbody_aux_components(
+            entt::registry& registry,
+            const ecs::Entity& entity)
+        {
+            if (!registry.all_of<ecs::RigidBodyComponent>(entity))
+                return;
+
+            if (!registry.all_of<ecs::PhysicsMaterialComponent>(entity))
+                registry.emplace<ecs::PhysicsMaterialComponent>(entity);
+            if (!registry.all_of<ecs::CollisionFilterComponent>(entity))
+                registry.emplace<ecs::CollisionFilterComponent>(entity);
+            if (!registry.all_of<ecs::PhysicsEventsComponent>(entity))
+                registry.emplace<ecs::PhysicsEventsComponent>(entity);
+        }
+
         void ensure_rigidbody(
             entt::registry& registry,
             const ecs::Entity& entity,
             ecs::PhysicsMotionType motion)
         {
-            if (registry.all_of<ecs::RigidBodyComponent>(entity))
-                return;
+            if (!registry.all_of<ecs::RigidBodyComponent>(entity))
+            {
+                ecs::RigidBodyComponent rb{};
+                rb.motion = motion;
+                registry.emplace<ecs::RigidBodyComponent>(entity, rb);
+            }
 
-            ecs::RigidBodyComponent rb{};
-            rb.motion = motion;
-            registry.emplace<ecs::RigidBodyComponent>(entity, rb);
+            ensure_rigidbody_aux_components(registry, entity);
         }
 
         void apply_mass_override(
@@ -222,6 +239,10 @@ namespace eeng::ecs
 
         auto& registry = em->registry();
         rig.chassis = em->get_entity_ref(chassis_entity);
+
+        // If the chassis already has a rigid body, ensure the companion components exist
+        // (matches editor bundle behavior for RBs).
+        ensure_rigidbody_aux_components(registry, chassis_entity);
 
         const std::string prefix = spec.name_prefix.empty() ? "VehicleRig1" : spec.name_prefix;
         const std::string chunk_tag = spec.chunk_tag.empty() ? "vehicle_rig1" : spec.chunk_tag;
@@ -350,6 +371,8 @@ namespace eeng::ecs
                         EENG_LOG_WARN(&ctx, "VehicleRig1Builder: Wheel %zu missing RigidBodyComponent.", i);
                     if (!registry.all_of<ecs::ColliderComponent>(wheel_entity))
                         EENG_LOG_WARN(&ctx, "VehicleRig1Builder: Wheel %zu missing ColliderComponent.", i);
+
+                    ensure_rigidbody_aux_components(registry, wheel_entity);
 
                     if (wheel_model_ref.guid.valid())
                         ensure_model_component(registry, wheel_entity, prefix + "_Wheel", wheel_model_ref);
@@ -511,6 +534,8 @@ namespace eeng::ecs
         chassis_rb.angular_damping = chassis_spec.angular_damping;
         chassis_rb.auto_mass = chassis_spec.auto_mass;
         chassis_rb.mass = chassis_spec.mass;
+
+        ensure_rigidbody_aux_components(registry, chassis_entity);
 
         ecs::ColliderComponent chassis_colliders{};
         ecs::ColliderDesc chassis_box{};
