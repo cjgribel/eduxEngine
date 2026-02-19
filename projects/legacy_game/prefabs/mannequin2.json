@@ -1,0 +1,126 @@
+[
+  {
+    "components": {
+      "eeng.ecs.AnimationGraphComponent": {
+        "Enabled": true,
+        "Graph Reference": {
+          "Guid": 3788003473024838853
+        },
+        "Name": ""
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 17119310245537703399,
+        "Name": "Mannequin",
+        "Parent Entity": {
+          "Guid": 0
+        }
+      },
+      "eeng.ecs.ModelComponent": {
+        "Blend Clip Index": -1,
+        "Blend Clip Speed": 1.0,
+        "Blend Factor": 0.0,
+        "Blend Loop": true,
+        "Clip Index": -1,
+        "Clip Speed": 1.0,
+        "Loop": true,
+        "Model reference": {
+          "Guid": 11212511411485387636
+        },
+        "Name": ""
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          0.02500000037252903,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.02500000037252903,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.02500000037252903,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          0.02500000037252903,
+          0.02500000037252903,
+          0.02500000037252903
+        ],
+        "World Matrix": [
+          0.02500000037252903,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.02500000037252903,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.02500000037252903,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "eeng.legacy_game.MannequinPlayerControllerComponent": {
+        "Aim X Param": "U_RT",
+        "Aim Y Param": "V_RT",
+        "Controller Id": -1,
+        "Enabled": true,
+        "Fire Param": "DO_FIRE_RIFLE",
+        "Hit0 Param": "DO_HITREACTION0",
+        "Hit1 Param": "DO_HITREACTION1",
+        "Hit2 Param": "DO_HITREACTION2",
+        "Hit3 Param": "DO_HITREACTION3",
+        "Jump Param": "DO_JUMP",
+        "Keyboard Fallback": true,
+        "Mouse Aim": true,
+        "Mouse Sensitivity": 0.009999999776482582,
+        "Move X Param": "U_LT",
+        "Move Y Param": "V_LT",
+        "Name": "",
+        "Reload Param": "DO_RELOAD_RIFLE",
+        "Stick Deadzone": 0.20000000298023224,
+        "Trigger Deadzone": 0.10000000149011612
+      }
+    },
+    "entity_guid": 17119310245537703399
+  }
+]
