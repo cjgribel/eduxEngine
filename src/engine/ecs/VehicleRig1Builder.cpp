@@ -158,6 +158,20 @@ namespace eeng::ecs
             ensure_rigidbody_aux_components(registry, entity);
         }
 
+        void apply_wheel_friction(
+            entt::registry& registry,
+            const ecs::Entity& entity,
+            float friction)
+        {
+            if (!registry.all_of<ecs::RigidBodyComponent>(entity))
+                return;
+
+            auto* material = registry.try_get<ecs::PhysicsMaterialComponent>(entity);
+            if (!material)
+                material = &registry.emplace<ecs::PhysicsMaterialComponent>(entity);
+            material->material.friction = friction;
+        }
+
         void apply_mass_override(
             entt::registry& registry,
             const ecs::EntityRef& ref,
@@ -307,6 +321,13 @@ namespace eeng::ecs
             const auto& wheel_spec = spec.wheels[i];
             VehicleRig1Rig::WheelRig wheel_rig{};
 
+            const float wheel_friction = wheel_spec.friction_override
+                ? wheel_spec.wheel_friction
+                : spec.wheel_friction;
+            const bool wheel_driven = wheel_spec.drive_override
+                ? wheel_spec.driven
+                : spec.drive_default;
+
             const glm::vec3 mount_local = wheel_spec.mount_override
                 ? wheel_spec.mount_local
                 : glm::vec3(
@@ -357,6 +378,7 @@ namespace eeng::ecs
                     ensure_transform(registry, wheel_entity, wheel_world, chassis_rot);
                     ensure_rigidbody(registry, wheel_entity, ecs::PhysicsMotionType::Dynamic);
                     ensure_wheel_collider(registry, wheel_entity, wheel_spec, axle_axis);
+                    apply_wheel_friction(registry, wheel_entity, wheel_friction);
                     apply_mass_override(registry, wheel_rig.wheel, wheel_spec.wheel_mass);
                     if (wheel_model_ref.guid.valid())
                         ensure_model_component(registry, wheel_entity, prefix + "_Wheel", wheel_model_ref);
@@ -373,6 +395,7 @@ namespace eeng::ecs
                         EENG_LOG_WARN(&ctx, "VehicleRig1Builder: Wheel %zu missing ColliderComponent.", i);
 
                     ensure_rigidbody_aux_components(registry, wheel_entity);
+                    apply_wheel_friction(registry, wheel_entity, wheel_friction);
 
                     if (wheel_model_ref.guid.valid())
                         ensure_model_component(registry, wheel_entity, prefix + "_Wheel", wheel_model_ref);
@@ -477,7 +500,7 @@ namespace eeng::ecs
             link.suspension_6dof = wheel_rig.suspension_6dof;
             link.axle_hinge = wheel_rig.axle_hinge;
             link.steerable = wheel_spec.steerable;
-            link.driven = wheel_spec.driven;
+            link.driven = wheel_driven;
             link.drive_direction = wheel_spec.drive_direction;
             link.steer_direction = wheel_spec.steer_direction;
             link.mount_local = mount_local;

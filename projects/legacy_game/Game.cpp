@@ -504,6 +504,8 @@ void Game::reset_vehicle_rig1_config()
     vehicle_rig1_spec_.steer_axis = { 0.0f, 1.0f, 0.0f };
     vehicle_rig1_spec_.steer_limit = 0.8f;
     vehicle_rig1_spec_.disable_collisions = true;
+    vehicle_rig1_spec_.drive_default = false;
+    vehicle_rig1_spec_.wheel_friction = 0.5f;
     vehicle_rig1_spec_.chassis_model_name = "carbody";
     vehicle_rig1_spec_.wheel_model_name = "tyre";
     vehicle_rig1_spec_.chassis_half_extents = { 1.6f, 0.35f, 1.0f };
@@ -540,6 +542,7 @@ void Game::reset_vehicle_rig1_config()
         // Per-wheel capability flags.
         wheel.steerable = steerable;
         wheel.driven = driven;
+        wheel.drive_override = true;
 
         // Flip drive direction for steerable wheels if needed (front wheels were observed reversed).
         wheel.drive_direction = steerable ? -1.0f : 1.0f;
@@ -783,10 +786,10 @@ void Game::renderUI()
             ImGui::TreePop();
         }
 
-        if (ImGui::TreeNode("Rig Config"))
-        {
-            ImGui::TextDisabled("Name prefix: %s", vehicle_rig1_spec_.name_prefix.c_str());
-            ImGui::TextDisabled("Chunk tag: %s", vehicle_rig1_spec_.chunk_tag.c_str());
+            if (ImGui::TreeNode("Rig Config"))
+            {
+                ImGui::TextDisabled("Name prefix: %s", vehicle_rig1_spec_.name_prefix.c_str());
+                ImGui::TextDisabled("Chunk tag: %s", vehicle_rig1_spec_.chunk_tag.c_str());
 
             glm::vec3 chassis_size = vehicle_rig1_spec_.chassis_half_extents * 2.0f;
             if (ImGui::DragFloat3("Chassis size", &chassis_size.x, 0.05f, 0.05f, 20.0f))
@@ -803,96 +806,210 @@ void Game::renderUI()
             ImGui::Checkbox("Disable collisions", &vehicle_rig1_spec_.disable_collisions);
             add_tooltip("Disable collision response between constrained body pairs.");
 
-            for (std::size_t i = 0; i < vehicle_rig1_spec_.wheels.size(); ++i)
-            {
-                auto& wheel = vehicle_rig1_spec_.wheels[i];
-                ImGui::PushID(static_cast<int>(i));
-                const std::string label = "Wheel " + std::to_string(i);
-                if (ImGui::TreeNode(label.c_str()))
+                if (ImGui::TreeNode("Wheel Defaults"))
                 {
-                    ImGui::Checkbox("Override mount", &wheel.mount_override);
-                    add_tooltip("Use a custom mount position instead of deriving from chassis size.");
-                    if (wheel.mount_override)
+                    ImGui::DragFloat("Wheel friction", &vehicle_rig1_spec_.wheel_friction, 0.1f, 0.0f, 10.0f);
+                    add_tooltip("Default wheel friction (used unless overridden per wheel).");
+                    ImGui::Checkbox("Drive default", &vehicle_rig1_spec_.drive_default);
+                    add_tooltip("Default driven flag for wheels without overrides.");
+
+                    if (ImGui::Button("Clear wheel overrides"))
                     {
-                        ImGui::DragFloat3("Mount local", &wheel.mount_local.x, 0.02f);
-                        add_tooltip("Chassis-local mount position for this wheel/suspension.");
+                        for (auto& wheel : vehicle_rig1_spec_.wheels)
+                        {
+                            wheel.friction_override = false;
+                            wheel.drive_override = false;
+                        }
                     }
-                    else
-                    {
-                        ImGui::DragFloat2("Mount sign", &wheel.mount_sign.x, 0.1f, -1.0f, 1.0f);
-                        add_tooltip("Sign used to place the wheel from chassis size (X/Z).");
-                        const glm::vec3 derived_mount{
-                            vehicle_rig1_spec_.chassis_half_extents.x * wheel.mount_sign.x,
-                            0.0f,
-                            vehicle_rig1_spec_.chassis_half_extents.z * wheel.mount_sign.y
-                        };
-                        ImGui::TextDisabled("Derived mount: (%.2f, %.2f, %.2f)",
-                            derived_mount.x,
-                            derived_mount.y,
-                            derived_mount.z);
-                    }
-                    ImGui::DragFloat3("Suspension axis", &wheel.suspension_axis.x, 0.02f);
-                    add_tooltip("Chassis-local axis for suspension travel (6DoF frame X).");
-                    ImGui::DragFloat3("Axle axis", &wheel.axle_axis.x, 0.02f);
-                    add_tooltip("Knuckle/wheel local axle axis for the hinge.");
-                    ImGui::DragFloat("Rest length", &wheel.suspension_rest_length, 0.01f, 0.0f, 10.0f);
-                    add_tooltip("Rest length along suspension axis (positive direction).");
-                    ImGui::DragFloat("Travel", &wheel.suspension_travel, 0.01f, 0.0f, 10.0f);
-                    add_tooltip("Total suspension travel (symmetric around rest length).");
-
-                    ImGui::Checkbox("Use linear limits", &wheel.use_linear_limits);
-                    add_tooltip("Override default linear limits for the 6DoF suspension axis.");
-                    if (wheel.use_linear_limits)
-                    {
-                        ImGui::DragFloat("Limit min X", &wheel.linear_limit_min.x, 0.01f, -10.0f, 10.0f);
-                        add_tooltip("Minimum limit along suspension axis (constraint frame X).");
-                        ImGui::DragFloat("Limit max X", &wheel.linear_limit_max.x, 0.01f, -10.0f, 10.0f);
-                        add_tooltip("Maximum limit along suspension axis (constraint frame X).");
-
-                        bool equilibrium_enabled = wheel.linear_equilibrium_enabled.x > 0.5f;
-                        if (ImGui::Checkbox("Equilibrium X", &equilibrium_enabled))
-                            wheel.linear_equilibrium_enabled = equilibrium_enabled ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f);
-                        add_tooltip("Enable spring equilibrium on the suspension axis.");
-                        ImGui::DragFloat("Equilibrium target X", &wheel.linear_equilibrium_target.x, 0.01f, -10.0f, 10.0f);
-                        add_tooltip("Target equilibrium position along the suspension axis.");
-                    }
-
-                    ImGui::DragFloat("Spring K", &wheel.spring_k, 1.0f, 0.0f, 50000.0f);
-                    add_tooltip("Suspension spring stiffness (6DoF spring on X).");
-                    ImGui::DragFloat("Spring D", &wheel.spring_d, 1.0f, 0.0f, 50000.0f);
-                    add_tooltip("Suspension damping (6DoF spring on X).");
-
-                    ImGui::DragFloat("Wheel radius", &wheel.wheel_radius, 0.01f, 0.05f, 5.0f);
-                    add_tooltip("Radius for autogenerated wheel collider.");
-                    int collider_choice = static_cast<int>(wheel.wheel_collider_type);
-                    if (ImGui::Combo("Wheel collider", &collider_choice, "Sphere\0Capsule\0"))
-                        wheel.wheel_collider_type = static_cast<eeng::ecs::WheelColliderType>(collider_choice);
-                    add_tooltip("Collider type used for autogenerated wheels.");
-                    if (wheel.wheel_collider_type == eeng::ecs::WheelColliderType::Capsule)
-                    {
-                        ImGui::DragFloat("Wheel width", &wheel.wheel_width, 0.01f, 0.0f, 5.0f);
-                        add_tooltip("Capsule height (wheel width) along the axle axis.");
-                    }
-                    ImGui::DragFloat("Knuckle radius", &wheel.knuckle_radius, 0.01f, 0.05f, 5.0f);
-                    add_tooltip("Radius for autogenerated knuckle trigger collider.");
-                    ImGui::DragFloat("Wheel mass", &wheel.wheel_mass, 0.1f, 0.0f, 100.0f);
-                    add_tooltip("Override wheel mass in kg (<= 0 keeps auto-mass).");
-                    ImGui::DragFloat("Knuckle mass", &wheel.knuckle_mass, 0.1f, 0.0f, 100.0f);
-                    add_tooltip("Override knuckle mass in kg (<= 0 keeps auto-mass).");
-
-                    ImGui::Checkbox("Steerable", &wheel.steerable);
-                    add_tooltip("Allow steering on this wheel (6DoF angular X).");
-                    ImGui::Checkbox("Driven", &wheel.driven);
-                    add_tooltip("Enable drive motor on this wheel hinge.");
-                    ImGui::DragFloat("Drive direction", &wheel.drive_direction, 0.1f, -5.0f, 5.0f);
-                    add_tooltip("Sign flip for drive direction (+/-).");
-                    ImGui::DragFloat("Steer direction", &wheel.steer_direction, 0.1f, -5.0f, 5.0f);
-                    add_tooltip("Sign flip for steering direction (+/-).");
+                    add_tooltip("Disable per-wheel overrides so all wheels use the defaults.");
 
                     ImGui::TreePop();
                 }
-                ImGui::PopID();
-            }
+
+                if (ImGui::BeginTable("VehicleRig1WheelSummary", 6,
+                    ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+                {
+                    ImGui::TableSetupColumn("#");
+                    ImGui::TableSetupColumn("Mount");
+                    ImGui::TableSetupColumn("Steer");
+                    ImGui::TableSetupColumn("Drive");
+                    ImGui::TableSetupColumn("Friction");
+                    ImGui::TableSetupColumn("Overrides");
+                    ImGui::TableHeadersRow();
+
+                    for (std::size_t i = 0; i < vehicle_rig1_spec_.wheels.size(); ++i)
+                    {
+                        const auto& wheel = vehicle_rig1_spec_.wheels[i];
+                        const float effective_friction = wheel.friction_override
+                            ? wheel.wheel_friction
+                            : vehicle_rig1_spec_.wheel_friction;
+                        const bool effective_driven = wheel.drive_override
+                            ? wheel.driven
+                            : vehicle_rig1_spec_.drive_default;
+
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::Text("%zu", i);
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::Text("%s", wheel.mount_override ? "Custom" : "Derived");
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TextUnformatted(wheel.steerable ? "Yes" : "No");
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TextUnformatted(effective_driven ? "Driven" : "Free");
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::Text("%.2f", effective_friction);
+                        ImGui::TableSetColumnIndex(5);
+                        ImGui::Text("%s%s",
+                            wheel.drive_override ? "Drive " : "",
+                            wheel.friction_override ? "Friction" : "");
+                    }
+                    ImGui::EndTable();
+                }
+                add_tooltip("Quick summary of effective per-wheel settings.");
+
+                for (std::size_t i = 0; i < vehicle_rig1_spec_.wheels.size(); ++i)
+                {
+                    auto& wheel = vehicle_rig1_spec_.wheels[i];
+                    ImGui::PushID(static_cast<int>(i));
+                    const std::string label = "Wheel " + std::to_string(i);
+                    if (ImGui::TreeNode(label.c_str()))
+                    {
+                        const float effective_friction = wheel.friction_override
+                            ? wheel.wheel_friction
+                            : vehicle_rig1_spec_.wheel_friction;
+                        const bool effective_driven = wheel.drive_override
+                            ? wheel.driven
+                            : vehicle_rig1_spec_.drive_default;
+
+                        ImGui::TextDisabled("Effective friction: %.2f", effective_friction);
+                        ImGui::TextDisabled("Effective drive: %s", effective_driven ? "Driven" : "Free");
+
+                        if (ImGui::BeginTabBar("WheelTabs"))
+                        {
+                            if (ImGui::BeginTabItem("Mount"))
+                            {
+                                ImGui::Checkbox("Override mount", &wheel.mount_override);
+                                add_tooltip("Use a custom mount position instead of deriving from chassis size.");
+                                if (wheel.mount_override)
+                                {
+                                    ImGui::DragFloat3("Mount local", &wheel.mount_local.x, 0.02f);
+                                    add_tooltip("Chassis-local mount position for this wheel/suspension.");
+                                }
+                                else
+                                {
+                                    ImGui::DragFloat2("Mount sign", &wheel.mount_sign.x, 0.1f, -1.0f, 1.0f);
+                                    add_tooltip("Sign used to place the wheel from chassis size (X/Z).");
+                                    const glm::vec3 derived_mount{
+                                        vehicle_rig1_spec_.chassis_half_extents.x * wheel.mount_sign.x,
+                                        0.0f,
+                                        vehicle_rig1_spec_.chassis_half_extents.z * wheel.mount_sign.y
+                                    };
+                                    ImGui::TextDisabled("Derived mount: (%.2f, %.2f, %.2f)",
+                                        derived_mount.x,
+                                        derived_mount.y,
+                                        derived_mount.z);
+                                }
+                                ImGui::EndTabItem();
+                            }
+
+                            if (ImGui::BeginTabItem("Suspension"))
+                            {
+                                ImGui::DragFloat3("Suspension axis", &wheel.suspension_axis.x, 0.02f);
+                                add_tooltip("Chassis-local axis for suspension travel (6DoF frame X).");
+                                ImGui::DragFloat3("Axle axis", &wheel.axle_axis.x, 0.02f);
+                                add_tooltip("Knuckle/wheel local axle axis for the hinge.");
+                                ImGui::DragFloat("Rest length", &wheel.suspension_rest_length, 0.01f, 0.0f, 10.0f);
+                                add_tooltip("Rest length along suspension axis (positive direction).");
+                                ImGui::DragFloat("Travel", &wheel.suspension_travel, 0.01f, 0.0f, 10.0f);
+                                add_tooltip("Total suspension travel (symmetric around rest length).");
+
+                                ImGui::Checkbox("Use linear limits", &wheel.use_linear_limits);
+                                add_tooltip("Override default linear limits for the 6DoF suspension axis.");
+                                if (wheel.use_linear_limits)
+                                {
+                                    ImGui::DragFloat("Limit min X", &wheel.linear_limit_min.x, 0.01f, -10.0f, 10.0f);
+                                    add_tooltip("Minimum limit along suspension axis (constraint frame X).");
+                                    ImGui::DragFloat("Limit max X", &wheel.linear_limit_max.x, 0.01f, -10.0f, 10.0f);
+                                    add_tooltip("Maximum limit along suspension axis (constraint frame X).");
+
+                                    bool equilibrium_enabled = wheel.linear_equilibrium_enabled.x > 0.5f;
+                                    if (ImGui::Checkbox("Equilibrium X", &equilibrium_enabled))
+                                        wheel.linear_equilibrium_enabled = equilibrium_enabled ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f);
+                                    add_tooltip("Enable spring equilibrium on the suspension axis.");
+                                    ImGui::DragFloat("Equilibrium target X", &wheel.linear_equilibrium_target.x, 0.01f, -10.0f, 10.0f);
+                                    add_tooltip("Target equilibrium position along the suspension axis.");
+                                }
+
+                                ImGui::DragFloat("Spring K", &wheel.spring_k, 1.0f, 0.0f, 50000.0f);
+                                add_tooltip("Suspension spring stiffness (6DoF spring on X).");
+                                ImGui::DragFloat("Spring D", &wheel.spring_d, 1.0f, 0.0f, 50000.0f);
+                                add_tooltip("Suspension damping (6DoF spring on X).");
+                                ImGui::EndTabItem();
+                            }
+
+                            if (ImGui::BeginTabItem("Collider"))
+                            {
+                                ImGui::DragFloat("Wheel radius", &wheel.wheel_radius, 0.01f, 0.05f, 5.0f);
+                                add_tooltip("Radius for autogenerated wheel collider.");
+                                int collider_choice = static_cast<int>(wheel.wheel_collider_type);
+                                if (ImGui::Combo("Wheel collider", &collider_choice, "Sphere\0Capsule\0"))
+                                    wheel.wheel_collider_type = static_cast<eeng::ecs::WheelColliderType>(collider_choice);
+                                add_tooltip("Collider type used for autogenerated wheels.");
+                                if (wheel.wheel_collider_type == eeng::ecs::WheelColliderType::Capsule)
+                                {
+                                    ImGui::DragFloat("Wheel width", &wheel.wheel_width, 0.01f, 0.0f, 5.0f);
+                                    add_tooltip("Capsule height (wheel width) along the axle axis.");
+                                }
+                                ImGui::DragFloat("Knuckle radius", &wheel.knuckle_radius, 0.01f, 0.05f, 5.0f);
+                                add_tooltip("Radius for autogenerated knuckle trigger collider.");
+                                ImGui::DragFloat("Wheel mass", &wheel.wheel_mass, 0.1f, 0.0f, 100.0f);
+                                add_tooltip("Override wheel mass in kg (<= 0 keeps auto-mass).");
+                                ImGui::DragFloat("Knuckle mass", &wheel.knuckle_mass, 0.1f, 0.0f, 100.0f);
+                                add_tooltip("Override knuckle mass in kg (<= 0 keeps auto-mass).");
+
+                                ImGui::Checkbox("Override friction", &wheel.friction_override);
+                                add_tooltip("Use a per-wheel friction instead of the global default.");
+                                if (wheel.friction_override)
+                                {
+                                    ImGui::DragFloat("Wheel friction", &wheel.wheel_friction, 0.1f, 0.0f, 10.0f);
+                                    add_tooltip("Wheel friction applied to the wheel rigid body.");
+                                }
+                                else
+                                {
+                                    ImGui::TextDisabled("Wheel friction (global): %.2f", vehicle_rig1_spec_.wheel_friction);
+                                }
+                                ImGui::EndTabItem();
+                            }
+
+                            if (ImGui::BeginTabItem("Drive"))
+                            {
+                                ImGui::Checkbox("Steerable", &wheel.steerable);
+                                add_tooltip("Allow steering on this wheel (6DoF angular X).");
+                                ImGui::Checkbox("Override drive", &wheel.drive_override);
+                                add_tooltip("Use a per-wheel driven flag instead of the global default.");
+                                if (wheel.drive_override)
+                                {
+                                    ImGui::Checkbox("Driven", &wheel.driven);
+                                    add_tooltip("Enable drive motor on this wheel hinge.");
+                                }
+                                else
+                                {
+                                    ImGui::TextDisabled("Driven (global): %s", vehicle_rig1_spec_.drive_default ? "Yes" : "No");
+                                }
+                                ImGui::DragFloat("Drive direction", &wheel.drive_direction, 0.1f, -5.0f, 5.0f);
+                                add_tooltip("Sign flip for drive direction (+/-).");
+                                ImGui::DragFloat("Steer direction", &wheel.steer_direction, 0.1f, -5.0f, 5.0f);
+                                add_tooltip("Sign flip for steering direction (+/-).");
+                                ImGui::EndTabItem();
+                            }
+
+                            ImGui::EndTabBar();
+                        }
+
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                }
 
             ImGui::TreePop();
         }

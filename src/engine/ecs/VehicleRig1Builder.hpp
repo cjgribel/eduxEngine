@@ -67,8 +67,14 @@ namespace eeng::ecs
         float wheel_mass = 1.0f;
         float knuckle_mass = 1.0f;
 
+        // Optional wheel friction override (PhysicsMaterialComponent).
+        bool friction_override = false;
+        float wheel_friction = 0.5f;
+
         bool steerable = false;
         bool driven = false;
+        // Override the global drive default (when false, uses VehicleRig1Spec::drive_default).
+        bool drive_override = false;
         // Optional sign flips to match art/axis conventions.
         float drive_direction = 1.0f;
         float steer_direction = 1.0f;
@@ -92,6 +98,11 @@ namespace eeng::ecs
 
         // Constraint tuning (disable collisions between constrained bodies).
         bool disable_collisions = true;
+
+        // Default drive flag (used when a wheel does not override).
+        bool drive_default = false;
+        // Default wheel friction (used when a wheel does not override).
+        float wheel_friction = 0.5f;
 
         // Steering axis in chassis local space.
         glm::vec3 steer_axis{ 0.0f, 1.0f, 0.0f };
