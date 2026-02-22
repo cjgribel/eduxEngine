@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "ImGuiBackendSDL.hpp"
+#include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
 
@@ -11,6 +12,7 @@ namespace eeng::imgui_backend
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
         return ImGui_ImplSDL2_InitForOpenGL(window, context)
             && ImGui_ImplOpenGL3_Init("#version 410 core");

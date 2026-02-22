@@ -32,6 +32,7 @@ namespace eeng
         void draw_task_monitor(EngineContext& ctx) const;
         void draw_command_queue(EngineContext& ctx) const;
         void draw_rig_spawner(EngineContext& ctx) const;
+        void draw_dockspace(EngineContext& ctx) const;
 
         void draw_scene_graph(EngineContext& ctx) const;
         void draw_animation_graph_visualizer(EngineContext& ctx) const;

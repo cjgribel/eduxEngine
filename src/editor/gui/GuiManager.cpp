@@ -1,6 +1,8 @@
 // Created by Carl Johan Gribel 2025.
 // Licensed under the MIT License. See LICENSE file for details.
 
+#define IMGUI_DEFINE_MATH_OPERATORS
+
 #include "GuiManager.hpp"
 #include "ResourceManager.hpp"
 #include "BatchRegistry.hpp"
@@ -23,15 +25,111 @@
 #include "MainThreadQueue.hpp"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <string>
 //#include <future>
 
 namespace eeng
 {
+    namespace
+    {
+        bool g_imgui_ini_set = false;
+        bool g_request_layout_reset = false;
+        bool g_layout_bootstrapped = false;
+        std::string g_imgui_ini_path;
+
+        void ensure_imgui_ini_path(EngineContext& ctx)
+        {
+            if (g_imgui_ini_set)
+                return;
+
+            std::filesystem::path root;
+            if (ctx.project_config)
+                root = ctx.project_config->project_root;
+            else
+                root = std::filesystem::current_path();
+
+            std::filesystem::path dir = root / ".editor";
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+
+            g_imgui_ini_path = (dir / "imgui.ini").string();
+            auto& io = ImGui::GetIO();
+            io.IniFilename = g_imgui_ini_path.c_str();
+
+            if (std::filesystem::exists(g_imgui_ini_path, ec))
+            {
+                ImGui::LoadIniSettingsFromDisk(g_imgui_ini_path.c_str());
+            }
+
+            g_imgui_ini_set = true;
+        }
+
+        bool should_bootstrap_layout()
+        {
+            if (g_request_layout_reset)
+                return true;
+
+            if (g_layout_bootstrapped)
+                return false;
+
+            std::error_code ec;
+            if (g_imgui_ini_path.empty() || !std::filesystem::exists(g_imgui_ini_path, ec))
+                return true;
+
+            return false;
+        }
+
+        void build_default_dock_layout(ImGuiID dockspace_id, const ImVec2& dockspace_size)
+        {
+            ImGui::DockBuilderRemoveNode(dockspace_id);
+            ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(dockspace_id, dockspace_size);
+
+            ImGuiID dock_main = dockspace_id;
+            ImGuiID dock_left = 0;
+            ImGuiID dock_right = 0;
+            ImGuiID dock_bottom = 0;
+
+            ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.23f, &dock_left, &dock_main);
+            ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.28f, &dock_right, &dock_main);
+            ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.27f, &dock_bottom, &dock_main);
+
+            // Left: scene hierarchy (includes embedded inspector).
+            ImGui::DockBuilderDockWindow("Scene Hierarchy", dock_left);
+
+            // Right: resource/tools.
+            ImGui::DockBuilderDockWindow("Resource Browser", dock_right);
+            ImGui::DockBuilderDockWindow("Storage", dock_right);
+            ImGui::DockBuilderDockWindow("Storage Occupancy", dock_right);
+            ImGui::DockBuilderDockWindow("Rig Spawner", dock_right);
+
+            // Bottom: logs + diagnostics.
+            ImGui::DockBuilderDockWindow("Log", dock_bottom);
+            ImGui::DockBuilderDockWindow("Command Queue", dock_bottom);
+            ImGui::DockBuilderDockWindow("Task Monitor", dock_bottom);
+            ImGui::DockBuilderDockWindow("Batch Registry", dock_bottom);
+            ImGui::DockBuilderDockWindow("Profiler", dock_bottom);
+            ImGui::DockBuilderDockWindow("Engine Info", dock_bottom);
+
+            // Center: graph tooling.
+            ImGui::DockBuilderDockWindow("Animation Graph Visualizer", dock_main);
+
+            ImGui::DockBuilderFinish(dockspace_id);
+
+            g_layout_bootstrapped = true;
+            g_request_layout_reset = false;
+
+            if (!g_imgui_ini_path.empty())
+                ImGui::SaveIniSettingsToDisk(g_imgui_ini_path.c_str());
+        }
+    } // namespace
+
     void GuiManager::init()
     {
         // ImGui::StyleColorsClassic();
@@ -50,6 +148,7 @@ namespace eeng
             && ctx.services->play_mode_active.load(std::memory_order_relaxed);
         draw_main_menu(ctx);
         draw_editor_controls(ctx);
+        draw_dockspace(ctx);
         if (is_playing)
             return;
 
@@ -235,6 +334,9 @@ namespace eeng
             toggle_gui_flag(GuiFlags::ShowAnimationGraphVisualizer, "Animation Graph");
             toggle_gui_flag(GuiFlags::ShowEngineInfo, "Engine Info");
             toggle_gui_flag(GuiFlags::ShowLogWindow, "Log");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Reset Layout"))
+                g_request_layout_reset = true;
             ImGui::EndMenu();
         }
 
@@ -257,6 +359,40 @@ namespace eeng
         ImGui::Begin("Profiler");
         gui::ProfilerWidget widget{ ctx };
         widget.draw();
+        ImGui::End();
+    }
+
+    void GuiManager::draw_dockspace(EngineContext& ctx) const
+    {
+        ensure_imgui_ini_path(ctx);
+
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->WorkPos);
+        ImGui::SetNextWindowSize(viewport->WorkSize);
+        ImGui::SetNextWindowViewport(viewport->ID);
+        ImGui::SetNextWindowBgAlpha(0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking
+            | ImGuiWindowFlags_NoTitleBar
+            | ImGuiWindowFlags_NoCollapse
+            | ImGuiWindowFlags_NoResize
+            | ImGuiWindowFlags_NoMove
+            | ImGuiWindowFlags_NoBringToFrontOnFocus
+            | ImGuiWindowFlags_NoNavFocus;
+
+        ImGui::Begin("EditorDockspace", nullptr, flags);
+        ImGui::PopStyleVar(3);
+
+        const ImGuiID dockspace_id = ImGui::GetID("EditorDockspaceRoot");
+        const ImGuiDockNodeFlags dock_flags = ImGuiDockNodeFlags_PassthruCentralNode;
+        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dock_flags);
+
+        if (should_bootstrap_layout())
+            build_default_dock_layout(dockspace_id, viewport->WorkSize);
+
         ImGui::End();
     }
 

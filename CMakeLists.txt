@@ -208,7 +208,7 @@ message(STATUS "Bullet Physics fetched and included")
 message(STATUS "Fetching Dear ImGui")
 FetchContent_Declare(imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui
-    GIT_TAG v1.89.9)
+    GIT_TAG v1.89.9-docking)
 FetchContent_MakeAvailable(imgui)
 include_directories(${imgui_SOURCE_DIR})
 include_directories(${imgui_SOURCE_DIR}/backends)
