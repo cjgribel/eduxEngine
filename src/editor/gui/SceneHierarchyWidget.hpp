@@ -15,6 +15,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <functional>
 
 namespace eeng::gui
 {
@@ -41,6 +42,8 @@ namespace eeng::gui
         std::unordered_set<Guid> guid_conflicts;
         BatchKey last_root_batch{};
         bool has_last_root_batch = false;
+        std::unordered_set<Entity> selection_path;
+        bool open_selected_path = false;
 
         SceneHierarchyWidget(EngineContext& ctx)
             : ctx(ctx)
@@ -57,6 +60,7 @@ namespace eeng::gui
             closed_index = -1;
             has_last_root_batch = false;
             build_batch_lookup();
+            update_selection_path();
 
             if (!scenegraph.size()) return;
 
@@ -85,36 +89,49 @@ namespace eeng::gui
                 maybe_draw_batch_separator(entity);
 
             const auto registry = em.registry_wptr().lock();
-            const std::string entity_name = meta::get_entity_name(registry, entity, entt::resolve<HeaderComponent>());
+            std::string entity_name = meta::get_entity_name(registry, entity, entt::resolve<HeaderComponent>());
+            const auto name_hash_pos = entity_name.rfind("###");
+            if (name_hash_pos != std::string::npos)
+                entity_name.resize(name_hash_pos);
+
             const std::string label = "[entity#" + std::to_string(entity.to_integral()) + "] " + entity_name;
 
             bool is_selected = entity_selection.contains(entity);
             bool is_leaf = scenegraph.get_nbr_children(entity) == 0;
 
             ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth;
-            if (is_leaf) flags |= ImGuiTreeNodeFlags_Leaf;
+            flags |= ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+            if (is_leaf) flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
             if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
 
-            ImGui::SetNextItemOpen(true);
-            if (ImGui::TreeNodeEx(label.c_str(), flags))
+            if (open_selected_path && selection_path.contains(entity))
+                ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+            else if (level == 0)
+                ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+
+            intptr_t id_int = static_cast<intptr_t>(entity.to_integral());
+            void* id_ptr = reinterpret_cast<void*>(id_int);
+
+            bool opened = ImGui::TreeNodeEx(id_ptr, flags, "%s", label.c_str());
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
+            {
+                if (bool ctrl_pressed = ImGui::IsKeyDown(ImGuiKey_ModCtrl); ctrl_pressed)
+                {
+                    // Multi-selection with Ctrl: toggle selection state
+                    is_selected ? entity_selection.remove(entity) : entity_selection.add(entity);
+                }
+                else
+                {
+                    // Single selection: clear previous selections and select this entity
+                    entity_selection.clear();
+                    entity_selection.add(entity);
+                }
+            }
+
+            if (opened)
             {
                 current_level = level;
                 closed_index = -1;
-
-                if (ImGui::IsItemClicked())
-                {
-                    if (bool ctrl_pressed = ImGui::IsKeyDown(ImGuiKey_ModCtrl); ctrl_pressed)
-                    {
-                        // Multi-selection with Ctrl: toggle selection state
-                        is_selected ? entity_selection.remove(entity) : entity_selection.add(entity);
-                    }
-                    else
-                    {
-                        // Single selection: clear previous selections and select this entity
-                        entity_selection.clear();
-                        entity_selection.add(entity);
-                    }
-                }
             }
             else
             {
@@ -222,6 +239,44 @@ namespace eeng::gui
 
             last_root_batch = key;
             has_last_root_batch = true;
+        }
+
+        size_t compute_selection_hash() const
+        {
+            size_t hash = 0;
+            for (const auto& entity : entity_selection.get_all())
+            {
+                const size_t h = std::hash<Entity>{}(entity);
+                hash ^= h + 0x9e3779b97f4a7c15ULL + (hash << 6) + (hash >> 2);
+            }
+            return hash;
+        }
+
+        void update_selection_path()
+        {
+            selection_path.clear();
+            open_selected_path = false;
+
+            static size_t last_hash = 0;
+            const size_t selection_hash = compute_selection_hash();
+            if (selection_hash == last_hash)
+                return;
+
+            last_hash = selection_hash;
+            if (selection_hash == 0)
+                return;
+
+            open_selected_path = true;
+            auto& tree = scenegraph.get_tree();
+            for (const auto& entity : entity_selection.get_all())
+            {
+                if (!entity.has_id() || !scenegraph.contains(entity))
+                    continue;
+                tree.ascend(entity, [&](Entity& payload, size_t)
+                    {
+                        selection_path.insert(payload);
+                    });
+            }
         }
     };
 } // namespace eeng::gui
