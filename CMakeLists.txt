@@ -350,6 +350,7 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/serializers/AnimationGraphSerialization.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/GuiManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/ProfilerWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/gui/RigSpawnerWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/LogManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/LogGlobals.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/physics/MassProperties.cpp

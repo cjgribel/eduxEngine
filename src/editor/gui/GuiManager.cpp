@@ -13,6 +13,7 @@
 #include "gui/CommandQueueWidget.hpp"
 #include "gui/ResourceBrowserWidget.hpp"
 #include "gui/ProfilerWidget.hpp"
+#include "gui/RigSpawnerWidget.hpp"
 
 #include "EngineContextHelpers.hpp"
 #include "editor/AnimationGraphComponentInspect.hpp"
@@ -69,6 +70,9 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowCommandQueue))
             draw_command_queue(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowRigSpawner))
+            draw_rig_spawner(ctx);
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowSceneGraph))
             draw_scene_graph(ctx);
@@ -219,6 +223,7 @@ namespace eeng
             toggle_gui_flag(GuiFlags::ShowBatchRegistry, "Batch Registry");
             toggle_gui_flag(GuiFlags::ShowTaskMonitor, "Task Monitor");
             toggle_gui_flag(GuiFlags::ShowCommandQueue, "Command Queue");
+            toggle_gui_flag(GuiFlags::ShowRigSpawner, "Rig Spawner");
             ImGui::EndMenu();
         }
 
@@ -251,6 +256,14 @@ namespace eeng
     {
         ImGui::Begin("Profiler");
         gui::ProfilerWidget widget{ ctx };
+        widget.draw();
+        ImGui::End();
+    }
+
+    void GuiManager::draw_rig_spawner(EngineContext& ctx) const
+    {
+        ImGui::Begin("Rig Spawner");
+        gui::RigSpawnerWidget widget{ ctx };
         widget.draw();
         ImGui::End();
     }

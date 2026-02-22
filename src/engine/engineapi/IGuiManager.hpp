@@ -20,7 +20,8 @@ namespace eeng
         ShowEntityInspector,
         ShowTaskMonitor,
         ShowCommandQueue,
-        ShowAnimationGraphVisualizer
+        ShowAnimationGraphVisualizer,
+        ShowRigSpawner
         // ShowRenderStats,
         // ShowInputDebugger,
         // ...

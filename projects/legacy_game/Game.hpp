@@ -93,12 +93,6 @@ public:
 private:
     /// @brief For rendering of GUI elements
     void renderUI();
-    void ensure_vehicle_rig1_config();
-    void reset_vehicle_rig1_config();
-    void spawn_vehicle_rig1_from_prefab();
-    void ensure_piston_rig_config();
-    void reset_piston_rig_config();
-    void spawn_piston_rig_from_prefab();
 
     // ENGINE API
     std::shared_ptr<eeng::EngineContext> ctx;
@@ -139,20 +133,6 @@ private:
 
     eeng::ecs::Entity player_entity;
     glm_aux::Ray view_ray;
-
-    // VehicleRig1 cached spawn config (editable in UI).
-    eeng::ecs::VehicleRig1Spec vehicle_rig1_spec_{};
-    bool vehicle_rig1_spec_initialized_ = false;
-    glm::vec3 vehicle_rig1_spawn_pos_{ 0.0f, 2.0f, 0.0f };
-    float vehicle_rig1_control_steer_speed_ = 6.0f;
-    float vehicle_rig1_control_steer_max_impulse_ = 2000.0f;
-    float vehicle_rig1_control_drive_velocity_ = 10.0f;
-    float vehicle_rig1_control_drive_max_impulse_ = 150.0f;
-    float vehicle_rig1_control_brake_max_impulse_ = 200.0f;
-
-    // Piston rig cached spawn config (editable in UI).
-    eeng::ecs::PistonRigSpec piston_rig_spec_{};
-    bool piston_rig_spec_initialized_ = false;
 
     // Light properties
     struct PointLight
