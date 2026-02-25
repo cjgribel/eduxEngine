@@ -27,6 +27,7 @@ namespace eeng
         void draw_storage(EngineContext& ctx) const;
 
         void draw_resource_browser(EngineContext& ctx) const;
+        void draw_asset_inspector(EngineContext& ctx) const;
 
         void draw_batch_registry(EngineContext& ctx) const;
         void draw_task_monitor(EngineContext& ctx) const;
@@ -35,6 +36,7 @@ namespace eeng
         void draw_dockspace(EngineContext& ctx) const;
 
         void draw_scene_graph(EngineContext& ctx) const;
+        void draw_entity_inspector(EngineContext& ctx) const;
         void draw_animation_graph_visualizer(EngineContext& ctx) const;
         void draw_editor_controls(EngineContext& ctx) const;
         void draw_main_menu(EngineContext& ctx) const;

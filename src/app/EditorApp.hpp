@@ -54,12 +54,14 @@ namespace eeng::editor
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowProfiler, true);
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowStorageWindow, true);
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowResourceBrowser, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowAssetInspector, true);
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowSceneGraph, true);
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowEntityInspector, true);
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowBatchRegistry, true);
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowTaskMonitor, true);
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowCommandQueue, true);
                 ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowAnimationGraphVisualizer, true);
+                ctx_->gui_manager->set_flag(eeng::GuiFlags::ShowEditorControls, true);
             }
             if (ctx_ && ctx_->services)
             {

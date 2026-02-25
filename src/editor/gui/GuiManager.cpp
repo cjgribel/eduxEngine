@@ -95,19 +95,25 @@ namespace eeng
             ImGuiID dock_left = 0;
             ImGuiID dock_right = 0;
             ImGuiID dock_bottom = 0;
+            ImGuiID dock_left_bottom = 0;
+            ImGuiID dock_right_bottom = 0;
 
             ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.23f, &dock_left, &dock_main);
             ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.28f, &dock_right, &dock_main);
             ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.27f, &dock_bottom, &dock_main);
+            ImGui::DockBuilderSplitNode(dock_left, ImGuiDir_Down, 0.45f, &dock_left_bottom, &dock_left);
+            ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Down, 0.45f, &dock_right_bottom, &dock_right);
 
-            // Left: scene hierarchy (includes embedded inspector).
+            // Left: scene hierarchy + entity inspector.
             ImGui::DockBuilderDockWindow("Scene Hierarchy", dock_left);
+            ImGui::DockBuilderDockWindow("Entity Inspector", dock_left_bottom);
 
             // Right: resource/tools.
             ImGui::DockBuilderDockWindow("Resource Browser", dock_right);
             ImGui::DockBuilderDockWindow("Storage", dock_right);
             ImGui::DockBuilderDockWindow("Storage Occupancy", dock_right);
             ImGui::DockBuilderDockWindow("Rig Spawner", dock_right);
+            ImGui::DockBuilderDockWindow("Asset Inspector", dock_right_bottom);
 
             // Bottom: logs + diagnostics.
             ImGui::DockBuilderDockWindow("Log", dock_bottom);
@@ -147,7 +153,8 @@ namespace eeng
         const bool is_playing = ctx.services
             && ctx.services->play_mode_active.load(std::memory_order_relaxed);
         draw_main_menu(ctx);
-        draw_editor_controls(ctx);
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEditorControls))
+            draw_editor_controls(ctx);
         draw_dockspace(ctx);
         if (is_playing)
             return;
@@ -160,6 +167,9 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowResourceBrowser))
             draw_resource_browser(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowAssetInspector))
+            draw_asset_inspector(ctx);
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowBatchRegistry))
             draw_batch_registry(ctx);
@@ -175,6 +185,9 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowSceneGraph))
             draw_scene_graph(ctx);
+
+        if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowEntityInspector))
+            draw_entity_inspector(ctx);
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowAnimationGraphVisualizer))
             draw_animation_graph_visualizer(ctx);
@@ -328,10 +341,18 @@ namespace eeng
 
         if (ImGui::BeginMenu("Window"))
         {
-            toggle_gui_flag(GuiFlags::ShowSceneGraph, "Scene Graph");
+            toggle_gui_flag(GuiFlags::ShowSceneGraph, "Scene Hierarchy");
+            toggle_gui_flag(GuiFlags::ShowEntityInspector, "Entity Inspector");
             toggle_gui_flag(GuiFlags::ShowResourceBrowser, "Resource Browser");
+            toggle_gui_flag(GuiFlags::ShowAssetInspector, "Asset Inspector");
             toggle_gui_flag(GuiFlags::ShowStorageWindow, "Storage");
+            toggle_gui_flag(GuiFlags::ShowProfiler, "Profiler");
+            toggle_gui_flag(GuiFlags::ShowBatchRegistry, "Batch Registry");
+            toggle_gui_flag(GuiFlags::ShowTaskMonitor, "Task Monitor");
+            toggle_gui_flag(GuiFlags::ShowCommandQueue, "Command Queue");
+            toggle_gui_flag(GuiFlags::ShowRigSpawner, "Rig Spawner");
             toggle_gui_flag(GuiFlags::ShowAnimationGraphVisualizer, "Animation Graph");
+            toggle_gui_flag(GuiFlags::ShowEditorControls, "Editor Controls");
             toggle_gui_flag(GuiFlags::ShowEngineInfo, "Engine Info");
             toggle_gui_flag(GuiFlags::ShowLogWindow, "Log");
             ImGui::Separator();
@@ -533,6 +554,21 @@ namespace eeng
 
         gui::ResourceBrowserWidget browser{ ctx };
         browser.draw();
+
+        ImGui::End();
+    }
+
+    void GuiManager::draw_asset_inspector(EngineContext& ctx) const
+    {
+        ImGui::Begin("Asset Inspector");
+
+        gui::ResourceBrowserActionsWidget actions{ ctx };
+        actions.draw();
+
+        ImGui::Separator();
+
+        gui::AssetInspectorWidget inspector{ ctx };
+        inspector.draw();
 
         ImGui::End();
     }
@@ -893,96 +929,30 @@ namespace eeng
 
         ImGui::Begin("Scene Hierarchy");
 
-        // --- Scene tree toolbar -------------------------------------------
-        {
-            gui::SceneTreeToolbarWidget toolbar{ ctx };
-            toolbar.draw();
-        }
+        gui::SceneTreeToolbarWidget toolbar{ ctx };
+        toolbar.draw();
 
         ImGui::Separator();
 
-        static gui::VerticalSplitterWidget scene_splitter{};
-        static bool scene_splitter_init = false;
-        ImVec2 pane_avail = ImGui::GetContentRegionAvail();
-        if (!scene_splitter_init)
+        if (ImGui::BeginChild("SceneHierarchyRegion",
+            ImVec2(0.0f, 0.0f),
+            true,
+            ImGuiWindowFlags_HorizontalScrollbar))
         {
-            const float line_h = ImGui::GetTextLineHeightWithSpacing();
-            const float desired_top = line_h * 10.0f;
-            scene_splitter.bottom_height = std::max(200.0f, pane_avail.y - desired_top);
-            scene_splitter_init = true;
-        }
-
-        const float top_height = scene_splitter.calc_top_height(pane_avail.y);
-
-        if (ImGui::BeginChild("SceneTopPane", ImVec2(0.0f, top_height), false))
-        {
-            auto& selection = *ctx.entity_selection;
-            std::string selection_list;
-            if (selection.empty())
-            {
-                selection_list = "(none)";
-            }
-            else
-            {
-                selection_list.reserve(selection.size() * 6); // tiny pre-reserve
-                bool first = true;
-                for (auto entity : selection.get_all())
-                {
-                    if (!first)
-                        selection_list += ", ";
-                    first = false;
-                    selection_list += std::to_string(entity.to_integral());
-                }
-            }
-
-            constexpr const char* selection_label = "Selected entities:";
-            const float available_width = ImGui::GetContentRegionAvail().x;
-            const float label_width = ImGui::CalcTextSize(selection_label).x + ImGui::GetStyle().ItemSpacing.x;
-            const float wrap_width = std::max(0.0f, available_width - label_width);
-            const float list_height = ImGui::CalcTextSize(selection_list.c_str(), nullptr, false, wrap_width).y;
-            const float selection_height = std::max(ImGui::GetTextLineHeightWithSpacing(), list_height);
-            const float available = ImGui::GetContentRegionAvail().y;
-            const float hierarchy_height = std::max(0.0f, available - selection_height - ImGui::GetStyle().ItemSpacing.y);
-
-            if (ImGui::BeginChild("SceneHierarchyRegion",
-                ImVec2(0.0f, hierarchy_height),
-                true,
-                ImGuiWindowFlags_HorizontalScrollbar))
-            {
-                gui::SceneHierarchyWidget hierarchy{ ctx };
-                hierarchy.draw();
-            }
-            ImGui::EndChild();
-
-            ImGui::Separator();
-
-            ImGui::TextUnformatted(selection_label);
-            ImGui::SameLine();
-            if (selection.empty())
-                ImGui::TextDisabled("%s", selection_list.c_str());
-            else
-                ImGui::TextWrapped("%s", selection_list.c_str());
+            gui::SceneHierarchyWidget hierarchy{ ctx };
+            hierarchy.draw();
         }
         ImGui::EndChild();
+        ImGui::End();
+    }
 
-        scene_splitter.draw_handle(pane_avail.y);
+    void GuiManager::draw_entity_inspector(EngineContext& ctx) const
+    {
+        ImGui::Begin("Entity Inspector");
 
-        if (ImGui::BeginChild(
-                "InspectorRegion",
-                ImVec2(0.0f, scene_splitter.bottom_height),
-                true,
-                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
-        {
-            gui::EntityInspectorWidget inspector{ ctx };
-            inspector.draw();
-        }
-        ImGui::EndChild();
+        gui::EntityInspectorWidget inspector{ ctx };
+        inspector.draw();
 
-        // --- Command Queue (NOT HERE) ----------------------------------------
-
-        // Inspector::inspect_command_queue(inspector);
-
-// End window
         ImGui::End();
     }
 

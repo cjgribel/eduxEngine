@@ -694,11 +694,7 @@ namespace eeng::gui
 
         void draw()
         {
-            static VerticalSplitterWidget splitter{};
-            ImVec2 avail = ImGui::GetContentRegionAvail();
-            float top_pane_height = splitter.calc_top_height(avail.y);
-
-            if (ImGui::BeginChild("##ResourceBrowserTopPane", ImVec2(0, top_pane_height), true))
+            if (ImGui::BeginChild("##ResourceBrowserPane", ImVec2(0, 0), true))
             {
                 if (ImGui::BeginTabBar("ResourceViews"))
                 {
@@ -760,20 +756,6 @@ namespace eeng::gui
 
                     ImGui::EndTabBar();
                 }
-            }
-            ImGui::EndChild();
-
-            splitter.draw_handle(avail.y);
-
-            if (ImGui::BeginChild("##ResourceBrowserBottomPane", ImVec2(0, splitter.bottom_height), true))
-            {
-                ResourceBrowserActionsWidget actions{ ctx };
-                actions.draw();
-
-                ImGui::Separator();
-
-                AssetInspectorWidget inspector{ ctx };
-                inspector.draw();
             }
             ImGui::EndChild();
         }
