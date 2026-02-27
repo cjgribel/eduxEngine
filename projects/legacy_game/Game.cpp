@@ -319,6 +319,10 @@ void Game::render(
             *shapeRenderer,
             VP_P_V,
             matrices.windowSize.y);
+        runtime_pipeline_.render_runtime_overlays(
+            registry,
+            *ctx,
+            *shapeRenderer);
     }
 
     // Begin rendering pass

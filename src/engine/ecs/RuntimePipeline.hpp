@@ -19,6 +19,7 @@
 #include "ecs/systems/RenderSystem.hpp"
 #include "ecs/systems/ScriptSystem.hpp"
 #include "ecs/systems/StickyNoteSystem.hpp"
+#include "ecs/systems/TrailSystem.hpp"
 #include "ecs/systems/TransformSystem.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -65,6 +66,7 @@ namespace eeng::ecs
             script_system_->init(ctx);
 
             debug_render_system_ = std::make_unique<systems::DebugRenderSystem>();
+            trail_system_ = std::make_unique<systems::TrailSystem>();
             sticky_note_system_ = std::make_unique<systems::StickyNoteSystem>();
         }
 
@@ -103,6 +105,10 @@ namespace eeng::ecs
                 two_anchor_align_system_->update(registry, ctx, delta_time);
 
             update_common(ctx, delta_time);
+
+            if (trail_system_)
+                trail_system_->update(registry, ctx, delta_time);
+
             // Push a snapshot for editor UI without requiring direct system access.
             update_physics_monitor_stats(ctx);
         }
@@ -140,6 +146,21 @@ namespace eeng::ecs
                 debug_render_system_->render(registry, ctx, renderer, vp_p_v, window_height);
             if (sticky_note_system_)
                 sticky_note_system_->render(registry, ctx, vp_p_v, window_height);
+        }
+
+        void render_runtime_overlays(
+            entt::registry& registry,
+            EngineContext& ctx,
+            ShapeRendering::ShapeRenderer& renderer)
+        {
+            bool play_mode = true;
+            if (ctx.services)
+                play_mode = ctx.services->play_mode_active.load(std::memory_order_relaxed);
+            if (!play_mode)
+                return;
+
+            if (trail_system_)
+                trail_system_->render(registry, ctx, renderer);
         }
 
         void render_entities(
@@ -229,6 +250,7 @@ namespace eeng::ecs
         std::unique_ptr<systems::TwoAnchorAlignSystem> two_anchor_align_system_;
         std::unique_ptr<systems::ScriptSystem> script_system_;
         std::unique_ptr<systems::DebugRenderSystem> debug_render_system_;
+        std::unique_ptr<systems::TrailSystem> trail_system_;
         std::unique_ptr<systems::StickyNoteSystem> sticky_note_system_;
     };
 } // namespace eeng::ecs

@@ -292,6 +292,7 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/AnimationGraphComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/TransformComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/HeaderComponent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/TrailComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/StickyNoteComponent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/VehicleRig1Builder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/PistonRigBuilder.cpp
@@ -311,6 +312,7 @@ add_executable(LegacyGame
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/PhysicsSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/SpringDamperSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/ScriptSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/TrailSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/ecs/systems/StickyNoteSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/editor/GuiCommands_Entities.cpp
