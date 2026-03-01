@@ -19,6 +19,8 @@
 
 #include "EngineContextHelpers.hpp"
 #include "editor/AnimationGraphComponentInspect.hpp"
+#include "editor/OverlayRenderSettingsPersistence.hpp"
+#include "ecs/RuntimePipeline.hpp"
 #include "ecs/systems/DebugRenderSystem.hpp"
 
 #include "ThreadPool.hpp" // remove?
@@ -288,39 +290,96 @@ namespace eeng
                 ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu("Debug Rendering"))
+            if (ImGui::BeginMenu("Overlay Rendering"))
             {
-                auto* debug_settings = ctx.services ? ctx.services->debug_render_settings : nullptr;
-                if (!debug_settings)
+                auto* overlay_settings = ctx.services ? ctx.services->overlay_render_settings : nullptr;
+                auto* debug_edit = ctx.services ? ctx.services->debug_render_settings_edit : nullptr;
+                auto* debug_play = ctx.services ? ctx.services->debug_render_settings_play : nullptr;
+                if (!overlay_settings || !debug_edit || !debug_play)
                 {
-                    ImGui::TextDisabled("Debug renderer unavailable.");
+                    ImGui::TextDisabled("Overlay settings unavailable.");
                 }
                 else
                 {
-                    ImGui::MenuItem("Transform Labels", nullptr, &debug_settings->show_transform_labels);
-                    ImGui::MenuItem("Colliders", nullptr, &debug_settings->show_colliders);
-                    ImGui::MenuItem("Collider Labels", nullptr, &debug_settings->show_collider_labels);
-                    ImGui::MenuItem("RigidBody Labels", nullptr, &debug_settings->show_rigidbody_labels);
-                    ImGui::MenuItem("RigidBody COM", nullptr, &debug_settings->show_rigidbody_com);
-                    ImGui::MenuItem("RigidBody Axes", nullptr, &debug_settings->show_rigidbody_axes);
-                    ImGui::MenuItem("RigidBody Offset Frame", nullptr, &debug_settings->show_rigidbody_offset);
-                    ImGui::MenuItem("Raycasts", nullptr, &debug_settings->show_raycast_debug);
-                    ImGui::MenuItem("Constraints", nullptr, &debug_settings->show_constraints);
-                    ImGui::MenuItem("Constraint Hinges", nullptr, &debug_settings->show_constraint_hinges);
-                    ImGui::MenuItem("Constraint Sliders", nullptr, &debug_settings->show_constraint_sliders);
-                    ImGui::MenuItem("Constraint 6DoF", nullptr, &debug_settings->show_constraint_6dof);
-                    ImGui::MenuItem("Constraint Anchor Points", nullptr, &debug_settings->show_constraint_points);
-                    ImGui::MenuItem("Springs", nullptr, &debug_settings->show_springs);
-                    ImGui::MenuItem("Demo Shapes", nullptr, &debug_settings->show_demo_shapes);
-
-                    if (ImGui::BeginMenu("Skeleton"))
+                    bool dirty = false;
+                    const auto toggle_bool = [&dirty](const char* label, bool& value)
                     {
-                        ImGui::MenuItem("Lines", nullptr, &debug_settings->show_skeleton);
-                        ImGui::MenuItem("Nodes", nullptr, &debug_settings->show_skeleton_nodes);
-                        ImGui::MenuItem("Axes", nullptr, &debug_settings->show_skeleton_axes);
-                        ImGui::MenuItem("Labels", nullptr, &debug_settings->show_skeleton_labels);
-                        ImGui::MenuItem("Bones Only", nullptr, &debug_settings->show_skeleton_bones_only);
+                        if (ImGui::MenuItem(label, nullptr, &value))
+                            dirty = true;
+                    };
+
+                    const auto draw_debug_feature_toggles =
+                        [&](eeng::ecs::systems::DebugRenderSettings& settings)
+                    {
+                        toggle_bool("Transform Labels", settings.show_transform_labels);
+                        toggle_bool("Colliders", settings.show_colliders);
+                        toggle_bool("Collider Labels", settings.show_collider_labels);
+                        toggle_bool("RigidBody Labels", settings.show_rigidbody_labels);
+                        toggle_bool("RigidBody COM", settings.show_rigidbody_com);
+                        toggle_bool("RigidBody Axes", settings.show_rigidbody_axes);
+                        toggle_bool("RigidBody Offset Frame", settings.show_rigidbody_offset);
+                        toggle_bool("Raycasts", settings.show_raycast_debug);
+                        toggle_bool("Constraints", settings.show_constraints);
+                        toggle_bool("Constraint Hinges", settings.show_constraint_hinges);
+                        toggle_bool("Constraint Sliders", settings.show_constraint_sliders);
+                        toggle_bool("Constraint 6DoF", settings.show_constraint_6dof);
+                        toggle_bool("Constraint Anchor Points", settings.show_constraint_points);
+                        toggle_bool("Springs", settings.show_springs);
+                        toggle_bool("Two-Anchor Align", settings.show_two_anchor_align);
+                        toggle_bool("Demo Shapes", settings.show_demo_shapes);
+                        toggle_bool("Sticky Notes", settings.show_sticky_notes);
+
+                        if (ImGui::BeginMenu("Skeleton"))
+                        {
+                            toggle_bool("Lines", settings.show_skeleton);
+                            toggle_bool("Nodes", settings.show_skeleton_nodes);
+                            toggle_bool("Axes", settings.show_skeleton_axes);
+                            toggle_bool("Labels", settings.show_skeleton_labels);
+                            toggle_bool("Bones Only", settings.show_skeleton_bones_only);
+                            ImGui::EndMenu();
+                        }
+                    };
+
+                    const auto draw_mode_menu =
+                        [&](const char* label, eeng::ecs::OverlayModeSettings& mode_settings, eeng::ecs::systems::DebugRenderSettings& debug_settings)
+                    {
+                        if (!ImGui::BeginMenu(label))
+                            return;
+
+                        toggle_bool("Show Debug Overlays", mode_settings.show_debug);
+                        toggle_bool("Show Trails", mode_settings.show_trails);
+
+                        ImGui::Separator();
+                        ImGui::TextDisabled("Debug Feature Toggles");
+                        draw_debug_feature_toggles(debug_settings);
+
                         ImGui::EndMenu();
+                    };
+
+                    draw_mode_menu("Edit Mode", overlay_settings->edit, *debug_edit);
+                    draw_mode_menu("Play Mode", overlay_settings->play, *debug_play);
+
+                    ImGui::Separator();
+                    if (ImGui::MenuItem("Copy Edit -> Play"))
+                    {
+                        overlay_settings->play = overlay_settings->edit;
+                        *debug_play = *debug_edit;
+                        dirty = true;
+                    }
+                    if (ImGui::MenuItem("Copy Play -> Edit"))
+                    {
+                        overlay_settings->edit = overlay_settings->play;
+                        *debug_edit = *debug_play;
+                        dirty = true;
+                    }
+
+                    if (dirty)
+                    {
+                        eeng::editor::save_overlay_render_settings(
+                            ctx,
+                            *overlay_settings,
+                            *debug_edit,
+                            *debug_play);
                     }
                 }
                 ImGui::EndMenu();

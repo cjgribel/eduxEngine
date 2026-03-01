@@ -4,6 +4,7 @@
 
 #include "ReferenceGame.hpp"
 #include "BatchRegistry.hpp"
+#include "editor/OverlayRenderSettingsPersistence.hpp"
 #include <glm/glm.hpp>
 
 namespace eeng::reference_game
@@ -19,7 +20,18 @@ namespace eeng::reference_game
         {
             runtime_pipeline_.init(*ctx_);
             if (ctx_->services)
-                ctx_->services->debug_render_settings = runtime_pipeline_.debug_render_settings();
+            {
+                ctx_->services->debug_render_settings = runtime_pipeline_.debug_render_settings_edit();
+                ctx_->services->debug_render_settings_edit = runtime_pipeline_.debug_render_settings_edit();
+                ctx_->services->debug_render_settings_play = runtime_pipeline_.debug_render_settings_play();
+                ctx_->services->overlay_render_settings = runtime_pipeline_.overlay_render_settings();
+
+                eeng::editor::load_overlay_render_settings(
+                    *ctx_,
+                    *runtime_pipeline_.overlay_render_settings(),
+                    *runtime_pipeline_.debug_render_settings_edit(),
+                    *runtime_pipeline_.debug_render_settings_play());
+            }
         }
         return true;
     }
@@ -92,9 +104,14 @@ namespace eeng::reference_game
     void ReferenceGame::destroy()
     {
         if (ctx_ && ctx_->services
-            && ctx_->services->debug_render_settings == runtime_pipeline_.debug_render_settings())
+            && ctx_->services->debug_render_settings_edit == runtime_pipeline_.debug_render_settings_edit()
+            && ctx_->services->debug_render_settings_play == runtime_pipeline_.debug_render_settings_play()
+            && ctx_->services->overlay_render_settings == runtime_pipeline_.overlay_render_settings())
         {
             ctx_->services->debug_render_settings = nullptr;
+            ctx_->services->debug_render_settings_edit = nullptr;
+            ctx_->services->debug_render_settings_play = nullptr;
+            ctx_->services->overlay_render_settings = nullptr;
         }
         runtime_pipeline_.shutdown();
     }

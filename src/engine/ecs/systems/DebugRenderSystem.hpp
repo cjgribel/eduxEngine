@@ -103,6 +103,7 @@ namespace eeng::ecs::systems
         // ShapeRenderer demo overlay (debug visualization).
         bool show_demo_shapes = true;
         glm::vec3 demo_shape_offset{ 0.0f, 0.0f, -5.0f };
+        bool show_sticky_notes = true;
 
         // Skeleton debug overlays.
         bool show_skeleton = false; // parent-child links

@@ -5,6 +5,7 @@
 #include "LegacyGameMetaReg.hpp"
 #include "editor/ecs/FirstPersonCameraComponent.hpp"
 #include "editor/ecs/ThirdPersonCameraComponent.hpp"
+#include "editor/OverlayRenderSettingsPersistence.hpp"
 #include "editor/ProjectConfig.hpp"
 #include "glmcommon.hpp"
 #include "ImGuiHelpers.hpp"
@@ -41,7 +42,18 @@ bool Game::init()
 
     runtime_pipeline_.init(*ctx);
     if (ctx && ctx->services)
-        ctx->services->debug_render_settings = runtime_pipeline_.debug_render_settings();
+    {
+        ctx->services->debug_render_settings = runtime_pipeline_.debug_render_settings_edit();
+        ctx->services->debug_render_settings_edit = runtime_pipeline_.debug_render_settings_edit();
+        ctx->services->debug_render_settings_play = runtime_pipeline_.debug_render_settings_play();
+        ctx->services->overlay_render_settings = runtime_pipeline_.overlay_render_settings();
+
+        eeng::editor::load_overlay_render_settings(
+            *ctx,
+            *runtime_pipeline_.overlay_render_settings(),
+            *runtime_pipeline_.debug_render_settings_edit(),
+            *runtime_pipeline_.debug_render_settings_play());
+    }
     playerControllerSystem = std::make_unique<eeng::ecs::systems::MannequinPlayerControllerSystem>();
     if (playerControllerSystem)
         playerControllerSystem->set_physics_system(runtime_pipeline_.physics_system());
@@ -553,9 +565,14 @@ void Game::renderUI()
 void Game::destroy()
 {
     if (ctx && ctx->services
-        && ctx->services->debug_render_settings == runtime_pipeline_.debug_render_settings())
+        && ctx->services->debug_render_settings_edit == runtime_pipeline_.debug_render_settings_edit()
+        && ctx->services->debug_render_settings_play == runtime_pipeline_.debug_render_settings_play()
+        && ctx->services->overlay_render_settings == runtime_pipeline_.overlay_render_settings())
     {
         ctx->services->debug_render_settings = nullptr;
+        ctx->services->debug_render_settings_edit = nullptr;
+        ctx->services->debug_render_settings_play = nullptr;
+        ctx->services->overlay_render_settings = nullptr;
     }
     runtime_pipeline_.shutdown();
 }

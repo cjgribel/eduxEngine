@@ -28,6 +28,24 @@
 
 namespace eeng::ecs
 {
+    enum class OverlayMode : std::uint8_t
+    {
+        Edit,
+        Play
+    };
+
+    struct OverlayModeSettings
+    {
+        bool show_debug = true;
+        bool show_trails = false;
+    };
+
+    struct OverlayRenderSettings
+    {
+        OverlayModeSettings edit{};
+        OverlayModeSettings play{ .show_debug = true, .show_trails = true };
+    };
+
     /**
      * @brief Engine-owned runtime pipeline for core ECS systems.
      *
@@ -66,6 +84,8 @@ namespace eeng::ecs
             script_system_->init(ctx);
 
             debug_render_system_ = std::make_unique<systems::DebugRenderSystem>();
+            debug_render_settings_edit_ = debug_render_system_->settings;
+            debug_render_settings_play_ = debug_render_system_->settings;
             trail_system_ = std::make_unique<systems::TrailSystem>();
             sticky_note_system_ = std::make_unique<systems::StickyNoteSystem>();
         }
@@ -106,7 +126,7 @@ namespace eeng::ecs
 
             update_common(ctx, delta_time);
 
-            if (trail_system_)
+            if (trail_system_ && overlay_settings_.play.show_trails)
                 trail_system_->update(registry, ctx, delta_time);
 
             // Push a snapshot for editor UI without requiring direct system access.
@@ -133,6 +153,8 @@ namespace eeng::ecs
             update_physics_monitor_stats(ctx);
             if (sticky_note_system_)
                 sticky_note_system_->update(registry, ctx, delta_time);
+            if (trail_system_ && overlay_settings_.edit.show_trails)
+                trail_system_->update(registry, ctx, delta_time);
         }
 
         void render_debug(
@@ -142,9 +164,15 @@ namespace eeng::ecs
             const glm::mat4& vp_p_v,
             int window_height)
         {
-            if (debug_render_system_)
+            const auto mode = active_overlay_mode(ctx);
+            const auto& mode_settings = overlay_mode_settings(mode);
+            const auto& debug_settings = debug_mode_settings(mode);
+            if (debug_render_system_ && mode_settings.show_debug)
+            {
+                debug_render_system_->settings = debug_settings;
                 debug_render_system_->render(registry, ctx, renderer, vp_p_v, window_height);
-            if (sticky_note_system_)
+            }
+            if (sticky_note_system_ && mode_settings.show_debug && debug_settings.show_sticky_notes)
                 sticky_note_system_->render(registry, ctx, vp_p_v, window_height);
         }
 
@@ -153,10 +181,9 @@ namespace eeng::ecs
             EngineContext& ctx,
             ShapeRendering::ShapeRenderer& renderer)
         {
-            bool play_mode = true;
-            if (ctx.services)
-                play_mode = ctx.services->play_mode_active.load(std::memory_order_relaxed);
-            if (!play_mode)
+            const auto mode = active_overlay_mode(ctx);
+            const auto& mode_settings = overlay_mode_settings(mode);
+            if (!mode_settings.show_trails)
                 return;
 
             if (trail_system_)
@@ -204,14 +231,65 @@ namespace eeng::ecs
         const systems::PhysicsSystem* physics_system() const { return physics_system_.get(); }
         systems::DebugRenderSettings* debug_render_settings()
         {
-            return debug_render_system_ ? &debug_render_system_->settings : nullptr;
+            return &debug_render_settings_edit_;
         }
         const systems::DebugRenderSettings* debug_render_settings() const
         {
-            return debug_render_system_ ? &debug_render_system_->settings : nullptr;
+            return &debug_render_settings_edit_;
+        }
+        systems::DebugRenderSettings* debug_render_settings_edit()
+        {
+            return &debug_render_settings_edit_;
+        }
+        const systems::DebugRenderSettings* debug_render_settings_edit() const
+        {
+            return &debug_render_settings_edit_;
+        }
+        systems::DebugRenderSettings* debug_render_settings_play()
+        {
+            return &debug_render_settings_play_;
+        }
+        const systems::DebugRenderSettings* debug_render_settings_play() const
+        {
+            return &debug_render_settings_play_;
+        }
+        OverlayRenderSettings* overlay_render_settings()
+        {
+            return &overlay_settings_;
+        }
+        const OverlayRenderSettings* overlay_render_settings() const
+        {
+            return &overlay_settings_;
         }
 
     private:
+        static OverlayMode active_overlay_mode(const EngineContext& ctx)
+        {
+            if (ctx.services && ctx.services->play_mode_active.load(std::memory_order_relaxed))
+                return OverlayMode::Play;
+            return OverlayMode::Edit;
+        }
+
+        OverlayModeSettings& overlay_mode_settings(OverlayMode mode)
+        {
+            return mode == OverlayMode::Play ? overlay_settings_.play : overlay_settings_.edit;
+        }
+
+        const OverlayModeSettings& overlay_mode_settings(OverlayMode mode) const
+        {
+            return mode == OverlayMode::Play ? overlay_settings_.play : overlay_settings_.edit;
+        }
+
+        systems::DebugRenderSettings& debug_mode_settings(OverlayMode mode)
+        {
+            return mode == OverlayMode::Play ? debug_render_settings_play_ : debug_render_settings_edit_;
+        }
+
+        const systems::DebugRenderSettings& debug_mode_settings(OverlayMode mode) const
+        {
+            return mode == OverlayMode::Play ? debug_render_settings_play_ : debug_render_settings_edit_;
+        }
+
         void update_common(EngineContext& ctx, float delta_time)
         {
             if (transform_system_)
@@ -250,6 +328,9 @@ namespace eeng::ecs
         std::unique_ptr<systems::TwoAnchorAlignSystem> two_anchor_align_system_;
         std::unique_ptr<systems::ScriptSystem> script_system_;
         std::unique_ptr<systems::DebugRenderSystem> debug_render_system_;
+        systems::DebugRenderSettings debug_render_settings_edit_{};
+        systems::DebugRenderSettings debug_render_settings_play_{};
+        OverlayRenderSettings overlay_settings_{};
         std::unique_ptr<systems::TrailSystem> trail_system_;
         std::unique_ptr<systems::StickyNoteSystem> sticky_note_system_;
     };

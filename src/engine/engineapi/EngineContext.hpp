@@ -38,6 +38,11 @@ namespace eeng::ecs::systems
     struct DebugRenderSettings;
 }
 
+namespace eeng::ecs
+{
+    struct OverlayRenderSettings;
+}
+
 namespace eeng
 {
     struct EngineContext;
@@ -208,6 +213,9 @@ namespace eeng
         std::shared_ptr<::ShapeRendering::ShapeRenderer> shape_renderer;
         // Optional hook to share debug render settings between game runtime and editor UI.
         ecs::systems::DebugRenderSettings* debug_render_settings = nullptr;
+        ecs::systems::DebugRenderSettings* debug_render_settings_edit = nullptr;
+        ecs::systems::DebugRenderSettings* debug_render_settings_play = nullptr;
+        ecs::OverlayRenderSettings* overlay_render_settings = nullptr;
         // Optional editor overlay hook (e.g. gizmo rendering) for shared renderers.
         EditorRenderHook                         editor_render_hook;
         std::unique_ptr<MainThreadQueue>        main_thread_queue;
