@@ -17,6 +17,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -187,6 +188,25 @@ namespace eeng::ecs::systems
             renderer.push_line(c010, c011);
             renderer.push_line(c110, c111);
         }
+
+        void append_label_line(std::string& label, const char* line)
+        {
+            if (!line || !line[0])
+                return;
+            if (!label.empty())
+                label.push_back('\n');
+            label += line;
+        }
+
+        template<typename... Args>
+        void append_label_linef(std::string& label, const char* format, Args... args)
+        {
+            char buffer[192];
+            const int written = std::snprintf(buffer, sizeof(buffer), format, args...);
+            if (written <= 0)
+                return;
+            append_label_line(label, buffer);
+        }
     } // namespace
 
     void DebugRenderSystem::render(
@@ -206,16 +226,32 @@ namespace eeng::ecs::systems
                 const auto* header = registry.try_get<ecs::HeaderComponent>(entity);
                 const auto world_pos = glm::vec3(transform.world_matrix[3]) + settings.transform_label_offset;
 
-                char label[128];
+                std::string label;
+                std::string entity_name;
                 if (header && !header->name.empty())
                 {
-                    std::snprintf(label, sizeof(label), "%s", header->name.c_str());
+                    entity_name = header->name;
                 }
                 else
                 {
-                    std::snprintf(label, sizeof(label), "Entity %u",
-                        static_cast<unsigned>(entt::to_integral(entity)));
+                    entity_name = "Entity " + std::to_string(static_cast<unsigned>(entt::to_integral(entity)));
                 }
+                if (settings.transform_label_show_name)
+                    append_label_line(label, entity_name.c_str());
+                if (settings.transform_label_show_position)
+                    append_label_linef(label, "Pos (%.2f, %.2f, %.2f)",
+                        transform.position.x, transform.position.y, transform.position.z);
+                if (settings.transform_label_show_rotation)
+                {
+                    const glm::vec3 euler_deg = glm::degrees(glm::eulerAngles(transform.rotation));
+                    append_label_linef(label, "Rot (%.1f, %.1f, %.1f) deg",
+                        euler_deg.x, euler_deg.y, euler_deg.z);
+                }
+                if (settings.transform_label_show_scale)
+                    append_label_linef(label, "Scale (%.2f, %.2f, %.2f)",
+                        transform.scale.x, transform.scale.y, transform.scale.z);
+                if (label.empty())
+                    append_label_line(label, entity_name.c_str());
 
                 const std::string window_name =
                     "TransformLabel##" + std::to_string(entt::to_integral(entity));
@@ -224,7 +260,7 @@ namespace eeng::ecs::systems
                     world_pos,
                     VP_PROJ_V,
                     window_height,
-                    label,
+                    label.c_str(),
                     window_name.c_str(),
                     settings.transform_label_bg,
                     settings.transform_label_text);
@@ -296,11 +332,44 @@ namespace eeng::ecs::systems
 
                     if (settings.show_collider_labels)
                     {
-                        char label[128];
-                        std::snprintf(label, sizeof(label), "Col %u %s%s",
-                            collider.id,
-                            collider_type_label(collider.type),
-                            collider.is_trigger ? " (Trigger)" : "");
+                        std::string label;
+                        if (settings.collider_label_show_id)
+                            append_label_linef(label, "Id %u", collider.id);
+                        if (settings.collider_label_show_type)
+                            append_label_linef(label, "Type %s", collider_type_label(collider.type));
+                        if (settings.collider_label_show_trigger_state)
+                            append_label_line(label, collider.is_trigger ? "Trigger: Yes" : "Trigger: No");
+                        if (settings.collider_label_show_local_position)
+                        {
+                            append_label_linef(label, "Local Pos (%.2f, %.2f, %.2f)",
+                                collider.local_position.x,
+                                collider.local_position.y,
+                                collider.local_position.z);
+                        }
+                        if (settings.collider_label_show_dimensions)
+                        {
+                            switch (collider.type)
+                            {
+                            case ecs::ColliderType::Sphere:
+                                append_label_linef(label, "Radius %.2f", collider.radius);
+                                break;
+                            case ecs::ColliderType::Capsule:
+                                append_label_linef(label, "R %.2f H %.2f", collider.radius, collider.height);
+                                break;
+                            case ecs::ColliderType::Box:
+                            case ecs::ColliderType::AABB:
+                            case ecs::ColliderType::ConvexHull:
+                            case ecs::ColliderType::TriangleMesh:
+                            default:
+                                append_label_linef(label, "HalfExt (%.2f, %.2f, %.2f)",
+                                    collider.half_extents.x,
+                                    collider.half_extents.y,
+                                    collider.half_extents.z);
+                                break;
+                            }
+                        }
+                        if (label.empty())
+                            append_label_line(label, "Collider");
 
                         const std::string window_name =
                             "ColliderLabel##" + std::to_string(entt::to_integral(entity)) + "_" + std::to_string(collider.id);
@@ -309,7 +378,7 @@ namespace eeng::ecs::systems
                             label_pos,
                             VP_PROJ_V,
                             window_height,
-                            label,
+                            label.c_str(),
                             window_name.c_str(),
                             settings.collider_label_bg,
                             settings.collider_label_text);
@@ -393,8 +462,27 @@ namespace eeng::ecs::systems
 
                 if (settings.show_rigidbody_labels)
                 {
-                    char label[128];
-                    std::snprintf(label, sizeof(label), "RB %s", motion_type_label(rb.motion));
+                    std::string label;
+                    if (settings.rigidbody_label_show_motion_type)
+                        append_label_linef(label, "Motion %s", motion_type_label(rb.motion));
+                    if (settings.rigidbody_label_show_mass)
+                        append_label_linef(label, "Mass %.3f%s", rb.mass, rb.auto_mass ? " (auto)" : "");
+                    if (settings.rigidbody_label_show_inertia)
+                    {
+                        append_label_linef(label, "Inertia Diag (%.3f, %.3f, %.3f)%s",
+                            rb.inertia.x, rb.inertia.y, rb.inertia.z, rb.auto_inertia ? " (auto)" : "");
+                    }
+                    if (settings.rigidbody_label_show_damping)
+                        append_label_linef(label, "Damping L %.2f A %.2f", rb.linear_damping, rb.angular_damping);
+                    if (settings.rigidbody_label_show_com_offset)
+                    {
+                        append_label_linef(label, "COM Offset (%.2f, %.2f, %.2f)",
+                            rb.com_local_position.x,
+                            rb.com_local_position.y,
+                            rb.com_local_position.z);
+                    }
+                    if (label.empty())
+                        append_label_line(label, "RigidBody");
 
                     const std::string window_name =
                         "RigidBodyLabel##" + std::to_string(entt::to_integral(entity));
@@ -403,7 +491,7 @@ namespace eeng::ecs::systems
                         label_pos,
                         VP_PROJ_V,
                         window_height,
-                        label,
+                        label.c_str(),
                         window_name.c_str(),
                         settings.rigidbody_label_bg,
                         settings.rigidbody_label_text);

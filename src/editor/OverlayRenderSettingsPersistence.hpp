@@ -27,11 +27,25 @@ namespace eeng::editor
             bool eeng::ecs::systems::DebugRenderSettings::* member;
         };
 
-        inline constexpr std::array<DebugBoolField, 22> kDebugBoolFields{ {
+        inline constexpr std::array<DebugBoolField, 36> kDebugBoolFields{ {
             { "show_transform_labels", &eeng::ecs::systems::DebugRenderSettings::show_transform_labels },
+            { "transform_label_show_name", &eeng::ecs::systems::DebugRenderSettings::transform_label_show_name },
+            { "transform_label_show_position", &eeng::ecs::systems::DebugRenderSettings::transform_label_show_position },
+            { "transform_label_show_rotation", &eeng::ecs::systems::DebugRenderSettings::transform_label_show_rotation },
+            { "transform_label_show_scale", &eeng::ecs::systems::DebugRenderSettings::transform_label_show_scale },
             { "show_colliders", &eeng::ecs::systems::DebugRenderSettings::show_colliders },
             { "show_collider_labels", &eeng::ecs::systems::DebugRenderSettings::show_collider_labels },
+            { "collider_label_show_id", &eeng::ecs::systems::DebugRenderSettings::collider_label_show_id },
+            { "collider_label_show_type", &eeng::ecs::systems::DebugRenderSettings::collider_label_show_type },
+            { "collider_label_show_trigger_state", &eeng::ecs::systems::DebugRenderSettings::collider_label_show_trigger_state },
+            { "collider_label_show_local_position", &eeng::ecs::systems::DebugRenderSettings::collider_label_show_local_position },
+            { "collider_label_show_dimensions", &eeng::ecs::systems::DebugRenderSettings::collider_label_show_dimensions },
             { "show_rigidbody_labels", &eeng::ecs::systems::DebugRenderSettings::show_rigidbody_labels },
+            { "rigidbody_label_show_motion_type", &eeng::ecs::systems::DebugRenderSettings::rigidbody_label_show_motion_type },
+            { "rigidbody_label_show_mass", &eeng::ecs::systems::DebugRenderSettings::rigidbody_label_show_mass },
+            { "rigidbody_label_show_inertia", &eeng::ecs::systems::DebugRenderSettings::rigidbody_label_show_inertia },
+            { "rigidbody_label_show_damping", &eeng::ecs::systems::DebugRenderSettings::rigidbody_label_show_damping },
+            { "rigidbody_label_show_com_offset", &eeng::ecs::systems::DebugRenderSettings::rigidbody_label_show_com_offset },
             { "show_rigidbody_com", &eeng::ecs::systems::DebugRenderSettings::show_rigidbody_com },
             { "show_rigidbody_axes", &eeng::ecs::systems::DebugRenderSettings::show_rigidbody_axes },
             { "show_rigidbody_offset", &eeng::ecs::systems::DebugRenderSettings::show_rigidbody_offset },

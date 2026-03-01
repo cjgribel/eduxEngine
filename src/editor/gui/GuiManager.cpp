@@ -311,10 +311,46 @@ namespace eeng
                     const auto draw_debug_feature_toggles =
                         [&](eeng::ecs::systems::DebugRenderSettings& settings)
                     {
-                        toggle_bool("Transform Labels", settings.show_transform_labels);
                         toggle_bool("Colliders", settings.show_colliders);
-                        toggle_bool("Collider Labels", settings.show_collider_labels);
-                        toggle_bool("RigidBody Labels", settings.show_rigidbody_labels);
+
+                        if (ImGui::BeginMenu("Transform Labels"))
+                        {
+                            toggle_bool("Show Labels", settings.show_transform_labels);
+                            ImGui::Separator();
+                            ImGui::TextDisabled("Label Data");
+                            toggle_bool("Entity Name", settings.transform_label_show_name);
+                            toggle_bool("Position", settings.transform_label_show_position);
+                            toggle_bool("Rotation", settings.transform_label_show_rotation);
+                            toggle_bool("Scale", settings.transform_label_show_scale);
+                            ImGui::EndMenu();
+                        }
+
+                        if (ImGui::BeginMenu("Collider Labels"))
+                        {
+                            toggle_bool("Show Labels", settings.show_collider_labels);
+                            ImGui::Separator();
+                            ImGui::TextDisabled("Label Data");
+                            toggle_bool("Collider Id", settings.collider_label_show_id);
+                            toggle_bool("Collider Type", settings.collider_label_show_type);
+                            toggle_bool("Trigger State", settings.collider_label_show_trigger_state);
+                            toggle_bool("Local Position", settings.collider_label_show_local_position);
+                            toggle_bool("Dimensions", settings.collider_label_show_dimensions);
+                            ImGui::EndMenu();
+                        }
+
+                        if (ImGui::BeginMenu("RigidBody Labels"))
+                        {
+                            toggle_bool("Show Labels", settings.show_rigidbody_labels);
+                            ImGui::Separator();
+                            ImGui::TextDisabled("Label Data");
+                            toggle_bool("Motion Type", settings.rigidbody_label_show_motion_type);
+                            toggle_bool("Mass", settings.rigidbody_label_show_mass);
+                            toggle_bool("Inertia", settings.rigidbody_label_show_inertia);
+                            toggle_bool("Damping", settings.rigidbody_label_show_damping);
+                            toggle_bool("COM Offset", settings.rigidbody_label_show_com_offset);
+                            ImGui::EndMenu();
+                        }
+
                         toggle_bool("RigidBody COM", settings.show_rigidbody_com);
                         toggle_bool("RigidBody Axes", settings.show_rigidbody_axes);
                         toggle_bool("RigidBody Offset Frame", settings.show_rigidbody_offset);

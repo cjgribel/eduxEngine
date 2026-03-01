@@ -28,6 +28,10 @@ namespace eeng::ecs::systems
         // Distinct label colors make it easier to spot component types.
         std::uint32_t transform_label_text = 0xffffffffu;
         glm::vec3 transform_label_offset{ 0.0f };
+        bool transform_label_show_name = true;
+        bool transform_label_show_position = false;
+        bool transform_label_show_rotation = false;
+        bool transform_label_show_scale = false;
 
         // Collider wireframe + labels.
         bool show_colliders = true;
@@ -36,12 +40,22 @@ namespace eeng::ecs::systems
         std::uint32_t collider_label_bg = 0x80202020u;
         std::uint32_t collider_label_text = 0xff80ff80u;
         glm::vec3 collider_label_offset{ 0.0f, 0.15f, 0.0f };
+        bool collider_label_show_id = true;
+        bool collider_label_show_type = true;
+        bool collider_label_show_trigger_state = true;
+        bool collider_label_show_local_position = false;
+        bool collider_label_show_dimensions = false;
 
         // RigidBody labels.
         bool show_rigidbody_labels = false; //
         std::uint32_t rigidbody_label_bg = 0x80202040u;
         std::uint32_t rigidbody_label_text = 0xffffc080u;
         glm::vec3 rigidbody_label_offset{ 0.0f, 0.3f, 0.0f };
+        bool rigidbody_label_show_motion_type = true;
+        bool rigidbody_label_show_mass = false;
+        bool rigidbody_label_show_inertia = false;
+        bool rigidbody_label_show_damping = false;
+        bool rigidbody_label_show_com_offset = false;
         // RigidBody COM + principal axes.
         bool show_rigidbody_com = true;
         bool show_rigidbody_axes = true;

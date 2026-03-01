@@ -1,6 +1,16 @@
 {
   "edit": {
     "debug": {
+      "collider_label_show_dimensions": false,
+      "collider_label_show_id": true,
+      "collider_label_show_local_position": false,
+      "collider_label_show_trigger_state": true,
+      "collider_label_show_type": true,
+      "rigidbody_label_show_com_offset": false,
+      "rigidbody_label_show_damping": false,
+      "rigidbody_label_show_inertia": false,
+      "rigidbody_label_show_mass": true,
+      "rigidbody_label_show_motion_type": true,
       "show_collider_labels": false,
       "show_colliders": true,
       "show_constraint_6dof": true,
@@ -22,7 +32,11 @@
       "show_springs": true,
       "show_sticky_notes": true,
       "show_transform_labels": false,
-      "show_two_anchor_align": true
+      "show_two_anchor_align": true,
+      "transform_label_show_name": true,
+      "transform_label_show_position": true,
+      "transform_label_show_rotation": true,
+      "transform_label_show_scale": true
     },
     "overlay": {
       "show_debug": true,
@@ -31,6 +45,16 @@
   },
   "play": {
     "debug": {
+      "collider_label_show_dimensions": false,
+      "collider_label_show_id": true,
+      "collider_label_show_local_position": false,
+      "collider_label_show_trigger_state": true,
+      "collider_label_show_type": true,
+      "rigidbody_label_show_com_offset": false,
+      "rigidbody_label_show_damping": false,
+      "rigidbody_label_show_inertia": false,
+      "rigidbody_label_show_mass": false,
+      "rigidbody_label_show_motion_type": true,
       "show_collider_labels": false,
       "show_colliders": false,
       "show_constraint_6dof": false,
@@ -52,7 +76,11 @@
       "show_springs": true,
       "show_sticky_notes": true,
       "show_transform_labels": false,
-      "show_two_anchor_align": true
+      "show_two_anchor_align": true,
+      "transform_label_show_name": true,
+      "transform_label_show_position": false,
+      "transform_label_show_rotation": false,
+      "transform_label_show_scale": false
     },
     "overlay": {
       "show_debug": true,
