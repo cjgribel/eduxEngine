@@ -6,11 +6,17 @@
 
 #include "imgui.h"
 
+namespace eeng
+{
+    struct DataMetaInfo;
+}
+
 namespace eeng::editor 
 {
     struct InspectorState
     {
         bool imgui_disabled = false;
+        const eeng::DataMetaInfo* current_data_meta_info = nullptr;
 
         void begin_disabled()
         {

@@ -34,6 +34,7 @@ namespace eeng::meta {
                 EENG_LOG_WARN(&ctx, "Edit ignored: command queue busy.");
             }
         }
+
     }
 
     std::string get_entity_name(
@@ -256,8 +257,13 @@ namespace eeng::meta {
                         bool readonly = has_flag(trait_flags, MetaFlags::readonly_inspection);
                         if (readonly) inspector.begin_disabled();
 
+                        const auto* prev_data_meta_info = inspector.current_data_meta_info;
+                        inspector.current_data_meta_info = meta_data.custom();
+
                         // Inspect
                         mod |= inspect_any(data_any, inspector, cmdb, ctx);
+                        inspector.current_data_meta_info = prev_data_meta_info;
+
                         // Unset readonly
                         if (readonly) inspector.end_disabled();
                         // Pop command meta path

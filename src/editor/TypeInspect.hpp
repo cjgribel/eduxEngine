@@ -5,6 +5,7 @@
 #define InspectType_hpp
 
 #include "InspectorState.hpp"
+#include "meta/MetaInfo.h"
 #include "misc/cpp/imgui_stdlib.h" // ImGui widgets for std::string
 
 namespace eeng::editor {
@@ -87,6 +88,21 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<uint32_t>(uint32_t& value, InspectorState& inspector)
     {
+        if (inspector.current_data_meta_info &&
+            inspector.current_data_meta_info->ui_hint == eeng::InspectorUiHint::ColorABGR)
+        {
+            ImVec4 color = ImGui::ColorConvertU32ToFloat4(static_cast<ImU32>(value));
+            if (!ImGui::ColorEdit4("##label", &color.x, ImGuiColorEditFlags_AlphaPreviewHalf))
+                return false;
+
+            const auto updated = static_cast<uint32_t>(ImGui::ColorConvertFloat4ToU32(color));
+            if (updated == value)
+                return false;
+
+            value = updated;
+            return true;
+        }
+
         return ImGui::InputScalar("Input uint32_t", ImGuiDataType_U32, &value);
     }
 
@@ -94,6 +110,19 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<const uint32_t>(const uint32_t& t, InspectorState& inspector)
     {
+        if (inspector.current_data_meta_info &&
+            inspector.current_data_meta_info->ui_hint == eeng::InspectorUiHint::ColorABGR)
+        {
+            ImVec4 color = ImGui::ColorConvertU32ToFloat4(static_cast<ImU32>(t));
+            inspector.begin_disabled();
+            ImGui::ColorEdit4(
+                "##label",
+                &color.x,
+                ImGuiColorEditFlags_AlphaPreviewHalf | ImGuiColorEditFlags_NoInputs);
+            inspector.end_disabled();
+            return false;
+        }
+
         ImGui::TextDisabled("%u", t);
         return false;
     }

@@ -10,6 +10,12 @@
 
 namespace eeng
 {
+    enum class InspectorUiHint : std::uint8_t
+    {
+        None = 0,
+        ColorABGR
+    };
+
     struct TypeMetaInfo
     {
         std::string id;
@@ -25,6 +31,7 @@ namespace eeng
         std::string name;
         std::string nice_name;
         std::string tooltip;
+        InspectorUiHint ui_hint = InspectorUiHint::None;
     };
 
     // struct EnumTypeMetaInfo

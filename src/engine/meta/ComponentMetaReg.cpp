@@ -617,11 +617,11 @@ namespace eeng
             .traits(MetaFlags::none)
 
             .data<&eeng::ecs::StickyNoteComponent::color_bg>("color_bg"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "color_bg", "Background Color", "ImGui background color (ABGR)." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "color_bg", "Background Color", "ImGui background color (ABGR).", InspectorUiHint::ColorABGR })
             .traits(MetaFlags::none)
 
             .data<&eeng::ecs::StickyNoteComponent::color_text>("color_text"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "color_text", "Text Color", "ImGui text color (ABGR)." })
+            .custom<DataMetaInfo>(DataMetaInfo{ "color_text", "Text Color", "ImGui text color (ABGR).", InspectorUiHint::ColorABGR })
             .traits(MetaFlags::none)
 
             // Line struct not registered
@@ -691,16 +691,16 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "min_emit_distance", "Emit Threshold", "Minimum movement before adding a point." })
                 .traits(MetaFlags::none)
                 .data<&Trail::color>("color"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "color", "Color", "Base trail color (ABGR)." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "color", "Color", "Base trail color (ABGR).", InspectorUiHint::ColorABGR })
                 .traits(MetaFlags::none)
                 .data<&Trail::use_color_over_age>("use_color_over_age"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "use_color_over_age", "Color Over Age", "Interpolate from start color to end color over lifetime." })
                 .traits(MetaFlags::none)
                 .data<&Trail::color_start>("color_start"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "color_start", "Start Color", "Color at age 0 (ABGR)." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "color_start", "Start Color", "Color at age 0 (ABGR).", InspectorUiHint::ColorABGR })
                 .traits(MetaFlags::none)
                 .data<&Trail::color_end>("color_end"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "color_end", "End Color", "Color at end of lifetime (ABGR)." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "color_end", "End Color", "Color at end of lifetime (ABGR).", InspectorUiHint::ColorABGR })
                 .traits(MetaFlags::none)
                 .data<&Trail::style>("style"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "style", "Style", "Line style settings." })
