@@ -197,6 +197,12 @@ namespace ShapeRendering {
         Thick
     };
 
+    enum class CoordinateSpace : uint8_t
+    {
+        Local,
+        World
+    };
+
     struct ThickLineVertex
     {
         glm::vec3 start;
@@ -527,17 +533,23 @@ namespace ShapeRendering {
             const glm::vec3& pos0,
             const glm::vec3& pos1);
 
+        // Push a polyline from a cyclic source buffer [start_index, start_index+nbr_vertices).
+        // In Local space, points are transformed by the current matrix stack state.
+        // In World space, points are consumed as-is (fast-path).
         void push_lines_from_cyclic_source(
             const LineVertex* vertices,
             int start_index,
             int nbr_vertices,
-            int max_vertices);
+            int max_vertices,
+            CoordinateSpace space = CoordinateSpace::Local);
 
+        // Simple-line variant of push_lines_from_cyclic_source with the same space contract.
         void push_simple_lines_from_cyclic_source(
             const LineVertex* vertices,
             int start_index,
             int nbr_vertices,
-            int max_vertices);
+            int max_vertices,
+            CoordinateSpace space = CoordinateSpace::Local);
 
         void push_lines(
             const std::vector<glm::vec3>& vertices,

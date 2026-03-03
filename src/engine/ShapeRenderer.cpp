@@ -974,13 +974,21 @@ namespace ShapeRendering {
     void ShapeRenderer::push_lines_from_cyclic_source(const LineVertex* vertices,
         int start_index,
         int nbr_vertices,
-        int max_vertices)
+        int max_vertices,
+        CoordinateSpace space)
     {
+        if (!vertices || max_vertices <= 0 || nbr_vertices < 2 || start_index < 0
+            || start_index >= max_vertices || nbr_vertices > max_vertices)
+        {
+            return;
+        }
+
         const auto& line_type = get_states<LineType>();
         if (line_type == LineType::Thick)
         {
             const LineBatch batch = make_line_batch_from_state();
             auto& index_batch = line_hash[batch];
+            const glm::mat4 M = get_states<glm::mat4>();
 
             for (int i = 0; i < nbr_vertices - 1; i++)
             {
@@ -988,32 +996,45 @@ namespace ShapeRendering {
                 unsigned idx1 = (start_index + i + 1) % max_vertices;
                 const LineVertex& v0 = vertices[idx0];
                 const LineVertex& v1 = vertices[idx1];
+                const glm::vec3 p0 = (space == CoordinateSpace::Local) ? transform_pos(M, v0.p) : v0.p;
+                const glm::vec3 p1 = (space == CoordinateSpace::Local) ? transform_pos(M, v1.p) : v1.p;
                 append_thick_line_segment(line_vertices,
                     index_batch,
-                    v0.p,
-                    v1.p,
+                    p0,
+                    p1,
                     v0.color,
                     v1.color);
             }
         }
         else
         {
-            push_simple_lines_from_cyclic_source(vertices, start_index, nbr_vertices, max_vertices);
+            push_simple_lines_from_cyclic_source(vertices, start_index, nbr_vertices, max_vertices, space);
         }
     }
 
     void ShapeRenderer::push_simple_lines_from_cyclic_source(const LineVertex* vertices,
         int start_index,
         int nbr_vertices,
-        int max_vertices)
+        int max_vertices,
+        CoordinateSpace space)
     {
+        if (!vertices || max_vertices <= 0 || nbr_vertices < 2 || start_index < 0
+            || start_index >= max_vertices || nbr_vertices > max_vertices)
+        {
+            return;
+        }
+
         const SimpleLineBatch ldc = make_simple_line_batch_from_state(GL_LINES);
         unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
+        const glm::mat4 M = get_states<glm::mat4>();
 
         for (int i = 0; i < nbr_vertices; i++)
         {
             unsigned index = (start_index + i) % max_vertices;
-            simple_line_vertices.push_back(vertices[index]);
+            LineVertex v = vertices[index];
+            if (space == CoordinateSpace::Local)
+                v.p = transform_pos(M, v.p);
+            simple_line_vertices.push_back(v);
         }
 
         for (int i = 0; i < nbr_vertices - 1; i++)

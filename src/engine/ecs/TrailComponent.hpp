@@ -4,103 +4,74 @@
 #ifndef TrailComponent_hpp
 #define TrailComponent_hpp
 
+#include <array>
 #include <cstdint>
 #include <string>
 
 #include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
 
 namespace eeng::ecs
 {
+    struct TrailLineStyle
+    {
+        float thickness = 2.0f;
+        float dash_period_px = 0.0f;
+        float dash_ratio = 0.5f;
+        float dash_offset_px = 0.0f;
+    };
+
+    enum class TrailFadeMode : std::uint8_t
+    {
+        None,
+        Linear
+    };
+
     struct TrailComponent
     {
-        constexpr static unsigned max_trails = 8;
+        static constexpr std::size_t max_trails = 8;
+        static constexpr std::size_t max_vertices_per_trail = 64;
 
         struct Trail
         {
-            /*
-                using VertexType = ImPrimitiveRendererNS::LineVertex; // Avoid this dependecy
-                static const unsigned max_vertices = 16;
-                uint color = BaseColors::White;
+            bool active = false;
+            bool emitting = true;
 
-                // Multiple trails
-                // * MotionTrailComponent contains 4 trails. 0-4 of them active.
-                // * Each trail has an offset (m4f)
-                // * Supply nbr of trails & offset during construction of the component
-                //      Do construction via MotionTrailSystem::spawn.
-                //      Do it like this for ALL components?
-                //          Well - I did one for MouseForce, but that one also spawned *entities*
-                //          Should System::spawn function spawn entities & stuff OR just a component?
+            float lifetime = 1.0f; // <= 0 means no lifetime culling.
+            float min_emit_distance = 0.1f;
+            std::uint32_t color = 0xffffffffu;
+            bool use_color_over_age = false;
+            std::uint32_t color_start = 0xffffffffu;
+            std::uint32_t color_end = 0xffffffffu;
+            TrailLineStyle style{};
+            glm::vec3 local_offset{ 0.0f };
+            TrailFadeMode fade_mode = TrailFadeMode::Linear;
 
-        //        struct TrailVertex
-        //        {
-        ////            VertexType vertex;
-        //            v3f point;
-        //            uint color;
-        //            float age;
-        //        };
+            bool clear_on_teleport = false;
+            float clear_teleport_distance = 8.0f;
 
-                VertexType vertices[max_vertices];
-                float vertex_ages[max_vertices];
-                int start_index = 0;
-                int nbr_vertices = 0;
+            int start_index = 0;
+            int count = 0;
+            struct Vertex
+            {
+                glm::vec3 p{ 0.0f };
+                std::uint32_t color = 0xffffffffu;
+            };
+            std::array<Vertex, max_vertices_per_trail> vertices{};
+            std::array<float, max_vertices_per_trail> ages{};
+        };
 
-                // "suggest_vertex"
-                void add_vertex(const v3f& vertex)
-                {
-                    const float min_dist = 0.2f;
-                    int prev_index = (start_index + nbr_vertices - 1) % max_vertices;
-                    if (length_squared(vertices[prev_index].p - vertex) < min_dist*min_dist)
-                        return;
+        std::array<Trail, max_trails> trails{};
+        std::uint8_t active_trail_count = 1;
 
-                    unsigned index = (start_index + nbr_vertices) % max_vertices;
-                    vertices[index] = VertexType {vertex, color};
-                    vertex_ages[index] = 0.0f;
-
-                    if (nbr_vertices < max_vertices)    ++nbr_vertices;
-                    else                                ++start_index;
-                }
-                void update(float dt)
-                {
-                    // System {MotionTrailComponent, Handle<Transform>}
-                    // Add vertex using Handle<Transform> * offset
-
-                    const float max_age = 1.0f;
-                    for (int i = 0; i < nbr_vertices; i++)
-                    {
-                        unsigned index = (start_index + i) % max_vertices;
-                        // Step age forward & discard vertex if it has reached max age
-                        vertex_ages[index] += dt;
-                        if (vertex_ages[index] > max_age)
-                        {
-                            ++start_index;
-                            --nbr_vertices;
-                            --i;
-                            continue;
-                        }
-                        //vertex_ages[index] = std::min(vertex_ages[index] + dt, max_age);
-                        // Blend alpha based on age
-                        unsigned char alpha = (unsigned char)((1.0f - vertex_ages[index]/max_age) * 255);
-                        vertices[index].color = ((vertices[index].color & 0x00ffffff) | (alpha << 24));
-                    }
-        //            std::cout << nbr_vertices << std::endl;
-                }
-                void dump()
-                {
-                    std::cout << "start_index " << start_index << ", nbr " << nbr_vertices << ": " << std::endl;
-                    for (int i = 0; i < nbr_vertices; i++)
-                    {
-                        unsigned index = (start_index + i) % max_vertices;
-                        std::cout
-                        << vertices[index].p << ", "
-                        << vertices[index].color << ", "
-                        << vertex_ages[index] << std::endl;
-                    }
-                }
-                */
-            } trails[max_trails];
-
+        TrailComponent()
+        {
+            trails[0].active = true;
+        }
     };
+
+    void TrailComponent_ClearTrail(TrailComponent::Trail& trail);
+    bool TrailComponent_AddSampleIfNeeded(TrailComponent::Trail& trail, const glm::vec3& world_pos);
+    void TrailComponent_AgeAndPrune(TrailComponent::Trail& trail, float dt);
 
     std::string to_string(const TrailComponent& t);
 

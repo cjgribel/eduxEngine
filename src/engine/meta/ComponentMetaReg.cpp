@@ -14,6 +14,7 @@
 #include "ecs/AnimationGraphComponent.hpp"
 #include "ecs/ScriptComponent.hpp"
 #include "ecs/StickyNoteComponent.hpp"
+#include "ecs/TrailComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
 #include "ecs/PistonConstraintDriveComponent.hpp"
 #include "ecs/PistonAnimSyncComponent.hpp"
@@ -630,6 +631,108 @@ namespace eeng
 
             ;
         register_component<ecs::StickyNoteComponent>();
+
+        // --- Trail types/components ----------------------------------------
+        {
+            using TrailFadeMode = eeng::ecs::TrailFadeMode;
+            auto trail_fade_mode_info = TypeMetaInfo
+            {
+                .id = "eeng.ecs.TrailFadeMode",
+                .name = "TrailFadeMode",
+                .tooltip = "Trail alpha fade mode.",
+                .underlying_type = entt::resolve<std::underlying_type_t<TrailFadeMode>>()
+            };
+            entt::meta_factory<TrailFadeMode>()
+                .custom<TypeMetaInfo>(trail_fade_mode_info)
+                .traits(MetaFlags::none)
+                .data<TrailFadeMode::None>("None"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "None", "Do not age-fade trail alpha." })
+                .traits(MetaFlags::none)
+                .data<TrailFadeMode::Linear>("Linear"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Linear", "Linearly fade alpha over trail lifetime." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<TrailFadeMode>();
+            warm_start_meta_type<TrailFadeMode>();
+
+            entt::meta_factory<eeng::ecs::TrailLineStyle>{}
+                .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.TrailLineStyle", .name = "TrailLineStyle", .tooltip = "Thick line style settings." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::TrailLineStyle::thickness>("thickness"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "thickness", "Thickness", "Line thickness in pixels." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::TrailLineStyle::dash_period_px>("dash_period_px"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "dash_period_px", "Dash Period", "Dash period in pixels. <= 0 disables dashes." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::TrailLineStyle::dash_ratio>("dash_ratio"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "dash_ratio", "Dash Ratio", "Fraction of dash period that is visible [0..1]." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::TrailLineStyle::dash_offset_px>("dash_offset_px"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "dash_offset_px", "Dash Offset", "Dash offset in pixels." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<eeng::ecs::TrailLineStyle>();
+            warm_start_meta_type<eeng::ecs::TrailLineStyle>();
+
+            using Trail = eeng::ecs::TrailComponent::Trail;
+            entt::meta_factory<Trail>{}
+                .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.TrailComponent.Trail", .name = "Trail", .tooltip = "Config for one trail slot." })
+                .traits(MetaFlags::none)
+                .data<&Trail::active>("active"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "active", "Active", "Enable this trail slot." })
+                .traits(MetaFlags::none)
+                .data<&Trail::emitting>("emitting"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "emitting", "Emitting", "Emit new trail points." })
+                .traits(MetaFlags::none)
+                .data<&Trail::lifetime>("lifetime"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "lifetime", "Lifetime", "Point lifetime in seconds. <= 0 disables age culling." })
+                .traits(MetaFlags::none)
+                .data<&Trail::min_emit_distance>("min_emit_distance"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "min_emit_distance", "Emit Threshold", "Minimum movement before adding a point." })
+                .traits(MetaFlags::none)
+                .data<&Trail::color>("color"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "color", "Color", "Base trail color (ABGR)." })
+                .traits(MetaFlags::none)
+                .data<&Trail::use_color_over_age>("use_color_over_age"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "use_color_over_age", "Color Over Age", "Interpolate from start color to end color over lifetime." })
+                .traits(MetaFlags::none)
+                .data<&Trail::color_start>("color_start"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "color_start", "Start Color", "Color at age 0 (ABGR)." })
+                .traits(MetaFlags::none)
+                .data<&Trail::color_end>("color_end"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "color_end", "End Color", "Color at end of lifetime (ABGR)." })
+                .traits(MetaFlags::none)
+                .data<&Trail::style>("style"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "style", "Style", "Line style settings." })
+                .traits(MetaFlags::none)
+                .data<&Trail::local_offset>("local_offset"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "local_offset", "Local Offset", "Emitter offset in local transform space." })
+                .traits(MetaFlags::none)
+                .data<&Trail::fade_mode>("fade_mode"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "fade_mode", "Fade Mode", "Trail alpha fading behavior." })
+                .traits(MetaFlags::none)
+                .data<&Trail::clear_on_teleport>("clear_on_teleport"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "clear_on_teleport", "Clear On Teleport", "Clear trail when movement exceeds teleport threshold." })
+                .traits(MetaFlags::none)
+                .data<&Trail::clear_teleport_distance>("clear_teleport_distance"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "clear_teleport_distance", "Teleport Distance", "Distance threshold for teleport clear." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<Trail>();
+            warm_start_meta_type<Trail>();
+        }
+
+        entt::meta_factory<eeng::ecs::TrailComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.TrailComponent", .name = "TrailComponent", .tooltip = "Motion trails rendered as overlay lines." })
+            .traits(MetaFlags::none)
+            .data<&eeng::ecs::TrailComponent::active_trail_count>("active_trail_count"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "active_trail_count", "Active Trail Count", "Number of trail slots to process (up to 8)." })
+            .traits(MetaFlags::none)
+            .data<&eeng::ecs::TrailComponent::trails>("trails"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "trails", "Trails", "Trail slot settings." })
+            .traits(MetaFlags::none)
+            ;
+        register_component<ecs::TrailComponent>();
 
 
         // --- HeaderComponent -------------------------------------------------

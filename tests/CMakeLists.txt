@@ -31,6 +31,7 @@ add_executable(tests
     MetaSerialize_tests.cpp ../src/engine/ecs/Entity.cpp ../src/engine/meta/MetaSerialize.cpp ../src/engine/engineapi/EngineContext.cpp ../src/engine/util/ThreadPool.cpp
     Storage_tests.cpp ../src/engine/assets/Storage.cpp
     EventQueue_tests.cpp
+    TrailComponent_tests.cpp ../src/engine/ecs/TrailComponent.cpp
     MetaFieldAssign_tests.cpp ../src/editor/MetaFieldAssign.cpp
     )
 
