@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <array>
 #include <cmath>
+#include <cstring>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -86,6 +87,61 @@ namespace ShapeRendering {
             indices.push_back(base + 1);
             indices.push_back(base + 3);
             indices.push_back(base + 2);
+        }
+
+        inline std::size_t effective_stride(std::size_t stride, std::size_t element_size)
+        {
+            return stride == 0 ? element_size : stride;
+        }
+
+        inline const std::byte* ptr_at(const void* base, std::size_t stride, int index)
+        {
+            return static_cast<const std::byte*>(base) + stride * static_cast<std::size_t>(index);
+        }
+
+        inline bool valid_cyclic_line_view(
+            const CyclicLineBufferView& view,
+            int start_index,
+            int nbr_vertices,
+            int max_vertices)
+        {
+            if (!view.positions || max_vertices <= 0 || nbr_vertices < 2 || start_index < 0
+                || start_index >= max_vertices || nbr_vertices > max_vertices)
+            {
+                return false;
+            }
+
+            const std::size_t position_stride = effective_stride(view.position_stride, sizeof(glm::vec3));
+            if (position_stride < sizeof(glm::vec3))
+                return false;
+
+            if (view.colors)
+            {
+                const std::size_t color_stride = effective_stride(view.color_stride, sizeof(uint32_t));
+                if (color_stride < sizeof(uint32_t))
+                    return false;
+            }
+
+            return true;
+        }
+
+        inline glm::vec3 read_position(const CyclicLineBufferView& view, int index)
+        {
+            const std::size_t stride = effective_stride(view.position_stride, sizeof(glm::vec3));
+            glm::vec3 position{};
+            std::memcpy(&position, ptr_at(view.positions, stride, index), sizeof(position));
+            return position;
+        }
+
+        inline uint32_t read_color(const CyclicLineBufferView& view, int index)
+        {
+            if (!view.colors)
+                return view.fallback_color;
+
+            const std::size_t stride = effective_stride(view.color_stride, sizeof(uint32_t));
+            uint32_t color = view.fallback_color;
+            std::memcpy(&color, ptr_at(view.colors, stride, index), sizeof(color));
+            return color;
         }
 
         glm::mat3 create_basis_from_vector(const glm::vec3& direction)
@@ -977,11 +1033,27 @@ namespace ShapeRendering {
         int max_vertices,
         CoordinateSpace space)
     {
-        if (!vertices || max_vertices <= 0 || nbr_vertices < 2 || start_index < 0
-            || start_index >= max_vertices || nbr_vertices > max_vertices)
+        CyclicLineBufferView view{};
+        if (vertices)
         {
-            return;
+            view.positions = &vertices[0].p;
+            view.colors = &vertices[0].color;
         }
+        view.position_stride = sizeof(LineVertex);
+        view.color_stride = sizeof(LineVertex);
+        view.fallback_color = 0xffffffffu;
+
+        push_lines_from_cyclic_source(view, start_index, nbr_vertices, max_vertices, space);
+    }
+
+    void ShapeRenderer::push_lines_from_cyclic_source(const CyclicLineBufferView& view,
+        int start_index,
+        int nbr_vertices,
+        int max_vertices,
+        CoordinateSpace space)
+    {
+        if (!valid_cyclic_line_view(view, start_index, nbr_vertices, max_vertices))
+            return;
 
         const auto& line_type = get_states<LineType>();
         if (line_type == LineType::Thick)
@@ -992,24 +1064,22 @@ namespace ShapeRendering {
 
             for (int i = 0; i < nbr_vertices - 1; i++)
             {
-                unsigned idx0 = (start_index + i) % max_vertices;
-                unsigned idx1 = (start_index + i + 1) % max_vertices;
-                const LineVertex& v0 = vertices[idx0];
-                const LineVertex& v1 = vertices[idx1];
-                const glm::vec3 p0 = (space == CoordinateSpace::Local) ? transform_pos(M, v0.p) : v0.p;
-                const glm::vec3 p1 = (space == CoordinateSpace::Local) ? transform_pos(M, v1.p) : v1.p;
-                append_thick_line_segment(line_vertices,
-                    index_batch,
-                    p0,
-                    p1,
-                    v0.color,
-                    v1.color);
+                const int idx0 = (start_index + i) % max_vertices;
+                const int idx1 = (start_index + i + 1) % max_vertices;
+                const glm::vec3 p0_local = read_position(view, idx0);
+                const glm::vec3 p1_local = read_position(view, idx1);
+                const glm::vec3 p0 = (space == CoordinateSpace::Local) ? transform_pos(M, p0_local) : p0_local;
+                const glm::vec3 p1 = (space == CoordinateSpace::Local) ? transform_pos(M, p1_local) : p1_local;
+                const uint32_t c0 = read_color(view, idx0);
+                const uint32_t c1 = read_color(view, idx1);
+                append_thick_line_segment(line_vertices, index_batch, p0, p1, c0, c1);
             }
         }
         else
         {
-            push_simple_lines_from_cyclic_source(vertices, start_index, nbr_vertices, max_vertices, space);
+            push_simple_lines_from_cyclic_source(view, start_index, nbr_vertices, max_vertices, space);
         }
+
     }
 
     void ShapeRenderer::push_simple_lines_from_cyclic_source(const LineVertex* vertices,
@@ -1018,11 +1088,27 @@ namespace ShapeRendering {
         int max_vertices,
         CoordinateSpace space)
     {
-        if (!vertices || max_vertices <= 0 || nbr_vertices < 2 || start_index < 0
-            || start_index >= max_vertices || nbr_vertices > max_vertices)
+        CyclicLineBufferView view{};
+        if (vertices)
         {
-            return;
+            view.positions = &vertices[0].p;
+            view.colors = &vertices[0].color;
         }
+        view.position_stride = sizeof(LineVertex);
+        view.color_stride = sizeof(LineVertex);
+        view.fallback_color = 0xffffffffu;
+
+        push_simple_lines_from_cyclic_source(view, start_index, nbr_vertices, max_vertices, space);
+    }
+
+    void ShapeRenderer::push_simple_lines_from_cyclic_source(const CyclicLineBufferView& view,
+        int start_index,
+        int nbr_vertices,
+        int max_vertices,
+        CoordinateSpace space)
+    {
+        if (!valid_cyclic_line_view(view, start_index, nbr_vertices, max_vertices))
+            return;
 
         const SimpleLineBatch ldc = make_simple_line_batch_from_state(GL_LINES);
         unsigned vertex_ofs = (unsigned)simple_line_vertices.size();
@@ -1030,8 +1116,10 @@ namespace ShapeRendering {
 
         for (int i = 0; i < nbr_vertices; i++)
         {
-            unsigned index = (start_index + i) % max_vertices;
-            LineVertex v = vertices[index];
+            const int index = (start_index + i) % max_vertices;
+            LineVertex v{};
+            v.p = read_position(view, index);
+            v.color = read_color(view, index);
             if (space == CoordinateSpace::Local)
                 v.p = transform_pos(M, v.p);
             simple_line_vertices.push_back(v);

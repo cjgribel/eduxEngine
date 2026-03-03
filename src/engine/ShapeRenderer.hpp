@@ -175,6 +175,22 @@ namespace ShapeRendering {
         uint color;
     };
 
+    struct CyclicLineBufferView
+    {
+        // Required: pointer to vertex positions.
+        const void* positions = nullptr;
+        // Byte stride between positions. 0 means tightly packed (sizeof(glm::vec3)).
+        std::size_t position_stride = 0;
+
+        // Optional: pointer to per-vertex colors. If null, fallback_color is used.
+        const void* colors = nullptr;
+        // Byte stride between colors. 0 means tightly packed (sizeof(uint32_t)).
+        std::size_t color_stride = 0;
+
+        // Used when colors == nullptr.
+        uint fallback_color = 0xffffffffu;
+    };
+
     struct LineStyle
     {
         float thickness = 1.0f;
@@ -536,6 +552,7 @@ namespace ShapeRendering {
         // Push a polyline from a cyclic source buffer [start_index, start_index+nbr_vertices).
         // In Local space, points are transformed by the current matrix stack state.
         // In World space, points are consumed as-is (fast-path).
+        // Typed convenience overload (compatible with existing call sites).
         void push_lines_from_cyclic_source(
             const LineVertex* vertices,
             int start_index,
@@ -543,9 +560,30 @@ namespace ShapeRendering {
             int max_vertices,
             CoordinateSpace space = CoordinateSpace::Local);
 
+        // Generic cyclic line submission from strided buffers.
+        // Stride values are in bytes; 0 means tightly packed element size.
+        // If colors is null, fallback_color is used for all vertices.
+        void push_lines_from_cyclic_source(
+            const CyclicLineBufferView& view,
+            int start_index,
+            int nbr_vertices,
+            int max_vertices,
+            CoordinateSpace space = CoordinateSpace::Local);
+
         // Simple-line variant of push_lines_from_cyclic_source with the same space contract.
+        // Typed convenience overload (compatible with existing call sites).
         void push_simple_lines_from_cyclic_source(
             const LineVertex* vertices,
+            int start_index,
+            int nbr_vertices,
+            int max_vertices,
+            CoordinateSpace space = CoordinateSpace::Local);
+
+        // Generic simple-line cyclic submission from strided buffers.
+        // Stride values are in bytes; 0 means tightly packed element size.
+        // If colors is null, fallback_color is used for all vertices.
+        void push_simple_lines_from_cyclic_source(
+            const CyclicLineBufferView& view,
             int start_index,
             int nbr_vertices,
             int max_vertices,

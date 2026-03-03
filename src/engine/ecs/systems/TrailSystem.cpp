@@ -8,7 +8,6 @@
 #include "ecs/TransformComponent.hpp"
 
 #include <algorithm>
-#include <array>
 
 namespace eeng::ecs::systems
 {
@@ -66,17 +65,16 @@ namespace eeng::ecs::systems
                     trail.style.dash_ratio,
                     trail.style.dash_offset_px
                 };
-                std::array<ShapeRendering::LineVertex, ecs::TrailComponent::max_vertices_per_trail> line_vertices{};
-                for (int i = 0; i < trail.count; ++i)
-                {
-                    const int src_index = (trail.start_index + i) %
-                        static_cast<int>(ecs::TrailComponent::max_vertices_per_trail);
-                    line_vertices[static_cast<std::size_t>(src_index)].p = trail.vertices[static_cast<std::size_t>(src_index)].p;
-                    line_vertices[static_cast<std::size_t>(src_index)].color = trail.vertices[static_cast<std::size_t>(src_index)].color;
-                }
+                ShapeRendering::CyclicLineBufferView vertex_view{};
+                vertex_view.positions = &trail.vertices[0].p;
+                vertex_view.position_stride = sizeof(ecs::TrailComponent::Trail::Vertex);
+                vertex_view.colors = &trail.vertices[0].color;
+                vertex_view.color_stride = sizeof(ecs::TrailComponent::Trail::Vertex);
+                vertex_view.fallback_color = trail.color;
+
                 renderer.push_states(ShapeRendering::LineType::Thick, line_style);
                 renderer.push_lines_from_cyclic_source(
-                    line_vertices.data(),
+                    vertex_view,
                     trail.start_index,
                     trail.count,
                     static_cast<int>(ecs::TrailComponent::max_vertices_per_trail),
