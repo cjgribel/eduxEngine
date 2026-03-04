@@ -150,6 +150,8 @@ namespace eeng::meta {
             const bool type_readonly = traits::is_readonly_inspection(meta_type);
             if (entt::meta_func meta_func = meta_type.func(literals::inspect_hs); meta_func)
             {
+                const auto* prev_data_meta_info = inspector.current_data_meta_info;
+                inspector.current_data_meta_info = nullptr;
                 if (type_readonly)
                 {
                     // Policy: Read-only types skip cloning and command generation.
@@ -193,6 +195,7 @@ namespace eeng::meta {
                         mod = true;
                     }
                 }
+                inspector.current_data_meta_info = prev_data_meta_info;
 
             }
             else if (meta_type.is_enum())

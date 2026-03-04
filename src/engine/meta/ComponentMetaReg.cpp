@@ -300,35 +300,86 @@ namespace eeng
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::distance>("distance"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "distance", "Distance", "Orbit radius from the pivot." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "distance",
+                .nice_name = "Distance",
+                .tooltip = "Orbit radius from the pivot.",
+                .ui_speed = 0.1f,
+                .ui_units = "u"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::mouse_sensitivity>("mouse_sensitivity"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "mouse_sensitivity", "Mouse Sensitivity", "Radians per pixel." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "mouse_sensitivity",
+                .nice_name = "Mouse Sensitivity",
+                .tooltip = "Radians per pixel.",
+                .ui_speed = 0.0001f,
+                .ui_units = "rad/px"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::controller_look_speed>("controller_look_speed"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "controller_look_speed", "Controller Look Speed", "Radians per second." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "controller_look_speed",
+                .nice_name = "Controller Look Speed",
+                .tooltip = "Radians per second.",
+                .ui_speed = 0.05f,
+                .ui_units = "rad/s"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::move_speed>("move_speed"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "move_speed", "Move Speed", "Units per second." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "move_speed",
+                .nice_name = "Move Speed",
+                .tooltip = "Units per second.",
+                .ui_speed = 0.1f,
+                .ui_units = "u/s"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::near_plane>("near_plane"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "near_plane", "Near Plane", "Camera near clip plane." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "near_plane",
+                .nice_name = "Near Plane",
+                .tooltip = "Camera near clip plane.",
+                .ui_speed = 0.05f,
+                .ui_units = "u"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::far_plane>("far_plane"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "far_plane", "Far Plane", "Camera far clip plane." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "far_plane",
+                .nice_name = "Far Plane",
+                .tooltip = "Camera far clip plane.",
+                .ui_speed = 1.0f,
+                .ui_units = "u"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::yaw>("yaw"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "yaw", "Yaw", "Horizontal orbit angle (radians)." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "yaw",
+                .nice_name = "Yaw",
+                .tooltip = "Horizontal orbit angle (radians).",
+                .ui_hints = InspectorUiHint::AngleDegrees,
+                .ui_speed = 1.0f
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::pitch>("pitch"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "pitch", "Pitch", "Vertical orbit angle (radians)." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "pitch",
+                .nice_name = "Pitch",
+                .tooltip = "Vertical orbit angle (radians).",
+                .ui_hints = InspectorUiHint::AngleDegrees,
+                .ui_has_range = true,
+                .ui_range_min = -89.0f,
+                .ui_range_max = 0.0f,
+                .ui_speed = 1.0f
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::ThirdPersonCameraComponent::look_at>("look_at"_hs)
@@ -372,31 +423,76 @@ namespace eeng
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::FirstPersonCameraComponent::move_speed>("move_speed"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "move_speed", "Move Speed", "Units per second." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "move_speed",
+                .nice_name = "Move Speed",
+                .tooltip = "Units per second.",
+                .ui_speed = 0.1f,
+                .ui_units = "u/s"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::FirstPersonCameraComponent::mouse_sensitivity>("mouse_sensitivity"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "mouse_sensitivity", "Mouse Sensitivity", "Radians per pixel." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "mouse_sensitivity",
+                .nice_name = "Mouse Sensitivity",
+                .tooltip = "Radians per pixel.",
+                .ui_speed = 0.0001f,
+                .ui_units = "rad/px"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::FirstPersonCameraComponent::controller_look_speed>("controller_look_speed"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "controller_look_speed", "Controller Look Speed", "Radians per second." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "controller_look_speed",
+                .nice_name = "Controller Look Speed",
+                .tooltip = "Radians per second.",
+                .ui_speed = 0.05f,
+                .ui_units = "rad/s"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::FirstPersonCameraComponent::near_plane>("near_plane"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "near_plane", "Near Plane", "Camera near clip plane." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "near_plane",
+                .nice_name = "Near Plane",
+                .tooltip = "Camera near clip plane.",
+                .ui_speed = 0.05f,
+                .ui_units = "u"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::FirstPersonCameraComponent::far_plane>("far_plane"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "far_plane", "Far Plane", "Camera far clip plane." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "far_plane",
+                .nice_name = "Far Plane",
+                .tooltip = "Camera far clip plane.",
+                .ui_speed = 1.0f,
+                .ui_units = "u"
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::FirstPersonCameraComponent::yaw>("yaw"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "yaw", "Yaw", "Horizontal view angle (radians)." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "yaw",
+                .nice_name = "Yaw",
+                .tooltip = "Horizontal view angle (radians).",
+                .ui_hints = InspectorUiHint::AngleDegrees,
+                .ui_speed = 1.0f
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::FirstPersonCameraComponent::pitch>("pitch"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "pitch", "Pitch", "Vertical view angle (radians)." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "pitch",
+                .nice_name = "Pitch",
+                .tooltip = "Vertical view angle (radians).",
+                .ui_hints = InspectorUiHint::AngleDegrees,
+                .ui_has_range = true,
+                .ui_range_min = -89.0f,
+                .ui_range_max = 89.0f,
+                .ui_speed = 1.0f
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::editor::FirstPersonCameraComponent::forward>("forward"_hs)
@@ -665,7 +761,14 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "dash_period_px", "Dash Period", "Dash period in pixels. <= 0 disables dashes." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::TrailLineStyle::dash_ratio>("dash_ratio"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "dash_ratio", "Dash Ratio", "Fraction of dash period that is visible [0..1]." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "dash_ratio",
+                    .nice_name = "Dash Ratio",
+                    .tooltip = "Fraction of dash period that is visible [0..1].",
+                    .ui_has_range = true,
+                    .ui_range_min = 0.0f,
+                    .ui_range_max = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::TrailLineStyle::dash_offset_px>("dash_offset_px"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "dash_offset_px", "Dash Offset", "Dash offset in pixels." })
@@ -974,10 +1077,20 @@ namespace eeng
             .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.CollisionFilter", .name = "CollisionFilter", .tooltip = "Collision filtering (layer/mask)." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::CollisionFilter::layer>("layer"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "layer", "Layer", "Collision layer." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "layer",
+                    .nice_name = "Layer",
+                    .tooltip = "Collision layer.",
+                    .ui_hints = InspectorUiHint::BitmaskEnum
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::CollisionFilter::mask>("mask"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "mask", "Mask", "Collision mask." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "mask",
+                    .nice_name = "Mask",
+                    .tooltip = "Collision mask.",
+                    .ui_hints = InspectorUiHint::BitmaskEnum
+                    })
                 .traits(MetaFlags::none)
                 ;
             meta::register_type<eeng::ecs::CollisionFilter>();
@@ -1212,10 +1325,22 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "use_limits", "Use Limits", "Enable angular limits around the hinge axis." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::HingeConstraintComponent::limit_min>("limit_min"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "limit_min", "Limit Min", "Lower hinge angle limit (radians)." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "limit_min",
+                    .nice_name = "Limit Min",
+                    .tooltip = "Lower hinge angle limit (radians).",
+                    .ui_hints = InspectorUiHint::AngleDegrees,
+                    .ui_speed = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::HingeConstraintComponent::limit_max>("limit_max"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "limit_max", "Limit Max", "Upper hinge angle limit (radians)." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "limit_max",
+                    .nice_name = "Limit Max",
+                    .tooltip = "Upper hinge angle limit (radians).",
+                    .ui_hints = InspectorUiHint::AngleDegrees,
+                    .ui_speed = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::HingeConstraintComponent::enable_motor>("enable_motor"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "enable_motor", "Enable Motor", "Enable hinge motor (angular velocity)." })
@@ -1263,10 +1388,22 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "linear_limit_max", "Linear Limit Max", "Upper linear limit along the slider axis (authoring units)." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SliderConstraintComponent::angular_limit_min>("angular_limit_min"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "angular_limit_min", "Angular Limit Min", "Lower angular limit around the slider axis (radians)." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "angular_limit_min",
+                    .nice_name = "Angular Limit Min",
+                    .tooltip = "Lower angular limit around the slider axis (radians).",
+                    .ui_hints = InspectorUiHint::AngleDegrees,
+                    .ui_speed = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SliderConstraintComponent::angular_limit_max>("angular_limit_max"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "angular_limit_max", "Angular Limit Max", "Upper angular limit around the slider axis (radians)." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "angular_limit_max",
+                    .nice_name = "Angular Limit Max",
+                    .tooltip = "Upper angular limit around the slider axis (radians).",
+                    .ui_hints = InspectorUiHint::AngleDegrees,
+                    .ui_speed = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SliderConstraintComponent::enable_linear_motor>("enable_linear_motor"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "enable_linear_motor", "Enable Motor", "Enable linear motor along the slider axis." })
@@ -1314,10 +1451,22 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "linear_limit_max", "Linear Limit Max", "Upper linear limits in the local constraint frame (authoring units)." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SixDofSpringConstraintComponent::angular_limit_min>("angular_limit_min"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "angular_limit_min", "Angular Limit Min", "Lower angular limits in the local constraint frame (radians)." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "angular_limit_min",
+                    .nice_name = "Angular Limit Min",
+                    .tooltip = "Lower angular limits in the local constraint frame (radians).",
+                    .ui_hints = InspectorUiHint::AngleDegrees,
+                    .ui_speed = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SixDofSpringConstraintComponent::angular_limit_max>("angular_limit_max"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "angular_limit_max", "Angular Limit Max", "Upper angular limits in the local constraint frame (radians)." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "angular_limit_max",
+                    .nice_name = "Angular Limit Max",
+                    .tooltip = "Upper angular limits in the local constraint frame (radians).",
+                    .ui_hints = InspectorUiHint::AngleDegrees,
+                    .ui_speed = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::SixDofSpringConstraintComponent::linear_stiffness>("linear_stiffness"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "linear_stiffness", "Linear Stiffness", "Linear spring stiffness per axis." })
@@ -1413,7 +1562,14 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "mode", "Mode", "0=Hold, 1=Extend, 2=Contract, 3=Position." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::PistonConstraintDriveComponent::target_extension>("target_extension"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "target_extension", "Target Extension", "Target extension (0..1) in Position mode." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "target_extension",
+                    .nice_name = "Target Extension",
+                    .tooltip = "Target extension (0..1) in Position mode.",
+                    .ui_has_range = true,
+                    .ui_range_min = 0.0f,
+                    .ui_range_max = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::PistonConstraintDriveComponent::lock_when_idle>("lock_when_idle"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "lock_when_idle", "Lock When Idle", "Lock piston position when holding." })

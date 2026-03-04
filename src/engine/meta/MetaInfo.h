@@ -10,11 +10,32 @@
 
 namespace eeng
 {
-    enum class InspectorUiHint : std::uint8_t
+    enum class InspectorUiHint : std::uint16_t
     {
         None = 0,
-        ColorABGR
+        ColorABGR = 1 << 0,
+        AngleDegrees = 1 << 1,
+        BitmaskEnum = 1 << 2
     };
+
+    constexpr InspectorUiHint operator|(InspectorUiHint lhs, InspectorUiHint rhs)
+    {
+        return static_cast<InspectorUiHint>(
+            static_cast<std::uint16_t>(lhs) |
+            static_cast<std::uint16_t>(rhs));
+    }
+
+    constexpr InspectorUiHint operator&(InspectorUiHint lhs, InspectorUiHint rhs)
+    {
+        return static_cast<InspectorUiHint>(
+            static_cast<std::uint16_t>(lhs) &
+            static_cast<std::uint16_t>(rhs));
+    }
+
+    constexpr bool has_ui_hint(InspectorUiHint hints, InspectorUiHint hint)
+    {
+        return (hints & hint) != InspectorUiHint::None;
+    }
 
     struct TypeMetaInfo
     {
@@ -31,7 +52,12 @@ namespace eeng
         std::string name;
         std::string nice_name;
         std::string tooltip;
-        InspectorUiHint ui_hint = InspectorUiHint::None;
+        InspectorUiHint ui_hints = InspectorUiHint::None;
+        bool ui_has_range = false;
+        float ui_range_min = 0.0f;
+        float ui_range_max = 0.0f;
+        float ui_speed = 0.0f; // <= 0 means inspector default speed.
+        std::string ui_units;
     };
 
     // struct EnumTypeMetaInfo

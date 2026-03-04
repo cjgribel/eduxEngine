@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "editor/GLMInspect.hpp"
+#include "meta/MetaInfo.h"
 
 #include <cassert>
 #include <type_traits>
@@ -15,8 +16,17 @@ namespace eeng::editor
 {
     namespace detail
     {
+        inline constexpr float kDegToRad = 0.01745329251994329577f;
+        inline constexpr float kRadToDeg = 57.2957795130823208768f;
+
+        inline bool use_angle_degrees(const InspectorState& inspector)
+        {
+            const auto* meta = inspector.current_data_meta_info;
+            return meta && eeng::has_ui_hint(meta->ui_hints, eeng::InspectorUiHint::AngleDegrees);
+        }
+
         template <class VecT>
-        bool inspect_glm_vector_inline(entt::meta_any& any)
+        bool inspect_glm_vector_inline(entt::meta_any& any, InspectorState& inspector)
         {
             auto ptr = any.try_cast<VecT>();
             assert(ptr && "inspect_glm_vector_inline: could not cast meta_any to requested glm vector type");
@@ -27,7 +37,36 @@ namespace eeng::editor
             if constexpr (std::is_same_v<scalar_t, float>)
             {
                 float* v = glm::value_ptr(*ptr);
-                const float speed = 0.05f;
+                const auto* meta = inspector.current_data_meta_info;
+                const float speed = (meta && meta->ui_speed > 0.0f) ? meta->ui_speed : 0.05f;
+
+                if (use_angle_degrees(inspector))
+                {
+                    float deg[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+                    for (int i = 0; i < n; ++i)
+                        deg[i] = v[i] * kRadToDeg;
+
+                    bool changed = false;
+                    if (meta && meta->ui_has_range)
+                    {
+                        if constexpr (n == 2) { changed = ImGui::SliderFloat2("##glm_vec", deg, meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
+                        if constexpr (n == 3) { changed = ImGui::SliderFloat3("##glm_vec", deg, meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
+                        if constexpr (n == 4) { changed = ImGui::SliderFloat4("##glm_vec", deg, meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
+                    }
+                    else
+                    {
+                        if constexpr (n == 2) { changed = ImGui::DragFloat2("##glm_vec", deg, speed, 0.0f, 0.0f, "%.2f deg"); }
+                        if constexpr (n == 3) { changed = ImGui::DragFloat3("##glm_vec", deg, speed, 0.0f, 0.0f, "%.2f deg"); }
+                        if constexpr (n == 4) { changed = ImGui::DragFloat4("##glm_vec", deg, speed, 0.0f, 0.0f, "%.2f deg"); }
+                    }
+
+                    if (changed)
+                    {
+                        for (int i = 0; i < n; ++i)
+                            v[i] = deg[i] * kDegToRad;
+                    }
+                    return changed;
+                }
 
                 if constexpr (n == 2) { return ImGui::DragFloat2("##glm_vec", v, speed); }
                 if constexpr (n == 3) { return ImGui::DragFloat3("##glm_vec", v, speed); }
@@ -97,38 +136,38 @@ namespace eeng::editor
 
     bool inspect_glmvec2(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
-        (void)inspector; (void)ctx;
-        return detail::inspect_glm_vector_inline<glm::vec2>(any);
+        (void)ctx;
+        return detail::inspect_glm_vector_inline<glm::vec2>(any, inspector);
     }
 
     bool inspect_glmvec3(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
-        (void)inspector; (void)ctx;
-        return detail::inspect_glm_vector_inline<glm::vec3>(any);
+        (void)ctx;
+        return detail::inspect_glm_vector_inline<glm::vec3>(any, inspector);
     }
 
     bool inspect_glmvec4(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
-        (void)inspector; (void)ctx;
-        return detail::inspect_glm_vector_inline<glm::vec4>(any);
+        (void)ctx;
+        return detail::inspect_glm_vector_inline<glm::vec4>(any, inspector);
     }
 
     bool inspect_glmivec2(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
-        (void)inspector; (void)ctx;
-        return detail::inspect_glm_vector_inline<glm::ivec2>(any);
+        (void)ctx;
+        return detail::inspect_glm_vector_inline<glm::ivec2>(any, inspector);
     }
 
     bool inspect_glmivec3(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
-        (void)inspector; (void)ctx;
-        return detail::inspect_glm_vector_inline<glm::ivec3>(any);
+        (void)ctx;
+        return detail::inspect_glm_vector_inline<glm::ivec3>(any, inspector);
     }
 
     bool inspect_glmivec4(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)
     {
-        (void)inspector; (void)ctx;
-        return detail::inspect_glm_vector_inline<glm::ivec4>(any);
+        (void)ctx;
+        return detail::inspect_glm_vector_inline<glm::ivec4>(any, inspector);
     }
 
     bool inspect_glmmat2(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx)

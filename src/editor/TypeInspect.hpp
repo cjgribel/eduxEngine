@@ -7,10 +7,40 @@
 #include "InspectorState.hpp"
 #include "meta/MetaInfo.h"
 #include "misc/cpp/imgui_stdlib.h" // ImGui widgets for std::string
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <string>
 
 namespace eeng::editor {
 
     // struct InspectorState;
+
+    namespace detail
+    {
+        inline constexpr float kDegToRad = 0.01745329251994329577f;
+        inline constexpr float kRadToDeg = 57.2957795130823208768f;
+
+        inline const DataMetaInfo* current_meta(const InspectorState& inspector)
+        {
+            return inspector.current_data_meta_info;
+        }
+
+        inline bool has_hint(const InspectorState& inspector, InspectorUiHint hint)
+        {
+            const auto* meta = current_meta(inspector);
+            return meta && has_ui_hint(meta->ui_hints, hint);
+        }
+
+        inline const char* float_format(const DataMetaInfo* meta, char* buffer, std::size_t buffer_size)
+        {
+            if (!meta || meta->ui_units.empty())
+                return "%.3f";
+
+            std::snprintf(buffer, buffer_size, "%%.3f %s", meta->ui_units.c_str());
+            return buffer;
+        }
+    } // namespace detail
 
     /// General type inspection template
     template<class T>
@@ -28,13 +58,51 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<float>(float& t, InspectorState& inspector)
     {
-        return ImGui::InputFloat("##label", &t, 1.0f);
+        const auto* meta = detail::current_meta(inspector);
+        if (!meta)
+            return ImGui::InputFloat("##label", &t, 1.0f);
+
+        if (detail::has_hint(inspector, InspectorUiHint::AngleDegrees))
+        {
+            float deg = t * detail::kRadToDeg;
+            const float speed = meta->ui_speed > 0.0f ? meta->ui_speed : 0.25f;
+            bool changed = false;
+            if (meta->ui_has_range)
+                changed = ImGui::SliderFloat("##label", &deg, meta->ui_range_min, meta->ui_range_max, "%.2f deg");
+            else
+                changed = ImGui::DragFloat("##label", &deg, speed, 0.0f, 0.0f, "%.2f deg");
+            if (!changed)
+                return false;
+            t = deg * detail::kDegToRad;
+            return true;
+        }
+
+        char format_buffer[64];
+        const char* format = detail::float_format(meta, format_buffer, sizeof(format_buffer));
+        const float speed = meta->ui_speed > 0.0f ? meta->ui_speed : 0.05f;
+        if (meta->ui_has_range)
+            return ImGui::SliderFloat("##label", &t, meta->ui_range_min, meta->ui_range_max, format);
+        return ImGui::DragFloat("##label", &t, speed, 0.0f, 0.0f, format);
     }
 
     /// Inspect const float
     template<>
     inline bool inspect_type<const float>(const float& t, InspectorState& inspector)
     {
+        const auto* meta = detail::current_meta(inspector);
+        if (meta)
+        {
+            if (detail::has_hint(inspector, InspectorUiHint::AngleDegrees))
+            {
+                ImGui::TextDisabled("%.2f deg", t * detail::kRadToDeg);
+                return false;
+            }
+            if (!meta->ui_units.empty())
+            {
+                ImGui::TextDisabled("%.3f %s", t, meta->ui_units.c_str());
+                return false;
+            }
+        }
         ImGui::TextDisabled("%.2f", t);
         return false;
     }
@@ -88,8 +156,7 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<uint32_t>(uint32_t& value, InspectorState& inspector)
     {
-        if (inspector.current_data_meta_info &&
-            inspector.current_data_meta_info->ui_hint == eeng::InspectorUiHint::ColorABGR)
+        if (detail::has_hint(inspector, InspectorUiHint::ColorABGR))
         {
             ImVec4 color = ImGui::ColorConvertU32ToFloat4(static_cast<ImU32>(value));
             if (!ImGui::ColorEdit4("##label", &color.x, ImGuiColorEditFlags_AlphaPreviewHalf))
@@ -103,6 +170,44 @@ namespace eeng::editor {
             return true;
         }
 
+        if (detail::has_hint(inspector, InspectorUiHint::BitmaskEnum))
+        {
+            bool changed = false;
+            char preview[32];
+            std::snprintf(preview, sizeof(preview), "0x%08X", value);
+
+            if (ImGui::BeginCombo("##label", preview))
+            {
+                if (ImGui::Button("Set All"))
+                {
+                    value = 0xFFFFFFFFu;
+                    changed = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Clear"))
+                {
+                    value = 0u;
+                    changed = true;
+                }
+                ImGui::Separator();
+
+                for (int bit = 0; bit < 32; ++bit)
+                {
+                    const std::uint32_t bit_mask = (1u << bit);
+                    bool enabled = (value & bit_mask) != 0u;
+                    std::string label = "Bit " + std::to_string(bit) + "##bit_" + std::to_string(bit);
+                    if (ImGui::Checkbox(label.c_str(), &enabled))
+                    {
+                        if (enabled) value |= bit_mask;
+                        else value &= ~bit_mask;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            return changed;
+        }
+
         return ImGui::InputScalar("Input uint32_t", ImGuiDataType_U32, &value);
     }
 
@@ -110,8 +215,7 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<const uint32_t>(const uint32_t& t, InspectorState& inspector)
     {
-        if (inspector.current_data_meta_info &&
-            inspector.current_data_meta_info->ui_hint == eeng::InspectorUiHint::ColorABGR)
+        if (detail::has_hint(inspector, InspectorUiHint::ColorABGR))
         {
             ImVec4 color = ImGui::ColorConvertU32ToFloat4(static_cast<ImU32>(t));
             inspector.begin_disabled();
@@ -120,6 +224,12 @@ namespace eeng::editor {
                 &color.x,
                 ImGuiColorEditFlags_AlphaPreviewHalf | ImGuiColorEditFlags_NoInputs);
             inspector.end_disabled();
+            return false;
+        }
+
+        if (detail::has_hint(inspector, InspectorUiHint::BitmaskEnum))
+        {
+            ImGui::TextDisabled("0x%08X", t);
             return false;
         }
 
