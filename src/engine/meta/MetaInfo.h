@@ -15,7 +15,8 @@ namespace eeng
         None = 0,
         ColorABGR = 1 << 0,
         AngleDegrees = 1 << 1,
-        BitmaskEnum = 1 << 2
+        BitmaskEnum = 1 << 2,
+        QuaternionEulerDegrees = 1 << 3
     };
 
     constexpr InspectorUiHint operator|(InspectorUiHint lhs, InspectorUiHint rhs)
@@ -52,11 +53,20 @@ namespace eeng
         std::string name;
         std::string nice_name;
         std::string tooltip;
+
+        // Optional inspector presentation hints consumed by TypeInspect/GLMInspect.
+        // Hints are non-destructive: they change UI representation, not storage format.
         InspectorUiHint ui_hints = InspectorUiHint::None;
+
+        // Optional slider range for numeric widgets.
         bool ui_has_range = false;
         float ui_range_min = 0.0f;
         float ui_range_max = 0.0f;
+
+        // Optional drag speed for float/vector/quaternion widgets.
         float ui_speed = 0.0f; // <= 0 means inspector default speed.
+
+        // Optional suffix displayed by scalar widgets (for example "m", "kg", "s").
         std::string ui_units;
     };
 

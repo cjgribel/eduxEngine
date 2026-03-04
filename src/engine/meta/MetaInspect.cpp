@@ -150,8 +150,6 @@ namespace eeng::meta {
             const bool type_readonly = traits::is_readonly_inspection(meta_type);
             if (entt::meta_func meta_func = meta_type.func(literals::inspect_hs); meta_func)
             {
-                const auto* prev_data_meta_info = inspector.current_data_meta_info;
-                inspector.current_data_meta_info = nullptr;
                 if (type_readonly)
                 {
                     // Policy: Read-only types skip cloning and command generation.
@@ -195,7 +193,6 @@ namespace eeng::meta {
                         mod = true;
                     }
                 }
-                inspector.current_data_meta_info = prev_data_meta_info;
 
             }
             else if (meta_type.is_enum())
@@ -403,6 +400,9 @@ namespace eeng::meta {
         EngineContext& ctx)
     {
         bool mod = false;
+        // Start each entity inspection with a clean field-metadata context.
+        // Field metadata is pushed/popped while traversing members.
+        inspector.current_data_meta_info = nullptr;
         // editor::AssignFieldCommandBuilder cmd_builder;
 
         // TODO: Take ctx directly as an argument
@@ -439,6 +439,8 @@ namespace eeng::meta {
                     //     .entity(entity)
                     //     .component(id);
                     auto comp_any = meta_type.from_void(type.value(entity)); // ref
+                    // Do not carry field metadata across component boundaries.
+                    inspector.current_data_meta_info = nullptr;
                     mod |= inspect_any(comp_any, inspector, cmdb, ctx);
 
                     inspector.end_node();

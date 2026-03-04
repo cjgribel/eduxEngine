@@ -175,6 +175,7 @@ namespace eeng::meta
 
             .func<&eeng::serializers::serialize_glmquat>(eeng::literals::serialize_hs)
             .func<&eeng::serializers::deserialize_glmquat>(eeng::literals::deserialize_hs)
+            .template func<&eeng::editor::inspect_glmquat>(eeng::literals::inspect_hs)
             ;
         register_type<glm::quat>();
         register_helper_type<glm::quat>();

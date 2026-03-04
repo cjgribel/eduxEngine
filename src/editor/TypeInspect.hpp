@@ -5,6 +5,7 @@
 #define InspectType_hpp
 
 #include "InspectorState.hpp"
+#include "InspectorEditPolicy.hpp"
 #include "meta/MetaInfo.h"
 #include "misc/cpp/imgui_stdlib.h" // ImGui widgets for std::string
 #include <cmath>
@@ -37,6 +38,8 @@ namespace eeng::editor {
             if (!meta || meta->ui_units.empty())
                 return "%.3f";
 
+            // ImGui uses printf-style format strings, so units can be appended
+            // directly in the format (for example "%.3f m/s").
             std::snprintf(buffer, buffer_size, "%%.3f %s", meta->ui_units.c_str());
             return buffer;
         }
@@ -60,29 +63,59 @@ namespace eeng::editor {
     {
         const auto* meta = detail::current_meta(inspector);
         if (!meta)
-            return ImGui::InputFloat("##label", &t, 1.0f);
+        {
+            float committed = t;
+            if (!edit_with_commit_on_end_buffered(
+                "##label",
+                t,
+                committed,
+                [](float& v) { return ImGui::InputFloat("##label", &v, 1.0f); }))
+            {
+                return false;
+            }
+            t = committed;
+            return true;
+        }
 
         if (detail::has_hint(inspector, InspectorUiHint::AngleDegrees))
         {
-            float deg = t * detail::kRadToDeg;
+            const float source_deg = t * detail::kRadToDeg;
+            float committed_deg = source_deg;
             const float speed = meta->ui_speed > 0.0f ? meta->ui_speed : 0.25f;
-            bool changed = false;
-            if (meta->ui_has_range)
-                changed = ImGui::SliderFloat("##label", &deg, meta->ui_range_min, meta->ui_range_max, "%.2f deg");
-            else
-                changed = ImGui::DragFloat("##label", &deg, speed, 0.0f, 0.0f, "%.2f deg");
-            if (!changed)
+            if (!edit_with_commit_on_end_buffered(
+                "##label",
+                source_deg,
+                committed_deg,
+                [&](float& deg) {
+                    if (meta->ui_has_range)
+                        return ImGui::SliderFloat("##label", &deg, meta->ui_range_min, meta->ui_range_max, "%.2f deg");
+                    return ImGui::DragFloat("##label", &deg, speed, 0.0f, 0.0f, "%.2f deg");
+                }))
+            {
                 return false;
-            t = deg * detail::kDegToRad;
+            }
+            t = committed_deg * detail::kDegToRad;
             return true;
         }
 
         char format_buffer[64];
         const char* format = detail::float_format(meta, format_buffer, sizeof(format_buffer));
         const float speed = meta->ui_speed > 0.0f ? meta->ui_speed : 0.05f;
-        if (meta->ui_has_range)
-            return ImGui::SliderFloat("##label", &t, meta->ui_range_min, meta->ui_range_max, format);
-        return ImGui::DragFloat("##label", &t, speed, 0.0f, 0.0f, format);
+        float committed = t;
+        if (!edit_with_commit_on_end_buffered(
+            "##label",
+            t,
+            committed,
+            [&](float& v) {
+                if (meta->ui_has_range)
+                    return ImGui::SliderFloat("##label", &v, meta->ui_range_min, meta->ui_range_max, format);
+                return ImGui::DragFloat("##label", &v, speed, 0.0f, 0.0f, format);
+            }))
+        {
+            return false;
+        }
+        t = committed;
+        return true;
     }
 
     /// Inspect const float
@@ -111,7 +144,17 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<double>(double& t, InspectorState& inspector)
     {
-        return ImGui::InputDouble("##label", &t, 1.0f);
+        double committed = t;
+        if (!edit_with_commit_on_end_buffered(
+            "##label",
+            t,
+            committed,
+            [](double& v) { return ImGui::InputDouble("##label", &v, 1.0f); }))
+        {
+            return false;
+        }
+        t = committed;
+        return true;
     }
 
     /// Inspect const double
@@ -126,7 +169,17 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<int>(int& t, InspectorState& inspector)
     {
-        return ImGui::InputInt("##label", &t, 1);
+        int committed = t;
+        if (!edit_with_commit_on_end_buffered(
+            "##label",
+            t,
+            committed,
+            [](int& v) { return ImGui::InputInt("##label", &v, 1); }))
+        {
+            return false;
+        }
+        t = committed;
+        return true;
     }
 
     /// Inspect const int
@@ -141,7 +194,17 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<uint8_t>(uint8_t& value, InspectorState& inspector)
     {
-        return ImGui::InputScalar("Input uint32_t", ImGuiDataType_U8, &value);
+        uint8_t committed = value;
+        if (!edit_with_commit_on_end_buffered(
+            "Input uint32_t",
+            value,
+            committed,
+            [](uint8_t& v) { return ImGui::InputScalar("Input uint32_t", ImGuiDataType_U8, &v); }))
+        {
+            return false;
+        }
+        value = committed;
+        return true;
     }
 
     /// Inspect const uint8_t
@@ -158,11 +221,19 @@ namespace eeng::editor {
     {
         if (detail::has_hint(inspector, InspectorUiHint::ColorABGR))
         {
-            ImVec4 color = ImGui::ColorConvertU32ToFloat4(static_cast<ImU32>(value));
-            if (!ImGui::ColorEdit4("##label", &color.x, ImGuiColorEditFlags_AlphaPreviewHalf))
+            // ABGR storage is preserved in component data; we convert only for UI.
+            const ImVec4 source_color = ImGui::ColorConvertU32ToFloat4(static_cast<ImU32>(value));
+            ImVec4 committed_color = source_color;
+            if (!edit_with_commit_on_end_buffered(
+                "##label",
+                source_color,
+                committed_color,
+                [](ImVec4& c) { return ImGui::ColorEdit4("##label", &c.x, ImGuiColorEditFlags_AlphaPreviewHalf); }))
+            {
                 return false;
+            }
 
-            const auto updated = static_cast<uint32_t>(ImGui::ColorConvertFloat4ToU32(color));
+            const auto updated = static_cast<uint32_t>(ImGui::ColorConvertFloat4ToU32(committed_color));
             if (updated == value)
                 return false;
 
@@ -172,6 +243,7 @@ namespace eeng::editor {
 
         if (detail::has_hint(inspector, InspectorUiHint::BitmaskEnum))
         {
+            // Generic bitmask editor for uint32-backed flag fields.
             bool changed = false;
             char preview[32];
             std::snprintf(preview, sizeof(preview), "0x%08X", value);
@@ -208,7 +280,17 @@ namespace eeng::editor {
             return changed;
         }
 
-        return ImGui::InputScalar("Input uint32_t", ImGuiDataType_U32, &value);
+        uint32_t committed = value;
+        if (!edit_with_commit_on_end_buffered(
+            "Input uint32_t",
+            value,
+            committed,
+            [](uint32_t& v) { return ImGui::InputScalar("Input uint32_t", ImGuiDataType_U32, &v); }))
+        {
+            return false;
+        }
+        value = committed;
+        return true;
     }
 
     /// Inspect const uint32_t
@@ -241,7 +323,9 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<bool>(bool& t, InspectorState& inspector)
     {
-        return ImGui::Checkbox("##label", &t);
+        return should_commit_last_item_edit(
+            ImGui::Checkbox("##label", &t),
+            InspectCommitMode::Immediate);
     }
 
     /// Inspect const bool
@@ -259,7 +343,17 @@ namespace eeng::editor {
     template<>
     inline bool inspect_type<std::string>(std::string& t, InspectorState& inspector)
     {
-        return ImGui::InputText("##label", &t); // label cannot be empty
+        std::string committed = t;
+        if (!edit_with_commit_on_end_buffered(
+            "##label",
+            t,
+            committed,
+            [](std::string& v) { return ImGui::InputText("##label", &v); })) // label cannot be empty
+        {
+            return false;
+        }
+        t = committed;
+        return true;
     }
 
     /// Inspect const std::string

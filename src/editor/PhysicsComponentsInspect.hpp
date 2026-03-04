@@ -51,6 +51,43 @@ namespace eeng::editor
             show_meta_tooltip(entt::resolve<T>(), field_name, flags);
         }
 
+        inline const eeng::DataMetaInfo* get_data_meta_info(
+            const entt::meta_type& meta_type,
+            const char* field_name)
+        {
+            if (!meta_type)
+                return nullptr;
+            entt::meta_data meta_data = meta_type.data(entt::hashed_string{ field_name }.value());
+            if (!meta_data)
+                return nullptr;
+            return meta_data.custom();
+        }
+
+        struct ScopedFieldMetaInfo
+        {
+            InspectorState& inspector;
+            const eeng::DataMetaInfo* prev = nullptr;
+
+            ScopedFieldMetaInfo(
+                InspectorState& inspector_in,
+                const entt::meta_type& meta_type,
+                const char* field_name)
+                : inspector(inspector_in)
+                , prev(inspector.current_data_meta_info)
+            {
+                // Temporarily override the active DataMetaInfo so nested widgets
+                // (for example quaternion editors) can pick up per-field hints
+                // such as "edit as Euler degrees" without hard-coding field names.
+                inspector.current_data_meta_info = get_data_meta_info(meta_type, field_name);
+            }
+
+            ~ScopedFieldMetaInfo()
+            {
+                // Restore previous context to avoid leaking hints across fields.
+                inspector.current_data_meta_info = prev;
+            }
+        };
+
         // Human-readable labels for collider types.
         inline const char* collider_type_label(ecs::ColliderType type)
         {
@@ -224,12 +261,13 @@ namespace eeng::editor
         inspector.end_leaf();
 
         inspector.begin_leaf("local_rotation");
-        float rotation_data[4] = { desc->local_rotation.x, desc->local_rotation.y, desc->local_rotation.z, desc->local_rotation.w };
-        if (ImGui::DragFloat4("##local_rotation", rotation_data, 0.01f))
         {
-            desc->local_rotation = glm::normalize(glm::quat(
-                rotation_data[3], rotation_data[0], rotation_data[1], rotation_data[2]));
-            modified = true;
+            detail::ScopedFieldMetaInfo field_scope(
+                inspector,
+                entt::resolve<ecs::ColliderDesc>(),
+                "local_rotation");
+            auto rot_any = entt::forward_as_meta(desc->local_rotation);
+            modified |= inspect_glmquat(rot_any, inspector, ctx);
         }
         detail::show_meta_tooltip<ecs::ColliderDesc>("local_rotation");
         inspector.end_leaf();
@@ -370,13 +408,12 @@ namespace eeng::editor
         inspector.begin_leaf("com_local_rotation");
         inspector.begin_disabled();
         {
-            float rotation_data[4] = {
-                rb->com_local_rotation.x,
-                rb->com_local_rotation.y,
-                rb->com_local_rotation.z,
-                rb->com_local_rotation.w
-            };
-            (void)ImGui::DragFloat4("##com_local_rotation", rotation_data, 0.01f);
+            detail::ScopedFieldMetaInfo field_scope(
+                inspector,
+                entt::resolve<ecs::RigidBodyComponent>(),
+                "com_local_rotation");
+            auto rot_any = entt::forward_as_meta(rb->com_local_rotation);
+            (void)inspect_glmquat(rot_any, inspector, ctx);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("Computed principal-axes rotation (body -> pivot).");

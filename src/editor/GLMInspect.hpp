@@ -13,6 +13,7 @@ namespace eeng::editor
     bool inspect_glmivec2(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx);
     bool inspect_glmivec3(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx);
     bool inspect_glmivec4(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx);
+    bool inspect_glmquat(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx);
     bool inspect_glmmat2(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx);
     bool inspect_glmmat3(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx);
     bool inspect_glmmat4(entt::meta_any& any, InspectorState& inspector, EngineContext& ctx);

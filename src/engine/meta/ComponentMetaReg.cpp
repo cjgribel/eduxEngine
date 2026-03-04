@@ -520,7 +520,14 @@ namespace eeng
             .traits(MetaFlags::none)
 
             .data<&eeng::ecs::TransformComponent::rotation>("rotation"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "rotation", "Rotation", "Local rotation." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "rotation",
+                .nice_name = "Rotation",
+                .tooltip = "Local rotation.",
+                // Store as quaternion, edit as Euler degrees in inspector.
+                .ui_hints = InspectorUiHint::QuaternionEulerDegrees,
+                .ui_speed = 1.0f
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::ecs::TransformComponent::scale>("scale"_hs)
@@ -794,15 +801,18 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "min_emit_distance", "Emit Threshold", "Minimum movement before adding a point." })
                 .traits(MetaFlags::none)
                 .data<&Trail::color>("color"_hs)
+                // ABGR integer with color picker UI hint.
                 .custom<DataMetaInfo>(DataMetaInfo{ "color", "Color", "Base trail color (ABGR).", InspectorUiHint::ColorABGR })
                 .traits(MetaFlags::none)
                 .data<&Trail::use_color_over_age>("use_color_over_age"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "use_color_over_age", "Color Over Age", "Interpolate from start color to end color over lifetime." })
                 .traits(MetaFlags::none)
                 .data<&Trail::color_start>("color_start"_hs)
+                // ABGR integer with color picker UI hint.
                 .custom<DataMetaInfo>(DataMetaInfo{ "color_start", "Start Color", "Color at age 0 (ABGR).", InspectorUiHint::ColorABGR })
                 .traits(MetaFlags::none)
                 .data<&Trail::color_end>("color_end"_hs)
+                // ABGR integer with color picker UI hint.
                 .custom<DataMetaInfo>(DataMetaInfo{ "color_end", "End Color", "Color at end of lifetime (ABGR).", InspectorUiHint::ColorABGR })
                 .traits(MetaFlags::none)
                 .data<&Trail::style>("style"_hs)
@@ -1109,7 +1119,13 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "local_position", "Local Position", "Local collider offset." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::ColliderDesc::local_rotation>("local_rotation"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "local_rotation", "Local Rotation", "Local collider rotation." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "local_rotation",
+                    .nice_name = "Local Rotation",
+                    .tooltip = "Local collider rotation.",
+                    .ui_hints = InspectorUiHint::QuaternionEulerDegrees,
+                    .ui_speed = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::ColliderDesc::half_extents>("half_extents"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "half_extents", "Half Extents", "Half extents for box/AABB." })
@@ -1623,7 +1639,13 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "local_offset", "Local Offset", "Offset in target local space." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::TransformSocketComponent::local_rotation>("local_rotation"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "local_rotation", "Local Rotation", "Rotation in target local space." })
+                .custom<DataMetaInfo>(DataMetaInfo{
+                    .name = "local_rotation",
+                    .nice_name = "Local Rotation",
+                    .tooltip = "Rotation in target local space.",
+                    .ui_hints = InspectorUiHint::QuaternionEulerDegrees,
+                    .ui_speed = 1.0f
+                    })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::TransformSocketComponent::follow_position>("follow_position"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "follow_position", "Follow Position", "Update position from target." })
