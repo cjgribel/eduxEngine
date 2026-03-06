@@ -423,6 +423,40 @@ namespace eeng::editor
         }
     }
 
+    void AssetActions::import_texture(
+        EngineContext& ctx,
+        const std::filesystem::path& source_file,
+        std::string texture_name,
+        std::shared_ptr<std::atomic<bool>> in_flight)
+    {
+        if (!can_queue_action(ctx, "ImportTexture"))
+            return;
+
+        if (in_flight)
+            in_flight->store(true, std::memory_order_relaxed);
+
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired())
+        {
+            if (in_flight)
+                in_flight->store(false, std::memory_order_relaxed);
+            return;
+        }
+
+        if (!try_add_command(
+                ctx,
+                CommandFactory::Create<ImportTextureCommand>(
+                    source_file,
+                    std::move(texture_name),
+                    ctx_wptr,
+                    std::move(in_flight)),
+                "ImportTexture"))
+        {
+            if (in_flight)
+                in_flight->store(false, std::memory_order_relaxed);
+        }
+    }
+
     void AssetActions::import_animation_graph_mock(
         EngineContext& ctx,
         std::string graph_name,

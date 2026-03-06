@@ -134,6 +134,7 @@ namespace eeng::ecs
 
             if (particle_system_)
                 particle_system_->update(registry, ctx, delta_time, physics_system_.get());
+            update_particle_monitor_stats(ctx);
 
             if (trail_system_ && overlay_settings_.play.show_trails)
                 trail_system_->update(registry, ctx, delta_time);
@@ -164,6 +165,7 @@ namespace eeng::ecs
                 sticky_note_system_->update(registry, ctx, delta_time);
             if (particle_system_)
                 particle_system_->update(registry, ctx, delta_time, physics_system_.get());
+            update_particle_monitor_stats(ctx);
             if (trail_system_ && overlay_settings_.edit.show_trails)
                 trail_system_->update(registry, ctx, delta_time);
         }
@@ -245,6 +247,7 @@ namespace eeng::ecs
                 proj_view,
                 camera_right,
                 camera_up);
+            update_particle_render_monitor_stats(ctx);
         }
 
         void shutdown()
@@ -347,6 +350,34 @@ namespace eeng::ecs
             out.dirty_entities = stats.dirty_entities;
             out.event_entities = stats.event_entities;
             out.tracked_contacts = stats.tracked_contacts;
+            out.valid = true;
+        }
+
+        void update_particle_monitor_stats(EngineContext& ctx)
+        {
+            if (!particle_system_ || !ctx.services || !ctx.services->particle_monitor_stats)
+                return;
+
+            const auto& stats = particle_system_->frame_stats();
+            auto& out = *ctx.services->particle_monitor_stats;
+            out.emitter_count = stats.emitter_count;
+            out.visible_emitter_count = stats.visible_emitter_count;
+            out.live_particles = stats.live_particles;
+            out.rendered_particles = stats.rendered_particles;
+            out.draw_batches = 0;
+            out.collisions_requested = stats.collisions_requested;
+            out.threaded_simulation_enabled = stats.threaded_simulation_enabled;
+            out.threaded_simulation_used = stats.threaded_simulation_used;
+            out.valid = true;
+        }
+
+        void update_particle_render_monitor_stats(EngineContext& ctx)
+        {
+            if (!particle_render_system_ || !ctx.services || !ctx.services->particle_monitor_stats)
+                return;
+
+            auto& out = *ctx.services->particle_monitor_stats;
+            out.draw_batches = particle_render_system_->last_draw_batch_count();
             out.valid = true;
         }
 

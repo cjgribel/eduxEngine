@@ -193,6 +193,8 @@ namespace eeng
 
         if (ctx.gui_manager->is_flag_enabled(eeng::GuiFlags::ShowAnimationGraphVisualizer))
             draw_animation_graph_visualizer(ctx);
+
+        gui::draw_resource_import_dialogs(ctx);
     }
 
     void GuiManager::draw_main_menu(EngineContext& ctx) const

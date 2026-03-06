@@ -34,8 +34,11 @@ namespace eeng::gui
     namespace detail
     {
         inline constexpr const char* kModelImportDialog = "ResourceBrowserImportDialog";
+        inline constexpr const char* kTextureImportDialog = "ResourceBrowserTextureImportDialog";
         inline constexpr const char* kModelImportFilters =
             "Model files{.fbx,.obj,.dae,.gltf,.glb,.3ds,.ply,.blend},All files{.*}";
+        inline constexpr const char* kTextureImportFilters =
+            "Texture files{.png,.tga,.jpg,.jpeg,.bmp,.gif},All files{.*}";
 
         inline void update_asset_selection(GuidSelection& selection, const Guid& guid)
         {
@@ -131,6 +134,26 @@ namespace eeng::gui
             return false;
         }
 
+        inline bool is_texture_extension(std::filesystem::path path)
+        {
+            auto ext = path.extension().string();
+            if (ext.empty())
+                return false;
+            for (char& c : ext)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+            static constexpr const char* kExts[] = {
+                ".png", ".tga", ".jpg", ".jpeg", ".bmp", ".gif"
+            };
+
+            for (const char* known : kExts)
+            {
+                if (ext == known)
+                    return true;
+            }
+            return false;
+        }
+
         inline assets::ImportFlags default_assimp_flags()
         {
             using assets::ImportFlags;
@@ -141,6 +164,12 @@ namespace eeng::gui
                 static_cast<unsigned>(ImportFlags::SortByPType) |
                 static_cast<unsigned>(ImportFlags::FlipUVs) |
                 static_cast<unsigned>(ImportFlags::OptimizeGraph));
+        }
+
+        inline std::shared_ptr<std::atomic<bool>>& import_in_flight_state()
+        {
+            static auto state = std::make_shared<std::atomic<bool>>(false);
+            return state;
         }
     }
 
@@ -359,8 +388,7 @@ namespace eeng::gui
 
         void draw()
         {
-            static std::shared_ptr<std::atomic<bool>> import_in_flight =
-                std::make_shared<std::atomic<bool>>(false);
+            auto import_in_flight = detail::import_in_flight_state();
             bool busy = resource_manager.is_busy() ||
                 import_in_flight->load(std::memory_order_relaxed);
             auto index_data = resource_manager.asset_index().get_index_data();
@@ -411,6 +439,18 @@ namespace eeng::gui
                     detail::kModelImportDialog,
                     "Import Model (Assimp)",
                     detail::kModelImportFilters,
+                    config);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Texture..."))
+            {
+                IGFD::FileDialogConfig config;
+                const auto& assets_root = resource_manager.assets_root();
+                config.path = assets_root.empty() ? "." : assets_root.string();
+                ImGuiFileDialog::Instance()->OpenDialog(
+                    detail::kTextureImportDialog,
+                    "Import Texture",
+                    detail::kTextureImportFilters,
                     config);
             }
 
@@ -495,37 +535,84 @@ namespace eeng::gui
 
             if (busy) ImGui::EndDisabled();
 
-            if (ImGuiFileDialog::Instance()->Display(detail::kModelImportDialog))
-            {
-                if (ImGuiFileDialog::Instance()->IsOk())
-                {
-                    const auto file_path = std::filesystem::path(
-                        ImGuiFileDialog::Instance()->GetFilePathName());
-
-                    if (!detail::is_assimp_extension(file_path))
-                    {
-                        EENG_LOG_WARN(&ctx, "Import skipped: unsupported extension %s",
-                            file_path.extension().string().c_str());
-                    }
-                    else if (busy)
-                    {
-                        EENG_LOG_WARN(&ctx, "Import skipped: resource manager busy.");
-                    }
-                    else
-                    {
-                        editor::AssetActions::import_model(
-                            ctx,
-                            file_path,
-                            detail::default_assimp_flags(),
-                            file_path.stem().string(),
-                            import_in_flight);
-                    }
-                }
-
-                ImGuiFileDialog::Instance()->Close();
-            }
         }
     };
+
+    inline void draw_resource_import_dialogs(EngineContext& ctx)
+    {
+        if (!ctx.resource_manager)
+            return;
+
+        auto& resource_manager = static_cast<ResourceManager&>(*ctx.resource_manager);
+        auto import_in_flight = detail::import_in_flight_state();
+        const bool busy = resource_manager.is_busy()
+            || import_in_flight->load(std::memory_order_relaxed);
+
+        if (ImGuiFileDialog::Instance()->Display(
+                detail::kModelImportDialog,
+                ImGuiWindowFlags_NoCollapse,
+                ImVec2(640.0f, 360.0f)))
+        {
+            if (ImGuiFileDialog::Instance()->IsOk())
+            {
+                const auto file_path = std::filesystem::path(
+                    ImGuiFileDialog::Instance()->GetFilePathName());
+
+                if (!detail::is_assimp_extension(file_path))
+                {
+                    EENG_LOG_WARN(&ctx, "Import skipped: unsupported extension %s",
+                        file_path.extension().string().c_str());
+                }
+                else if (busy)
+                {
+                    EENG_LOG_WARN(&ctx, "Import skipped: resource manager busy.");
+                }
+                else
+                {
+                    editor::AssetActions::import_model(
+                        ctx,
+                        file_path,
+                        detail::default_assimp_flags(),
+                        file_path.stem().string(),
+                        import_in_flight);
+                }
+            }
+
+            ImGuiFileDialog::Instance()->Close();
+        }
+
+        if (ImGuiFileDialog::Instance()->Display(
+                detail::kTextureImportDialog,
+                ImGuiWindowFlags_NoCollapse,
+                ImVec2(640.0f, 360.0f)))
+        {
+            if (ImGuiFileDialog::Instance()->IsOk())
+            {
+                const auto file_path = std::filesystem::path(
+                    ImGuiFileDialog::Instance()->GetFilePathName());
+
+                if (!detail::is_texture_extension(file_path))
+                {
+                    EENG_LOG_WARN(&ctx, "Texture import skipped: unsupported extension %s",
+                        file_path.extension().string().c_str());
+                }
+                else if (busy)
+                {
+                    EENG_LOG_WARN(&ctx, "Texture import skipped: resource manager busy.");
+                }
+                else
+                {
+                    editor::AssetActions::import_texture(
+                        ctx,
+                        file_path,
+                        file_path.stem().string(),
+                        import_in_flight);
+                }
+            }
+
+            ImGuiFileDialog::Instance()->Close();
+        }
+    }
 
     struct AssetInspectorWidget
     {

@@ -184,6 +184,19 @@ namespace eeng
         bool valid = false;
     };
 
+    struct ParticleMonitorStats
+    {
+        std::size_t emitter_count = 0;
+        std::size_t visible_emitter_count = 0;
+        std::size_t live_particles = 0;
+        std::size_t rendered_particles = 0;
+        std::size_t draw_batches = 0;
+        bool collisions_requested = false;
+        bool threaded_simulation_enabled = false;
+        bool threaded_simulation_used = false;
+        bool valid = false;
+    };
+
     using EditorRenderHook =
         std::function<void(EngineContext&, ::ShapeRendering::ShapeRenderer&, const OverlayViewState&)>;
 
@@ -207,6 +220,7 @@ namespace eeng
         std::atomic<PlayModePolicy>             play_mode_policy_override{ PlayModePolicy::Preview };
         // Shared stats snapshot for editor UI (updated by runtime systems).
         std::shared_ptr<PhysicsMonitorStats>    physics_monitor_stats;
+        std::shared_ptr<ParticleMonitorStats>   particle_monitor_stats;
         // Current view state for overlay/debug rendering.
         std::shared_ptr<OverlayViewState>       overlay_view_state;
         // Core debug renderer shared across engine/editor/game.
@@ -284,6 +298,7 @@ namespace eeng
         PtrView<EngineConfig>           engine_config;
         // Compatibility view of shared editor stats/config.
         std::shared_ptr<PhysicsMonitorStats> physics_monitor_stats;
+        std::shared_ptr<ParticleMonitorStats> particle_monitor_stats;
         std::shared_ptr<editor::ProjectConfig> project_config;
         std::shared_ptr<::ShapeRendering::ShapeRenderer> shape_renderer;
         std::shared_ptr<OverlayViewState> overlay_view_state;

@@ -24,6 +24,17 @@ namespace eeng::ecs::systems
     class ParticleSystem
     {
     public:
+        struct FrameStats
+        {
+            std::size_t emitter_count = 0;
+            std::size_t visible_emitter_count = 0;
+            std::size_t live_particles = 0;
+            std::size_t rendered_particles = 0;
+            bool collisions_requested = false;
+            bool threaded_simulation_enabled = false;
+            bool threaded_simulation_used = false;
+        };
+
         struct RenderParticle
         {
             glm::vec3 position{ 0.0f };
@@ -65,6 +76,7 @@ namespace eeng::ecs::systems
         void request_burst(entt::entity entity, std::uint32_t count);
 
         void clear();
+        const FrameStats& frame_stats() const { return frame_stats_; }
 
         template<typename Fn>
         void for_each_render_emitter(entt::registry& registry, Fn&& fn) const
@@ -88,5 +100,6 @@ namespace eeng::ecs::systems
         std::unordered_map<entt::entity, EmitterRuntime> runtimes_;
         std::unordered_map<entt::entity, std::uint32_t> pending_bursts_;
         bool threaded_simulation_ = false;
+        FrameStats frame_stats_{};
     };
 }

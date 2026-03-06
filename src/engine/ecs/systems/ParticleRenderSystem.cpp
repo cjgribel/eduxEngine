@@ -171,6 +171,7 @@ namespace eeng::ecs::systems
         const glm::vec3& camera_right,
         const glm::vec3& camera_up)
     {
+        last_draw_batch_count_ = 0;
         if (!initialized())
             return;
 
@@ -286,6 +287,7 @@ namespace eeng::ecs::systems
         {
             if (instances.empty())
                 continue;
+            ++last_draw_batch_count_;
 
             glDepthMask(key.depth_write ? GL_TRUE : GL_FALSE);
             if (key.additive_blend)

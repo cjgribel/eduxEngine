@@ -402,6 +402,21 @@ namespace eeng::gui
             }
         }
 
+        if (ctx.particle_monitor_stats && ctx.particle_monitor_stats->valid
+            && ImGui::CollapsingHeader("Particles", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            const auto& stats = *ctx.particle_monitor_stats;
+            ImGui::Text("Emitters: %zu (%zu visible)", stats.emitter_count, stats.visible_emitter_count);
+            ImGui::Text("Live particles: %zu", stats.live_particles);
+            ImGui::Text("Rendered particles: %zu", stats.rendered_particles);
+            ImGui::Text("Draw batches: %zu", stats.draw_batches);
+            ImGui::Text("Collisions requested: %s", stats.collisions_requested ? "yes" : "no");
+            ImGui::Text(
+                "Threaded sim: %s (%s)",
+                stats.threaded_simulation_enabled ? "enabled" : "disabled",
+                stats.threaded_simulation_used ? "used this frame" : "not used this frame");
+        }
+
         if (ImGui::CollapsingHeader("Memory", ImGuiTreeNodeFlags_DefaultOpen))
         {
             static StorageMemorySnapshot snapshot{};

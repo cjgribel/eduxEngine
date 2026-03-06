@@ -288,7 +288,11 @@ namespace eeng::ecs::systems
         float delta_time,
         const PhysicsSystem* physics_system)
     {
+        frame_stats_ = FrameStats{};
+        frame_stats_.threaded_simulation_enabled = threaded_simulation_;
+
         auto view = registry.view<ecs::ParticleEmitterComponent>();
+        frame_stats_.emitter_count = view.size();
 
         std::vector<entt::entity> entities;
         entities.reserve(view.size());
@@ -339,45 +343,58 @@ namespace eeng::ecs::systems
                 || item.emitter.collision_mode != ecs::ParticleCollisionMode::None;
         }
         pending_bursts_.clear();
+        frame_stats_.collisions_requested = collisions_requested;
 
         const bool can_thread =
             threaded_simulation_
             && !collisions_requested
             && ctx.thread_pool
             && work_items.size() >= 16;
+        frame_stats_.threaded_simulation_used = can_thread;
 
         if (!can_thread)
         {
             for (const auto& item : work_items)
                 update_emitter_particles(item, delta_time, physics_system);
-            return;
         }
-
-        std::vector<std::future<void>> futures;
-        const std::size_t worker_count = std::max<std::size_t>(1u, ctx.thread_pool->nbr_threads());
-        const std::size_t chunk_size = std::max<std::size_t>(
-            8u,
-            (work_items.size() + worker_count - 1u) / worker_count);
-
-        for (std::size_t start = 0; start < work_items.size(); start += chunk_size)
+        else
         {
-            const std::size_t end = std::min(start + chunk_size, work_items.size());
-            futures.push_back(ctx.thread_pool->queue_task(
-                [start, end, delta_time, &work_items]()
-                {
-                    for (std::size_t i = start; i < end; ++i)
-                        update_emitter_particles(work_items[i], delta_time, nullptr);
-                }));
+            std::vector<std::future<void>> futures;
+            const std::size_t worker_count = std::max<std::size_t>(1u, ctx.thread_pool->nbr_threads());
+            const std::size_t chunk_size = std::max<std::size_t>(
+                8u,
+                (work_items.size() + worker_count - 1u) / worker_count);
+
+            for (std::size_t start = 0; start < work_items.size(); start += chunk_size)
+            {
+                const std::size_t end = std::min(start + chunk_size, work_items.size());
+                futures.push_back(ctx.thread_pool->queue_task(
+                    [start, end, delta_time, &work_items]()
+                    {
+                        for (std::size_t i = start; i < end; ++i)
+                            update_emitter_particles(work_items[i], delta_time, nullptr);
+                    }));
+            }
+
+            for (auto& future : futures)
+                future.get();
         }
 
-        for (auto& future : futures)
-            future.get();
+        for (const auto& [entity, runtime] : runtimes_)
+        {
+            (void)entity;
+            frame_stats_.live_particles += runtime.particles.size();
+            frame_stats_.rendered_particles += runtime.render_particles.size();
+            if (!runtime.render_particles.empty())
+                ++frame_stats_.visible_emitter_count;
+        }
     }
 
     void ParticleSystem::clear()
     {
         runtimes_.clear();
         pending_bursts_.clear();
+        frame_stats_ = FrameStats{};
     }
 
     void ParticleSystem::request_burst(entt::entity entity, std::uint32_t count)

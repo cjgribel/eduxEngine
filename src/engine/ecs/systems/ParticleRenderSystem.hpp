@@ -7,6 +7,7 @@
 
 #include "entt/entt.hpp"
 
+#include <cstddef>
 #include <string>
 
 #include <glm/glm.hpp>
@@ -32,6 +33,7 @@ namespace eeng::ecs::systems
         void shutdown();
 
         bool initialized() const noexcept { return shader_program_ != 0; }
+        std::size_t last_draw_batch_count() const noexcept { return last_draw_batch_count_; }
 
         void render(
             entt::registry& registry,
@@ -46,6 +48,6 @@ namespace eeng::ecs::systems
         GLuint vao_ = 0;
         GLuint quad_vbo_ = 0;
         GLuint instance_vbo_ = 0;
+        std::size_t last_draw_batch_count_ = 0;
     };
 }
-

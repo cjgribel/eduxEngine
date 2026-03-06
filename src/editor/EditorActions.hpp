@@ -61,6 +61,13 @@ namespace eeng::editor
             std::string model_name = {},
             std::shared_ptr<std::atomic<bool>> in_flight = {});
 
+        /// @brief Queue an undoable standalone texture import.
+        static void import_texture(
+            EngineContext& ctx,
+            const std::filesystem::path& source_file,
+            std::string texture_name = {},
+            std::shared_ptr<std::atomic<bool>> in_flight = {});
+
         /// @brief Create a mock animation graph asset for quick testing.
         static void import_animation_graph_mock(
             EngineContext& ctx,
