@@ -12,6 +12,8 @@
 #include "ecs/systems/PistonAnimSyncSystem.hpp"
 #include "ecs/systems/PistonConstraintDriveSystem.hpp"
 #include "ecs/systems/MousePointConstraintSystem.hpp"
+#include "ecs/systems/ParticleRenderSystem.hpp"
+#include "ecs/systems/ParticleSystem.hpp"
 #include "ecs/systems/PhysicsSystem.hpp"
 #include "ecs/systems/SpringDamperSystem.hpp"
 #include "ecs/systems/TransformSocketSystem.hpp"
@@ -86,6 +88,10 @@ namespace eeng::ecs
             debug_render_system_ = std::make_unique<systems::DebugRenderSystem>();
             debug_render_settings_edit_ = debug_render_system_->settings;
             debug_render_settings_play_ = debug_render_system_->settings;
+            particle_system_ = std::make_unique<systems::ParticleSystem>();
+            particle_system_->set_threaded_simulation(true);
+            particle_render_system_ = std::make_unique<systems::ParticleRenderSystem>();
+            particle_render_system_->init();
             trail_system_ = std::make_unique<systems::TrailSystem>();
             sticky_note_system_ = std::make_unique<systems::StickyNoteSystem>();
         }
@@ -126,6 +132,9 @@ namespace eeng::ecs
 
             update_common(ctx, delta_time);
 
+            if (particle_system_)
+                particle_system_->update(registry, ctx, delta_time, physics_system_.get());
+
             if (trail_system_ && overlay_settings_.play.show_trails)
                 trail_system_->update(registry, ctx, delta_time);
 
@@ -153,6 +162,8 @@ namespace eeng::ecs
             update_physics_monitor_stats(ctx);
             if (sticky_note_system_)
                 sticky_note_system_->update(registry, ctx, delta_time);
+            if (particle_system_)
+                particle_system_->update(registry, ctx, delta_time, physics_system_.get());
             if (trail_system_ && overlay_settings_.edit.show_trails)
                 trail_system_->update(registry, ctx, delta_time);
         }
@@ -217,6 +228,25 @@ namespace eeng::ecs
                 });
         }
 
+        void render_particles(
+            entt::registry& registry,
+            EngineContext& ctx,
+            const glm::mat4& proj_view,
+            const glm::vec3& camera_right,
+            const glm::vec3& camera_up)
+        {
+            if (!particle_render_system_ || !particle_system_ || !particle_render_system_->initialized())
+                return;
+
+            particle_render_system_->render(
+                registry,
+                ctx,
+                *particle_system_,
+                proj_view,
+                camera_right,
+                camera_up);
+        }
+
         void shutdown()
         {
             if (render_system_)
@@ -225,10 +255,16 @@ namespace eeng::ecs
                 physics_system_->shutdown();
             if (script_system_)
                 script_system_->shutdown();
+            if (particle_render_system_)
+                particle_render_system_->shutdown();
+            if (particle_system_)
+                particle_system_->clear();
         }
 
         systems::PhysicsSystem* physics_system() { return physics_system_.get(); }
         const systems::PhysicsSystem* physics_system() const { return physics_system_.get(); }
+        systems::ParticleSystem* particle_system() { return particle_system_.get(); }
+        const systems::ParticleSystem* particle_system() const { return particle_system_.get(); }
         systems::DebugRenderSettings* debug_render_settings()
         {
             return &debug_render_settings_edit_;
@@ -328,6 +364,8 @@ namespace eeng::ecs
         std::unique_ptr<systems::TwoAnchorAlignSystem> two_anchor_align_system_;
         std::unique_ptr<systems::ScriptSystem> script_system_;
         std::unique_ptr<systems::DebugRenderSystem> debug_render_system_;
+        std::unique_ptr<systems::ParticleSystem> particle_system_;
+        std::unique_ptr<systems::ParticleRenderSystem> particle_render_system_;
         systems::DebugRenderSettings debug_render_settings_edit_{};
         systems::DebugRenderSettings debug_render_settings_play_{};
         OverlayRenderSettings overlay_settings_{};

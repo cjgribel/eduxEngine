@@ -403,6 +403,16 @@ void Game::render(
     {
         auto& registry = ctx->entity_manager->registry();
         const auto proj_view = matrices.P * matrices.V;
+        glm::vec3 camera_right = glm::vec3(active_camera.view_to_world[0]);
+        glm::vec3 camera_up = glm::vec3(active_camera.view_to_world[1]);
+        if (glm::dot(camera_right, camera_right) <= 1.0e-8f)
+            camera_right = glm::vec3(1.0f, 0.0f, 0.0f);
+        else
+            camera_right = glm::normalize(camera_right);
+        if (glm::dot(camera_up, camera_up) <= 1.0e-8f)
+            camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
+        else
+            camera_up = glm::normalize(camera_up);
 
         runtime_pipeline_.render_entities(
             registry,
@@ -411,6 +421,12 @@ void Game::render(
             pointlight.pos,
             pointlight.color,
             active_camera.position);
+        runtime_pipeline_.render_particles(
+            registry,
+            *ctx,
+            proj_view,
+            camera_right,
+            camera_up);
     }
 
     // Draw player view ray

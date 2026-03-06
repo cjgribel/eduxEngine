@@ -11,6 +11,7 @@
 #include "ecs/TransformComponent.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/ModelComponent.hpp"
+#include "ecs/ParticleEmitterComponent.hpp"
 #include "ecs/AnimationGraphComponent.hpp"
 #include "ecs/ScriptComponent.hpp"
 #include "ecs/StickyNoteComponent.hpp"
@@ -846,6 +847,182 @@ namespace eeng
             .traits(MetaFlags::none)
             ;
         register_component<ecs::TrailComponent>();
+
+        // --- ParticleEmitterComponent ---------------------------------------
+        {
+            using ParticleRenderMode = eeng::ecs::ParticleRenderMode;
+            auto render_mode_info = TypeMetaInfo
+            {
+                .id = "eeng.ecs.ParticleRenderMode",
+                .name = "ParticleRenderMode",
+                .tooltip = "Particle rendering mode.",
+                .underlying_type = entt::resolve<std::underlying_type_t<ParticleRenderMode>>()
+            };
+            entt::meta_factory<ParticleRenderMode>()
+                .custom<TypeMetaInfo>(render_mode_info)
+                .traits(MetaFlags::none)
+                .data<ParticleRenderMode::SoftCircle>("SoftCircle"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "SoftCircle", "Analytic soft circle billboard (no texture required)." })
+                .traits(MetaFlags::none)
+                .data<ParticleRenderMode::Billboard>("Billboard"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Billboard", "Textured or untextured camera-facing quad." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<ParticleRenderMode>();
+            warm_start_meta_type<ParticleRenderMode>();
+        }
+
+        {
+            using ParticleCollisionMode = eeng::ecs::ParticleCollisionMode;
+            auto collision_mode_info = TypeMetaInfo
+            {
+                .id = "eeng.ecs.ParticleCollisionMode",
+                .name = "ParticleCollisionMode",
+                .tooltip = "Particle collision response mode.",
+                .underlying_type = entt::resolve<std::underlying_type_t<ParticleCollisionMode>>()
+            };
+            entt::meta_factory<ParticleCollisionMode>()
+                .custom<TypeMetaInfo>(collision_mode_info)
+                .traits(MetaFlags::none)
+                .data<ParticleCollisionMode::None>("None"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "None", "No collision response." })
+                .traits(MetaFlags::none)
+                .data<ParticleCollisionMode::Kill>("Kill"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Kill", "Destroy particles on first hit." })
+                .traits(MetaFlags::none)
+                .data<ParticleCollisionMode::Bounce>("Bounce"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Bounce", "Simple reflection against hit normal." })
+                .traits(MetaFlags::none)
+                ;
+            meta::register_type<ParticleCollisionMode>();
+            warm_start_meta_type<ParticleCollisionMode>();
+        }
+
+        entt::meta_factory<eeng::ecs::ParticleEmitterComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{
+                .id = "eeng.ecs.ParticleEmitterComponent",
+                .name = "ParticleEmitterComponent",
+                .tooltip = "CPU-simulated particle emitter with instanced billboard rendering."
+                })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::enabled>("enabled"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable update and rendering for this emitter." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::emitting>("emitting"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "emitting", "Emitting", "Emit new particles while true." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::looping>("looping"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "looping", "Looping", "Loop finite duration windows when true." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::duration>("duration"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "duration", "Duration", "Emission window in seconds; <= 0 means infinite." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::max_particles>("max_particles"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "max_particles", "Max Particles", "Per-emitter particle capacity." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::spawn_rate>("spawn_rate"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "spawn_rate", "Spawn Rate", "Particles spawned per second." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::lifetime_min>("lifetime_min"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "lifetime_min", "Lifetime Min", "Minimum lifetime in seconds." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::lifetime_max>("lifetime_max"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "lifetime_max", "Lifetime Max", "Maximum lifetime in seconds." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::speed_min>("speed_min"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "speed_min", "Speed Min", "Minimum initial speed." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::speed_max>("speed_max"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "speed_max", "Speed Max", "Maximum initial speed." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::spread_angle_deg>("spread_angle_deg"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "spread_angle_deg", "Spread Angle", "Cone spread half-angle in degrees." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::local_direction>("local_direction"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "local_direction", "Local Direction", "Emitter forward direction in local space." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::local_offset>("local_offset"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "local_offset", "Local Offset", "Emitter origin offset in local space." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::acceleration>("acceleration"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "acceleration", "Acceleration", "Constant acceleration (gravity/wind base)." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::drag>("drag"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "drag", "Drag", "Linear drag coefficient." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::size_begin>("size_begin"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "size_begin", "Size Begin", "Particle size at birth." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::size_end>("size_end"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "size_end", "Size End", "Particle size at death." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::color_begin>("color_begin"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "color_begin", "Color Begin", "ABGR color at birth.", InspectorUiHint::ColorABGR })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::color_end>("color_end"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "color_end", "Color End", "ABGR color at death.", InspectorUiHint::ColorABGR })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::render_mode>("render_mode"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "render_mode", "Render Mode", "Particle primitive mode." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::use_texture>("use_texture"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "use_texture", "Use Texture", "Sample texture for billboard particles." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::texture_ref>("texture_ref"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "texture_ref", "Texture", "Optional billboard texture." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::additive_blend>("additive_blend"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "additive_blend", "Additive Blend", "Use additive blending instead of alpha blend." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::depth_write>("depth_write"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "depth_write", "Depth Write", "Write depth while rendering particles." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::collision_mode>("collision_mode"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "collision_mode", "Collision Mode", "Collision response policy (raycast-based)." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::collision_layer>("collision_layer"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "collision_layer", "Collision Layer", "Raycast layer for particle collisions." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::collision_mask>("collision_mask"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "collision_mask", "Collision Mask", "Raycast mask for particle collisions." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::collision_radius>("collision_radius"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "collision_radius", "Collision Radius", "Small offset from hit point after contact." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::collision_bounce>("collision_bounce"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "collision_bounce", "Collision Bounce", "Velocity reflection factor on collision." })
+            .traits(MetaFlags::none)
+            ;
+        register_component<ecs::ParticleEmitterComponent>();
 
 
         // --- HeaderComponent -------------------------------------------------

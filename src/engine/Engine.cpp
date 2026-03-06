@@ -48,6 +48,8 @@ namespace
             EENG_LOG_WARN(ctx, "%s", message);
     }
 
+    /// @brief  Repeatedly pump main-thread work and event dispatching until no work is left, or a reasonable iteration limit is hit.
+    /// @param ctx The engine context containing the main-thread queue and event queue.
     void drain_shutdown_queues(eeng::EngineContext& ctx)
     {
         // Bounded drain: handle already-queued main-thread work and any events it
@@ -74,6 +76,13 @@ namespace
         }
     }
 
+    /// @brief Pump main-thread work and event dispatching until the given future is ready, or a reasonable timeout is hit.
+    /// @tparam FutureType The type of the future to wait on.
+    /// @param ctx The engine context containing the main-thread queue and event queue.
+    /// @param future The future to wait for.
+    /// @param label A label for logging purposes.
+    /// @param timeout_ms The maximum time to wait in milliseconds. 0 means no timeout.
+    /// @return True if the future became ready within the timeout, false otherwise.
     template<typename FutureType>
     bool pump_until_ready(
         eeng::EngineContext& ctx,
@@ -100,6 +109,11 @@ namespace
         return true;
     }
 
+    /// @brief Pump main-thread work and event dispatching until the resource manager reports it's idle, or a reasonable timeout is hit.
+    /// @param ctx The engine context containing the main-thread queue and event queue.
+    /// @param rm The resource manager to wait on.
+    /// @param timeout_ms The maximum time to wait in milliseconds. 0 means no timeout.
+    /// @return True if the resource manager became idle within the timeout, false otherwise.
     bool pump_until_resource_idle(
         eeng::EngineContext& ctx,
         eeng::IResourceManager& rm,
@@ -712,6 +726,8 @@ namespace eeng
         }
     }
 
+    /// @brief  Enter play mode by creating a new play world, binding the engine context to it, and initializing it based on the selected play mode policy.
+    /// @return True if play mode was successfully entered, false otherwise.
     bool Engine::enter_play_mode()
     {
         if (!ctx || mode_ == EngineMode::Play)
