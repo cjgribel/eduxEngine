@@ -134,6 +134,71 @@ namespace eeng::ecs::systems
             return std::clamp(max_particles, 1u, 200000u);
         }
 
+        std::uint32_t atlas_frame_capacity(const ecs::ParticleEmitterComponent& emitter)
+        {
+            const std::uint32_t columns = std::max(1u, emitter.atlas_columns);
+            const std::uint32_t rows = std::max(1u, emitter.atlas_rows);
+            const std::uint32_t atlas_capacity = columns * rows;
+            return std::clamp(emitter.atlas_frame_count, 1u, atlas_capacity);
+        }
+
+        std::uint32_t particle_atlas_frame(
+            const ecs::ParticleEmitterComponent& emitter,
+            const ParticleSystem::ParticleRuntime& particle)
+        {
+            if (!emitter.atlas_enabled)
+                return 0u;
+
+            const std::uint32_t frame_count = atlas_frame_capacity(emitter);
+            if (frame_count <= 1u)
+                return 0u;
+
+            std::uint32_t frame = 0u;
+            if (emitter.atlas_fps > 0.0f)
+            {
+                const float raw = particle.age * emitter.atlas_fps;
+                if (emitter.atlas_loop)
+                    frame = static_cast<std::uint32_t>(raw) % frame_count;
+                else
+                    frame = std::min<std::uint32_t>(static_cast<std::uint32_t>(raw), frame_count - 1u);
+            }
+            else
+            {
+                const float age01 = std::clamp(particle.age / particle.lifetime, 0.0f, 1.0f);
+                frame = std::min<std::uint32_t>(
+                    static_cast<std::uint32_t>(age01 * static_cast<float>(frame_count)),
+                    frame_count - 1u);
+            }
+
+            return (frame + particle.atlas_start_frame) % frame_count;
+        }
+
+        void particle_atlas_uv(
+            const ecs::ParticleEmitterComponent& emitter,
+            const ParticleSystem::ParticleRuntime& particle,
+            glm::vec2& uv_min,
+            glm::vec2& uv_size)
+        {
+            uv_min = glm::vec2(0.0f, 0.0f);
+            uv_size = glm::vec2(1.0f, 1.0f);
+            if (!emitter.atlas_enabled)
+                return;
+
+            const std::uint32_t columns = std::max(1u, emitter.atlas_columns);
+            const std::uint32_t rows = std::max(1u, emitter.atlas_rows);
+            const std::uint32_t frame = particle_atlas_frame(emitter, particle);
+            const std::uint32_t col = frame % columns;
+            const std::uint32_t row_from_top = frame / columns;
+            const std::uint32_t row = (rows - 1u) - std::min(row_from_top, rows - 1u);
+
+            uv_size = glm::vec2(
+                1.0f / static_cast<float>(columns),
+                1.0f / static_cast<float>(rows));
+            uv_min = glm::vec2(
+                uv_size.x * static_cast<float>(col),
+                uv_size.y * static_cast<float>(row));
+        }
+
         bool can_emit_now(
             const ecs::ParticleEmitterComponent& emitter,
             ParticleSystem::EmitterRuntime& runtime,
@@ -203,6 +268,17 @@ namespace eeng::ecs::systems
                     particle.size_end = emitter.size_end;
                     particle.color_begin = emitter.color_begin;
                     particle.color_end = emitter.color_end;
+                    if (emitter.atlas_enabled && emitter.atlas_random_start)
+                    {
+                        const std::uint32_t frame_count = atlas_frame_capacity(emitter);
+                        particle.atlas_start_frame = frame_count > 0u
+                            ? (xorshift32(runtime.rng_state) % frame_count)
+                            : 0u;
+                    }
+                    else
+                    {
+                        particle.atlas_start_frame = 0u;
+                    }
                     runtime.particles.push_back(particle);
                 }
             }
@@ -272,10 +348,15 @@ namespace eeng::ecs::systems
 
                 const float age01 = std::clamp(particle.age / particle.lifetime, 0.0f, 1.0f);
                 const float size = glm::mix(particle.size_begin, particle.size_end, age01);
+                glm::vec2 uv_min{};
+                glm::vec2 uv_size{};
+                particle_atlas_uv(emitter, particle, uv_min, uv_size);
                 runtime.render_particles.push_back(ParticleSystem::RenderParticle{
                     particle.position,
                     std::max(0.0f, size),
-                    lerp_color(particle.color_begin, particle.color_end, age01)
+                    lerp_color(particle.color_begin, particle.color_end, age01),
+                    uv_min,
+                    uv_size
                     });
                 ++i;
             }

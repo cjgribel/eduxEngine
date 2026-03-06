@@ -994,6 +994,50 @@ namespace eeng
             .custom<DataMetaInfo>(DataMetaInfo{ "texture_ref", "Texture", "Optional billboard texture." })
             .traits(MetaFlags::none)
 
+            .data<&eeng::ecs::ParticleEmitterComponent::atlas_enabled>("atlas_enabled"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "atlas_enabled", "Atlas Enabled", "Interpret the texture as a sprite atlas." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::atlas_columns>("atlas_columns"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "atlas_columns", "Atlas Columns", "Number of columns in the atlas grid." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::atlas_rows>("atlas_rows"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "atlas_rows", "Atlas Rows", "Number of rows in the atlas grid." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::atlas_frame_count>("atlas_frame_count"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "atlas_frame_count", "Atlas Frame Count", "Number of frames used from the atlas grid." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::atlas_fps>("atlas_fps"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "atlas_fps", "Atlas FPS", "Frames per second; <= 0 means advance over particle lifetime." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::atlas_loop>("atlas_loop"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "atlas_loop", "Atlas Loop", "Loop atlas playback when FPS-driven animation is used." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::atlas_random_start>("atlas_random_start"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "atlas_random_start", "Atlas Random Start", "Start each particle on a random atlas frame." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::texture_key_enabled>("texture_key_enabled"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "texture_key_enabled", "Texture Key Enabled", "Treat a chosen texture color as transparent." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::texture_key_color>("texture_key_color"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "texture_key_color", "Texture Key Color", "Texture color to fade out when keying is enabled." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::texture_key_threshold>("texture_key_threshold"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "texture_key_threshold", "Texture Key Threshold", "Color distance used for keyed transparency." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEmitterComponent::texture_flip_v>("texture_flip_v"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "texture_flip_v", "Texture Flip V", "Flip sampled particle texture coordinates vertically." })
+            .traits(MetaFlags::none)
+
             .data<&eeng::ecs::ParticleEmitterComponent::additive_blend>("additive_blend"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "additive_blend", "Additive Blend", "Use additive blending instead of alpha blend." })
             .traits(MetaFlags::none)

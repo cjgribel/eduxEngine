@@ -60,6 +60,17 @@ namespace eeng::ecs
         ParticleRenderMode render_mode = ParticleRenderMode::SoftCircle;
         bool use_texture = false;
         AssetRef<assets::GpuTextureAsset> texture_ref{};
+        bool atlas_enabled = false;
+        std::uint32_t atlas_columns = 1u;
+        std::uint32_t atlas_rows = 1u;
+        std::uint32_t atlas_frame_count = 1u;
+        float atlas_fps = 0.0f;
+        bool atlas_loop = false;
+        bool atlas_random_start = false;
+        bool texture_key_enabled = false;
+        glm::vec3 texture_key_color{ 0.0f, 0.0f, 0.0f };
+        float texture_key_threshold = 0.1f;
+        bool texture_flip_v = false;
         bool additive_blend = true;
         bool depth_write = false;
 
@@ -82,4 +93,3 @@ namespace eeng::ecs
     template<typename Visitor>
     void visit_entity_refs(ParticleEmitterComponent& t, Visitor&& visitor) {}
 }
-

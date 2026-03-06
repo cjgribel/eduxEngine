@@ -43,6 +43,7 @@ namespace eeng::ecs::systems
             glm::vec3 center{ 0.0f };
             float size = 0.0f;
             std::uint32_t color_abgr = 0xffffffffu;
+            glm::vec4 uv_rect{ 0.0f, 0.0f, 1.0f, 1.0f };
         };
 
         struct BatchKey
@@ -50,6 +51,10 @@ namespace eeng::ecs::systems
             ecs::ParticleRenderMode render_mode = ecs::ParticleRenderMode::SoftCircle;
             GLuint texture = 0;
             bool use_texture = false;
+            bool texture_key_enabled = false;
+            glm::vec3 texture_key_color{ 0.0f, 0.0f, 0.0f };
+            float texture_key_threshold = 0.0f;
+            bool texture_flip_v = false;
             bool additive_blend = true;
             bool depth_write = false;
 
@@ -58,6 +63,10 @@ namespace eeng::ecs::systems
                 return render_mode == other.render_mode
                     && texture == other.texture
                     && use_texture == other.use_texture
+                    && texture_key_enabled == other.texture_key_enabled
+                    && texture_key_color == other.texture_key_color
+                    && texture_key_threshold == other.texture_key_threshold
+                    && texture_flip_v == other.texture_flip_v
                     && additive_blend == other.additive_blend
                     && depth_write == other.depth_write;
             }
@@ -76,6 +85,12 @@ namespace eeng::ecs::systems
                 hash_combine(std::hash<std::uint8_t>{}(static_cast<std::uint8_t>(key.render_mode)));
                 hash_combine(std::hash<std::uint32_t>{}(key.texture));
                 hash_combine(std::hash<std::uint8_t>{}(key.use_texture ? 1u : 0u));
+                hash_combine(std::hash<std::uint8_t>{}(key.texture_key_enabled ? 1u : 0u));
+                hash_combine(std::hash<float>{}(key.texture_key_color.x));
+                hash_combine(std::hash<float>{}(key.texture_key_color.y));
+                hash_combine(std::hash<float>{}(key.texture_key_color.z));
+                hash_combine(std::hash<float>{}(key.texture_key_threshold));
+                hash_combine(std::hash<std::uint8_t>{}(key.texture_flip_v ? 1u : 0u));
                 hash_combine(std::hash<std::uint8_t>{}(key.additive_blend ? 1u : 0u));
                 hash_combine(std::hash<std::uint8_t>{}(key.depth_write ? 1u : 0u));
                 return seed;
@@ -134,6 +149,10 @@ namespace eeng::ecs::systems
         glEnableVertexAttribArray(3);
         glVertexAttribIPointer(3, 1, GL_UNSIGNED_INT, sizeof(InstanceData), reinterpret_cast<void*>(offsetof(InstanceData, color_abgr)));
         glVertexAttribDivisor(3, 1);
+
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData), reinterpret_cast<void*>(offsetof(InstanceData, uv_rect)));
+        glVertexAttribDivisor(4, 1);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -222,6 +241,10 @@ namespace eeng::ecs::systems
                 key.render_mode = emitter.render_mode;
                 key.texture = texture_id;
                 key.use_texture = use_texture;
+                key.texture_key_enabled = emitter.texture_key_enabled && use_texture;
+                key.texture_key_color = emitter.texture_key_color;
+                key.texture_key_threshold = std::max(0.0f, emitter.texture_key_threshold);
+                key.texture_flip_v = emitter.texture_flip_v && use_texture;
                 key.additive_blend = emitter.additive_blend;
                 key.depth_write = emitter.depth_write;
 
@@ -234,7 +257,8 @@ namespace eeng::ecs::systems
                     batch_instances.push_back(InstanceData{
                         particle.position,
                         particle.size,
-                        particle.color_abgr
+                        particle.color_abgr,
+                        glm::vec4(particle.uv_min, particle.uv_size)
                         });
                 }
             });
@@ -301,6 +325,19 @@ namespace eeng::ecs::systems
             glUniform1i(
                 glGetUniformLocation(shader_program_, "uSoftCircle"),
                 key.render_mode == ecs::ParticleRenderMode::SoftCircle ? 1 : 0);
+            glUniform1i(
+                glGetUniformLocation(shader_program_, "uTextureKeyEnabled"),
+                key.texture_key_enabled ? 1 : 0);
+            glUniform3fv(
+                glGetUniformLocation(shader_program_, "uTextureKeyColor"),
+                1,
+                glm::value_ptr(key.texture_key_color));
+            glUniform1f(
+                glGetUniformLocation(shader_program_, "uTextureKeyThreshold"),
+                key.texture_key_threshold);
+            glUniform1i(
+                glGetUniformLocation(shader_program_, "uTextureFlipV"),
+                key.texture_flip_v ? 1 : 0);
 
             glBindBuffer(GL_ARRAY_BUFFER, instance_vbo_);
             glBufferData(

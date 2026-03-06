@@ -40,6 +40,8 @@ namespace eeng::ecs::systems
             glm::vec3 position{ 0.0f };
             float size = 0.0f;
             std::uint32_t color_abgr = 0xffffffffu;
+            glm::vec2 uv_min{ 0.0f, 0.0f };
+            glm::vec2 uv_size{ 1.0f, 1.0f };
         };
 
         // Internal runtime structs are public so update helpers can be implemented
@@ -54,6 +56,7 @@ namespace eeng::ecs::systems
             float size_end = 0.0f;
             std::uint32_t color_begin = 0xffffffffu;
             std::uint32_t color_end = 0xffffffffu;
+            std::uint32_t atlas_start_frame = 0u;
         };
 
         struct EmitterRuntime
