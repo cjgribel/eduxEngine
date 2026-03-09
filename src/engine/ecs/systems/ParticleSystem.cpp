@@ -25,9 +25,12 @@ namespace eeng::ecs::systems
         struct EmitterUpdateItem
         {
             ecs::ParticleEmitterComponent emitter{};
+            entt::entity entity = entt::null;
             glm::mat4 world_matrix{ 1.0f };
             std::uint32_t requested_burst = 0u;
             ParticleSystem::EmitterRuntime* runtime = nullptr;
+            ecs::ParticleEventsComponent* events = nullptr;
+            ParticleSystem::FrameStats* frame_stats = nullptr;
         };
 
         std::uint32_t seed_from_entity(entt::entity entity)
@@ -232,6 +235,10 @@ namespace eeng::ecs::systems
             const auto& emitter = item.emitter;
             if (!emitter.enabled)
                 return;
+            const bool wants_hit_events =
+                item.events
+                && item.events->emit_hit_events
+                && item.events->max_hit_events_per_frame > 0u;
 
             const std::uint32_t capacity = next_particle_capacity(emitter.max_particles);
             if (runtime.particles.size() > capacity)
@@ -303,7 +310,7 @@ namespace eeng::ecs::systems
                 glm::vec3 next_position = particle.position + particle.velocity * dt;
 
                 if (physics_system
-                    && emitter.collision_mode != ecs::ParticleCollisionMode::None)
+                    && (emitter.collision_mode != ecs::ParticleCollisionMode::None || wants_hit_events))
                 {
                     const glm::vec3 segment = next_position - prev_position;
                     const float segment_len = glm::length(segment);
@@ -323,6 +330,27 @@ namespace eeng::ecs::systems
                             filter);
                         if (did_hit && hit.hit)
                         {
+                            if (wants_hit_events
+                                && item.events->hit_events.size() < item.events->max_hit_events_per_frame)
+                            {
+                                const float age01 = std::clamp(particle.age / particle.lifetime, 0.0f, 1.0f);
+                                const float event_size = std::max(0.0f, glm::mix(particle.size_begin, particle.size_end, age01));
+                                item.events->hit_events.push_back(ecs::ParticleHitEvent{
+                                    ecs::Entity(item.entity),
+                                    hit.entity,
+                                    hit.collider_id,
+                                    hit.point,
+                                    hit.normal,
+                                    particle.velocity,
+                                    particle.age,
+                                    particle.lifetime,
+                                    event_size,
+                                    lerp_color(particle.color_begin, particle.color_end, age01)
+                                    });
+                                if (item.frame_stats)
+                                    ++item.frame_stats->hit_events_emitted;
+                            }
+
                             if (emitter.collision_mode == ecs::ParticleCollisionMode::Kill)
                             {
                                 runtime.particles[i] = runtime.particles.back();
@@ -372,6 +400,10 @@ namespace eeng::ecs::systems
         frame_stats_ = FrameStats{};
         frame_stats_.threaded_simulation_enabled = threaded_simulation_;
 
+        auto events_view = registry.view<ecs::ParticleEventsComponent>();
+        for (auto entity : events_view)
+            events_view.get<ecs::ParticleEventsComponent>(entity).hit_events.clear();
+
         auto view = registry.view<ecs::ParticleEmitterComponent>();
         frame_stats_.emitter_count = view.size();
 
@@ -414,14 +446,20 @@ namespace eeng::ecs::systems
 
             EmitterUpdateItem item{};
             item.emitter = view.get<ecs::ParticleEmitterComponent>(entity);
+            item.entity = entity;
             if (const auto* transform = registry.try_get<ecs::TransformComponent>(entity))
                 item.world_matrix = transform->world_matrix;
             if (const auto burst_it = pending_bursts_.find(entity); burst_it != pending_bursts_.end())
                 item.requested_burst = burst_it->second;
             item.runtime = &runtime_it->second;
+            item.events = registry.try_get<ecs::ParticleEventsComponent>(entity);
+            item.frame_stats = &frame_stats_;
             work_items.push_back(item);
             collisions_requested = collisions_requested
-                || item.emitter.collision_mode != ecs::ParticleCollisionMode::None;
+                || item.emitter.collision_mode != ecs::ParticleCollisionMode::None
+                || (item.events
+                    && item.events->emit_hit_events
+                    && item.events->max_hit_events_per_frame > 0u);
         }
         pending_bursts_.clear();
         frame_stats_.collisions_requested = collisions_requested;

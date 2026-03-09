@@ -16,5 +16,13 @@ namespace eeng::ecs
             t.max_particles,
             t.spawn_rate);
     }
-}
 
+    std::string to_string(const ParticleEventsComponent& t)
+    {
+        return std::format(
+            "ParticleEventsComponent(emit_hit_events={}, max_hit_events_per_frame={}, buffered_hits={})",
+            t.emit_hit_events,
+            t.max_hit_events_per_frame,
+            t.hit_events.size());
+    }
+}

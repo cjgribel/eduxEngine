@@ -1068,6 +1068,24 @@ namespace eeng
             ;
         register_component<ecs::ParticleEmitterComponent>();
 
+        entt::meta_factory<eeng::ecs::ParticleEventsComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{
+                .id = "eeng.ecs.ParticleEventsComponent",
+                .name = "ParticleEventsComponent",
+                .tooltip = "Particle hit event toggles and runtime buffer."
+                })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEventsComponent::emit_hit_events>("emit_hit_events"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "emit_hit_events", "Emit Hit Events", "Emit particle hit events for this emitter." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::ecs::ParticleEventsComponent::max_hit_events_per_frame>("max_hit_events_per_frame"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "max_hit_events_per_frame", "Max Hit Events / Frame", "Cap particle hit events emitted per frame for this emitter." })
+            .traits(MetaFlags::none)
+            ;
+        register_component<ecs::ParticleEventsComponent>();
+
 
         // --- HeaderComponent -------------------------------------------------
 #if 0

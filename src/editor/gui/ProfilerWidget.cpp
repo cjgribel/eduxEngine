@@ -410,6 +410,7 @@ namespace eeng::gui
             ImGui::Text("Live particles: %zu", stats.live_particles);
             ImGui::Text("Rendered particles: %zu", stats.rendered_particles);
             ImGui::Text("Draw batches: %zu", stats.draw_batches);
+            ImGui::Text("Hit events emitted: %zu", stats.hit_events_emitted);
             ImGui::Text("Collisions requested: %s", stats.collisions_requested ? "yes" : "no");
             ImGui::Text(
                 "Threaded sim: %s (%s)",

@@ -5,9 +5,11 @@
 
 #include "assets/AssetRef.hpp"
 #include "assets/types/ModelAssets.hpp"
+#include "ecs/Entity.hpp"
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -82,7 +84,29 @@ namespace eeng::ecs
         float collision_bounce = 0.2f;
     };
 
+    struct ParticleHitEvent
+    {
+        Entity emitter_entity;
+        Entity hit_entity;
+        std::uint32_t hit_collider_id = 0u;
+        glm::vec3 point{ 0.0f };
+        glm::vec3 normal{ 0.0f };
+        glm::vec3 velocity{ 0.0f };
+        float particle_age = 0.0f;
+        float particle_lifetime = 0.0f;
+        float particle_size = 0.0f;
+        std::uint32_t particle_color_abgr = 0xffffffffu;
+    };
+
+    struct ParticleEventsComponent
+    {
+        bool emit_hit_events = true;
+        std::uint32_t max_hit_events_per_frame = 64u;
+        std::vector<ParticleHitEvent> hit_events;
+    };
+
     std::string to_string(const ParticleEmitterComponent& t);
+    std::string to_string(const ParticleEventsComponent& t);
 
     template<typename Visitor>
     void visit_asset_refs(ParticleEmitterComponent& t, Visitor&& visitor)
@@ -92,4 +116,10 @@ namespace eeng::ecs
 
     template<typename Visitor>
     void visit_entity_refs(ParticleEmitterComponent& t, Visitor&& visitor) {}
+
+    template<typename Visitor>
+    void visit_asset_refs(ParticleEventsComponent& t, Visitor&& visitor) {}
+
+    template<typename Visitor>
+    void visit_entity_refs(ParticleEventsComponent& t, Visitor&& visitor) {}
 }

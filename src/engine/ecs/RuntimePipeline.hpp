@@ -365,6 +365,7 @@ namespace eeng::ecs
             out.live_particles = stats.live_particles;
             out.rendered_particles = stats.rendered_particles;
             out.draw_batches = 0;
+            out.hit_events_emitted = stats.hit_events_emitted;
             out.collisions_requested = stats.collisions_requested;
             out.threaded_simulation_enabled = stats.threaded_simulation_enabled;
             out.threaded_simulation_used = stats.threaded_simulation_used;

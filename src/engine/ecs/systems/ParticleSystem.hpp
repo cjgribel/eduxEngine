@@ -33,6 +33,7 @@ namespace eeng::ecs::systems
             bool collisions_requested = false;
             bool threaded_simulation_enabled = false;
             bool threaded_simulation_used = false;
+            std::size_t hit_events_emitted = 0;
         };
 
         struct RenderParticle

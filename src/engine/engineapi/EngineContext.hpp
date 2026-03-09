@@ -191,6 +191,7 @@ namespace eeng
         std::size_t live_particles = 0;
         std::size_t rendered_particles = 0;
         std::size_t draw_batches = 0;
+        std::size_t hit_events_emitted = 0;
         bool collisions_requested = false;
         bool threaded_simulation_enabled = false;
         bool threaded_simulation_used = false;
