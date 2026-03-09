@@ -1,0 +1,16 @@
+{
+  "batches": [
+    {
+      "asset_closure_hdr": [],
+      "filename": "8f3f777b-07d8-020d.json",
+      "id": "8f3f777b-07d8-020d",
+      "name": "default"
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "2c56e226-ebc9-dd70.json",
+      "id": "2c56e226-ebc9-dd70",
+      "name": "editor"
+    }
+  ]
+}

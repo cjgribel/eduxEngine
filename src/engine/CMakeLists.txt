@@ -1,0 +1,105 @@
+add_library(edux_engine STATIC
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/Engine.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/EngineOverlayGui.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/GLDebugMessageCallback.cc
+    ${CMAKE_SOURCE_DIR}/src/engine/glmcommon.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/input/InputManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/Texture.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/RenderableMesh.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ForwardRenderer.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ShapeRenderer.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ImGuiBackendSDL.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/BatchRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/engineapi/EngineContext.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/assets/Storage.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/assets/AssetIndex.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/assets/ResourceManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/assets/AnimationGraphRuntime.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/assets/AnimationGraphValidation.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/assets/importers/AssimpImporter.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/assets/importers/MockImporter.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/gpu/GpuAssetOps.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/Entity.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/EntityManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/EntityBatchPolicy.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/SceneGraph.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/AnimationGraphComponent.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/TransformComponent.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/HeaderComponent.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/ParticleEmitterComponent.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/TrailComponent.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/StickyNoteComponent.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/VehicleRig1Builder.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/PistonRigBuilder.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/CoreComponents.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/RenderSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/AnimationSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/AnimationGraphSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/TransformSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/TransformSocketSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ConstraintSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/PistonConstraintDriveSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/PistonAnimSyncSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/TwoAnchorAlignSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/MousePointConstraintSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/DebugRenderSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/PhysicsSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/SpringDamperSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ScriptSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ParticleSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ParticleRenderSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/TrailSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/StickyNoteSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/util/Profiler.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/util/ThreadPool.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/meta/AssetMetaReg.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/meta/ComponentMetaReg.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/meta/GLMMetaReg.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/meta/MetaSerialize.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/meta/MetaInspect.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/meta/MetaClone.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/serializers/GuidSerialize.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/serializers/GLMSerialize.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/serializers/ModelDataAssetSerialization.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/serializers/AnimationGraphSerialization.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/LogManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/LogGlobals.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/physics/MassProperties.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/physics/PhysicsWorld.cpp
+    ${CMAKE_SOURCE_DIR}/src/editor/AssignFieldCommand.cpp
+    ${CMAKE_SOURCE_DIR}/src/editor/CommandContext.cpp
+    ${CMAKE_SOURCE_DIR}/src/editor/CommandSanityChecks.cpp
+    ${CMAKE_SOURCE_DIR}/src/editor/GLMInspect.cpp
+    ${CMAKE_SOURCE_DIR}/src/editor/MetaFieldAssign.cpp
+)
+
+target_include_directories(edux_engine PUBLIC
+    ${glew_SOURCE_DIR}/include
+)
+
+target_link_libraries(edux_engine PUBLIC
+    SDL2
+    assimp
+    $<TARGET_FILE:libglew_static>
+    glm::glm
+    nlohmann_json::nlohmann_json
+    BulletDynamics
+    BulletCollision
+    LinearMath
+    ${OPENGL_LIBRARIES}
+)
+if(TARGET ZLIB::ZLIB)
+    target_link_libraries(edux_engine PUBLIC ZLIB::ZLIB)
+endif()
+
+target_compile_definitions(edux_engine PRIVATE
+    META_OUTPUT_DIR="${CMAKE_BINARY_DIR}/meta"
+)

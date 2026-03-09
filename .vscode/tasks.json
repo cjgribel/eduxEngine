@@ -76,6 +76,42 @@
             "problemMatcher": []
         },
         {
+            "label": "CMake Build LegacyGame (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Debug",
+                "--target",
+                "LegacyGame",
+                "--config",
+                "Debug"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Build ReferenceGame (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Debug",
+                "--target",
+                "ReferenceGame",
+                "--config",
+                "Debug"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "CMake Build (Release)",
             "type": "shell",
             "command": "cmake",
@@ -93,6 +129,58 @@
                 "reveal": "always",
                 "panel": "shared"
             }
+        },
+        {
+            "label": "CMake Build LegacyGame (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Release",
+                "--target",
+                "LegacyGame",
+                "--config",
+                "Release"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "CMake Build ReferenceGame (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Release",
+                "--target",
+                "ReferenceGame",
+                "--config",
+                "Release"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "CMake Build tests (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Debug",
+                "--target",
+                "tests",
+                "--config",
+                "Debug"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
         },
         // === TEST TASKS ===
         {

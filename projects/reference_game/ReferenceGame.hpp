@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ecs/systems/FluidFrameSystem.hpp"
 #include "engineapi/IGameRuntime.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "EngineContext.hpp"
@@ -33,5 +34,6 @@ namespace eeng::reference_game
 
         std::shared_ptr<EngineContext> ctx_;
         eeng::ecs::RuntimePipeline runtime_pipeline_;
+        eeng::reference_game::ecs::systems::FluidFrameSystem fluid_frame_system_;
     };
 }

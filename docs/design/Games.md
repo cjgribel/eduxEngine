@@ -11,3 +11,4 @@
 - [ ] Vehicles. Trailers. (Constraints & Motors)
 - [ ] Animated linear actuators. (Distance constraints + linear forces)
 - [ ] Spring-picker: Game comp/sys which makes it possible to RMB-pick objects and drag them with a spring force. Draw spring using ShapeRenderer helix.
+- [ ] 2D Navier-Stokes frame sandbox. See `docs/design/NavierStokes2D.md`.

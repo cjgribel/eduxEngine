@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "simulation": {
+    "cell_size": 0.05,
+    "viscosity": 0.0005,
+    "velocity_damping": 0.001,
+    "density_damping": 0.020,
+    "pressure_iterations": 24
+  },
+  "boundaries": {
+    "left": {
+      "velocity": { "type": "dirichlet", "value": [1.0, 0.0] },
+      "density": { "type": "dirichlet", "value": 0.0 }
+    },
+    "right": {
+      "velocity": { "type": "dirichlet", "value": [0.0, 0.0] },
+      "density": { "type": "neumann", "value": 0.0 }
+    },
+    "top": {
+      "velocity": { "type": "dirichlet", "value": [0.0, 0.0] },
+      "density": { "type": "neumann", "value": 0.0 }
+    },
+    "bottom": {
+      "velocity": { "type": "dirichlet", "value": [0.0, 0.0] },
+      "density": { "type": "neumann", "value": 0.0 }
+    }
+  },
+  "obstacles": [
+    {
+      "shape": "box",
+      "min_uv": [0.42, 0.30],
+      "max_uv": [0.48, 0.70],
+      "boundary": "no_slip"
+    }
+  ],
+  "emitters": [
+    {
+      "kind": "density",
+      "shape": "circle",
+      "center_uv": [0.12, 0.50],
+      "radius_uv": 0.05,
+      "amount": 5.0
+    },
+    {
+      "kind": "velocity",
+      "shape": "circle",
+      "center_uv": [0.12, 0.50],
+      "radius_uv": 0.08,
+      "value": [2.0, 0.0]
+    }
+  ]
+}

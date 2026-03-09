@@ -4,6 +4,7 @@
 
 #include "ReferenceGame.hpp"
 #include "BatchRegistry.hpp"
+#include "FluidSandboxMetaReg.hpp"
 #include "editor/OverlayRenderSettingsPersistence.hpp"
 #include <glm/glm.hpp>
 
@@ -18,6 +19,7 @@ namespace eeng::reference_game
     {
         if (ctx_)
         {
+            register_fluid_sandbox_meta_types(*ctx_);
             runtime_pipeline_.init(*ctx_);
             if (ctx_->services)
             {
@@ -46,14 +48,22 @@ namespace eeng::reference_game
     {
         (void)time_s;
         if (ctx_)
+        {
             runtime_pipeline_.update_edit(*ctx_, deltaTime_s);
+            if (ctx_->entity_manager)
+                fluid_frame_system_.update(ctx_->entity_manager->registry(), *ctx_, deltaTime_s);
+        }
     }
 
     void ReferenceGame::update_play(float time_s, float deltaTime_s)
     {
         (void)time_s;
         if (ctx_)
+        {
             runtime_pipeline_.update_play(*ctx_, deltaTime_s);
+            if (ctx_->entity_manager)
+                fluid_frame_system_.update(ctx_->entity_manager->registry(), *ctx_, deltaTime_s);
+        }
     }
 
     void ReferenceGame::render(float time_s, int windowWidth, int windowHeight)
@@ -75,6 +85,8 @@ namespace eeng::reference_game
     {
         // Provide a view for editor overlays (gizmos, debug shapes).
         publish_overlay_view(ctx.window_width, ctx.window_height);
+        if (ctx_ && ctx_->entity_manager && ctx_->shape_renderer)
+            fluid_frame_system_.render_overlay(ctx_->entity_manager->registry(), *ctx_, *ctx_->shape_renderer);
     }
 
     void ReferenceGame::render_gui(const RenderContext& ctx)
@@ -113,6 +125,7 @@ namespace eeng::reference_game
             ctx_->services->debug_render_settings_play = nullptr;
             ctx_->services->overlay_render_settings = nullptr;
         }
+        fluid_frame_system_.clear();
         runtime_pipeline_.shutdown();
     }
 
