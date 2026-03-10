@@ -1,0 +1,712 @@
+[
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 5246012682476704771,
+        "Name": "Piston_Rig",
+        "Parent Entity": {
+          "Guid": 0
+        }
+      },
+      "eeng.ecs.PistonAnimSyncComponent": {
+        "Auto Find Target": true,
+        "Clip Name": "",
+        "Enabled": true,
+        "Name": "PistonAnimSync",
+        "Target": {
+          "Guid": 0
+        }
+      },
+      "eeng.ecs.PistonConstraintDriveComponent": {
+        "Anchor A": {
+          "Guid": 8225065239193123150
+        },
+        "Anchor B": {
+          "Guid": 771930542380891689
+        },
+        "Axis Local": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Command Position": 0.0,
+        "Constraint": {
+          "Guid": 8964484700479385402
+        },
+        "Current Extension": 0.0,
+        "Current Position": 0.0,
+        "Enabled": true,
+        "Lock When Idle": true,
+        "Max Force": 2000.0,
+        "Max Velocity": 1.0,
+        "Mode": 0,
+        "Name": "PistonConstraintDrive",
+        "Stroke Max": 1.7999999523162842,
+        "Stroke Min": 1.0,
+        "Target Extension": 0.0
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "eeng.legacy_game.PistonInputComponent": {
+        "Controller Id": -1,
+        "Drive Input": 0.0,
+        "Enabled": true,
+        "Input Deadzone": 0.05000000074505806,
+        "Keyboard Fallback": true,
+        "Name": "PistonInput",
+        "Trigger Deadzone": 0.05000000074505806
+      }
+    },
+    "entity_guid": 5246012682476704771
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 17955885844382909698,
+        "Name": "Piston_Visual",
+        "Parent Entity": {
+          "Guid": 5246012682476704771
+        }
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          0.9925994873046875,
+          0.0,
+          0.12143398821353912,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          -0.12143398821353912,
+          0.0,
+          0.9925994873046875,
+          0.0,
+          -2.0248043537139893,
+          2.0,
+          -2.455322265625,
+          1.0
+        ],
+        "Position": [
+          -2.0248043537139893,
+          2.0,
+          -2.455322265625
+        ],
+        "Rotation": [
+          0.0,
+          -0.06082964316010475,
+          0.0,
+          0.9981481432914734
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          0.9925994873046875,
+          0.0,
+          0.12143398821353912,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          -0.12143398821353912,
+          0.0,
+          0.9925994873046875,
+          0.0,
+          -2.0248043537139893,
+          2.0,
+          -2.455322265625,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          -0.06082964316010475,
+          0.0,
+          0.9981481432914734
+        ],
+        "World Rotation Matrix": [
+          0.9925994873046875,
+          0.0,
+          0.12143398821353912,
+          -0.0,
+          1.0,
+          0.0,
+          -0.12143398821353912,
+          -0.0,
+          0.9925994873046875
+        ]
+      },
+      "eeng.ecs.TwoAnchorAlignComponent": {
+        "Align Position": true,
+        "Align Rotation": true,
+        "Anchor A": {
+          "Guid": 8225065239193123150
+        },
+        "Anchor B": {
+          "Guid": 771930542380891689
+        },
+        "Current Length": 1.4452210664749146,
+        "Enabled": true,
+        "Local Forward": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "Local Up": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "Name": "TwoAnchorAlign",
+        "Position Mode": 0,
+        "Position Offset": 0.0,
+        "Preserve Scale": true,
+        "Target": {
+          "Guid": 0
+        },
+        "Up Axis Ref": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "Up Reference": {
+          "Guid": 6093984750435318629
+        }
+      }
+    },
+    "entity_guid": 17955885844382909698
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 8964484700479385402,
+        "Name": "Piston_Constraint",
+        "Parent Entity": {
+          "Guid": 5246012682476704771
+        }
+      },
+      "eeng.ecs.SixDofSpringConstraintComponent": {
+        "Angular Damping": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Limit Max": [
+          3.1415927410125732,
+          3.1415927410125732,
+          3.1415927410125732
+        ],
+        "Angular Limit Min": [
+          -3.1415927410125732,
+          -3.1415927410125732,
+          -3.1415927410125732
+        ],
+        "Angular Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Angular Stiffness": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Disable Collisions": true,
+        "Enabled": true,
+        "Entity A": {
+          "Guid": 6093984750435318629
+        },
+        "Entity B": {
+          "Guid": 7906702317761279090
+        },
+        "Linear Damping": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Equilibrium Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Limit Max": [
+          2.0,
+          100000.0,
+          100000.0
+        ],
+        "Linear Limit Min": [
+          1.0,
+          -100000.0,
+          -100000.0
+        ],
+        "Linear Motor Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Max Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Motor Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Enabled": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Servo Target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Linear Stiffness": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Local Anchor A": [
+          0.5,
+          0.0,
+          0.0
+        ],
+        "Local Anchor B": [
+          -0.5,
+          0.0,
+          0.0
+        ],
+        "Local Rotation A": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Local Rotation B": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "entity_guid": 8964484700479385402
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 771930542380891689,
+        "Name": "Piston_AnchorB",
+        "Parent Entity": {
+          "Guid": 5246012682476704771
+        }
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -0.5902786254882813,
+          2.0,
+          -2.2798233032226563,
+          1.0
+        ],
+        "Position": [
+          -0.5902786254882813,
+          2.0,
+          -2.2798233032226563
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -0.5902786254882813,
+          2.0,
+          -2.2798233032226563,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "eeng.ecs.TransformSocketComponent": {
+        "Capture Offset In Edit": false,
+        "Enabled": true,
+        "Follow Position": true,
+        "Follow Rotation": false,
+        "Last Local Version": 8556,
+        "Local Offset": [
+          -0.5,
+          0.0,
+          0.0
+        ],
+        "Local Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Name": "TransformSocket",
+        "Preserve Scale": true,
+        "Target": {
+          "Guid": 7906702317761279090
+        },
+        "Update In Edit": true
+      }
+    },
+    "entity_guid": 771930542380891689
+  },
+  {
+    "components": {
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 8225065239193123150,
+        "Name": "Piston_AnchorA",
+        "Parent Entity": {
+          "Guid": 5246012682476704771
+        }
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -2.0248043537139893,
+          2.0,
+          -2.455322265625,
+          1.0
+        ],
+        "Position": [
+          -2.0248043537139893,
+          2.0,
+          -2.455322265625
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "World Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -2.0248043537139893,
+          2.0,
+          -2.455322265625,
+          1.0
+        ],
+        "World Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "World Rotation Matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "eeng.ecs.TransformSocketComponent": {
+        "Capture Offset In Edit": false,
+        "Enabled": true,
+        "Follow Position": true,
+        "Follow Rotation": false,
+        "Last Local Version": 8556,
+        "Local Offset": [
+          0.5,
+          0.0,
+          0.0
+        ],
+        "Local Rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Name": "TransformSocket",
+        "Preserve Scale": true,
+        "Target": {
+          "Guid": 6093984750435318629
+        },
+        "Update In Edit": true
+      }
+    },
+    "entity_guid": 8225065239193123150
+  },
+  {
+    "components": {
+      "eeng.ecs.AnimationGraphComponent": {
+        "Enabled": true,
+        "Graph Reference": {
+          "Guid": 3238453642519934798
+        },
+        "Name": ""
+      },
+      "eeng.ecs.HeaderComponent": {
+        "Guid": 268979717565012319,
+        "Name": "pivot",
+        "Parent Entity": {
+          "Guid": 17955885844382909698
+        }
+      },
+      "eeng.ecs.ModelComponent": {
+        "Blend Clip Index": -1,
+        "Blend Clip Speed": 1.0,
+        "Blend Factor": 0.0,
+        "Blend Loop": true,
+        "Clip Index": -1,
+        "Clip Speed": 1.0,
+        "Loop": true,
+        "Model reference": {
+          "Guid": 8550776214772721383
+        },
+        "Name": ""
+      },
+      "eeng.ecs.TransformComponent": {
+        "Local Matrix": [
+          -1.1920929132713809e-08,
+          -0.10000001639127731,
+          0.0,
+          0.0,
+          0.10000001639127731,
+          -1.1920929132713809e-08,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.10000000149011612,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "Rotation": [
+          0.0,
+          0.0,
+          -0.7071068286895752,
+          0.7071068286895752
+        ],
+        "Scale": [
+          0.10000000149011612,
+          0.10000000149011612,
+          0.10000000149011612
+        ],
+        "World Matrix": [
+          -1.1832708146641835e-08,
+          -0.10000001639127731,
+          -1.4476059240209338e-09,
+          0.0,
+          0.09925996512174606,
+          -1.1920929132713809e-08,
+          0.012143400497734547,
+          0.0,
+          -0.012143398635089397,
+          0.0,
+          0.09925995022058487,
+          0.0,
+          -2.0248043537139893,
+          2.0,
+          -2.455322265625,
+          1.0
+        ],
+        "World Rotation": [
+          0.04301305487751961,
+          -0.04301305487751961,
+          -0.7057973742485046,
+          0.7057973742485046
+        ],
+        "World Rotation Matrix": [
+          -1.1920928955078125e-07,
+          -1.0000001192092896,
+          0.0,
+          0.992599606513977,
+          -1.1920928955078125e-07,
+          0.12143400311470032,
+          -0.12143400311470032,
+          0.0,
+          0.9925994873046875
+        ]
+      }
+    },
+    "entity_guid": 268979717565012319
+  }
+]
