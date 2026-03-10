@@ -1,0 +1,733 @@
+{
+  "entities": [
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 12111273237656956675,
+          "Name": "Flame 2",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.ParticleEmitterComponent": {
+          "Acceleration": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Additive Blend": false,
+          "Atlas Columns": 5,
+          "Atlas Enabled": true,
+          "Atlas FPS": 24.0,
+          "Atlas Frame Count": 25,
+          "Atlas Loop": true,
+          "Atlas Random Start": true,
+          "Atlas Rows": 5,
+          "Collision Bounce": 0.20000000298023224,
+          "Collision Layer": 1,
+          "Collision Mask": 4294967295,
+          "Collision Mode": "None",
+          "Collision Radius": 0.014999999664723873,
+          "Color Begin": 1275068415,
+          "Color End": 0,
+          "Depth Write": false,
+          "Drag": 0.0,
+          "Duration": 0.0,
+          "Emitting": true,
+          "Enabled": true,
+          "Lifetime Max": 2.0,
+          "Lifetime Min": 1.0,
+          "Local Direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "Local Offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Looping": true,
+          "Max Particles": 1024,
+          "Render Mode": "Billboard",
+          "Size Begin": 2.0,
+          "Size End": 4.0,
+          "Spawn Rate": 30.0,
+          "Speed Max": 2.0,
+          "Speed Min": 0.5,
+          "Spread Angle": 20.0,
+          "Texture": {
+            "Guid": 8782420209524166524
+          },
+          "Texture Flip V": true,
+          "Texture Key Color": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Texture Key Enabled": true,
+          "Texture Key Threshold": 1.0,
+          "Use Texture": true
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.8479719161987305,
+            5.112707614898682,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            0.8479719161987305,
+            5.112707614898682,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "World Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.8479719161987305,
+            5.112707614898682,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 12111273237656956675
+    },
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 2543203887045357149,
+          "Name": "Flame 1",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.ParticleEmitterComponent": {
+          "Acceleration": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Additive Blend": true,
+          "Atlas Columns": 5,
+          "Atlas Enabled": true,
+          "Atlas FPS": 0.0,
+          "Atlas Frame Count": 25,
+          "Atlas Loop": true,
+          "Atlas Random Start": true,
+          "Atlas Rows": 5,
+          "Collision Bounce": 0.20000000298023224,
+          "Collision Layer": 1,
+          "Collision Mask": 4294967295,
+          "Collision Mode": "None",
+          "Collision Radius": 0.014999999664723873,
+          "Color Begin": 1354298111,
+          "Color End": 0,
+          "Depth Write": false,
+          "Drag": 0.0,
+          "Duration": 0.0,
+          "Emitting": true,
+          "Enabled": true,
+          "Lifetime Max": 3.0,
+          "Lifetime Min": 1.0,
+          "Local Direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "Local Offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Looping": true,
+          "Max Particles": 1024,
+          "Render Mode": "Billboard",
+          "Size Begin": 1.0,
+          "Size End": 5.0,
+          "Spawn Rate": 5.0,
+          "Speed Max": 3.0,
+          "Speed Min": 1.0,
+          "Spread Angle": 12.0,
+          "Texture": {
+            "Guid": 8782420209524166524
+          },
+          "Texture Flip V": true,
+          "Texture Key Color": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Texture Key Enabled": false,
+          "Texture Key Threshold": 1.0,
+          "Use Texture": true
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -3.3650078773498535,
+            4.69094705581665,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            -3.3650078773498535,
+            4.69094705581665,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "World Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -3.3650078773498535,
+            4.69094705581665,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 2543203887045357149
+    },
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 18328682663682078616,
+          "Name": "Blue",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.ParticleEmitterComponent": {
+          "Acceleration": [
+            0.0,
+            -9.8100004196167,
+            0.0
+          ],
+          "Additive Blend": false,
+          "Atlas Columns": 1,
+          "Atlas Enabled": false,
+          "Atlas FPS": 0.0,
+          "Atlas Frame Count": 1,
+          "Atlas Loop": false,
+          "Atlas Random Start": false,
+          "Atlas Rows": 1,
+          "Collision Bounce": 0.20000000298023224,
+          "Collision Layer": 1,
+          "Collision Mask": 4294967295,
+          "Collision Mode": "Bounce",
+          "Collision Radius": 0.014999999664723873,
+          "Color Begin": 2147446865,
+          "Color End": 2147483647,
+          "Depth Write": false,
+          "Drag": 0.0,
+          "Duration": 0.0,
+          "Emitting": true,
+          "Enabled": true,
+          "Lifetime Max": 1.0,
+          "Lifetime Min": 1.0,
+          "Local Direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "Local Offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Looping": true,
+          "Max Particles": 1024,
+          "Render Mode": "SoftCircle",
+          "Size Begin": 0.4000000059604645,
+          "Size End": 0.009999999776482582,
+          "Spawn Rate": 200.0,
+          "Speed Max": 10.0,
+          "Speed Min": 8.0,
+          "Spread Angle": 30.0,
+          "Texture": {
+            "Guid": 0
+          },
+          "Texture Flip V": false,
+          "Texture Key Color": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Texture Key Enabled": false,
+          "Texture Key Threshold": 0.10000000149011612,
+          "Use Texture": false
+        },
+        "eeng.ecs.ParticleEventsComponent": {
+          "Emit Hit Events": true,
+          "Max Hit Events / Frame": 64
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            -0.4419217109680176,
+            -0.8970536589622498,
+            0.0,
+            0.0,
+            0.8970536589622498,
+            -0.4419217109680176,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -9.814327239990234,
+            3.2974061965942383,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            -9.814327239990234,
+            3.2974061965942383,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            -0.8490941524505615,
+            0.5282415747642517
+          ],
+          "Scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "World Matrix": [
+            -0.4419217109680176,
+            -0.8970536589622498,
+            0.0,
+            0.0,
+            0.8970536589622498,
+            -0.4419217109680176,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -9.814327239990234,
+            3.2974061965942383,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            -0.8490941524505615,
+            0.5282415747642517
+          ],
+          "World Rotation Matrix": [
+            -0.4419217109680176,
+            -0.8970536589622498,
+            -0.0,
+            0.8970536589622498,
+            -0.4419217109680176,
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 18328682663682078616
+    },
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 14655315753975768547,
+          "Name": "Red",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.ParticleEmitterComponent": {
+          "Acceleration": [
+            0.0,
+            -9.8100004196167,
+            0.0
+          ],
+          "Additive Blend": false,
+          "Atlas Columns": 1,
+          "Atlas Enabled": false,
+          "Atlas FPS": 0.0,
+          "Atlas Frame Count": 1,
+          "Atlas Loop": false,
+          "Atlas Random Start": false,
+          "Atlas Rows": 1,
+          "Collision Bounce": 0.20000000298023224,
+          "Collision Layer": 1,
+          "Collision Mask": 4294967295,
+          "Collision Mode": "Bounce",
+          "Collision Radius": 0.014999999664723873,
+          "Color Begin": 2147483647,
+          "Color End": 2130706687,
+          "Depth Write": false,
+          "Drag": 0.0,
+          "Duration": 0.0,
+          "Emitting": true,
+          "Enabled": true,
+          "Lifetime Max": 1.0,
+          "Lifetime Min": 1.0,
+          "Local Direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "Local Offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Looping": true,
+          "Max Particles": 1024,
+          "Render Mode": "SoftCircle",
+          "Size Begin": 0.4000000059604645,
+          "Size End": 0.009999999776482582,
+          "Spawn Rate": 200.0,
+          "Speed Max": 10.0,
+          "Speed Min": 8.0,
+          "Spread Angle": 30.0,
+          "Texture": {
+            "Guid": 0
+          },
+          "Texture Flip V": false,
+          "Texture Key Color": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Texture Key Enabled": false,
+          "Texture Key Threshold": 0.10000000149011612,
+          "Use Texture": false
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            -0.4419217109680176,
+            -0.8970536589622498,
+            0.0,
+            0.0,
+            0.8970536589622498,
+            -0.4419217109680176,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -13.141106605529785,
+            1.249866008758545,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            -13.141106605529785,
+            1.249866008758545,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            -0.8490941524505615,
+            0.5282415747642517
+          ],
+          "Scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "World Matrix": [
+            -0.4419217109680176,
+            -0.8970536589622498,
+            0.0,
+            0.0,
+            0.8970536589622498,
+            -0.4419217109680176,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -13.141106605529785,
+            1.249866008758545,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            -0.8490941524505615,
+            0.5282415747642517
+          ],
+          "World Rotation Matrix": [
+            -0.4419217109680176,
+            -0.8970536589622498,
+            -0.0,
+            0.8970536589622498,
+            -0.4419217109680176,
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 14655315753975768547
+    },
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 10231977577372140881,
+          "Name": "Smoke 1",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.ParticleEmitterComponent": {
+          "Acceleration": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Additive Blend": false,
+          "Atlas Columns": 4,
+          "Atlas Enabled": true,
+          "Atlas FPS": 0.0,
+          "Atlas Frame Count": 16,
+          "Atlas Loop": true,
+          "Atlas Random Start": false,
+          "Atlas Rows": 4,
+          "Collision Bounce": 0.20000000298023224,
+          "Collision Layer": 1,
+          "Collision Mask": 4294967295,
+          "Collision Mode": "None",
+          "Collision Radius": 0.014999999664723873,
+          "Color Begin": 4294967295,
+          "Color End": 0,
+          "Depth Write": false,
+          "Drag": 0.0,
+          "Duration": 0.0,
+          "Emitting": true,
+          "Enabled": true,
+          "Lifetime Max": 4.0,
+          "Lifetime Min": 1.0,
+          "Local Direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "Local Offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Looping": true,
+          "Max Particles": 1024,
+          "Render Mode": "Billboard",
+          "Size Begin": 0.0,
+          "Size End": 2.0,
+          "Spawn Rate": 24.0,
+          "Speed Max": 1.0,
+          "Speed Min": 0.5,
+          "Spread Angle": 45.0,
+          "Texture": {
+            "Guid": 10033672841754490294
+          },
+          "Texture Flip V": true,
+          "Texture Key Color": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Texture Key Enabled": false,
+          "Texture Key Threshold": 1.0,
+          "Use Texture": true
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -6.788984298706055,
+            4.539761543273926,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            -6.788984298706055,
+            4.539761543273926,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "World Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -6.788984298706055,
+            4.539761543273926,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 10231977577372140881
+    }
+  ],
+  "header": {
+    "asset_closure": [
+      "79e16ca6-38e6-4f7c",
+      "8b3ec449-f542-b5b6",
+      "de6e3253-afed-ed0e",
+      "f3c0d397-1a91-f5c7"
+    ],
+    "id": "42c5bb77-c708-d2b6",
+    "name": "particles"
+  }
+}

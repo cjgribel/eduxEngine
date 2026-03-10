@@ -4,10 +4,9 @@ doxygen/
 .DS_Store
 
 assets/
-# Ignore project files for now
-projects/legacy_game/project.json
-projects/legacy_game/texture.png
-projects/legacy_game/batches
+# Ignore imported assets for now
+projects/reference_game/imported_assets
+projects/fluid_sandbox/imported_assets
 projects/legacy_game/imported_assets
 # Whitelist
 !src/assets/

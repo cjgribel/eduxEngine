@@ -1,0 +1,44 @@
+{
+  "batches": [
+    {
+      "asset_closure_hdr": [],
+      "filename": "42c5bb77-c708-d2b6.json",
+      "id": "42c5bb77-c708-d2b6",
+      "name": "particles"
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "73351f1d-f1c2-9c63.json",
+      "id": "73351f1d-f1c2-9c63",
+      "name": "editor"
+    },
+    {
+      "asset_closure_hdr": [
+        "2273c201-7d8a-445f",
+        "26eb916f-2fc5-682e",
+        "28a561a0-386e-db46",
+        "4758fca9-8100-53b9",
+        "4e4b4fd9-df27-c9ae",
+        "5e75ad8e-9bb3-780a",
+        "abe6a09f-0849-6905",
+        "b8b55380-f255-ec20"
+      ],
+      "filename": "16e47c92-14cc-c2cd.json",
+      "id": "16e47c92-14cc-c2cd",
+      "name": "default"
+    },
+    {
+      "asset_closure_hdr": [
+        "26eb916f-2fc5-682e",
+        "28a561a0-386e-db46",
+        "599a0fa6-dd3c-76df",
+        "67ea7720-6df5-6d7d",
+        "71ee3a82-96c6-b7ac",
+        "b006edaa-ce3c-607e"
+      ],
+      "filename": "abffa1db-3740-66e7.json",
+      "id": "abffa1db-3740-66e7",
+      "name": "a"
+    }
+  ]
+}
