@@ -23,7 +23,7 @@ namespace eeng
     struct EngineContext;
 }
 
-namespace eeng::reference_game::ecs::systems
+namespace eeng::fluid_sandbox::ecs::systems
 {
     class FluidFrameSystem
     {

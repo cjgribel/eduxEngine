@@ -5,7 +5,7 @@
 
 #include "EngineContext.hpp"
 
-namespace eeng::reference_game
+namespace eeng::fluid_sandbox
 {
     void register_fluid_sandbox_meta_types(EngineContext& ctx);
 }

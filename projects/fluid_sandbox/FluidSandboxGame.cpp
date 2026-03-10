@@ -1,23 +1,25 @@
-// ReferenceGame is a minimal stub kept in sync with the evolving engine API.
-// It demonstrates Strict play-mode hooks and render-phase structure without
-// depending on any gameplay code.
+// FluidSandboxGame is a project-local runtime for fluid experiments.
+// It keeps the same editor/runtime shell as the reference sample while allowing
+// fluid-specific systems and metadata to evolve independently.
 
-#include "ReferenceGame.hpp"
+#include "FluidSandboxGame.hpp"
 #include "BatchRegistry.hpp"
+#include "FluidSandboxMetaReg.hpp"
 #include "editor/OverlayRenderSettingsPersistence.hpp"
 #include <glm/glm.hpp>
 
-namespace eeng::reference_game
+namespace eeng::fluid_sandbox
 {
-    ReferenceGame::ReferenceGame(std::shared_ptr<EngineContext> ctx)
+    FluidSandboxGame::FluidSandboxGame(std::shared_ptr<EngineContext> ctx)
         : ctx_(std::move(ctx))
     {
     }
 
-    bool ReferenceGame::init()
+    bool FluidSandboxGame::init()
     {
         if (ctx_)
         {
+            register_fluid_sandbox_meta_types(*ctx_);
             runtime_pipeline_.init(*ctx_);
             if (ctx_->services)
             {
@@ -36,27 +38,35 @@ namespace eeng::reference_game
         return true;
     }
 
-    void ReferenceGame::update(float time_s, float deltaTime_s)
+    void FluidSandboxGame::update(float time_s, float deltaTime_s)
     {
         (void)time_s;
         update_edit(time_s, deltaTime_s);
     }
 
-    void ReferenceGame::update_edit(float time_s, float deltaTime_s)
+    void FluidSandboxGame::update_edit(float time_s, float deltaTime_s)
     {
         (void)time_s;
         if (ctx_)
+        {
             runtime_pipeline_.update_edit(*ctx_, deltaTime_s);
+            if (ctx_->entity_manager)
+                fluid_frame_system_.update(ctx_->entity_manager->registry(), *ctx_, deltaTime_s);
+        }
     }
 
-    void ReferenceGame::update_play(float time_s, float deltaTime_s)
+    void FluidSandboxGame::update_play(float time_s, float deltaTime_s)
     {
         (void)time_s;
         if (ctx_)
+        {
             runtime_pipeline_.update_play(*ctx_, deltaTime_s);
+            if (ctx_->entity_manager)
+                fluid_frame_system_.update(ctx_->entity_manager->registry(), *ctx_, deltaTime_s);
+        }
     }
 
-    void ReferenceGame::render(float time_s, int windowWidth, int windowHeight)
+    void FluidSandboxGame::render(float time_s, int windowWidth, int windowHeight)
     {
         (void)time_s;
         // Legacy render entry point: keep the overlay view in sync even if a
@@ -64,26 +74,28 @@ namespace eeng::reference_game
         publish_overlay_view(windowWidth, windowHeight);
     }
 
-    void ReferenceGame::render_scene(const RenderContext& ctx)
+    void FluidSandboxGame::render_scene(const RenderContext& ctx)
     {
         // Scene rendering would typically call RuntimePipeline::render_entities()
-        // plus any game-specific renderers. ReferenceGame renders nothing.
+        // plus any game-specific renderers. FluidSandboxGame renders nothing yet.
         (void)ctx;
     }
 
-    void ReferenceGame::render_overlay(const RenderContext& ctx)
+    void FluidSandboxGame::render_overlay(const RenderContext& ctx)
     {
         // Provide a view for editor overlays (gizmos, debug shapes).
         publish_overlay_view(ctx.window_width, ctx.window_height);
+        if (ctx_ && ctx_->entity_manager && ctx_->shape_renderer)
+            fluid_frame_system_.render_overlay(ctx_->entity_manager->registry(), *ctx_, *ctx_->shape_renderer);
     }
 
-    void ReferenceGame::render_gui(const RenderContext& ctx)
+    void FluidSandboxGame::render_gui(const RenderContext& ctx)
     {
         // Games can submit ImGui windows or HUD here.
         (void)ctx;
     }
 
-    void ReferenceGame::publish_overlay_view(int windowWidth, int windowHeight)
+    void FluidSandboxGame::publish_overlay_view(int windowWidth, int windowHeight)
     {
         if (!ctx_ || !ctx_->overlay_view_state)
             return;
@@ -92,7 +104,7 @@ namespace eeng::reference_game
             return;
 
         // Publish a placeholder overlay view so editor gizmos can draw, even though
-        // ReferenceGame has no camera of its own yet.
+        // FluidSandboxGame has no camera of its own yet.
         auto& overlay = *ctx_->overlay_view_state;
         overlay.view = glm::mat4(1.0f);
         overlay.proj = glm::mat4(1.0f);
@@ -101,7 +113,7 @@ namespace eeng::reference_game
         overlay.valid = true;
     }
 
-    void ReferenceGame::destroy()
+    void FluidSandboxGame::destroy()
     {
         if (ctx_ && ctx_->services
             && ctx_->services->debug_render_settings_edit == runtime_pipeline_.debug_render_settings_edit()
@@ -113,40 +125,41 @@ namespace eeng::reference_game
             ctx_->services->debug_render_settings_play = nullptr;
             ctx_->services->overlay_render_settings = nullptr;
         }
+        fluid_frame_system_.clear();
         runtime_pipeline_.shutdown();
     }
 
-    PlayModePolicy ReferenceGame::preferred_play_policy() const
+    PlayModePolicy FluidSandboxGame::preferred_play_policy() const
     {
         // Prefer Preview to reuse the current edit-world state, or Strict to request
         // explicit batch loading each time play starts (the app can override).
         return PlayModePolicy::Strict;
     }
 
-    std::vector<std::string> ReferenceGame::preferred_startup_batches() const
+    std::vector<std::string> FluidSandboxGame::preferred_startup_batches() const
     {
         // In Strict mode, list preferred batch names to load at play start.
         // These are resolved through the play world's BatchRegistry by the app.
         return { std::string(BatchRegistry::kDefaultBatchName) };
     }
 
-    void ReferenceGame::on_play_world_created(EngineContext& ctx)
+    void FluidSandboxGame::on_play_world_created(EngineContext& ctx)
     {
         // Configure the fresh play world before loading batches (e.g., set the batch index path).
         if (!ctx.batch_registry)
             return;
 
         auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
-        br.load_or_create_index("projects/reference_game/batches/index.json");
+        br.load_or_create_index("projects/fluid_sandbox/batches/index.json");
     }
 
-    void ReferenceGame::on_enter_play(EngineContext& ctx)
+    void FluidSandboxGame::on_enter_play(EngineContext& ctx)
     {
         // Runtime-only setup goes here (spawn player, reset timers, etc).
         (void)ctx;
     }
 
-    void ReferenceGame::on_exit_play(EngineContext& ctx)
+    void FluidSandboxGame::on_exit_play(EngineContext& ctx)
     {
         // Cleanup runtime-only state before returning to edit mode.
         (void)ctx;

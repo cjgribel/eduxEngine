@@ -1,17 +1,18 @@
 #pragma once
 
+#include "ecs/systems/FluidFrameSystem.hpp"
 #include "engineapi/IGameRuntime.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "EngineContext.hpp"
 #include <memory>
 
-namespace eeng::reference_game
+namespace eeng::fluid_sandbox
 {
-    // ReferenceGame is a minimal stub kept in sync with the evolving engine API.
-    class ReferenceGame : public IGameRuntime
+    // FluidSandboxGame is a project-local runtime for fluid experiments.
+    class FluidSandboxGame : public IGameRuntime
     {
     public:
-        explicit ReferenceGame(std::shared_ptr<EngineContext> ctx);
+        explicit FluidSandboxGame(std::shared_ptr<EngineContext> ctx);
 
         bool init() override;
         void update(float time_s, float deltaTime_s) override;
@@ -33,5 +34,6 @@ namespace eeng::reference_game
 
         std::shared_ptr<EngineContext> ctx_;
         eeng::ecs::RuntimePipeline runtime_pipeline_;
+        eeng::fluid_sandbox::ecs::systems::FluidFrameSystem fluid_frame_system_;
     };
 }

@@ -8,7 +8,7 @@
 
 #include <glm/glm.hpp>
 
-namespace eeng::reference_game::ecs
+namespace eeng::fluid_sandbox::ecs
 {
     enum class FluidFrameRenderMode : std::uint8_t
     {
@@ -31,7 +31,7 @@ namespace eeng::reference_game::ecs
         int substeps = 1;
 
         // Keep v1 project-local and low-friction: point directly at a JSON file.
-        std::string config_path = "projects/reference_game/data/fluids/default_frame.json";
+        std::string config_path = "projects/fluid_sandbox/data/fluids/default_frame.json";
 
         FluidFrameRenderMode render_mode = FluidFrameRenderMode::Density;
         bool debug_draw_frame = true;

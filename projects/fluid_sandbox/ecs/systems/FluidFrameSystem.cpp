@@ -17,7 +17,7 @@
 #include <glm/geometric.hpp>
 #include <nlohmann/json.hpp>
 
-namespace eeng::reference_game::ecs::systems
+namespace eeng::fluid_sandbox::ecs::systems
 {
     namespace
     {

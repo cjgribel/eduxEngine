@@ -27,12 +27,12 @@ That last point is important: a raw JSON path keeps the first version isolated f
 
 For a minimal, non-core version:
 
-- `projects/reference_game/ecs/FluidFrameComponent.hpp`
-- `projects/reference_game/ecs/systems/FluidFrameSystem.hpp`
-- `projects/reference_game/ecs/systems/FluidFrameSystem.cpp`
-- `projects/reference_game/FluidSandboxMetaReg.hpp`
-- `projects/reference_game/FluidSandboxMetaReg.cpp`
-- `projects/reference_game/data/fluids/*.json`
+- `projects/fluid_sandbox/ecs/FluidFrameComponent.hpp`
+- `projects/fluid_sandbox/ecs/systems/FluidFrameSystem.hpp`
+- `projects/fluid_sandbox/ecs/systems/FluidFrameSystem.cpp`
+- `projects/fluid_sandbox/FluidSandboxMetaReg.hpp`
+- `projects/fluid_sandbox/FluidSandboxMetaReg.cpp`
+- `projects/fluid_sandbox/data/fluids/*.json`
 
 If you want it available in the current sample game instead, swap `reference_game` for `legacy_game`.
 
@@ -56,7 +56,7 @@ namespace eeng::reference_game
         int substeps = 1;
 
         // MVP: direct JSON file path, project-relative.
-        std::string config_path = "projects/reference_game/data/fluids/default_frame.json";
+        std::string config_path = "projects/fluid_sandbox/data/fluids/default_frame.json";
 
         // Rendering/debug
         bool render_density = true;
