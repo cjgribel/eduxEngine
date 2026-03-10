@@ -87,9 +87,15 @@ namespace eeng::editor {
                 source_deg,
                 committed_deg,
                 [&](float& deg) {
-                    if (meta->ui_has_range)
-                        return ImGui::SliderFloat("##label", &deg, meta->ui_range_min, meta->ui_range_max, "%.2f deg");
-                    return ImGui::DragFloat("##label", &deg, speed, 0.0f, 0.0f, "%.2f deg");
+                    const bool changed = meta->ui_has_range
+                        ? ImGui::SliderFloat("##label", &deg, meta->ui_range_min, meta->ui_range_max, "%.2f deg")
+                        : ImGui::DragFloat("##label", &deg, speed, 0.0f, 0.0f, "%.2f deg");
+                    if (changed)
+                    {
+                        // Snap in display-space so angle steps stay intuitive.
+                        deg = apply_snap_from_meta(deg, meta);
+                    }
+                    return changed;
                 }))
             {
                 return false;
@@ -107,9 +113,12 @@ namespace eeng::editor {
             t,
             committed,
             [&](float& v) {
-                if (meta->ui_has_range)
-                    return ImGui::SliderFloat("##label", &v, meta->ui_range_min, meta->ui_range_max, format);
-                return ImGui::DragFloat("##label", &v, speed, 0.0f, 0.0f, format);
+                const bool changed = meta->ui_has_range
+                    ? ImGui::SliderFloat("##label", &v, meta->ui_range_min, meta->ui_range_max, format)
+                    : ImGui::DragFloat("##label", &v, speed, 0.0f, 0.0f, format);
+                if (changed)
+                    v = apply_snap_from_meta(v, meta);
+                return changed;
             }))
         {
             return false;

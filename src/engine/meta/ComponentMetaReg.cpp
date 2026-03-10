@@ -366,6 +366,8 @@ namespace eeng
                 .nice_name = "Yaw",
                 .tooltip = "Horizontal orbit angle (radians).",
                 .ui_hints = InspectorUiHint::AngleDegrees,
+                .ui_has_snap = true,
+                .ui_snap_step = 1.0f,
                 .ui_speed = 1.0f
                 })
             .traits(MetaFlags::none)
@@ -379,6 +381,8 @@ namespace eeng
                 .ui_has_range = true,
                 .ui_range_min = -89.0f,
                 .ui_range_max = 0.0f,
+                .ui_has_snap = true,
+                .ui_snap_step = 1.0f,
                 .ui_speed = 1.0f
                 })
             .traits(MetaFlags::none)
@@ -479,6 +483,8 @@ namespace eeng
                 .nice_name = "Yaw",
                 .tooltip = "Horizontal view angle (radians).",
                 .ui_hints = InspectorUiHint::AngleDegrees,
+                .ui_has_snap = true,
+                .ui_snap_step = 1.0f,
                 .ui_speed = 1.0f
                 })
             .traits(MetaFlags::none)
@@ -492,6 +498,8 @@ namespace eeng
                 .ui_has_range = true,
                 .ui_range_min = -89.0f,
                 .ui_range_max = 89.0f,
+                .ui_has_snap = true,
+                .ui_snap_step = 1.0f,
                 .ui_speed = 1.0f
                 })
             .traits(MetaFlags::none)
@@ -517,7 +525,13 @@ namespace eeng
             .traits(MetaFlags::none)
 
             .data<&eeng::ecs::TransformComponent::position>("position"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "position", "Position", "Local position." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "position",
+                .nice_name = "Position",
+                .tooltip = "Local position.",
+                .ui_has_snap = true,
+                .ui_snap_step = 0.1f
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::ecs::TransformComponent::rotation>("rotation"_hs)
@@ -532,7 +546,13 @@ namespace eeng
             .traits(MetaFlags::none)
 
             .data<&eeng::ecs::TransformComponent::scale>("scale"_hs)
-            .custom<DataMetaInfo>(DataMetaInfo{ "scale", "Scale", "Local scale." })
+            .custom<DataMetaInfo>(DataMetaInfo{
+                .name = "scale",
+                .nice_name = "Scale",
+                .tooltip = "Local scale.",
+                .ui_has_snap = true,
+                .ui_snap_step = 0.05f
+                })
             .traits(MetaFlags::none)
 
             .data<&eeng::ecs::TransformComponent::local_matrix>("local_matrix"_hs)

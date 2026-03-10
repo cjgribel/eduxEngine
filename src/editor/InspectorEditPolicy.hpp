@@ -3,8 +3,12 @@
 
 #pragma once
 
+#include "meta/MetaInfo.h"
 #include "imgui.h"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <unordered_map>
 
@@ -31,6 +35,39 @@ namespace eeng::editor
 
         // Commit only when the active edit session ends.
         return ImGui::IsItemDeactivatedAfterEdit();
+    }
+
+    inline bool has_snap(const DataMetaInfo* meta)
+    {
+        return meta && meta->ui_has_snap && meta->ui_snap_step > 0.0f;
+    }
+
+    inline float snap_scalar(float value, float step)
+    {
+        if (step <= 0.0f)
+            return value;
+        return std::round(value / step) * step;
+    }
+
+    inline float clamp_scalar_to_meta_range(float value, const DataMetaInfo* meta)
+    {
+        if (!meta || !meta->ui_has_range)
+            return value;
+        return std::clamp(value, meta->ui_range_min, meta->ui_range_max);
+    }
+
+    inline float apply_snap_from_meta(float value, const DataMetaInfo* meta)
+    {
+        if (!has_snap(meta))
+            return clamp_scalar_to_meta_range(value, meta);
+        return clamp_scalar_to_meta_range(snap_scalar(value, meta->ui_snap_step), meta);
+    }
+
+    template <std::size_t N>
+    inline void apply_snap_from_meta(std::array<float, N>& values, const DataMetaInfo* meta)
+    {
+        for (float& value : values)
+            value = apply_snap_from_meta(value, meta);
     }
 
     template <class T, class DrawFn>

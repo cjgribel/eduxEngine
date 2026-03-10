@@ -65,16 +65,26 @@ namespace eeng::editor
                         source_deg,
                         committed_deg,
                         [&](std::array<float, 4>& deg) {
+                            bool changed = false;
                             if (meta && meta->ui_has_range)
                             {
-                                if constexpr (n == 2) { return ImGui::SliderFloat2("##glm_vec", deg.data(), meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
-                                if constexpr (n == 3) { return ImGui::SliderFloat3("##glm_vec", deg.data(), meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
-                                if constexpr (n == 4) { return ImGui::SliderFloat4("##glm_vec", deg.data(), meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
+                                if constexpr (n == 2) { changed = ImGui::SliderFloat2("##glm_vec", deg.data(), meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
+                                if constexpr (n == 3) { changed = ImGui::SliderFloat3("##glm_vec", deg.data(), meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
+                                if constexpr (n == 4) { changed = ImGui::SliderFloat4("##glm_vec", deg.data(), meta->ui_range_min, meta->ui_range_max, "%.2f deg"); }
                             }
-                            if constexpr (n == 2) { return ImGui::DragFloat2("##glm_vec", deg.data(), speed, 0.0f, 0.0f, "%.2f deg"); }
-                            if constexpr (n == 3) { return ImGui::DragFloat3("##glm_vec", deg.data(), speed, 0.0f, 0.0f, "%.2f deg"); }
-                            if constexpr (n == 4) { return ImGui::DragFloat4("##glm_vec", deg.data(), speed, 0.0f, 0.0f, "%.2f deg"); }
-                            return false;
+                            else
+                            {
+                                if constexpr (n == 2) { changed = ImGui::DragFloat2("##glm_vec", deg.data(), speed, 0.0f, 0.0f, "%.2f deg"); }
+                                if constexpr (n == 3) { changed = ImGui::DragFloat3("##glm_vec", deg.data(), speed, 0.0f, 0.0f, "%.2f deg"); }
+                                if constexpr (n == 4) { changed = ImGui::DragFloat4("##glm_vec", deg.data(), speed, 0.0f, 0.0f, "%.2f deg"); }
+                            }
+
+                            if (changed)
+                            {
+                                // Snap in degrees so inspector steps match what the user sees.
+                                apply_snap_from_meta(deg, meta);
+                            }
+                            return changed;
                         }))
                     {
                         return false;
@@ -96,10 +106,13 @@ namespace eeng::editor
                     source,
                     committed,
                     [&](std::array<float, 4>& p) {
-                        if constexpr (n == 2) { return ImGui::DragFloat2("##glm_vec", p.data(), speed); }
-                        if constexpr (n == 3) { return ImGui::DragFloat3("##glm_vec", p.data(), speed); }
-                        if constexpr (n == 4) { return ImGui::DragFloat4("##glm_vec", p.data(), speed); }
-                        return false;
+                        bool changed = false;
+                        if constexpr (n == 2) { changed = ImGui::DragFloat2("##glm_vec", p.data(), speed); }
+                        if constexpr (n == 3) { changed = ImGui::DragFloat3("##glm_vec", p.data(), speed); }
+                        if constexpr (n == 4) { changed = ImGui::DragFloat4("##glm_vec", p.data(), speed); }
+                        if (changed)
+                            apply_snap_from_meta(p, meta);
+                        return changed;
                     }))
                 {
                     return false;

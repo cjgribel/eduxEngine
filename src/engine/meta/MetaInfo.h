@@ -63,6 +63,11 @@ namespace eeng
         float ui_range_min = 0.0f;
         float ui_range_max = 0.0f;
 
+        // Optional snap step for numeric widgets. Snap is applied in displayed
+        // units (for example degrees when the UI shows degrees).
+        bool ui_has_snap = false;
+        float ui_snap_step = 0.0f; // <= 0 means snap is disabled.
+
         // Optional drag speed for float/vector/quaternion widgets.
         float ui_speed = 0.0f; // <= 0 means inspector default speed.
 
