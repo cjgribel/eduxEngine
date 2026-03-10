@@ -112,6 +112,24 @@
             "problemMatcher": []
         },
         {
+            "label": "CMake Build FluidSandbox (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Debug",
+                "--target",
+                "FluidSandbox",
+                "--config",
+                "Debug"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "CMake Build All (Release)",
             "type": "shell",
             "command": "cmake",
@@ -153,6 +171,23 @@
                 "${workspaceFolder}/Release",
                 "--target",
                 "ReferenceGame",
+                "--config",
+                "Release"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "CMake Build FluidSandbox (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Release",
+                "--target",
+                "FluidSandbox",
                 "--config",
                 "Release"
             ],
