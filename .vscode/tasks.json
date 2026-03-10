@@ -56,7 +56,7 @@
         },
         // === BUILD TASKS ===
         {
-            "label": "CMake Build (Debug)",
+            "label": "CMake Build All (Debug)",
             "type": "shell",
             "command": "cmake",
             "args": [
@@ -112,7 +112,7 @@
             "problemMatcher": []
         },
         {
-            "label": "CMake Build (Release)",
+            "label": "CMake Build All (Release)",
             "type": "shell",
             "command": "cmake",
             "args": [
@@ -121,10 +121,7 @@
                 "--config",
                 "Release" // Only needed for multi-config generators
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
+            "group": "build",
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
