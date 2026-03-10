@@ -12,11 +12,10 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "cppvsdbg",
             "preLaunchTask": "CMake Build LegacyGame (Debug)"
         },
         {
-            "name": "Launch LegacyGame (Debug) (Linux)",
+            "name": "Launch LegacyGame (Debug) (Unix)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/Debug/legacy_game/LegacyGame",
@@ -25,29 +24,21 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "gdb",
             "preLaunchTask": "CMake Build LegacyGame (Debug)",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "miDebuggerPath": "/usr/bin/gdb"
-        },
-        {
-            "name": "Launch LegacyGame (Debug) (macOS)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/Debug/legacy_game/LegacyGame",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",
-            "preLaunchTask": "CMake Build LegacyGame (Debug)"
+            "linux": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ],
+                "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+                "MIMode": "lldb"
+            }
         },
         {
             "name": "Launch ReferenceGame (Debug) (Windows)",
@@ -59,11 +50,10 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "cppvsdbg",
             "preLaunchTask": "CMake Build ReferenceGame (Debug)"
         },
         {
-            "name": "Launch ReferenceGame (Debug) (Linux)",
+            "name": "Launch ReferenceGame (Debug) (Unix)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/Debug/reference_game/ReferenceGame",
@@ -72,29 +62,21 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "gdb",
             "preLaunchTask": "CMake Build ReferenceGame (Debug)",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "miDebuggerPath": "/usr/bin/gdb"
-        },
-        {
-            "name": "Launch ReferenceGame (Debug) (macOS)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/Debug/reference_game/ReferenceGame",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",
-            "preLaunchTask": "CMake Build ReferenceGame (Debug)"
+            "linux": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ],
+                "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+                "MIMode": "lldb"
+            }
         },
         // === RELEASE LAUNCH ===
         {
@@ -107,11 +89,10 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "cppvsdbg",
             "preLaunchTask": "CMake Build LegacyGame (Release)"
         },
         {
-            "name": "Launch LegacyGame (Release) (Linux)",
+            "name": "Launch LegacyGame (Release) (Unix)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/Release/legacy_game/LegacyGame",
@@ -120,29 +101,21 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "gdb",
             "preLaunchTask": "CMake Build LegacyGame (Release)",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "miDebuggerPath": "/usr/bin/gdb"
-        },
-        {
-            "name": "Launch LegacyGame (Release) (macOS)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/Release/legacy_game/LegacyGame",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",
-            "preLaunchTask": "CMake Build LegacyGame (Release)"
+            "linux": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ],
+                "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+                "MIMode": "lldb"
+            }
         },
         {
             "name": "Launch ReferenceGame (Release) (Windows)",
@@ -154,11 +127,10 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "cppvsdbg",
             "preLaunchTask": "CMake Build ReferenceGame (Release)"
         },
         {
-            "name": "Launch ReferenceGame (Release) (Linux)",
+            "name": "Launch ReferenceGame (Release) (Unix)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/Release/reference_game/ReferenceGame",
@@ -167,29 +139,21 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "gdb",
             "preLaunchTask": "CMake Build ReferenceGame (Release)",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "miDebuggerPath": "/usr/bin/gdb"
-        },
-        {
-            "name": "Launch ReferenceGame (Release) (macOS)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/Release/reference_game/ReferenceGame",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",
-            "preLaunchTask": "CMake Build ReferenceGame (Release)"
+            "linux": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ],
+                "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+                "MIMode": "lldb"
+            }
         },
         // === DEBUG LAUNCH TESTS ===
         {
@@ -202,11 +166,10 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "cppvsdbg",
             "preLaunchTask": "CMake Build tests (Debug)"
         },
         {
-            "name": "Launch Tests (Debug) (Linux)",
+            "name": "Launch Tests (Debug) (Unix)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/Debug/tests/tests",
@@ -215,29 +178,21 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "gdb",
             "preLaunchTask": "CMake Build tests (Debug)",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "miDebuggerPath": "/usr/bin/gdb"
-        },
-        {
-            "name": "Launch Tests (Debug) (macOS)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/Debug/tests/tests",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",
-            "preLaunchTask": "CMake Build tests (Debug)"
+            "linux": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ],
+                "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+                "MIMode": "lldb"
+            }
         }
     ]
 }
