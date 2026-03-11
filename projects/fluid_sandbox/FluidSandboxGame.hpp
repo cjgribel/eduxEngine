@@ -23,6 +23,7 @@ namespace eeng::fluid_sandbox
         void render_overlay(const RenderContext& ctx) override;
         void render_gui(const RenderContext& ctx) override;
         void destroy() override;
+        bool get_editor_view(OverlayViewState& out) const override;
         PlayModePolicy preferred_play_policy() const override;
         std::vector<std::string> preferred_startup_batches() const override;
         void on_play_world_created(EngineContext& ctx) override;
@@ -30,10 +31,12 @@ namespace eeng::fluid_sandbox
         void on_exit_play(EngineContext& ctx) override;
 
     private:
+        bool build_editor_view(OverlayViewState& out, glm::ivec2 window_size) const;
         void publish_overlay_view(int windowWidth, int windowHeight);
 
         std::shared_ptr<EngineContext> ctx_;
         eeng::ecs::RuntimePipeline runtime_pipeline_;
         eeng::fluid_sandbox::ecs::systems::FluidFrameSystem fluid_frame_system_;
+        glm::ivec2 last_window_size_{ 0, 0 };
     };
 }

@@ -5,6 +5,7 @@
 
 #include "ecs/FluidFrameComponent.hpp"
 #include "entt/entt.hpp"
+#include "ShapeRenderer.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -54,6 +55,14 @@ namespace eeng::fluid_sandbox::ecs::systems
         {
             NoSlip,
             FreeSlip
+        };
+
+        enum class FaceState : std::uint8_t
+        {
+            Fluid,
+            SolidInterior,
+            SolidBoundaryNoSlip,
+            SolidBoundaryFreeSlip
         };
 
         enum class EmitterKind : std::uint8_t
@@ -175,9 +184,13 @@ namespace eeng::fluid_sandbox::ecs::systems
             std::vector<float> pressure;
             std::vector<float> pressure_tmp;
             std::vector<float> divergence;
+            std::vector<float> vorticity;
             std::vector<float> density;
             std::vector<float> density_tmp;
-            std::vector<std::uint8_t> solid_mask;
+            std::vector<std::uint8_t> obstacle_mask;
+            std::vector<std::uint8_t> obstacle_boundary_modes;
+            std::vector<std::uint8_t> u_face_states;
+            std::vector<std::uint8_t> v_face_states;
 
             std::filesystem::path loaded_config_path;
             std::filesystem::file_time_type loaded_write_time{};
@@ -194,20 +207,38 @@ namespace eeng::fluid_sandbox::ecs::systems
         static std::size_t u_index(int x, int y, int nx);
         static std::size_t v_index(int x, int y, int nx);
 
-        static void resize_runtime(Runtime& runtime, glm::ivec2 resolution);
+        static bool resize_runtime(Runtime& runtime, glm::ivec2 resolution);
         static bool load_config_from_file(const std::filesystem::path& path, Config& out_config);
         static void rebuild_solid_mask(Runtime& runtime);
 
+        static bool is_obstacle_cell(const Runtime& runtime, int x, int y);
+        static ObstacleBoundaryMode obstacle_boundary_mode_at(const Runtime& runtime, int x, int y);
+        static FaceState u_face_state_at(const Runtime& runtime, int x, int y);
+        static FaceState v_face_state_at(const Runtime& runtime, int x, int y);
+        static bool is_fluid_u_face(const Runtime& runtime, int x, int y);
+        static bool is_fluid_v_face(const Runtime& runtime, int x, int y);
+        static bool point_inside_obstacle_region(const Runtime& runtime, glm::vec2 ij);
+        static glm::vec2 clamp_backtrace_to_fluid(const Runtime& runtime, glm::vec2 origin_ij, glm::vec2 traced_ij);
+
         static float sample_center_field(const std::vector<float>& field, int nx, int ny, glm::vec2 ij);
+        static float sample_u_field(const std::vector<float>& field, int nx, int ny, glm::vec2 u_ij);
+        static float sample_v_field(const std::vector<float>& field, int nx, int ny, glm::vec2 v_ij);
+        static glm::vec2 sample_velocity_field_legacy(const Runtime& runtime, glm::vec2 ij);
         static glm::vec2 sample_velocity_field(const Runtime& runtime, glm::vec2 ij);
 
         static void apply_emitters(Runtime& runtime, float dt);
+        static void apply_emitters(const FluidFrameComponent& component, Runtime& runtime, float dt);
+        static void advect_velocity_legacy(Runtime& runtime);
         static void advect_velocity(Runtime& runtime, float dt);
         static void diffuse_velocity(Runtime& runtime, float dt);
         static void compute_divergence(Runtime& runtime, float dt);
+        static void compute_vorticity(Runtime& runtime);
+        static void solve_pressure_legacy(Runtime& runtime, float dt);
         static void solve_pressure(Runtime& runtime, float dt);
+        static void project_velocity_legacy(Runtime& runtime, float dt);
         static void project_velocity(Runtime& runtime, float dt);
         static void advect_density(Runtime& runtime, float dt);
+        static void apply_boundary_conditions_legacy(Runtime& runtime);
         static void apply_boundary_conditions(Runtime& runtime);
 
         std::unordered_map<entt::entity, Runtime> runtimes_;

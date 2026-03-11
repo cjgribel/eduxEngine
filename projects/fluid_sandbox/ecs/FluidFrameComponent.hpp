@@ -14,7 +14,9 @@ namespace eeng::fluid_sandbox::ecs
     {
         Density,
         VelocityGlyphs,
-        Pressure
+        Pressure,
+        Divergence,
+        Vorticity
     };
 
     struct FluidFrameComponent
@@ -33,9 +35,23 @@ namespace eeng::fluid_sandbox::ecs
         // Keep v1 project-local and low-friction: point directly at a JSON file.
         std::string config_path = "projects/fluid_sandbox/data/fluids/default_frame.json";
 
+        // Inspector-facing simulation controls. JSON remains the default source,
+        // but these toggles let us disable or override damping live for debugging.
+        bool apply_velocity_damping = false;
+        bool apply_density_damping = false;
+        bool override_velocity_damping = false;
+        float velocity_damping = 0.0f;
+        bool override_density_damping = false;
+        float density_damping = 0.0f;
+        bool emit_density = true;
+        bool emit_velocity = true;
+        float density_emitter_scale = 1.0f;
+        float velocity_emitter_scale = 1.35f;
+
         FluidFrameRenderMode render_mode = FluidFrameRenderMode::Density;
         bool debug_draw_frame = true;
         bool debug_draw_velocity = false;
+        bool debug_draw_obstacle_faces = false;
         float density_gain = 1.0f;
         float velocity_glyph_scale = 0.20f;
         std::uint32_t tint_abgr = 0xffffffffu;
