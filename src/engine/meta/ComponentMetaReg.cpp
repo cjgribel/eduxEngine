@@ -549,9 +549,7 @@ namespace eeng
             .custom<DataMetaInfo>(DataMetaInfo{
                 .name = "scale",
                 .nice_name = "Scale",
-                .tooltip = "Local scale.",
-                .ui_has_snap = true,
-                .ui_snap_step = 0.05f
+                .tooltip = "Local scale."
                 })
             .traits(MetaFlags::none)
 
