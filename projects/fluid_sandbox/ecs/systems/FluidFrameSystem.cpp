@@ -528,6 +528,53 @@ namespace eeng::fluid_sandbox::ecs::systems
         frame_stats_ = FrameStats{};
     }
 
+    void FluidFrameSystem::reset_runtime(entt::entity entity)
+    {
+        runtimes_.erase(entity);
+    }
+
+    void FluidFrameSystem::clear_runtime_state(entt::entity entity)
+    {
+        const auto it = runtimes_.find(entity);
+        if (it == runtimes_.end())
+            return;
+
+        auto& runtime = it->second;
+        std::fill(runtime.u.begin(), runtime.u.end(), 0.0f);
+        std::fill(runtime.u_tmp.begin(), runtime.u_tmp.end(), 0.0f);
+        std::fill(runtime.v.begin(), runtime.v.end(), 0.0f);
+        std::fill(runtime.v_tmp.begin(), runtime.v_tmp.end(), 0.0f);
+        std::fill(runtime.pressure.begin(), runtime.pressure.end(), 0.0f);
+        std::fill(runtime.pressure_tmp.begin(), runtime.pressure_tmp.end(), 0.0f);
+        std::fill(runtime.divergence.begin(), runtime.divergence.end(), 0.0f);
+        std::fill(runtime.vorticity.begin(), runtime.vorticity.end(), 0.0f);
+        std::fill(runtime.density.begin(), runtime.density.end(), 0.0f);
+        std::fill(runtime.density_tmp.begin(), runtime.density_tmp.end(), 0.0f);
+        apply_boundary_conditions(runtime);
+    }
+
+    FluidFrameSystem::Config* FluidFrameSystem::runtime_config(entt::entity entity)
+    {
+        const auto it = runtimes_.find(entity);
+        return it != runtimes_.end() ? &it->second.config : nullptr;
+    }
+
+    const FluidFrameSystem::Config* FluidFrameSystem::runtime_config(entt::entity entity) const
+    {
+        const auto it = runtimes_.find(entity);
+        return it != runtimes_.end() ? &it->second.config : nullptr;
+    }
+
+    void FluidFrameSystem::refresh_runtime_config(entt::entity entity)
+    {
+        const auto it = runtimes_.find(entity);
+        if (it == runtimes_.end())
+            return;
+
+        rebuild_solid_mask(it->second);
+        apply_boundary_conditions(it->second);
+    }
+
     void FluidFrameSystem::update_single_frame(
         entt::entity,
         const FluidFrameComponent& component,
@@ -567,6 +614,13 @@ namespace eeng::fluid_sandbox::ecs::systems
             runtime.loaded_config_path = config_path;
         }
 
+        runtime.cell_size = component.override_cell_size ? component.cell_size : runtime.config.cell_size;
+        runtime.viscosity = component.apply_viscosity
+            ? (component.override_viscosity ? component.viscosity : runtime.config.viscosity)
+            : 0.0f;
+        runtime.vorticity_confinement = component.apply_vorticity_confinement
+            ? component.vorticity_confinement
+            : 0.0f;
         runtime.velocity_damping = component.apply_velocity_damping
             ? (component.override_velocity_damping ? component.velocity_damping : runtime.config.velocity_damping)
             : 0.0f;
@@ -590,17 +644,20 @@ namespace eeng::fluid_sandbox::ecs::systems
             // 1) Add sources/forces
             // 2) Advect velocity
             // 3) Diffuse velocity (optional)
-            // 4) Re-impose wall/obstacle boundary conditions on the intermediate velocity
-            // 5) Compute divergence of the intermediate velocity u*
-            // 6) Solve pressure Poisson equation
-            // 7) Project u* -> u^{n+1} so div(u^{n+1}) = 0
-            // 8) Re-apply wall/obstacle boundary conditions after projection
-            // 9) Advect density using the projected velocity
-            // 10) Re-apply wall/obstacle boundary conditions once more so
+            // 4) Compute cell-centered vorticity and add a confinement force
+            //    that restores swirl lost to dissipative numerics
+            // 5) Re-impose wall/obstacle boundary conditions on the intermediate velocity
+            // 6) Compute divergence of the intermediate velocity u*
+            // 7) Solve pressure Poisson equation
+            // 8) Project u* -> u^{n+1} so div(u^{n+1}) = 0
+            // 9) Re-apply wall/obstacle boundary conditions after projection
+            // 10) Advect density using the projected velocity
+            // 11) Re-apply wall/obstacle boundary conditions once more so
             //     density is cleared inside solids and face velocities stay valid
             apply_emitters(component, runtime, step_dt);
             advect_velocity(runtime, step_dt);
             diffuse_velocity(runtime, step_dt);
+            apply_vorticity_confinement(runtime, step_dt);
             apply_boundary_conditions(runtime);
             compute_divergence(runtime, step_dt);
             solve_pressure(runtime, step_dt);
@@ -1272,8 +1329,12 @@ namespace eeng::fluid_sandbox::ecs::systems
         runtime.v.swap(runtime.v_tmp);
     }
 
-    void FluidFrameSystem::diffuse_velocity(Runtime& runtime, float)
+    void FluidFrameSystem::diffuse_velocity(Runtime& runtime, float dt)
     {
+        constexpr bool kUseLegacyDiffusionStub = false;
+        if (kUseLegacyDiffusionStub)
+            return;
+
         // Intended equation:
         //
         //     du/dt = nu laplacian(u)
@@ -1282,9 +1343,254 @@ namespace eeng::fluid_sandbox::ecs::systems
         //
         //     (I - dt * nu * laplacian) u^{n+1} = u^*
         //
-        // For now we skip the solve when viscosity is effectively zero.
-        if (runtime.viscosity <= 1.0e-8f)
+        // The old simplified path stopped here and treated viscosity as a parsed
+        // but unused parameter. Keep that behavior easy to recover with the flag
+        // above, but use the active branch below by default.
+        if (runtime.viscosity <= 1.0e-8f || dt <= 1.0e-8f)
             return;
+
+        const int nx = runtime.resolution.x;
+        const int ny = runtime.resolution.y;
+        const float h = std::max(1.0e-6f, runtime.cell_size);
+
+        // The dimensionless diffusion weight used by the 5-point Laplacian:
+        //
+        //     a = nu * dt / h^2
+        //
+        // Larger viscosity, larger dt, or smaller cells all increase how much
+        // each face value gets pulled toward its neighbors.
+        const float alpha = runtime.viscosity * dt / (h * h);
+        if (alpha <= 1.0e-8f)
+            return;
+
+        // Keep the iteration count modest so this remains interactive. Jacobi is
+        // slow per iteration, but it is easy to read and stable enough for this
+        // sandbox-sized grid.
+        const int iterations = std::max(8, runtime.pressure_iterations / 2);
+
+        const auto diffuse_face_field =
+            [&](std::vector<float>& field,
+                std::vector<float>& scratch,
+                int width,
+                int height,
+                auto index_of,
+                auto is_fluid_face)
+        {
+            // In the implicit system:
+            //
+            //     (I - a * Laplacian) x_new = x_old
+            //
+            // x_old is the already-advected velocity field for this substep and
+            // stays fixed as the Jacobi right-hand side. The iterated unknown is
+            // x_new, which we solve into `field`.
+            const std::vector<float> source = field;
+
+            for (int iter = 0; iter < iterations; ++iter)
+            {
+                for (int y = 0; y < height; ++y)
+                {
+                    for (int x = 0; x < width; ++x)
+                    {
+                        const std::size_t idx = index_of(x, y, nx);
+                        if (!is_fluid_face(runtime, x, y))
+                        {
+                            scratch[idx] = 0.0f;
+                            continue;
+                        }
+
+                        // Active obstacle-aware branch:
+                        //
+                        // When a Jacobi stencil steps outside the fluid face
+                        // region, reuse the current face value instead of
+                        // sampling through solids. Discretely, that is the same
+                        // "ghost equals interior" trick used for zero-normal-
+                        // derivative walls, and it prevents viscosity from
+                        // smearing momentum into blocked obstacle faces.
+                        float neighbor_sum = 0.0f;
+                        int neighbor_count = 0;
+                        const float center_iterate = field[idx];
+
+                        const auto accumulate_neighbor = [&](int xn, int yn)
+                        {
+                            if (xn >= 0
+                                && xn < width
+                                && yn >= 0
+                                && yn < height
+                                && is_fluid_face(runtime, xn, yn))
+                            {
+                                neighbor_sum += field[index_of(xn, yn, nx)];
+                            }
+                            else
+                            {
+                                neighbor_sum += center_iterate;
+                            }
+                            ++neighbor_count;
+                        };
+
+                        accumulate_neighbor(x - 1, y);
+                        accumulate_neighbor(x + 1, y);
+                        accumulate_neighbor(x, y - 1);
+                        accumulate_neighbor(x, y + 1);
+
+                        // Jacobi update for:
+                        //
+                        //     x_new - a * sum(neighbors - x_new) = x_old
+                        //
+                        // Rearranged with a 4-neighbor stencil:
+                        //
+                        //     x_new = (x_old + a * neighbor_sum) / (1 + a * N)
+                        //
+                        // where N is the number of stencil directions we kept.
+                        scratch[idx] =
+                            (source[idx] + alpha * neighbor_sum)
+                            / (1.0f + alpha * static_cast<float>(neighbor_count));
+                    }
+                }
+
+                field.swap(scratch);
+            }
+        };
+
+        diffuse_face_field(
+            runtime.u,
+            runtime.u_tmp,
+            nx + 1,
+            ny,
+            [](int x, int y, int grid_nx) { return FluidFrameSystem::u_index(x, y, grid_nx); },
+            [](const Runtime& state, int x, int y) { return FluidFrameSystem::is_fluid_u_face(state, x, y); });
+
+        diffuse_face_field(
+            runtime.v,
+            runtime.v_tmp,
+            nx,
+            ny + 1,
+            [](int x, int y, int grid_nx) { return FluidFrameSystem::v_index(x, y, grid_nx); },
+            [](const Runtime& state, int x, int y) { return FluidFrameSystem::is_fluid_v_face(state, x, y); });
+    }
+
+    void FluidFrameSystem::apply_vorticity_confinement(Runtime& runtime, float dt)
+    {
+        // Vorticity confinement is a deliberate non-physical helper force used by
+        // many real-time smoke solvers:
+        //
+        //     N = grad(|w|) / |grad(|w|)|
+        //     f_conf = epsilon * h * (N x w)
+        //
+        // where:
+        //
+        // - w is the scalar 2D vorticity (the z-component of curl(u))
+        // - N points toward nearby stronger vorticity magnitude
+        // - epsilon is the user-controlled confinement strength
+        //
+        // Intuition:
+        //
+        // Semi-Lagrangian advection is stable, but it is also numerically
+        // dissipative. Small vortices tend to wash out. Confinement pushes
+        // momentum back around existing curl structures so they stay visible
+        // long enough to debug and interact with.
+        //
+        // Legacy/simple branch:
+        //
+        // Leaving confinement disabled restores the simpler solver path:
+        //
+        //     advection -> diffusion -> projection
+        //
+        // with no extra curl-restoring force.
+        if (runtime.vorticity_confinement <= 1.0e-8f || dt <= 1.0e-8f)
+            return;
+
+        const int nx = runtime.resolution.x;
+        const int ny = runtime.resolution.y;
+        const float h = std::max(1.0e-6f, runtime.cell_size);
+        const float inv_2h = 0.5f / h;
+
+        // Step 4a:
+        //
+        // Compute the current cell-centered vorticity field from the advected /
+        // diffused intermediate velocity. The confinement force uses this as its
+        // source signal.
+        compute_vorticity(runtime);
+
+        std::fill(runtime.u_tmp.begin(), runtime.u_tmp.end(), 0.0f);
+        std::fill(runtime.v_tmp.begin(), runtime.v_tmp.end(), 0.0f);
+
+        for (int y = 0; y < ny; ++y)
+        {
+            for (int x = 0; x < nx; ++x)
+            {
+                const std::size_t idx = center_index(x, y, nx);
+                if (runtime.obstacle_mask[idx] != 0u)
+                    continue;
+
+                const float w_center = runtime.vorticity[idx];
+
+                // Step 4b:
+                //
+                // Estimate grad(|w|) with centered differences so we can build N,
+                // the unit vector that points toward stronger local swirl.
+                const float abs_left = std::abs(runtime.vorticity[center_index(std::max(x - 1, 0), y, nx)]);
+                const float abs_right = std::abs(runtime.vorticity[center_index(std::min(x + 1, nx - 1), y, nx)]);
+                const float abs_down = std::abs(runtime.vorticity[center_index(x, std::max(y - 1, 0), nx)]);
+                const float abs_up = std::abs(runtime.vorticity[center_index(x, std::min(y + 1, ny - 1), nx)]);
+
+                const glm::vec2 grad_abs_w(
+                    (abs_right - abs_left) * inv_2h,
+                    (abs_up - abs_down) * inv_2h);
+
+                const float grad_len = glm::length(grad_abs_w);
+                if (grad_len <= 1.0e-8f)
+                    continue;
+
+                const glm::vec2 N = grad_abs_w / grad_len;
+
+                // Step 4c:
+                //
+                // In 2D, w points along +/-Z, so:
+                //
+                //     N x (0, 0, w) = (Ny * w, -Nx * w, 0)
+                //
+                // This gives a planar force tangent to the swirl ring.
+                const glm::vec2 confinement_force =
+                    runtime.vorticity_confinement
+                    * h
+                    * glm::vec2(N.y * w_center, -N.x * w_center);
+
+                // Step 4d:
+                //
+                // The force is computed at cell centers, but velocity lives on
+                // MAC faces. Distribute the x-force equally to the two adjacent
+                // u faces and the y-force equally to the two adjacent v faces.
+                //
+                // Each receiving face later adds:
+                //
+                //     u += dt * f_x
+                //     v += dt * f_y
+                //
+                // If a face is blocked by solids, skip it entirely so the
+                // confinement force does not punch momentum through obstacles.
+                const float fx = dt * confinement_force.x;
+                const float fy = dt * confinement_force.y;
+
+                if (is_fluid_u_face(runtime, x, y))
+                    runtime.u_tmp[u_index(x, y, nx)] += 0.5f * fx;
+                if (is_fluid_u_face(runtime, x + 1, y))
+                    runtime.u_tmp[u_index(x + 1, y, nx)] += 0.5f * fx;
+                if (is_fluid_v_face(runtime, x, y))
+                    runtime.v_tmp[v_index(x, y, nx)] += 0.5f * fy;
+                if (is_fluid_v_face(runtime, x, y + 1))
+                    runtime.v_tmp[v_index(x, y + 1, nx)] += 0.5f * fy;
+            }
+        }
+
+        // Step 4e:
+        //
+        // Accumulate the face-centered force contribution into the intermediate
+        // velocity field. Projection will later remove any divergence this force
+        // introduced, leaving the rotational part behind.
+        for (std::size_t i = 0; i < runtime.u.size(); ++i)
+            runtime.u[i] += runtime.u_tmp[i];
+        for (std::size_t i = 0; i < runtime.v.size(); ++i)
+            runtime.v[i] += runtime.v_tmp[i];
     }
 
     void FluidFrameSystem::compute_divergence(Runtime& runtime, float dt)

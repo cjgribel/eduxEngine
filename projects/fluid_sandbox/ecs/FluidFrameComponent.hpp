@@ -37,6 +37,13 @@ namespace eeng::fluid_sandbox::ecs
 
         // Inspector-facing simulation controls. JSON remains the default source,
         // but these toggles let us disable or override damping live for debugging.
+        bool override_cell_size = false;
+        float cell_size = 0.05f;
+        bool apply_viscosity = true;
+        bool override_viscosity = false;
+        float viscosity = 0.0005f;
+        bool apply_vorticity_confinement = true;
+        float vorticity_confinement = 0.35f;
         bool apply_velocity_damping = false;
         bool apply_density_damping = false;
         bool override_velocity_damping = false;

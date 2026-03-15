@@ -117,6 +117,58 @@ namespace eeng::fluid_sandbox
             .custom<DataMetaInfo>(DataMetaInfo{ "config_path", "Config Path", "Project-relative JSON file for boundaries, obstacles, and emitters." })
             .traits(MetaFlags::none)
 
+            .data<&eeng::fluid_sandbox::ecs::FluidFrameComponent::override_cell_size>("override_cell_size"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "override_cell_size", "Override Cell Size", "Use the inspector value instead of the JSON config cell size." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::fluid_sandbox::ecs::FluidFrameComponent::cell_size>("cell_size"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{
+                "cell_size",
+                "Cell Size",
+                "Physical cell width used by the solver.",
+                .ui_has_range = true,
+                .ui_range_min = 0.005f,
+                .ui_range_max = 0.25f,
+                .ui_speed = 0.001f
+            })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::fluid_sandbox::ecs::FluidFrameComponent::apply_viscosity>("apply_viscosity"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "apply_viscosity", "Apply Viscosity", "If disabled, effective viscosity is forced to zero." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::fluid_sandbox::ecs::FluidFrameComponent::override_viscosity>("override_viscosity"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "override_viscosity", "Override Viscosity", "Use the inspector value instead of the JSON config value." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::fluid_sandbox::ecs::FluidFrameComponent::viscosity>("viscosity"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{
+                "viscosity",
+                "Viscosity",
+                "Kinematic viscosity used by the velocity diffusion solve.",
+                .ui_has_range = true,
+                .ui_range_min = 0.0f,
+                .ui_range_max = 0.02f,
+                .ui_speed = 0.0001f
+            })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::fluid_sandbox::ecs::FluidFrameComponent::apply_vorticity_confinement>("apply_vorticity_confinement"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{ "apply_vorticity_confinement", "Apply Vorticity Confinement", "Inject a curl-aligned force to restore small-scale swirl lost to dissipative advection." })
+            .traits(MetaFlags::none)
+
+            .data<&eeng::fluid_sandbox::ecs::FluidFrameComponent::vorticity_confinement>("vorticity_confinement"_hs)
+            .custom<DataMetaInfo>(DataMetaInfo{
+                "vorticity_confinement",
+                "Vorticity Confinement",
+                "Strength of the curl-restoring force added after advection and diffusion.",
+                .ui_has_range = true,
+                .ui_range_min = 0.0f,
+                .ui_range_max = 5.0f,
+                .ui_speed = 0.01f
+            })
+            .traits(MetaFlags::none)
+
             .data<&eeng::fluid_sandbox::ecs::FluidFrameComponent::apply_velocity_damping>("apply_velocity_damping"_hs)
             .custom<DataMetaInfo>(DataMetaInfo{ "apply_velocity_damping", "Apply Velocity Damping", "If disabled, effective velocity damping is forced to zero." })
             .traits(MetaFlags::none)
@@ -184,7 +236,7 @@ namespace eeng::fluid_sandbox
                 "Multiplier applied to velocity emitter strength.",
                 .ui_has_range = true,
                 .ui_range_min = 0.0f,
-                .ui_range_max = 5.0f,
+                .ui_range_max = 20.0f,
                 .ui_speed = 0.01f
             })
             .traits(MetaFlags::none)

@@ -143,6 +143,11 @@ namespace eeng::fluid_sandbox::ecs::systems
             EngineContext& ctx,
             ShapeRendering::ShapeRenderer& renderer);
         void clear();
+        void reset_runtime(entt::entity entity);
+        void clear_runtime_state(entt::entity entity);
+        Config* runtime_config(entt::entity entity);
+        const Config* runtime_config(entt::entity entity) const;
+        void refresh_runtime_config(entt::entity entity);
 
         const FrameStats& frame_stats() const { return frame_stats_; }
 
@@ -154,11 +159,13 @@ namespace eeng::fluid_sandbox::ecs::systems
         //
         // We use the standard "advection + diffusion + projection" split:
         //
-        // 1. Advect velocity
-        // 2. Diffuse velocity (optional)
-        // 3. Solve pressure from div(u*)
-        // 4. Project velocity to make div(u^{n+1}) = 0
-        // 5. Advect density/dye
+        // 1. Add sources
+        // 2. Advect velocity
+        // 3. Diffuse velocity (optional)
+        // 4. Add vorticity confinement (optional)
+        // 5. Solve pressure from div(u*)
+        // 6. Project velocity to make div(u^{n+1}) = 0
+        // 7. Advect density/dye
         //
         // For references, see docs/design/NavierStokesMath.md.
 
@@ -167,6 +174,7 @@ namespace eeng::fluid_sandbox::ecs::systems
             glm::ivec2 resolution{ 0, 0 };
             float cell_size = 0.05f;
             float viscosity = 0.0f;
+            float vorticity_confinement = 0.0f;
             float velocity_damping = 0.0f;
             float density_damping = 0.0f;
             int pressure_iterations = 24;
@@ -231,6 +239,7 @@ namespace eeng::fluid_sandbox::ecs::systems
         static void advect_velocity_legacy(Runtime& runtime);
         static void advect_velocity(Runtime& runtime, float dt);
         static void diffuse_velocity(Runtime& runtime, float dt);
+        static void apply_vorticity_confinement(Runtime& runtime, float dt);
         static void compute_divergence(Runtime& runtime, float dt);
         static void compute_vorticity(Runtime& runtime);
         static void solve_pressure_legacy(Runtime& runtime, float dt);

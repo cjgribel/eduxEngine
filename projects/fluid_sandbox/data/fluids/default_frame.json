@@ -28,8 +28,8 @@
   "obstacles": [
     {
       "shape": "box",
-      "min_uv": [0.42, 0.30],
-      "max_uv": [0.48, 0.70],
+      "min_uv": [0.43, 0.36],
+      "max_uv": [0.47, 0.64],
       "boundary": "no_slip"
     }
   ],
