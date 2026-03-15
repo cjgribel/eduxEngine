@@ -16,6 +16,7 @@
 #include "assets/types/AnimationGraphAsset.hpp"
 #include "assets/AnimationGraphRuntime.hpp"
 #include "assets/types/ModelAssets.hpp"
+#include "assets/types/TerrainAssets.hpp"
 #include "gpu/GpuAssetOps.hpp"
 #include "mock/MockAssetTypes.hpp"
 #include "Storage.hpp"
@@ -30,6 +31,7 @@ namespace eeng::serializers
 {
     void register_modeldataasset_serialization();
     void register_animationgraphasset_serialization();
+    void register_terrainasset_serialization();
 }
 
 namespace eeng {
@@ -630,6 +632,154 @@ namespace eeng {
                 ;
             register_asset<assets::AnimationGraphAsset>();
             serializers::register_animationgraphasset_serialization();
+        }
+
+        // TerrainRecipeAsset
+        {
+            entt::meta_factory<assets::TerrainRecipeAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.TerrainRecipeAsset", .name = "TerrainRecipeAsset", .tooltip = "Terrain cook recipe sourced from an artist-authored terrain mesh." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::source_model_ref>("source_model_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "source_model_ref", "Source Model", "Full source terrain mesh used by the cooker." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::source_submesh_index>("source_submesh_index"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "source_submesh_index", "Source Submesh", "Submesh index to interpret as terrain (`-1` means submesh 0)." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::world_origin>("world_origin"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "world_origin", "World Origin", "Terrain-space origin used by the terrain cook." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::sample_spacing_x>("sample_spacing_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "sample_spacing_x", "Sample Spacing X", "Distance between sampled terrain points along X." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::sample_spacing_z>("sample_spacing_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "sample_spacing_z", "Sample Spacing Z", "Distance between sampled terrain points along Z." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::chunk_size_quads_x>("chunk_size_quads_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_x", "Chunk Quads X", "Number of terrain cells per cooked chunk along X." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::chunk_size_quads_z>("chunk_size_quads_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_z", "Chunk Quads Z", "Number of terrain cells per cooked chunk along Z." })
+                .traits(MetaFlags::none)
+                ;
+            register_asset<assets::TerrainRecipeAsset>();
+        }
+
+        // TerrainAsset
+        {
+            entt::meta_factory<assets::TerrainAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.TerrainAsset", .name = "TerrainAsset", .tooltip = "Runtime terrain manifest referencing cooked terrain chunks." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::world_origin>("world_origin"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "world_origin", "World Origin", "Terrain-space origin shared by all chunks." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::total_samples_x>("total_samples_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "total_samples_x", "Total Samples X", "Total terrain sample count along X before chunking." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::total_samples_z>("total_samples_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "total_samples_z", "Total Samples Z", "Total terrain sample count along Z before chunking." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::cell_size_x>("cell_size_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "cell_size_x", "Cell Size X", "Distance between neighboring terrain samples along X." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::cell_size_z>("cell_size_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "cell_size_z", "Cell Size Z", "Distance between neighboring terrain samples along Z." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::chunk_size_quads_x>("chunk_size_quads_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_x", "Chunk Quads X", "Cooked chunk size in terrain cells along X." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::chunk_size_quads_z>("chunk_size_quads_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_z", "Chunk Quads Z", "Cooked chunk size in terrain cells along Z." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::chunk_count_x>("chunk_count_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_count_x", "Chunk Count X", "Number of chunk columns in the cooked terrain." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::chunk_count_z>("chunk_count_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_count_z", "Chunk Count Z", "Number of chunk rows in the cooked terrain." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainAsset::chunks>("chunks"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunks", "Chunks", "Cooked terrain chunk references." })
+                .traits(MetaFlags::no_inspection)
+                ;
+            register_asset<assets::TerrainAsset>();
+        }
+
+        // TerrainChunkAsset
+        {
+            entt::meta_factory<assets::TerrainChunkAsset>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.TerrainChunkAsset", .name = "TerrainChunkAsset", .tooltip = "Cooked terrain chunk with chunk-local render and collision data." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::chunk_x>("chunk_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_x", "Chunk X", "Chunk coordinate along X." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::chunk_z>("chunk_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_z", "Chunk Z", "Chunk coordinate along Z." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::world_origin>("world_origin"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "world_origin", "World Origin", "World-space origin of the chunk sample grid." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::local_bounds_min>("local_bounds_min"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "local_bounds_min", "Local Bounds Min", "Minimum local-space bounds for the chunk." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::local_bounds_max>("local_bounds_max"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "local_bounds_max", "Local Bounds Max", "Maximum local-space bounds for the chunk." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::samples_x>("samples_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "samples_x", "Samples X", "Height sample count along X, including shared borders." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::samples_z>("samples_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "samples_z", "Samples Z", "Height sample count along Z, including shared borders." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::cell_size_x>("cell_size_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "cell_size_x", "Cell Size X", "Distance between neighboring height samples along X." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::cell_size_z>("cell_size_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "cell_size_z", "Cell Size Z", "Distance between neighboring height samples along Z." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::min_height>("min_height"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "min_height", "Min Height", "Minimum chunk height used for bounds and Bullet heightfield construction." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::max_height>("max_height"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "max_height", "Max Height", "Maximum chunk height used for bounds and Bullet heightfield construction." })
+                .traits(MetaFlags::readonly_inspection)
+
+                .data<&assets::TerrainChunkAsset::heights>("heights"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "heights", "Heights", "Chunk-local row-major height samples." })
+                .traits(MetaFlags::no_inspection)
+
+                .data<&assets::TerrainChunkAsset::render_model_ref>("render_model_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "render_model_ref", "Render Model", "Chunk-local render mesh uploaded independently of the source terrain." })
+                .traits(MetaFlags::readonly_inspection)
+                ;
+            register_asset<assets::TerrainChunkAsset>();
+            serializers::register_terrainasset_serialization();
         }
 
         // === MOCK RESOURCES ===

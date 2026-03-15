@@ -69,6 +69,7 @@ add_library(edux_engine STATIC
     ${CMAKE_SOURCE_DIR}/src/engine/serializers/GuidSerialize.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/serializers/GLMSerialize.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/serializers/ModelDataAssetSerialization.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/serializers/TerrainAssetSerialization.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/serializers/AnimationGraphSerialization.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/LogManager.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/LogGlobals.cpp
