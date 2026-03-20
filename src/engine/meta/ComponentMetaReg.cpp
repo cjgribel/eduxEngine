@@ -11,6 +11,7 @@
 #include "ecs/TransformComponent.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/ModelComponent.hpp"
+#include "ecs/TerrainComponent.hpp"
 #include "ecs/ParticleEmitterComponent.hpp"
 #include "ecs/AnimationGraphComponent.hpp"
 #include "ecs/ScriptComponent.hpp"
@@ -1203,6 +1204,23 @@ namespace eeng
             register_component<ecs::ModelComponent>();
         }
 
+        // --- TerrainComponent ------------------------------------------------
+        {
+            entt::meta_factory<eeng::ecs::TerrainComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.TerrainComponent", .name = "TerrainComponent", .tooltip = "Terrain manifest reference for chunked terrain runtime systems." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::TerrainComponent::name>("name"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Entity name." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::TerrainComponent::terrain_ref>("terrain_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "terrain_ref", "Terrain", "Cooked TerrainAsset manifest to stream from." })
+                .traits(MetaFlags::none)
+                ;
+            register_component<ecs::TerrainComponent>();
+        }
+
         // --- Script component ----------------------------------------------
         {
             entt::meta_factory<eeng::ecs::ScriptComponent>{}
@@ -1272,6 +1290,9 @@ namespace eeng
                 .traits(MetaFlags::none)
                 .data<ColliderType::TriangleMesh>("TriangleMesh"_hs)
                 .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Triangle Mesh", "Triangle mesh collider." })
+                .traits(MetaFlags::none)
+                .data<ColliderType::Heightfield>("Heightfield"_hs)
+                .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "Heightfield", "Cooked terrain heightfield collider." })
                 .traits(MetaFlags::none)
                 .data<ColliderType::AABB>("AABB"_hs)
                 .custom<EnumDataMetaInfo>(EnumDataMetaInfo{ "AABB", "Axis-aligned bounding box collider." })
@@ -1398,6 +1419,9 @@ namespace eeng
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::ColliderDesc::submesh_index>("submesh_index"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "submesh_index", "Submesh Index", "Submesh index for mesh colliders." })
+                .traits(MetaFlags::none)
+                .data<&eeng::ecs::ColliderDesc::terrain_chunk_ref>("terrain_chunk_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "terrain_chunk_ref", "Terrain Chunk", "Cooked TerrainChunkAsset source for heightfield colliders." })
                 .traits(MetaFlags::none)
                 .data<&eeng::ecs::ColliderDesc::is_trigger>("is_trigger"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "is_trigger", "Is Trigger", "Trigger-only collider." })

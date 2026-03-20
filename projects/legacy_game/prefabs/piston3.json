@@ -635,6 +635,9 @@
             },
             "Radius": 0.5,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Box"
           }
         ]
@@ -797,6 +800,9 @@
             },
             "Radius": 0.5,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Box"
           }
         ]

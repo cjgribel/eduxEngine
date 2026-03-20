@@ -17,6 +17,7 @@
 namespace eeng::assets
 {
     struct ModelDataAsset;
+    struct TerrainChunkAsset;
 }
 
 namespace eeng::ecs
@@ -39,6 +40,7 @@ namespace eeng::ecs
         Capsule,
         ConvexHull,
         TriangleMesh,
+        Heightfield,
         AABB
     };
 
@@ -87,6 +89,9 @@ namespace eeng::ecs
         // Mesh source (used by ConvexHull/TriangleMesh).
         AssetRef<assets::ModelDataAsset> mesh_ref;
         int submesh_index = -1;
+
+        // Cooked terrain chunk source (used by Heightfield).
+        AssetRef<assets::TerrainChunkAsset> terrain_chunk_ref;
 
         // Trigger colliders emit events without physical response (see PhysicsSystem limitation).
         bool is_trigger = false;
@@ -377,6 +382,7 @@ namespace eeng::ecs
         for (auto& desc : c.colliders)
         {
             visitor(desc.mesh_ref);
+            visitor(desc.terrain_chunk_ref);
         }
     }
 

@@ -15,6 +15,7 @@
 #include "ecs/PhysicsComponents.hpp"
 #include "physics/PhysicsGeometry.hpp"
 #include "assets/types/ModelAssets.hpp"
+#include "assets/types/TerrainAssets.hpp"
 
 #include "imgui.h"
 #include <algorithm>
@@ -98,6 +99,7 @@ namespace eeng::editor
             case ecs::ColliderType::Capsule: return "Capsule";
             case ecs::ColliderType::ConvexHull: return "Convex Hull";
             case ecs::ColliderType::TriangleMesh: return "Triangle Mesh";
+            case ecs::ColliderType::Heightfield: return "Heightfield";
             case ecs::ColliderType::AABB: return "AABB";
             default: return "Unknown";
             }
@@ -236,6 +238,7 @@ namespace eeng::editor
                 ecs::ColliderType::Capsule,
                 ecs::ColliderType::ConvexHull,
                 ecs::ColliderType::TriangleMesh,
+                ecs::ColliderType::Heightfield,
                 ecs::ColliderType::AABB
             };
             for (ecs::ColliderType option : options)
@@ -276,6 +279,7 @@ namespace eeng::editor
         const bool is_sphere = desc->type == ecs::ColliderType::Sphere;
         const bool is_capsule = desc->type == ecs::ColliderType::Capsule;
         const bool is_mesh = desc->type == ecs::ColliderType::ConvexHull || desc->type == ecs::ColliderType::TriangleMesh;
+        const bool is_heightfield = desc->type == ecs::ColliderType::Heightfield;
 
         if (is_box)
         {
@@ -313,6 +317,15 @@ namespace eeng::editor
             inspector.begin_leaf("submesh_index");
             modified |= inspect_type(desc->submesh_index, inspector);
             detail::show_meta_tooltip<ecs::ColliderDesc>("submesh_index");
+            inspector.end_leaf();
+        }
+
+        if (is_heightfield)
+        {
+            inspector.begin_leaf("terrain_chunk_ref");
+            auto ref_any = entt::forward_as_meta(desc->terrain_chunk_ref);
+            modified |= inspect_AssetRef<assets::TerrainChunkAsset>(ref_any, inspector, ctx);
+            detail::show_meta_tooltip<ecs::ColliderDesc>("terrain_chunk_ref");
             inspector.end_leaf();
         }
 
@@ -485,6 +498,7 @@ namespace eeng::editor
                 ecs::ColliderType::Capsule,
                 ecs::ColliderType::ConvexHull,
                 ecs::ColliderType::TriangleMesh,
+                ecs::ColliderType::Heightfield,
                 ecs::ColliderType::AABB
             };
             for (ecs::ColliderType option : options)

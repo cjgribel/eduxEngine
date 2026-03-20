@@ -235,20 +235,32 @@ namespace eeng::ecs::systems
 
             // Compound shape acts as the root to support multiple colliders per entity.
             std::unique_ptr<btCompoundShape> compound_shape;
+
             // Single collider root shape (used when no compound is required).
             std::unique_ptr<btCollisionShape> root_shape;
+
             std::vector<std::unique_ptr<btCollisionShape>> child_shapes;
+
+            // Heightfield shapes keep raw pointers to their sample arrays, so
+            // runtime storage must outlive the Bullet shapes that read from it.
+            std::vector<std::vector<float>> heightfield_samples;
+
             // Per-child collider metadata for contact event lookup.
             std::vector<ColliderRuntimeInfo> collider_info;
+
             // Bullet stores raw pointers to these objects; we own them and must keep them alive.
             std::unique_ptr<btDefaultMotionState> motion_state;
             std::unique_ptr<btRigidBody> body;
+
             // Body-local transform from COM/principal axes to the authoring pivot.
             btTransform com_local = btTransform::getIdentity();
             btTransform com_local_inverse = btTransform::getIdentity();
+            
             // Cached component state so we can rebuild when key properties change.
             ecs::PhysicsMotionType motion = ecs::PhysicsMotionType::Dynamic;
+            
             glm::vec3 scale{ 1.0f };
+            
             // Cached local transform version for kinematic/static sync throttling.
             std::uint32_t local_version = 0;
         };

@@ -121,15 +121,22 @@ namespace eeng::assets
     };
 
     template<typename Visitor>
-    void visit_asset_refs(TerrainRecipeAsset& terrain, Visitor&& visitor)
+    void visit_asset_refs(TerrainRecipeAsset&, Visitor&&)
     {
-        visitor(terrain.source_model_ref);
+        // Intentionally empty.
+        //
+        // Terrain recipes are editor/tool-side descriptors. We do not want the
+        // generic asset-recursion path to pull in the full source terrain mesh
+        // just because the recipe itself is loaded or inspected.
+        //
+        // Tools that actually perform terrain cooking should resolve
+        // `source_model_ref` explicitly when they need it.
     }
 
     template<typename Visitor>
-    void visit_asset_refs(const TerrainRecipeAsset& terrain, Visitor&& visitor)
+    void visit_asset_refs(const TerrainRecipeAsset&, Visitor&&)
     {
-        visitor(terrain.source_model_ref);
+        // See non-const overload above.
     }
 
     template<typename Visitor>

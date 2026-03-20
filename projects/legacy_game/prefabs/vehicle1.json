@@ -297,6 +297,9 @@
             },
             "Radius": 0.5,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Box"
           }
         ]
@@ -430,6 +433,9 @@
             },
             "Radius": 0.15000000596046448,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Sphere"
           }
         ]
@@ -563,6 +569,9 @@
             },
             "Radius": 0.3499999940395355,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Sphere"
           }
         ]
@@ -888,6 +897,9 @@
             },
             "Radius": 0.15000000596046448,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Sphere"
           }
         ]
@@ -1021,6 +1033,9 @@
             },
             "Radius": 0.3499999940395355,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Sphere"
           }
         ]
@@ -1346,6 +1361,9 @@
             },
             "Radius": 0.15000000596046448,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Sphere"
           }
         ]
@@ -1479,6 +1497,9 @@
             },
             "Radius": 0.3499999940395355,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Sphere"
           }
         ]
@@ -1804,6 +1825,9 @@
             },
             "Radius": 0.15000000596046448,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Sphere"
           }
         ]
@@ -1937,6 +1961,9 @@
             },
             "Radius": 0.3499999940395355,
             "Submesh Index": -1,
+            "Terrain Chunk": {
+              "Guid": 0
+            },
             "Type": "Sphere"
           }
         ]

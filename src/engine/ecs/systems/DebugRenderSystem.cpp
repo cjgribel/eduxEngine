@@ -39,6 +39,7 @@ namespace eeng::ecs::systems
             case eeng::ecs::ColliderType::Capsule: return "Capsule";
             case eeng::ecs::ColliderType::ConvexHull: return "ConvexHull";
             case eeng::ecs::ColliderType::TriangleMesh: return "TriMesh";
+            case eeng::ecs::ColliderType::Heightfield: return "Heightfield";
             case eeng::ecs::ColliderType::AABB: return "AABB";
             default: return "Unknown";
             }
@@ -320,6 +321,7 @@ namespace eeng::ecs::systems
                             break;
                         case ecs::ColliderType::ConvexHull:
                         case ecs::ColliderType::TriangleMesh:
+                        case ecs::ColliderType::Heightfield:
                             renderer.push_AABB(-collider.half_extents, collider.half_extents);
                             break;
                         default:
@@ -360,6 +362,7 @@ namespace eeng::ecs::systems
                             case ecs::ColliderType::AABB:
                             case ecs::ColliderType::ConvexHull:
                             case ecs::ColliderType::TriangleMesh:
+                            case ecs::ColliderType::Heightfield:
                             default:
                                 append_label_linef(label, "HalfExt (%.2f, %.2f, %.2f)",
                                     collider.half_extents.x,

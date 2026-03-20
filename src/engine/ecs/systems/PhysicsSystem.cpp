@@ -13,7 +13,9 @@
 #include "editor/AssignFieldCommand.hpp"
 #include "physics/MassProperties.hpp"
 #include "assets/types/ModelAssets.hpp"
+#include "assets/types/TerrainAssets.hpp"
 #include <btBulletDynamicsCommon.h>
+#include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +25,13 @@
 
 namespace
 {
+    struct BuiltShape
+    {
+        std::unique_ptr<btCollisionShape> shape;
+        btTransform local_shape_transform = btTransform::getIdentity();
+        std::vector<float> owned_height_samples;
+    };
+
     // Helper to resolve an event target into a live entity.
     std::optional<eeng::ecs::Entity> resolve_event_entity(
         const eeng::editor::FieldTarget& target,
@@ -151,6 +160,11 @@ namespace
         if (pos_len > kEpsilon)
             return false;
         return is_identity_quat(rotation);
+    }
+
+    bool is_identity_transform(const btTransform& transform)
+    {
+        return transform.getOrigin().fuzzyZero() && is_identity_quat(transform.getRotation());
     }
 
     // Diagonalize a symmetric inertia tensor.
@@ -288,6 +302,35 @@ namespace
             }
             break;
         }
+        case eeng::ecs::ColliderType::Heightfield:
+        {
+            auto* rm = eeng::try_get_resource_manager_ptr(ctx, "PhysicsSystem");
+            if (!rm)
+                break;
+
+            bool read_ok = eeng::try_read_asset_ref(
+                *rm,
+                collider.terrain_chunk_ref,
+                ctx,
+                "PhysicsSystem",
+                "Missing TerrainChunkAsset for heightfield collider.",
+                [&](const eeng::assets::TerrainChunkAsset& chunk)
+                {
+                    const glm::vec3 chunk_size = chunk.local_bounds_max - chunk.local_bounds_min;
+                    const glm::vec3 half_extents = glm::max(chunk_size * 0.5f * scale_m, glm::vec3(0.01f));
+                    props = eeng::physics::mass_properties_box(half_extents, density);
+                    has_props = true;
+                });
+            (void)read_ok;
+
+            if (!has_props)
+            {
+                const glm::vec3 half_extents = collider.half_extents * scale_m;
+                props = eeng::physics::mass_properties_box(half_extents, density);
+                has_props = true;
+            }
+            break;
+        }
         case eeng::ecs::ColliderType::TriangleMesh:
         default:
         {
@@ -360,11 +403,13 @@ namespace
 
 
     // Build a Bullet shape from a collider description and entity scale.
-    std::unique_ptr<btCollisionShape> build_shape(
+    BuiltShape build_shape(
         const eeng::ecs::ColliderDesc& collider,
         const glm::vec3& entity_scale,
-        float units_per_meter)
+        float units_per_meter,
+        eeng::EngineContext& ctx)
     {
+        BuiltShape out{};
         const float meters_per_unit = units_per_meter > 0.0f ? 1.0f / units_per_meter : 1.0f;
         const glm::vec3 scaled_extents = collider.half_extents * entity_scale * meters_per_unit;
         const float scale_u = uniform_scale(entity_scale) * meters_per_unit;
@@ -375,19 +420,103 @@ namespace
         case eeng::ecs::ColliderType::AABB:
         {
             const btVector3 half_extents(scaled_extents.x, scaled_extents.y, scaled_extents.z);
-            return std::make_unique<btBoxShape>(half_extents);
+            out.shape = std::make_unique<btBoxShape>(half_extents);
+            return out;
         }
         case eeng::ecs::ColliderType::Sphere:
         {
             const float radius = std::max(0.0f, collider.radius * scale_u);
-            return std::make_unique<btSphereShape>(radius);
+            out.shape = std::make_unique<btSphereShape>(radius);
+            return out;
         }
         case eeng::ecs::ColliderType::Capsule:
         {
             // Our debug capsule uses height as the cylinder length; Bullet does the same.
             const float radius = std::max(0.0f, collider.radius * scale_u);
             const float height = std::max(0.0f, collider.height * scale_u);
-            return std::make_unique<btCapsuleShapeZ>(radius, height);
+            out.shape = std::make_unique<btCapsuleShapeZ>(radius, height);
+            return out;
+        }
+        case eeng::ecs::ColliderType::Heightfield:
+        {
+            auto* rm = eeng::try_get_resource_manager_ptr(ctx, "PhysicsSystem");
+            if (!rm)
+                break;
+
+            bool built_heightfield = false;
+            eeng::try_read_asset_ref(
+                *rm,
+                collider.terrain_chunk_ref,
+                ctx,
+                "PhysicsSystem",
+                "Missing TerrainChunkAsset for heightfield collider.",
+                [&](const eeng::assets::TerrainChunkAsset& chunk)
+                {
+                    const std::size_t sample_count =
+                        static_cast<std::size_t>(chunk.samples_x)
+                        * static_cast<std::size_t>(chunk.samples_z);
+                    if (chunk.samples_x < 2
+                        || chunk.samples_z < 2
+                        || sample_count == 0
+                        || chunk.heights.size() != sample_count)
+                    {
+                        EENG_LOG_WARN(&ctx,
+                            "PhysicsSystem: Heightfield collider %u has invalid TerrainChunkAsset sample data; using box fallback.",
+                            collider.id);
+                        return;
+                    }
+
+                    // Bullet keeps a raw pointer to the sample memory, so we
+                    // move an owned copy into BodyRuntime after shape creation.
+                    out.owned_height_samples = chunk.heights;
+
+                    const float scale_x = entity_scale.x * meters_per_unit;
+                    const float scale_y = entity_scale.y * meters_per_unit;
+                    const float scale_z = entity_scale.z * meters_per_unit;
+
+                    const float min_height = chunk.min_height;
+                    const float max_height = chunk.max_height;
+
+                    auto heightfield = std::make_unique<btHeightfieldTerrainShape>(
+                        static_cast<int>(chunk.samples_x),
+                        static_cast<int>(chunk.samples_z),
+                        out.owned_height_samples.data(),
+                        min_height,
+                        max_height,
+                        1,
+                        false);
+
+                    heightfield->setUseDiamondSubdivision(true);
+                    heightfield->setLocalScaling(btVector3(
+                        chunk.cell_size_x * scale_x,
+                        scale_y,
+                        chunk.cell_size_z * scale_z));
+
+                    const float width = static_cast<float>(chunk.samples_x - 1) * chunk.cell_size_x * scale_x;
+                    const float length = static_cast<float>(chunk.samples_z - 1) * chunk.cell_size_z * scale_z;
+                    const float center_height = 0.5f * (min_height + max_height) * scale_y;
+
+                    // Bullet heightfields are centered on their internal AABB.
+                    // We shift them back into our chunk-corner convention here
+                    // so chunk.world_origin/local_position can refer to the
+                    // chunk's minimum X/Z corner instead of Bullet's center.
+                    out.local_shape_transform.setIdentity();
+                    out.local_shape_transform.setOrigin(btVector3(
+                        chunk.local_bounds_min.x * scale_x + width * 0.5f,
+                        center_height,
+                        chunk.local_bounds_min.z * scale_z + length * 0.5f));
+
+                    out.shape = std::move(heightfield);
+                    built_heightfield = true;
+                });
+
+            if (built_heightfield)
+                return out;
+
+            EENG_LOG_WARN(&ctx,
+                "PhysicsSystem: Heightfield collider %u using box fallback.",
+                collider.id);
+            [[fallthrough]];
         }
         case eeng::ecs::ColliderType::ConvexHull:
         case eeng::ecs::ColliderType::TriangleMesh:
@@ -395,9 +524,12 @@ namespace
         {
             // Placeholder: use a box sized by half_extents when mesh data isn't cooked yet.
             const btVector3 half_extents(scaled_extents.x, scaled_extents.y, scaled_extents.z);
-            return std::make_unique<btBoxShape>(half_extents);
+            out.shape = std::make_unique<btBoxShape>(half_extents);
+            return out;
         }
         }
+
+        return out;
     }
 } // namespace
 
@@ -856,8 +988,12 @@ namespace eeng::ecs::systems
         const bool single_collider = (colliders.colliders.size() == 1);
         const bool single_identity =
             single_collider && is_identity_collider_transform(colliders.colliders.front());
+        const bool single_requires_child_transform =
+            single_collider && colliders.colliders.front().type == ecs::ColliderType::Heightfield;
         const bool com_identity = is_identity_com(com_local_pos, com_rotation);
-        const bool use_compound = !(single_collider && single_identity && com_identity);
+        const bool use_compound =
+            single_requires_child_transform
+            || !(single_collider && single_identity && com_identity);
 
         if (use_compound)
             runtime.compound_shape = std::make_unique<btCompoundShape>();
@@ -868,9 +1004,12 @@ namespace eeng::ecs::systems
         // Build collision shapes (rebuilds are driven by the dirty set).
         for (const auto& collider : colliders.colliders)
         {
-            auto shape = build_shape(collider, tfm.scale, settings_.units_per_meter);
-            if (!shape)
+            auto built_shape = build_shape(collider, tfm.scale, settings_.units_per_meter, ctx);
+            if (!built_shape.shape)
                 continue;
+
+            if (!built_shape.owned_height_samples.empty())
+                runtime.heightfield_samples.push_back(std::move(built_shape.owned_height_samples));
 
             if (use_compound)
             {
@@ -880,10 +1019,16 @@ namespace eeng::ecs::systems
                 local.setOrigin(to_bt_vec3(collider.local_position * tfm.scale, settings_.units_per_meter));
                 local.setRotation(to_bt_quat(collider.local_rotation));
 
+                // Some Bullet shapes, such as heightfields, are internally
+                // centered differently than our chunk authoring convention. The
+                // shape-local transform lets the builder correct that without
+                // leaking Bullet-specific offsets into serialized collider data.
+                local = local * built_shape.local_shape_transform;
+
                 // Shift the child into COM/principal-axis space for a stable body frame.
                 const btTransform shifted = runtime.com_local_inverse * local;
-                runtime.compound_shape->addChildShape(shifted, shape.get());
-                runtime.child_shapes.emplace_back(std::move(shape));
+                runtime.compound_shape->addChildShape(shifted, built_shape.shape.get());
+                runtime.child_shapes.emplace_back(std::move(built_shape.shape));
                 // Track collider metadata by child index so contact events can resolve ids.
                 runtime.collider_info.push_back(
                     BodyRuntime::ColliderRuntimeInfo{ collider.id, collider.is_trigger });
@@ -891,7 +1036,7 @@ namespace eeng::ecs::systems
             else
             {
                 // Single collider with identity local transform: no compound required.
-                runtime.root_shape = std::move(shape);
+                runtime.root_shape = std::move(built_shape.shape);
                 runtime.collider_info.push_back(
                     BodyRuntime::ColliderRuntimeInfo{ collider.id, collider.is_trigger });
             }
