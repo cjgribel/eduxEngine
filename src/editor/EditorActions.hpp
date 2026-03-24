@@ -80,6 +80,22 @@ namespace eeng::editor
             std::string graph_name = "PistonGraph",
             std::string clip_name = "Piston");
 
+        /// @brief Create an empty TerrainRecipeAsset for authoring terrain cooks.
+        static void create_terrain_recipe(
+            EngineContext& ctx,
+            std::string recipe_name = "TerrainRecipe");
+
+        /**
+         * @brief Explicitly cook a terrain recipe into runtime terrain assets.
+         *
+         * This is intentionally treated as an asset-build action rather than a
+         * normal undoable scene edit. Re-cooking overwrites the deterministic
+         * output folder owned by the recipe.
+         */
+        static void cook_terrain_recipe(
+            EngineContext& ctx,
+            const Guid& recipe_guid);
+
         /// @brief Queue an undoable unimport by GUID (serialized on RM strand).
         static void unimport_assets(
             EngineContext& ctx,

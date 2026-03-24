@@ -39,7 +39,18 @@ namespace eeng::assets
         float sample_spacing_x = 1.0f;
         float sample_spacing_z = 1.0f;
 
+        // Optional cook-time scaling applied to the authored source mesh before
+        // rasterization. This is the safe way to resize terrain without
+        // relying on runtime transform scaling, which can diverge between
+        // render and physics if parent scales are introduced later.
+        float horizontal_scale_x = 1.0f;
+        float horizontal_scale_z = 1.0f;
+        float height_scale = 1.0f;
+
         // Number of terrain cells per cooked chunk in X/Z.
+        // World-space chunk width/depth is:
+        //   chunk_size_quads_x * sample_spacing_x
+        //   chunk_size_quads_z * sample_spacing_z
         // The cooker should emit one extra border sample so neighboring chunks
         // share their edge heights cleanly.
         std::uint32_t chunk_size_quads_x = 64;
@@ -140,21 +151,23 @@ namespace eeng::assets
     }
 
     template<typename Visitor>
-    void visit_asset_refs(TerrainAsset& terrain, Visitor&& visitor)
+    void visit_asset_refs(TerrainAsset&, Visitor&&)
     {
-        for (auto& chunk : terrain.chunks)
-        {
-            visitor(chunk);
-        }
+        // Intentionally empty.
+        //
+        // Terrain manifests are runtime lookup tables, not eager dependency
+        // roots. If we recursively visited all chunk refs here then binding the
+        // manifest would immediately pull in every cooked chunk, which defeats
+        // the whole point of chunked terrain.
+        //
+        // The terrain runtime system is expected to pick the chunk coords it
+        // wants and request those TerrainChunkAssets explicitly.
     }
 
     template<typename Visitor>
-    void visit_asset_refs(const TerrainAsset& terrain, Visitor&& visitor)
+    void visit_asset_refs(const TerrainAsset&, Visitor&&)
     {
-        for (const auto& chunk : terrain.chunks)
-        {
-            visitor(chunk);
-        }
+        // See non-const overload above.
     }
 
     template<typename Visitor>

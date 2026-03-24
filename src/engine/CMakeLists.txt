@@ -26,6 +26,7 @@ add_library(edux_engine STATIC
     ${CMAKE_SOURCE_DIR}/src/engine/assets/AnimationGraphValidation.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/assets/importers/AssimpImporter.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/assets/importers/MockImporter.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/assets/importers/TerrainCooker.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/gpu/GpuAssetOps.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/Entity.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/EntityManager.cpp
@@ -56,6 +57,7 @@ add_library(edux_engine STATIC
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ScriptSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ParticleSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ParticleRenderSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/TerrainSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/TrailSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/StickyNoteSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/util/Profiler.cpp

@@ -9,6 +9,7 @@
 #include "EngineContextHelpers.hpp"
 #include "hash_combine.h"
 #include "assets/types/ModelAssets.hpp"
+#include "assets/types/TerrainAssets.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/ModelComponent.hpp"
 #include "ecs/PhysicsComponents.hpp"
@@ -321,9 +322,30 @@ namespace eeng::ecs::systems
                             break;
                         case ecs::ColliderType::ConvexHull:
                         case ecs::ColliderType::TriangleMesh:
-                        case ecs::ColliderType::Heightfield:
                             renderer.push_AABB(-collider.half_extents, collider.half_extents);
                             break;
+                        case ecs::ColliderType::Heightfield:
+                        {
+                            bool drew_heightfield_bounds = false;
+                            if (auto* rm = eeng::try_get_resource_manager_ptr(ctx, "DebugRenderSystem"))
+                            {
+                                eeng::try_read_asset_ref(
+                                    *rm,
+                                    collider.terrain_chunk_ref,
+                                    ctx,
+                                    "DebugRenderSystem",
+                                    "",
+                                    [&](const eeng::assets::TerrainChunkAsset& chunk)
+                                    {
+                                        renderer.push_AABB(chunk.local_bounds_min, chunk.local_bounds_max);
+                                        drew_heightfield_bounds = true;
+                                    });
+                            }
+
+                            if (!drew_heightfield_bounds)
+                                renderer.push_AABB(-collider.half_extents, collider.half_extents);
+                            break;
+                        }
                         default:
                             renderer.push_AABB(-collider.half_extents, collider.half_extents);
                             break;
@@ -362,13 +384,43 @@ namespace eeng::ecs::systems
                             case ecs::ColliderType::AABB:
                             case ecs::ColliderType::ConvexHull:
                             case ecs::ColliderType::TriangleMesh:
-                            case ecs::ColliderType::Heightfield:
                             default:
                                 append_label_linef(label, "HalfExt (%.2f, %.2f, %.2f)",
                                     collider.half_extents.x,
                                     collider.half_extents.y,
                                     collider.half_extents.z);
                                 break;
+                            case ecs::ColliderType::Heightfield:
+                            {
+                                bool labeled_heightfield = false;
+                                if (auto* rm = eeng::try_get_resource_manager_ptr(ctx, "DebugRenderSystem"))
+                                {
+                                    eeng::try_read_asset_ref(
+                                        *rm,
+                                        collider.terrain_chunk_ref,
+                                        ctx,
+                                        "DebugRenderSystem",
+                                        "",
+                                        [&](const eeng::assets::TerrainChunkAsset& chunk)
+                                        {
+                                            const glm::vec3 size = chunk.local_bounds_max - chunk.local_bounds_min;
+                                            append_label_linef(label, "Size (%.2f, %.2f, %.2f)",
+                                                size.x,
+                                                size.y,
+                                                size.z);
+                                            labeled_heightfield = true;
+                                        });
+                                }
+
+                                if (!labeled_heightfield)
+                                {
+                                    append_label_linef(label, "HalfExt (%.2f, %.2f, %.2f)",
+                                        collider.half_extents.x,
+                                        collider.half_extents.y,
+                                        collider.half_extents.z);
+                                }
+                                break;
+                            }
                             }
                         }
                         if (label.empty())

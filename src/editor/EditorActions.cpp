@@ -9,11 +9,14 @@
 #include "editor/content_generators/PistonGraph.hpp"
 #include "ResourceManager.hpp"
 #include "AssetMetaData.hpp"
+#include "assets/importers/TerrainCooker.hpp"
 #include "assets/types/AnimationGraphAsset.hpp"
+#include "assets/types/TerrainAssets.hpp"
 #include "ecs/EntityManager.hpp"
 #include "meta/MetaAux.h"
 #include "LogMacros.h"
 #include <array>
+#include <cctype>
 #include <memory>
 #include <unordered_set>
 
@@ -83,6 +86,37 @@ namespace eeng::editor
             }
 
             return filtered_entities;
+        }
+
+        std::string sanitize_asset_name(std::string name)
+        {
+            for (char& ch : name)
+            {
+                const unsigned char uch = static_cast<unsigned char>(ch);
+                if (std::isalnum(uch) || ch == '_' || ch == '-')
+                    continue;
+                ch = '_';
+            }
+            while (!name.empty() && (name.back() == '_' || name.back() == ' '))
+                name.pop_back();
+            if (name.empty())
+                name = "TerrainRecipe";
+            return name;
+        }
+
+        std::string make_unique_asset_stem(
+            const std::filesystem::path& directory,
+            std::string stem)
+        {
+            stem = sanitize_asset_name(std::move(stem));
+            std::string candidate = stem;
+            int suffix = 1;
+            while (std::filesystem::exists(directory / (candidate + ".json"))
+                || std::filesystem::exists(directory / (candidate + ".meta.json")))
+            {
+                candidate = stem + "_" + std::to_string(suffix++);
+            }
+            return candidate;
         }
     }
 
@@ -587,6 +621,96 @@ namespace eeng::editor
                 catch (...)
                 {
                     res.add_result(meta.guid, false, "unknown exception in import job");
+                }
+                return res;
+            },
+            ctx);
+    }
+
+    void AssetActions::create_terrain_recipe(
+        EngineContext& ctx,
+        std::string recipe_name)
+    {
+        auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+        const auto& assets_root = rm.assets_root();
+        if (assets_root.empty())
+        {
+            EENG_LOG_WARN(&ctx, "Terrain recipe creation skipped: assets root not set.");
+            return;
+        }
+
+        const auto recipe_dir = assets_root / "terrain_recipes";
+        const std::string recipe_stem = make_unique_asset_stem(recipe_dir, std::move(recipe_name));
+        const auto asset_path = recipe_dir / (recipe_stem + ".json");
+        const auto meta_path = recipe_dir / (recipe_stem + ".meta.json");
+
+        assets::TerrainRecipeAsset recipe{};
+        AssetMetaData meta{};
+        meta.guid = Guid::generate();
+        meta.guid_parent = Guid::invalid();
+        meta.name = recipe_stem;
+        meta.type_id = meta::get_meta_type_id_string<assets::TerrainRecipeAsset>();
+
+        rm.queue_import_job(
+            [recipe = std::move(recipe), meta = std::move(meta), asset_path, meta_path, assets_root]
+            (ResourceManager& rm, EngineContext& ctx) mutable -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Import;
+                try
+                {
+                    std::filesystem::create_directories(asset_path.parent_path());
+                    rm.import(recipe, asset_path.string(), meta, meta_path.string());
+                    rm.scan_assets_async(assets_root, ctx);
+                    res.add_result(meta.guid, true, "Terrain recipe created");
+                }
+                catch (const std::exception& ex)
+                {
+                    res.add_result(meta.guid, false, ex.what());
+                }
+                return res;
+            },
+            ctx);
+    }
+
+    void AssetActions::cook_terrain_recipe(
+        EngineContext& ctx,
+        const Guid& recipe_guid)
+    {
+        if (!recipe_guid.valid())
+        {
+            EENG_LOG_WARN(&ctx, "Terrain cook skipped: invalid recipe guid.");
+            return;
+        }
+
+        auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+        const auto& assets_root = rm.assets_root();
+        if (assets_root.empty())
+        {
+            EENG_LOG_WARN(&ctx, "Terrain cook skipped: assets root not set.");
+            return;
+        }
+
+        rm.queue_import_job(
+            [recipe_guid, assets_root](ResourceManager& rm, EngineContext& ctx) -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Import;
+                try
+                {
+                    const auto cook_result = assets::TerrainCooker::cook_recipe(rm, recipe_guid, ctx);
+                    if (!cook_result.success)
+                    {
+                        res.add_result(recipe_guid, false, cook_result.error_message);
+                        return res;
+                    }
+
+                    rm.scan_assets_async(assets_root, ctx);
+                    res.add_result(cook_result.terrain_guid, true, "Terrain cook ok");
+                }
+                catch (const std::exception& ex)
+                {
+                    res.add_result(recipe_guid, false, ex.what());
                 }
                 return res;
             },

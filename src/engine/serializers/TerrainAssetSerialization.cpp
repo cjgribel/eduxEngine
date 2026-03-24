@@ -77,6 +77,9 @@ namespace eeng::serializers
         j["world_origin"] = serialize_vec3(terrain.world_origin);
         j["sample_spacing_x"] = terrain.sample_spacing_x;
         j["sample_spacing_z"] = terrain.sample_spacing_z;
+        j["horizontal_scale_x"] = terrain.horizontal_scale_x;
+        j["horizontal_scale_z"] = terrain.horizontal_scale_z;
+        j["height_scale"] = terrain.height_scale;
         j["chunk_size_quads_x"] = terrain.chunk_size_quads_x;
         j["chunk_size_quads_z"] = terrain.chunk_size_quads_z;
     }
@@ -95,6 +98,9 @@ namespace eeng::serializers
             terrain.world_origin = deserialize_vec3(j["world_origin"]);
         terrain.sample_spacing_x = j.value("sample_spacing_x", 1.0f);
         terrain.sample_spacing_z = j.value("sample_spacing_z", 1.0f);
+        terrain.horizontal_scale_x = j.value("horizontal_scale_x", 1.0f);
+        terrain.horizontal_scale_z = j.value("horizontal_scale_z", 1.0f);
+        terrain.height_scale = j.value("height_scale", 1.0f);
         terrain.chunk_size_quads_x = j.value("chunk_size_quads_x", 64u);
         terrain.chunk_size_quads_z = j.value("chunk_size_quads_z", 64u);
     }

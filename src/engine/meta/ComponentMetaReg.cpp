@@ -1214,8 +1214,16 @@ namespace eeng
                 .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Entity name." })
                 .traits(MetaFlags::none)
 
+                .data<&eeng::ecs::TerrainComponent::enabled>("enabled"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable terrain chunk spawning for this terrain root." })
+                .traits(MetaFlags::none)
+
                 .data<&eeng::ecs::TerrainComponent::terrain_ref>("terrain_ref"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "terrain_ref", "Terrain", "Cooked TerrainAsset manifest to stream from." })
+                .traits(MetaFlags::none)
+
+                .data<&eeng::ecs::TerrainComponent::explicit_chunk_coord>("explicit_chunk_coord"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "explicit_chunk_coord", "Explicit Chunk", "Chunk coordinate to spawn for the terrain MVP." })
                 .traits(MetaFlags::none)
                 ;
             register_component<ecs::TerrainComponent>();

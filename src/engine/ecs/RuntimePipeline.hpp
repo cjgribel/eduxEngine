@@ -21,6 +21,7 @@
 #include "ecs/systems/RenderSystem.hpp"
 #include "ecs/systems/ScriptSystem.hpp"
 #include "ecs/systems/StickyNoteSystem.hpp"
+#include "ecs/systems/TerrainSystem.hpp"
 #include "ecs/systems/TrailSystem.hpp"
 #include "ecs/systems/TransformSystem.hpp"
 #include <glm/glm.hpp>
@@ -71,6 +72,7 @@ namespace eeng::ecs
             transform_system_ = std::make_unique<systems::TransformSystem>();
             transform_system_->init(ctx);
             transform_socket_system_ = std::make_unique<systems::TransformSocketSystem>();
+            terrain_system_ = std::make_unique<systems::TerrainSystem>();
 
             physics_system_ = std::make_unique<systems::PhysicsSystem>();
             physics_system_->init(ctx);
@@ -103,6 +105,8 @@ namespace eeng::ecs
 
             auto& registry = ctx.entity_manager->registry();
 
+            if (terrain_system_)
+                terrain_system_->update(registry, ctx, delta_time);
             if (mouse_point_constraint_system_ && physics_system_)
                 mouse_point_constraint_system_->update(registry, ctx, *physics_system_);
             if (transform_socket_system_)
@@ -151,6 +155,8 @@ namespace eeng::ecs
             update_common(ctx, delta_time);
 
             auto& registry = ctx.entity_manager->registry();
+            if (terrain_system_)
+                terrain_system_->update(registry, ctx, delta_time);
             if (physics_system_)
                 physics_system_->update_edit(registry, ctx);
             if (mouse_point_constraint_system_ && physics_system_)
@@ -387,6 +393,7 @@ namespace eeng::ecs
         std::unique_ptr<systems::AnimationGraphSystem> animation_graph_system_;
         std::unique_ptr<systems::TransformSystem> transform_system_;
         std::unique_ptr<systems::TransformSocketSystem> transform_socket_system_;
+        std::unique_ptr<systems::TerrainSystem> terrain_system_;
         std::unique_ptr<systems::PhysicsSystem> physics_system_;
         std::unique_ptr<systems::ConstraintSystem> constraint_system_;
         std::unique_ptr<systems::MousePointConstraintSystem> mouse_point_constraint_system_;

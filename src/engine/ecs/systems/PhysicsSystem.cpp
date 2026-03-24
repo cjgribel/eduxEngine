@@ -985,15 +985,15 @@ namespace eeng::ecs::systems
         runtime.com_local_inverse = runtime.com_local.inverse();
 
         // Optimization: skip btCompoundShape only when both collider and COM are identity.
+        // Heightfields used to force the compound path solely to carry an
+        // internal shape offset. We now keep that offset explicitly on the
+        // BodyRuntime so single heightfields can stay as root shapes.
         const bool single_collider = (colliders.colliders.size() == 1);
         const bool single_identity =
             single_collider && is_identity_collider_transform(colliders.colliders.front());
-        const bool single_requires_child_transform =
-            single_collider && colliders.colliders.front().type == ecs::ColliderType::Heightfield;
         const bool com_identity = is_identity_com(com_local_pos, com_rotation);
         const bool use_compound =
-            single_requires_child_transform
-            || !(single_collider && single_identity && com_identity);
+            !(single_collider && single_identity && com_identity);
 
         if (use_compound)
             runtime.compound_shape = std::make_unique<btCompoundShape>();
@@ -1035,8 +1035,13 @@ namespace eeng::ecs::systems
             }
             else
             {
-                // Single collider with identity local transform: no compound required.
+                // Single collider with identity serialized local transform: no
+                // compound required. Keep any builder-provided root-shape
+                // offset so centered Bullet shapes, such as heightfields, land
+                // at the same place as the authored render chunk.
                 runtime.root_shape = std::move(built_shape.shape);
+                runtime.root_shape_local = built_shape.local_shape_transform;
+                runtime.root_shape_local_inverse = runtime.root_shape_local.inverse();
                 runtime.collider_info.push_back(
                     BodyRuntime::ColliderRuntimeInfo{ collider.id, collider.is_trigger });
             }
@@ -1063,7 +1068,8 @@ namespace eeng::ecs::systems
         pivot_transform.setOrigin(to_bt_vec3(tfm.position, settings_.units_per_meter));
         pivot_transform.setRotation(to_bt_quat(tfm.rotation));
 
-        const btTransform start_transform = pivot_transform * runtime.com_local;
+        const btTransform start_transform =
+            pivot_transform * runtime.com_local * runtime.root_shape_local;
         runtime.motion_state = std::make_unique<btDefaultMotionState>(start_transform);
 
         btCollisionShape* collision_shape = runtime.compound_shape
@@ -1188,7 +1194,8 @@ namespace eeng::ecs::systems
             transform.setRotation(to_bt_quat(tfm->rotation));
 
             // Body lives at COM/principal axes; pivot is the authoring transform.
-            const btTransform body_transform = transform * runtime.com_local;
+            const btTransform body_transform =
+                transform * runtime.com_local * runtime.root_shape_local;
             runtime.body->setWorldTransform(body_transform);
             runtime.body->getMotionState()->setWorldTransform(body_transform);
             runtime.body->setInterpolationWorldTransform(body_transform);
@@ -1223,7 +1230,8 @@ namespace eeng::ecs::systems
             runtime.body->getMotionState()->getWorldTransform(body_transform);
 
             // Convert from COM/principal-axes frame back to the authoring pivot.
-            const btTransform pivot_transform = body_transform * runtime.com_local_inverse;
+            const btTransform pivot_transform =
+                body_transform * runtime.root_shape_local_inverse * runtime.com_local_inverse;
 
             // Write back into local transforms (hierarchy handling comes later).
             tfm->position = from_bt_vec3(pivot_transform.getOrigin(), settings_.units_per_meter);

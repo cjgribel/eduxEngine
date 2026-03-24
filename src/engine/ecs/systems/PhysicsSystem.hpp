@@ -255,6 +255,12 @@ namespace eeng::ecs::systems
             // Body-local transform from COM/principal axes to the authoring pivot.
             btTransform com_local = btTransform::getIdentity();
             btTransform com_local_inverse = btTransform::getIdentity();
+
+            // Some single-shape colliders, such as heightfields, need an
+            // additional root-shape offset because Bullet internally centers
+            // the shape differently than our authoring pivot convention.
+            btTransform root_shape_local = btTransform::getIdentity();
+            btTransform root_shape_local_inverse = btTransform::getIdentity();
             
             // Cached component state so we can rebuild when key properties change.
             ecs::PhysicsMotionType motion = ecs::PhysicsMotionType::Dynamic;

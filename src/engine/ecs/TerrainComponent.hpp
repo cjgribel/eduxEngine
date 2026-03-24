@@ -8,21 +8,43 @@
 #include "assets/types/TerrainAssets.hpp"
 
 #include <format>
+#include <glm/glm.hpp>
 #include <string>
 
 namespace eeng::ecs
 {
-    // TerrainComponent
-    // - Lightweight ECS hook for terrain streaming/render/physics systems.
-    // - Points at the cooked runtime terrain manifest, not the source terrain
-    //   recipe or artist-authored full mesh.
+    /**
+     * @brief Scene-level hook for cooked chunked terrain.
+     *
+     * `TerrainComponent` belongs on a terrain root entity and points at a
+     * cooked `TerrainAsset` manifest. Runtime systems use it to decide which
+     * transient terrain chunk entities should exist for rendering and physics.
+     *
+     * Important:
+     * - This references a cooked runtime terrain manifest.
+     * - It does not reference the editor-only `TerrainRecipeAsset`.
+     * - The chunk entities spawned from it are runtime-owned, transient view
+     *   entities rather than user-authored scene content.
+     */
     struct TerrainComponent
     {
         // Human-readable label for editor display and debugging.
         std::string name;
 
+        // Master enable for the terrain root. Disabling this lets us keep the
+        // manifest reference in place while making the runtime despawn any
+        // chunk entities it previously created.
+        bool enabled = true;
+
         // Runtime terrain manifest to stream from.
         AssetRef<assets::TerrainAsset> terrain_ref;
+
+        // MVP chunk selection policy.
+        // We start with one explicitly chosen chunk so there is a single, clear
+        // place in code where chunk filtering happens. Later this can be
+        // replaced by camera/player radius logic without changing the overall
+        // terrain-system shape.
+        glm::ivec2 explicit_chunk_coord{ 0, 0 };
     };
 
     inline std::string to_string(const TerrainComponent& terrain)

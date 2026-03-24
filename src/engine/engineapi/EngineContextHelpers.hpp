@@ -320,8 +320,21 @@ namespace eeng
         const char* missing_label,
         Fn&& fn)
     {
-        if (!ref.is_bound())
+        if (!ref.guid.valid())
             return false;
-        return try_read_asset(rm, ref.handle, ref.guid, ctx, log_tag, missing_label, std::forward<Fn>(fn));
+
+        // Most runtime paths bind AssetRef handles eagerly, but lightweight
+        // editor/runtime flows can occasionally hold only the GUID while the
+        // asset is already resident in the ResourceManager. Fall back to a
+        // GUID lookup here so readers remain robust instead of failing only
+        // because the caller has not rebound the handle yet.
+        auto handle = ref.handle;
+        if (!handle)
+        {
+            if (auto handle_opt = rm.handle_for_guid<T>(ref.guid))
+                handle = *handle_opt;
+        }
+
+        return try_read_asset(rm, handle, ref.guid, ctx, log_tag, missing_label, std::forward<Fn>(fn));
     }
 } // namespace eeng

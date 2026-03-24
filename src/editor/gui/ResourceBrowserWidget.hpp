@@ -6,6 +6,7 @@
 #include "EngineContext.hpp"
 #include "ResourceManager.hpp"
 #include "AssetTreeViews.hpp"
+#include "assets/types/TerrainAssets.hpp"
 #include "editor/InspectorState.hpp"
 #include "editor/AssignFieldCommand.hpp"
 #include "editor/EditorActions.hpp"
@@ -466,6 +467,11 @@ namespace eeng::gui
             {
                 editor::AssetActions::import_animation_graph_piston(ctx);
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Terrain Recipe"))
+            {
+                editor::AssetActions::create_terrain_recipe(ctx);
+            }
 
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Unimport");
@@ -714,6 +720,15 @@ namespace eeng::gui
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("Asset must be loaded to save.");
                 }
+
+                if (entry.meta.type_id == "assets.TerrainRecipeAsset")
+                {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Cook Terrain"))
+                    {
+                        editor::AssetActions::cook_terrain_recipe(ctx, entry.meta.guid);
+                    }
+                }
             }
             ImGui::EndChild();
         }
@@ -758,6 +773,35 @@ namespace eeng::gui
 
                         if (insp.begin_node(type_name.c_str()))
                         {
+                            if (auto recipe = any.try_cast<assets::TerrainRecipeAsset>())
+                            {
+                                // Designers usually think in world-space chunk extents,
+                                // not in cooked grid-cell counts. Show the derived size
+                                // here so the recipe is easier to reason about without
+                                // changing the serialized recipe format yet.
+                                const float chunk_world_x =
+                                    static_cast<float>(recipe->chunk_size_quads_x) * recipe->sample_spacing_x;
+                                const float chunk_world_z =
+                                    static_cast<float>(recipe->chunk_size_quads_z) * recipe->sample_spacing_z;
+                                const std::uint32_t chunk_samples_x = recipe->chunk_size_quads_x + 1u;
+                                const std::uint32_t chunk_samples_z = recipe->chunk_size_quads_z + 1u;
+
+                                ImGui::TextDisabled(
+                                    "Derived chunk world size: %.3f x %.3f",
+                                    chunk_world_x,
+                                    chunk_world_z);
+                                ImGui::TextDisabled(
+                                    "Derived samples per chunk: %u x %u",
+                                    chunk_samples_x,
+                                    chunk_samples_z);
+                                ImGui::TextDisabled(
+                                    "Cook-time terrain scale: X %.3f  Y %.3f  Z %.3f",
+                                    recipe->horizontal_scale_x,
+                                    recipe->height_scale,
+                                    recipe->horizontal_scale_z);
+                                ImGui::Separator();
+                            }
+
                             cmd_builder.target_asset(ctx, ctx.resource_manager, entry.meta.guid, entry.meta.type_id);
                             meta::inspect_any(any, insp, cmd_builder, ctx);
                             insp.end_node();

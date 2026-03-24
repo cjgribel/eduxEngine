@@ -660,12 +660,24 @@ namespace eeng {
                 .custom<DataMetaInfo>(DataMetaInfo{ "sample_spacing_z", "Sample Spacing Z", "Distance between sampled terrain points along Z." })
                 .traits(MetaFlags::none)
 
+                .data<&assets::TerrainRecipeAsset::horizontal_scale_x>("horizontal_scale_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "horizontal_scale_x", "Horizontal Scale X", "Cook-time scale applied to the source terrain along X before chunking." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::horizontal_scale_z>("horizontal_scale_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "horizontal_scale_z", "Horizontal Scale Z", "Cook-time scale applied to the source terrain along Z before chunking." })
+                .traits(MetaFlags::none)
+
+                .data<&assets::TerrainRecipeAsset::height_scale>("height_scale"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "height_scale", "Height Scale", "Cook-time scale applied to source terrain heights before chunking." })
+                .traits(MetaFlags::none)
+
                 .data<&assets::TerrainRecipeAsset::chunk_size_quads_x>("chunk_size_quads_x"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_x", "Chunk Quads X", "Number of terrain cells per cooked chunk along X." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_x", "Chunk Cells X", "Number of cooked terrain cells per chunk along X. World chunk width = chunk_size_quads_x * sample_spacing_x." })
                 .traits(MetaFlags::none)
 
                 .data<&assets::TerrainRecipeAsset::chunk_size_quads_z>("chunk_size_quads_z"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_z", "Chunk Quads Z", "Number of terrain cells per cooked chunk along Z." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_z", "Chunk Cells Z", "Number of cooked terrain cells per chunk along Z. World chunk depth = chunk_size_quads_z * sample_spacing_z." })
                 .traits(MetaFlags::none)
                 ;
             register_asset<assets::TerrainRecipeAsset>();
