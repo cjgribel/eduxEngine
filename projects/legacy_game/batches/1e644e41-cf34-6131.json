@@ -1,0 +1,151 @@
+{
+  "entities": [
+    {
+      "components": {
+        "eeng.ecs.AnimationGraphComponent": {
+          "Enabled": true,
+          "Graph Reference": {
+            "Guid": 3788003473024838853
+          },
+          "Name": ""
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 4309678297008599328,
+          "Name": "Mannequin",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 11212511411485387636
+          },
+          "Name": ""
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.02500000037252903,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.02500000037252903,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.02500000037252903,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.02500000037252903,
+            0.02500000037252903,
+            0.02500000037252903
+          ],
+          "World Matrix": [
+            0.02500000037252903,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.02500000037252903,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.02500000037252903,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "eeng.legacy_game.MannequinPlayerControllerComponent": {
+          "Aim X Param": "U_RT",
+          "Aim Y Param": "V_RT",
+          "Controller Id": -1,
+          "Enabled": true,
+          "Fire Param": "DO_FIRE_RIFLE",
+          "Hit0 Param": "DO_HITREACTION0",
+          "Hit1 Param": "DO_HITREACTION1",
+          "Hit2 Param": "DO_HITREACTION2",
+          "Hit3 Param": "DO_HITREACTION3",
+          "Jump Param": "DO_JUMP",
+          "Keyboard Fallback": true,
+          "Mouse Aim": true,
+          "Mouse Sensitivity": 0.009999999776482582,
+          "Move X Param": "U_LT",
+          "Move Y Param": "V_LT",
+          "Name": "",
+          "Reload Param": "DO_RELOAD_RIFLE",
+          "Stick Deadzone": 0.20000000298023224,
+          "Trigger Deadzone": 0.10000000149011612
+        }
+      },
+      "entity_guid": 4309678297008599328
+    }
+  ],
+  "header": {
+    "asset_closure": [
+      "047ead31-3bb4-6490",
+      "3491b116-c997-6cc5",
+      "37bdfb90-999a-70d9",
+      "460034ac-b1d6-39e0",
+      "46d38bcb-0b97-38d1",
+      "5850e709-ce9e-8871",
+      "61b9d884-49ba-71a9",
+      "67a808e3-76d2-12b2",
+      "86bc647a-ccca-d8ed",
+      "97b72f78-2364-9975",
+      "9b9ad7b8-e999-ab74",
+      "9facdf6a-0935-6be4",
+      "a4839845-89e8-3ce5",
+      "cb32eb64-880e-2a6a",
+      "d4b2913c-6032-e6b4",
+      "ec6b2922-e4dc-29d3",
+      "fd5cbcba-7fdd-e0c4"
+    ],
+    "id": "1e644e41-cf34-6131",
+    "name": "character"
+  }
+}

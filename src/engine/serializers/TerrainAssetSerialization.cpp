@@ -63,6 +63,67 @@ namespace eeng::serializers
                 refs.push_back(deserialize_asset_ref<T>(elem));
             }
         }
+
+        nlohmann::json serialize_batch_id(const assets::BatchId& id)
+        {
+            return nlohmann::json{ { "guid", id.raw() } };
+        }
+
+        assets::BatchId deserialize_batch_id(const nlohmann::json& j)
+        {
+            if (j.is_object() && j.contains("guid"))
+                return assets::BatchId{ j["guid"].get<Guid::underlying_type>() };
+            if (j.is_number_integer() || j.is_number_unsigned())
+                return assets::BatchId{ j.get<Guid::underlying_type>() };
+            return assets::BatchId{};
+        }
+
+        nlohmann::json serialize_chunk_entries(const std::vector<assets::TerrainChunkEntry>& chunks)
+        {
+            nlohmann::json j = nlohmann::json::array();
+            auto& arr = j.get_ref<nlohmann::json::array_t&>();
+            arr.reserve(chunks.size());
+            for (const auto& chunk : chunks)
+            {
+                arr.push_back({
+                    { "chunk_x", chunk.chunk_x },
+                    { "chunk_z", chunk.chunk_z },
+                    { "terrain_chunk_ref", serialize_asset_ref(chunk.terrain_chunk_ref) },
+                    { "batch_id", serialize_batch_id(chunk.batch_id) },
+                    { "batch_name", chunk.batch_name },
+                    { "world_bounds_min", serialize_vec3(chunk.world_bounds_min) },
+                    { "world_bounds_max", serialize_vec3(chunk.world_bounds_max) }
+                    });
+            }
+            return j;
+        }
+
+        void deserialize_chunk_entries(
+            const nlohmann::json& j,
+            std::vector<assets::TerrainChunkEntry>& chunks)
+        {
+            chunks.clear();
+            if (!j.is_array())
+                return;
+
+            chunks.reserve(j.size());
+            for (const auto& elem : j)
+            {
+                assets::TerrainChunkEntry chunk{};
+                chunk.chunk_x = elem.value("chunk_x", 0);
+                chunk.chunk_z = elem.value("chunk_z", 0);
+                if (elem.contains("terrain_chunk_ref"))
+                    chunk.terrain_chunk_ref = deserialize_asset_ref<assets::TerrainChunkAsset>(elem["terrain_chunk_ref"]);
+                if (elem.contains("batch_id"))
+                    chunk.batch_id = deserialize_batch_id(elem["batch_id"]);
+                chunk.batch_name = elem.value("batch_name", std::string{});
+                if (elem.contains("world_bounds_min"))
+                    chunk.world_bounds_min = deserialize_vec3(elem["world_bounds_min"]);
+                if (elem.contains("world_bounds_max"))
+                    chunk.world_bounds_max = deserialize_vec3(elem["world_bounds_max"]);
+                chunks.push_back(std::move(chunk));
+            }
+        }
     }
 
     void serialize_TerrainRecipeAsset(nlohmann::json& j, const entt::meta_any& any)
@@ -80,8 +141,8 @@ namespace eeng::serializers
         j["horizontal_scale_x"] = terrain.horizontal_scale_x;
         j["horizontal_scale_z"] = terrain.horizontal_scale_z;
         j["height_scale"] = terrain.height_scale;
-        j["chunk_size_quads_x"] = terrain.chunk_size_quads_x;
-        j["chunk_size_quads_z"] = terrain.chunk_size_quads_z;
+        j["chunk_count_x"] = terrain.chunk_count_x;
+        j["chunk_count_z"] = terrain.chunk_count_z;
     }
 
     void deserialize_TerrainRecipeAsset(const nlohmann::json& j, entt::meta_any& any)
@@ -101,8 +162,14 @@ namespace eeng::serializers
         terrain.horizontal_scale_x = j.value("horizontal_scale_x", 1.0f);
         terrain.horizontal_scale_z = j.value("horizontal_scale_z", 1.0f);
         terrain.height_scale = j.value("height_scale", 1.0f);
-        terrain.chunk_size_quads_x = j.value("chunk_size_quads_x", 64u);
-        terrain.chunk_size_quads_z = j.value("chunk_size_quads_z", 64u);
+        terrain.chunk_count_x = j.value("chunk_count_x", 0u);
+        terrain.chunk_count_z = j.value("chunk_count_z", 0u);
+        // Backward compatibility for earlier terrain recipes that stored
+        // chunk size in cooked cells instead of chunk count.
+        if (terrain.chunk_count_x == 0u)
+            terrain.chunk_count_x = 1u;
+        if (terrain.chunk_count_z == 0u)
+            terrain.chunk_count_z = 1u;
     }
 
     void serialize_TerrainAsset(nlohmann::json& j, const entt::meta_any& any)
@@ -117,11 +184,9 @@ namespace eeng::serializers
         j["total_samples_z"] = terrain.total_samples_z;
         j["cell_size_x"] = terrain.cell_size_x;
         j["cell_size_z"] = terrain.cell_size_z;
-        j["chunk_size_quads_x"] = terrain.chunk_size_quads_x;
-        j["chunk_size_quads_z"] = terrain.chunk_size_quads_z;
         j["chunk_count_x"] = terrain.chunk_count_x;
         j["chunk_count_z"] = terrain.chunk_count_z;
-        j["chunks"] = serialize_asset_ref_array(terrain.chunks);
+        j["chunks"] = serialize_chunk_entries(terrain.chunks);
     }
 
     void deserialize_TerrainAsset(const nlohmann::json& j, entt::meta_any& any)
@@ -137,12 +202,10 @@ namespace eeng::serializers
         terrain.total_samples_z = j.value("total_samples_z", 0u);
         terrain.cell_size_x = j.value("cell_size_x", 1.0f);
         terrain.cell_size_z = j.value("cell_size_z", 1.0f);
-        terrain.chunk_size_quads_x = j.value("chunk_size_quads_x", 64u);
-        terrain.chunk_size_quads_z = j.value("chunk_size_quads_z", 64u);
         terrain.chunk_count_x = j.value("chunk_count_x", 0u);
         terrain.chunk_count_z = j.value("chunk_count_z", 0u);
         if (j.contains("chunks"))
-            deserialize_asset_ref_array(j["chunks"], terrain.chunks);
+            deserialize_chunk_entries(j["chunks"], terrain.chunks);
     }
 
     void serialize_TerrainChunkAsset(nlohmann::json& j, const entt::meta_any& any)
@@ -164,7 +227,6 @@ namespace eeng::serializers
         j["min_height"] = chunk.min_height;
         j["max_height"] = chunk.max_height;
         j["heights"] = chunk.heights;
-        j["render_model_ref"] = serialize_asset_ref(chunk.render_model_ref);
     }
 
     void deserialize_TerrainChunkAsset(const nlohmann::json& j, entt::meta_any& any)
@@ -190,8 +252,6 @@ namespace eeng::serializers
         chunk.max_height = j.value("max_height", 0.0f);
         if (j.contains("heights") && j["heights"].is_array())
             chunk.heights = j["heights"].get<std::vector<float>>();
-        if (j.contains("render_model_ref"))
-            chunk.render_model_ref = deserialize_asset_ref<assets::GpuModelAsset>(j["render_model_ref"]);
     }
 
     void register_terrainasset_serialization()

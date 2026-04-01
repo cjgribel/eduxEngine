@@ -57,7 +57,6 @@ add_library(edux_engine STATIC
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ScriptSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ParticleSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/ParticleRenderSystem.cpp
-    ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/TerrainSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/TrailSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/ecs/systems/StickyNoteSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/util/Profiler.cpp

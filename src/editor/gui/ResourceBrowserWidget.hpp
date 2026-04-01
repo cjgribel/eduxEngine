@@ -25,6 +25,7 @@
 #include <deque>
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -775,25 +776,57 @@ namespace eeng::gui
                         {
                             if (auto recipe = any.try_cast<assets::TerrainRecipeAsset>())
                             {
-                                // Designers usually think in world-space chunk extents,
-                                // not in cooked grid-cell counts. Show the derived size
-                                // here so the recipe is easier to reason about without
-                                // changing the serialized recipe format yet.
-                                const float chunk_world_x =
-                                    static_cast<float>(recipe->chunk_size_quads_x) * recipe->sample_spacing_x;
-                                const float chunk_world_z =
-                                    static_cast<float>(recipe->chunk_size_quads_z) * recipe->sample_spacing_z;
-                                const std::uint32_t chunk_samples_x = recipe->chunk_size_quads_x + 1u;
-                                const std::uint32_t chunk_samples_z = recipe->chunk_size_quads_z + 1u;
+                                // The recipe now stores chunk resolution
+                                // directly. Show the resulting average chunk
+                                // sizing so the user can reason about the cook
+                                // without manually working back from the source
+                                // mesh dimensions.
+                                float terrain_extent_x = 0.0f;
+                                float terrain_extent_z = 0.0f;
+                                if (recipe->source_model_ref.is_bound())
+                                {
+                                    resource_manager.storage().read(recipe->source_model_ref.handle, [&](const assets::ModelDataAsset& model)
+                                    {
+                                        if (!model.positions.empty())
+                                        {
+                                            float min_x = std::numeric_limits<float>::max();
+                                            float max_x = std::numeric_limits<float>::lowest();
+                                            float min_z = std::numeric_limits<float>::max();
+                                            float max_z = std::numeric_limits<float>::lowest();
+                                            for (const auto& pos : model.positions)
+                                            {
+                                                min_x = std::min(min_x, pos.x * recipe->horizontal_scale_x);
+                                                max_x = std::max(max_x, pos.x * recipe->horizontal_scale_x);
+                                                min_z = std::min(min_z, pos.z * recipe->horizontal_scale_z);
+                                                max_z = std::max(max_z, pos.z * recipe->horizontal_scale_z);
+                                            }
+                                            terrain_extent_x = std::max(0.0f, max_x - min_x);
+                                            terrain_extent_z = std::max(0.0f, max_z - min_z);
+                                        }
+                                    });
+                                }
+
+                                const float approx_chunk_world_x =
+                                    terrain_extent_x / static_cast<float>(std::max(1u, recipe->chunk_count_x));
+                                const float approx_chunk_world_z =
+                                    terrain_extent_z / static_cast<float>(std::max(1u, recipe->chunk_count_z));
+                                const float approx_chunk_cells_x =
+                                    (recipe->sample_spacing_x > 0.0f)
+                                    ? approx_chunk_world_x / recipe->sample_spacing_x
+                                    : 0.0f;
+                                const float approx_chunk_cells_z =
+                                    (recipe->sample_spacing_z > 0.0f)
+                                    ? approx_chunk_world_z / recipe->sample_spacing_z
+                                    : 0.0f;
 
                                 ImGui::TextDisabled(
-                                    "Derived chunk world size: %.3f x %.3f",
-                                    chunk_world_x,
-                                    chunk_world_z);
+                                    "Approx chunk world size: %.3f x %.3f",
+                                    approx_chunk_world_x,
+                                    approx_chunk_world_z);
                                 ImGui::TextDisabled(
-                                    "Derived samples per chunk: %u x %u",
-                                    chunk_samples_x,
-                                    chunk_samples_z);
+                                    "Approx cells per chunk: %.1f x %.1f",
+                                    approx_chunk_cells_x,
+                                    approx_chunk_cells_z);
                                 ImGui::TextDisabled(
                                     "Cook-time terrain scale: X %.3f  Y %.3f  Z %.3f",
                                     recipe->horizontal_scale_x,

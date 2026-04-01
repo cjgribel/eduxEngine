@@ -5,10 +5,16 @@
 
 #include "AssetIndexData.hpp"
 #include "AssetMetaData.hpp"
+#include "BatchRegistry.hpp"
 #include "LogMacros.h"
 #include "ResourceManager.hpp"
 #include "assets/types/ModelAssets.hpp"
 #include "assets/types/TerrainAssets.hpp"
+#include "ecs/HeaderComponent.hpp"
+#include "ecs/ModelComponent.hpp"
+#include "ecs/PhysicsComponents.hpp"
+#include "ecs/TransformComponent.hpp"
+#include "meta/MetaSerialize.hpp"
 #include "meta/MetaAux.h"
 
 #include <algorithm>
@@ -17,12 +23,17 @@
 #include <cfloat>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <limits>
 #include <optional>
+#include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <glm/geometric.hpp>
+#include <entt/entt.hpp>
+#include <nlohmann/json.hpp>
 
 namespace eeng::assets
 {
@@ -54,6 +65,21 @@ namespace eeng::assets
             TerrainChunkAsset chunk_asset{};
             ModelDataAsset render_model{};
             GpuModelAsset render_gpu_model{};
+            Guid chunk_guid{};
+            Guid render_model_guid{};
+            Guid render_gpu_guid{};
+            BatchId batch_id{};
+            std::string batch_name{};
+            std::vector<Guid> asset_closure{};
+        };
+
+        // One axis partition of the sampled terrain grid into chunk-sized
+        // ranges. Counts are expressed in terrain cells/quads; the extra
+        // shared border sample is recovered when building the chunk payload.
+        struct ChunkAxisRange
+        {
+            std::uint32_t start_quad = 0;
+            std::uint32_t quad_count = 0;
         };
 
         // Keep generated cook output folder/file names deterministic and
@@ -106,6 +132,38 @@ namespace eeng::assets
             return Guid::generate();
         }
 
+        Guid deterministic_guid(
+            const Guid& seed_guid,
+            std::string_view artifact_kind,
+            std::int32_t x = 0,
+            std::int32_t z = 0)
+        {
+            // Terrain chunk batches should retain stable identities across
+            // re-cooks. A deterministic hash is enough for generated content
+            // as long as the inputs stay stable.
+            std::uint64_t hash = 1469598103934665603ull;
+            const auto mix_byte = [&](std::uint8_t byte)
+            {
+                hash ^= static_cast<std::uint64_t>(byte);
+                hash *= 1099511628211ull;
+            };
+            const auto mix_u64 = [&](std::uint64_t value)
+            {
+                for (int i = 0; i < 8; ++i)
+                    mix_byte(static_cast<std::uint8_t>((value >> (i * 8)) & 0xFFu));
+            };
+
+            mix_u64(seed_guid.raw());
+            for (char ch : artifact_kind)
+                mix_byte(static_cast<std::uint8_t>(ch));
+            mix_u64(static_cast<std::uint64_t>(static_cast<std::int64_t>(x)));
+            mix_u64(static_cast<std::uint64_t>(static_cast<std::int64_t>(z)));
+
+            if (hash == 0ull)
+                hash = 1ull;
+            return Guid{ hash };
+        }
+
         AssetMetaData make_meta(
             const Guid& guid,
             const Guid& parent_guid,
@@ -118,6 +176,68 @@ namespace eeng::assets
             meta.name = name;
             meta.type_id = type_id;
             return meta;
+        }
+
+        std::vector<ChunkAxisRange> build_chunk_axis_ranges(
+            const std::uint32_t total_quads,
+            const std::uint32_t requested_chunk_count)
+        {
+            std::vector<ChunkAxisRange> ranges{};
+            const std::uint32_t chunk_count = std::max(1u, requested_chunk_count);
+            ranges.reserve(chunk_count);
+
+            const std::uint32_t base = total_quads / chunk_count;
+            const std::uint32_t remainder = total_quads % chunk_count;
+
+            std::uint32_t cursor = 0;
+            for (std::uint32_t chunk = 0; chunk < chunk_count; ++chunk)
+            {
+                const std::uint32_t quad_count = base + (chunk < remainder ? 1u : 0u);
+                ranges.push_back(ChunkAxisRange{
+                    .start_quad = cursor,
+                    .quad_count = quad_count
+                    });
+                cursor += quad_count;
+            }
+            return ranges;
+        }
+
+        std::vector<Guid> read_existing_chunk_batch_ids(const std::filesystem::path& terrain_asset_path)
+        {
+            std::vector<Guid> batch_ids{};
+            std::ifstream file(terrain_asset_path);
+            if (!file.is_open())
+                return batch_ids;
+
+            nlohmann::json j;
+            try
+            {
+                file >> j;
+            }
+            catch (...)
+            {
+                return batch_ids;
+            }
+
+            const auto it = j.find("chunks");
+            if (it == j.end() || !it->is_array())
+                return batch_ids;
+
+            batch_ids.reserve(it->size());
+            for (const auto& elem : *it)
+            {
+                if (!elem.is_object() || !elem.contains("batch_id"))
+                    continue;
+                const auto& batch_json = elem["batch_id"];
+                if (batch_json.is_object() && batch_json.contains("guid"))
+                {
+                    const auto raw = batch_json["guid"].get<Guid::underlying_type>();
+                    if (raw != 0)
+                        batch_ids.emplace_back(raw);
+                }
+            }
+
+            return batch_ids;
         }
 
         std::size_t sample_index(
@@ -354,26 +474,69 @@ namespace eeng::assets
             return glm::normalize(glm::vec3(-ddx, 1.0f, -ddz));
         }
 
+        nlohmann::json build_chunk_batch_entity_json(
+            const Guid& entity_guid,
+            std::string entity_name,
+            const TerrainChunkAsset& chunk_asset,
+            const Guid& render_gpu_guid,
+            const Guid& terrain_chunk_guid)
+        {
+            auto registry = std::make_shared<entt::registry>();
+            const auto entity = ecs::Entity{ registry->create() };
+
+            ecs::HeaderComponent header{};
+            header.name = std::move(entity_name);
+            header.chunk_tag = "generated_terrain_chunk";
+            header.guid = entity_guid;
+            header.parent_entity = ecs::EntityRef{};
+            registry->emplace<ecs::HeaderComponent>(entity, std::move(header));
+
+            ecs::TransformComponent transform{};
+            transform.set_position(chunk_asset.world_origin);
+            transform.set_rotation(glm::quat{ 1.0f, 0.0f, 0.0f, 0.0f });
+            transform.set_scale(glm::vec3{ 1.0f });
+            registry->emplace<ecs::TransformComponent>(entity, std::move(transform));
+
+            ecs::ModelComponent model{};
+            model.name = std::format("TerrainChunkModel({}, {})", chunk_asset.chunk_x, chunk_asset.chunk_z);
+            model.model_ref = AssetRef<GpuModelAsset>{ render_gpu_guid };
+            registry->emplace<ecs::ModelComponent>(entity, std::move(model));
+
+            ecs::RigidBodyComponent rigid_body{};
+            rigid_body.motion = ecs::PhysicsMotionType::Static;
+            registry->emplace<ecs::RigidBodyComponent>(entity, std::move(rigid_body));
+
+            ecs::ColliderDesc collider{};
+            collider.id = 1;
+            collider.type = ecs::ColliderType::Heightfield;
+            collider.terrain_chunk_ref = AssetRef<TerrainChunkAsset>{ terrain_chunk_guid };
+
+            ecs::ColliderComponent collider_component{};
+            collider_component.colliders.push_back(std::move(collider));
+            registry->emplace<ecs::ColliderComponent>(entity, std::move(collider_component));
+
+            return meta::serialize_entity(
+                ecs::EntityRef{ entity_guid, entity },
+                registry,
+                meta::SerializationPurpose::file);
+        }
+
         TerrainChunkCookOutput build_chunk_output(
             const HeightGrid& grid,
             const TerrainRecipeAsset& recipe,
+            const ChunkAxisRange& range_x,
+            const ChunkAxisRange& range_z,
             std::uint32_t chunk_x,
             std::uint32_t chunk_z)
         {
             // Chunks are sliced from the common sampled height grid so that the
             // generated render mesh and generated heightfield collider are
             // derived from the exact same source data.
-            const std::uint32_t total_quads_x = grid.samples_x - 1;
-            const std::uint32_t total_quads_z = grid.samples_z - 1;
-            const std::uint32_t start_quad_x = chunk_x * recipe.chunk_size_quads_x;
-            const std::uint32_t start_quad_z = chunk_z * recipe.chunk_size_quads_z;
+            const std::uint32_t start_quad_x = range_x.start_quad;
+            const std::uint32_t start_quad_z = range_z.start_quad;
 
-            const std::uint32_t local_quads_x = std::min(
-                recipe.chunk_size_quads_x,
-                total_quads_x - start_quad_x);
-            const std::uint32_t local_quads_z = std::min(
-                recipe.chunk_size_quads_z,
-                total_quads_z - start_quad_z);
+            const std::uint32_t local_quads_x = range_x.quad_count;
+            const std::uint32_t local_quads_z = range_z.quad_count;
             const std::uint32_t local_samples_x = local_quads_x + 1;
             const std::uint32_t local_samples_z = local_quads_z + 1;
 
@@ -564,6 +727,11 @@ namespace eeng::assets
             result.error_message = "Terrain cook failed: terrain scale values must be > 0.";
             return result;
         }
+        if (recipe.chunk_count_x == 0u || recipe.chunk_count_z == 0u)
+        {
+            result.error_message = "Terrain cook failed: chunk counts must be > 0.";
+            return result;
+        }
 
         bool loaded_model_here = false;
         if (!rm.handle_for_guid<ModelDataAsset>(recipe.source_model_ref.guid))
@@ -617,9 +785,43 @@ namespace eeng::assets
         const std::filesystem::path cook_root = assets_root / "terrain" / recipe_name;
         const std::filesystem::path chunks_root = cook_root / "chunks";
         const std::filesystem::path render_root = cook_root / "render";
+        const std::filesystem::path terrain_asset_path = cook_root / "terrain.json";
+        const std::filesystem::path terrain_meta_path = cook_root / "terrain.meta.json";
 
-        const Guid terrain_guid = guid_for_asset_path_or_new(index_data, cook_root / "terrain.json");
+        auto* batch_registry = dynamic_cast<BatchRegistry*>(ctx.batch_registry.get());
+        if (!batch_registry || batch_registry->index_path().empty())
+        {
+            result.error_message = "Terrain cook failed: concrete BatchRegistry with a valid index is required.";
+            return result;
+        }
+
+        const std::filesystem::path batches_root = batch_registry->index_path().parent_path();
+        const std::vector<Guid> old_batch_ids = read_existing_chunk_batch_ids(terrain_asset_path);
+
+        // Re-cook is expected to be a normal workflow. Before we overwrite any
+        // generated terrain batches, unload the previously generated chunk
+        // batches for this recipe so their live entities and asset leases do
+        // not survive into the new cook output.
+        for (const auto& old_batch_id : old_batch_ids)
+        {
+            if (!old_batch_id.valid() || !batch_registry->is_batch_loaded(old_batch_id))
+                continue;
+
+            TaskResult unload_result = batch_registry->queue_unload(old_batch_id, ctx).get();
+            if (!unload_result.success)
+            {
+                result.error_message = std::format(
+                    "Terrain cook failed: could not unload existing terrain chunk batch {}.",
+                    old_batch_id.to_string());
+                return result;
+            }
+        }
+
+        const Guid terrain_guid = guid_for_asset_path_or_new(index_data, terrain_asset_path);
         result.terrain_guid = terrain_guid;
+
+        const auto chunk_ranges_x = build_chunk_axis_ranges(grid.samples_x - 1u, recipe.chunk_count_x);
+        const auto chunk_ranges_z = build_chunk_axis_ranges(grid.samples_z - 1u, recipe.chunk_count_z);
 
         // The terrain cook owns its folder. Wiping and rewriting it keeps
         // re-cooks deterministic and prevents stale chunk files from surviving
@@ -627,6 +829,7 @@ namespace eeng::assets
         std::filesystem::remove_all(cook_root);
         std::filesystem::create_directories(chunks_root);
         std::filesystem::create_directories(render_root);
+        std::filesystem::create_directories(batches_root);
 
         TerrainAsset terrain_asset{};
         terrain_asset.world_origin = recipe.world_origin + glm::vec3(grid.origin_x, 0.0f, grid.origin_z);
@@ -634,12 +837,10 @@ namespace eeng::assets
         terrain_asset.total_samples_z = grid.samples_z;
         terrain_asset.cell_size_x = recipe.sample_spacing_x;
         terrain_asset.cell_size_z = recipe.sample_spacing_z;
-        terrain_asset.chunk_size_quads_x = recipe.chunk_size_quads_x;
-        terrain_asset.chunk_size_quads_z = recipe.chunk_size_quads_z;
-        terrain_asset.chunk_count_x =
-            (grid.samples_x - 1 + recipe.chunk_size_quads_x - 1) / recipe.chunk_size_quads_x;
-        terrain_asset.chunk_count_z =
-            (grid.samples_z - 1 + recipe.chunk_size_quads_z - 1) / recipe.chunk_size_quads_z;
+        terrain_asset.chunk_count_x = static_cast<std::uint32_t>(chunk_ranges_x.size());
+        terrain_asset.chunk_count_z = static_cast<std::uint32_t>(chunk_ranges_z.size());
+
+        std::set<Guid> new_batch_ids{};
 
         // Build every chunk from the same sampled grid so collision and render
         // match exactly. That is the key simplification for the MVP.
@@ -648,7 +849,13 @@ namespace eeng::assets
             for (std::uint32_t chunk_x = 0; chunk_x < terrain_asset.chunk_count_x; ++chunk_x)
             {
                 TerrainChunkCookOutput chunk_output =
-                    build_chunk_output(grid, recipe, chunk_x, chunk_z);
+                    build_chunk_output(
+                        grid,
+                        recipe,
+                        chunk_ranges_x[chunk_x],
+                        chunk_ranges_z[chunk_z],
+                        chunk_x,
+                        chunk_z);
 
                 const std::string chunk_stem =
                     std::format("chunk_{}_{}", chunk_x, chunk_z);
@@ -660,25 +867,40 @@ namespace eeng::assets
                 const std::filesystem::path render_gpu_path = render_root / (chunk_stem + "_gpu.json");
                 const std::filesystem::path render_gpu_meta_path = render_root / (chunk_stem + "_gpu.meta.json");
 
-                const Guid chunk_guid = guid_for_asset_path_or_new(index_data, chunk_asset_path);
-                const Guid render_model_guid = guid_for_asset_path_or_new(index_data, render_model_path);
-                const Guid render_gpu_guid = guid_for_asset_path_or_new(index_data, render_gpu_path);
+                chunk_output.chunk_guid = guid_for_asset_path_or_new(index_data, chunk_asset_path);
+                chunk_output.render_model_guid = guid_for_asset_path_or_new(index_data, render_model_path);
+                chunk_output.render_gpu_guid = guid_for_asset_path_or_new(index_data, render_gpu_path);
+                chunk_output.batch_id = deterministic_guid(recipe_guid, "terrain_chunk_batch", static_cast<int>(chunk_x), static_cast<int>(chunk_z));
+                chunk_output.batch_name = std::format(
+                    "terrain_{}_chunk_{}_{}",
+                    recipe_name,
+                    chunk_x,
+                    chunk_z);
 
-                chunk_output.render_gpu_model.model_ref = AssetRef<ModelDataAsset>{ render_model_guid };
-                chunk_output.chunk_asset.render_model_ref = AssetRef<GpuModelAsset>{ render_gpu_guid };
+                chunk_output.render_gpu_model.model_ref = AssetRef<ModelDataAsset>{ chunk_output.render_model_guid };
+
+                // The generated terrain chunk batch only needs the chunk-local
+                // render assets plus the terrain chunk collision payload.
+                // Keep this explicit rather than trying to infer it through a
+                // broader asset tree during the cook.
+                chunk_output.asset_closure = {
+                    chunk_output.render_model_guid,
+                    chunk_output.render_gpu_guid,
+                    chunk_output.chunk_guid
+                };
 
                 const AssetMetaData render_model_meta = make_meta(
-                    render_model_guid,
-                    chunk_guid,
+                    chunk_output.render_model_guid,
+                    chunk_output.chunk_guid,
                     chunk_stem + "_model",
                     meta::get_meta_type_id_string<ModelDataAsset>());
                 const AssetMetaData render_gpu_meta = make_meta(
-                    render_gpu_guid,
-                    chunk_guid,
+                    chunk_output.render_gpu_guid,
+                    chunk_output.chunk_guid,
                     chunk_stem + "_gpu",
                     meta::get_meta_type_id_string<GpuModelAsset>());
                 const AssetMetaData chunk_meta = make_meta(
-                    chunk_guid,
+                    chunk_output.chunk_guid,
                     terrain_guid,
                     chunk_stem,
                     meta::get_meta_type_id_string<TerrainChunkAsset>());
@@ -699,17 +921,94 @@ namespace eeng::assets
                     chunk_meta,
                     chunk_meta_path.string());
 
-                terrain_asset.chunks.push_back(AssetRef<TerrainChunkAsset>{ chunk_guid });
+                const glm::vec3 world_bounds_min =
+                    chunk_output.chunk_asset.world_origin + chunk_output.chunk_asset.local_bounds_min;
+                const glm::vec3 world_bounds_max =
+                    chunk_output.chunk_asset.world_origin + chunk_output.chunk_asset.local_bounds_max;
+
+                terrain_asset.chunks.push_back(TerrainChunkEntry{
+                    .chunk_x = static_cast<std::int32_t>(chunk_x),
+                    .chunk_z = static_cast<std::int32_t>(chunk_z),
+                    .terrain_chunk_ref = AssetRef<TerrainChunkAsset>{ chunk_output.chunk_guid },
+                    .batch_id = chunk_output.batch_id,
+                    .batch_name = chunk_output.batch_name,
+                    .world_bounds_min = world_bounds_min,
+                    .world_bounds_max = world_bounds_max
+                    });
+
+                new_batch_ids.insert(chunk_output.batch_id);
+
+                const auto batch_path = batches_root / (chunk_output.batch_id.to_string() + ".json");
+                const auto entity_guid = deterministic_guid(recipe_guid, "terrain_chunk_entity", static_cast<int>(chunk_x), static_cast<int>(chunk_z));
+                const nlohmann::json entity_json = build_chunk_batch_entity_json(
+                    entity_guid,
+                    std::format("TerrainChunk({}, {})", chunk_x, chunk_z),
+                    chunk_output.chunk_asset,
+                    chunk_output.render_gpu_guid,
+                    chunk_output.chunk_guid);
+
+                nlohmann::json batch_json{};
+                batch_json["header"] = nlohmann::json{
+                    { "id", chunk_output.batch_id.to_string() },
+                    { "name", chunk_output.batch_name }
+                };
+                batch_json["header"]["asset_closure"] = nlohmann::json::array();
+                for (const auto& guid : chunk_output.asset_closure)
+                    batch_json["header"]["asset_closure"].push_back(guid.to_string());
+                batch_json["entities"] = nlohmann::json::array({ entity_json });
+
+                std::ofstream batch_file(batch_path);
+                if (!batch_file.is_open())
+                {
+                    result.error_message = std::format(
+                        "Terrain cook failed: could not write batch file '{}'.",
+                        batch_path.string());
+                    return result;
+                }
+                batch_file << batch_json.dump(2);
+
+                if (!batch_registry->upsert_batch_record(BatchInfo{
+                    .id = chunk_output.batch_id,
+                    .name = chunk_output.batch_name,
+                    .filename = batch_path.filename(),
+                    .asset_closure_hdr = chunk_output.asset_closure
+                    }))
+                {
+                    result.error_message = std::format(
+                        "Terrain cook failed: could not register terrain chunk batch {}.",
+                        chunk_output.batch_id.to_string());
+                    return result;
+                }
             }
         }
+
+        for (const auto& old_batch_id : old_batch_ids)
+        {
+            if (!old_batch_id.valid() || new_batch_ids.contains(old_batch_id))
+                continue;
+
+            if (batch_registry->is_batch_loaded(old_batch_id))
+            {
+                TaskResult unload_result = batch_registry->queue_unload(old_batch_id, ctx).get();
+                if (!unload_result.success)
+                {
+                    result.error_message = std::format(
+                        "Terrain cook failed: could not unload stale terrain chunk batch {}.",
+                        old_batch_id.to_string());
+                    return result;
+                }
+            }
+
+            (void)batch_registry->delete_batch(old_batch_id);
+        }
+
+        batch_registry->save_index();
 
         const AssetMetaData terrain_meta = make_meta(
             terrain_guid,
             recipe_guid,
             recipe_name + "_terrain",
             meta::get_meta_type_id_string<TerrainAsset>());
-        const std::filesystem::path terrain_asset_path = cook_root / "terrain.json";
-        const std::filesystem::path terrain_meta_path = cook_root / "terrain.meta.json";
         rm.import(
             terrain_asset,
             terrain_asset_path.string(),

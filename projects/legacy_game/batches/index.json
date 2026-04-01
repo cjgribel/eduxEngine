@@ -1,6 +1,36 @@
 {
   "batches": [
     {
+      "asset_closure_hdr": [
+        "f7cdae66-5364-a59b",
+        "45902b6c-1642-3c4d",
+        "fb78cac2-6d58-87b5"
+      ],
+      "filename": "99854598-9c28-b08f.json",
+      "id": "99854598-9c28-b08f",
+      "name": "terrain_TerrainRecipe_chunk_1_1"
+    },
+    {
+      "asset_closure_hdr": [
+        "46e044ab-354e-1dc6",
+        "88d8f632-7aac-1229",
+        "42f42a2c-4271-fb6d"
+      ],
+      "filename": "7a8a7e8f-9139-666e.json",
+      "id": "7a8a7e8f-9139-666e",
+      "name": "terrain_TerrainRecipe_chunk_1_0"
+    },
+    {
+      "asset_closure_hdr": [
+        "5729a35d-5562-0b8a",
+        "07d0a49f-2314-e90c",
+        "49b7f454-5256-1c3f"
+      ],
+      "filename": "c9889457-a44e-7eaf.json",
+      "id": "c9889457-a44e-7eaf",
+      "name": "terrain_TerrainRecipe_chunk_0_0"
+    },
+    {
       "asset_closure_hdr": [],
       "filename": "9ff7fc64-c8fe-d4c6.json",
       "id": "9ff7fc64-c8fe-d4c6",
@@ -43,6 +73,22 @@
       "filename": "16e47c92-14cc-c2cd.json",
       "id": "16e47c92-14cc-c2cd",
       "name": "default"
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "1e644e41-cf34-6131.json",
+      "id": "1e644e41-cf34-6131",
+      "name": "character"
+    },
+    {
+      "asset_closure_hdr": [
+        "2d626531-7be6-c956",
+        "adf43eeb-6338-420c",
+        "d23446fe-5a47-b2a8"
+      ],
+      "filename": "aa8dcd4e-995f-348e.json",
+      "id": "aa8dcd4e-995f-348e",
+      "name": "terrain_TerrainRecipe_chunk_0_1"
     },
     {
       "asset_closure_hdr": [

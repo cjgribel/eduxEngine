@@ -107,6 +107,7 @@ namespace eeng {
         void save_index(const std::filesystem::path& index_path);
         void load_or_create_index(const std::filesystem::path& index_path);
         void save_index();
+        const std::filesystem::path& index_path() const noexcept { return index_path_; }
 
         Guid create_batch(
             // const BatchId& id,
@@ -114,6 +115,12 @@ namespace eeng {
             // const std::filesystem::path& path
         );
         Guid create_batch_with_id(const BatchId& id, std::string name);
+        /// @brief Insert or update an unloaded batch record in the registry/index model.
+        ///
+        /// This is intended for tool-generated content such as cooked terrain
+        /// chunk batches, where the batch JSON and the batch index entry are
+        /// produced offline rather than by saving a currently loaded scene batch.
+        bool upsert_batch_record(BatchInfo info);
         bool delete_batch(const BatchId& id, BatchInfo* out_info = nullptr);
         bool restore_batch(BatchInfo info);
 

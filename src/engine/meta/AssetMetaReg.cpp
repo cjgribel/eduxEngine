@@ -672,12 +672,12 @@ namespace eeng {
                 .custom<DataMetaInfo>(DataMetaInfo{ "height_scale", "Height Scale", "Cook-time scale applied to source terrain heights before chunking." })
                 .traits(MetaFlags::none)
 
-                .data<&assets::TerrainRecipeAsset::chunk_size_quads_x>("chunk_size_quads_x"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_x", "Chunk Cells X", "Number of cooked terrain cells per chunk along X. World chunk width = chunk_size_quads_x * sample_spacing_x." })
+                .data<&assets::TerrainRecipeAsset::chunk_count_x>("chunk_count_x"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_count_x", "Chunk Count X", "Number of chunks the cooker should emit along X." })
                 .traits(MetaFlags::none)
 
-                .data<&assets::TerrainRecipeAsset::chunk_size_quads_z>("chunk_size_quads_z"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_z", "Chunk Cells Z", "Number of cooked terrain cells per chunk along Z. World chunk depth = chunk_size_quads_z * sample_spacing_z." })
+                .data<&assets::TerrainRecipeAsset::chunk_count_z>("chunk_count_z"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_count_z", "Chunk Count Z", "Number of chunks the cooker should emit along Z." })
                 .traits(MetaFlags::none)
                 ;
             register_asset<assets::TerrainRecipeAsset>();
@@ -686,7 +686,7 @@ namespace eeng {
         // TerrainAsset
         {
             entt::meta_factory<assets::TerrainAsset>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.TerrainAsset", .name = "TerrainAsset", .tooltip = "Runtime terrain manifest referencing cooked terrain chunks." })
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.TerrainAsset", .name = "TerrainAsset", .tooltip = "Terrain-wide collection asset describing cooked terrain chunks and generated chunk batches." })
                 .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::TerrainAsset::world_origin>("world_origin"_hs)
@@ -709,14 +709,6 @@ namespace eeng {
                 .custom<DataMetaInfo>(DataMetaInfo{ "cell_size_z", "Cell Size Z", "Distance between neighboring terrain samples along Z." })
                 .traits(MetaFlags::readonly_inspection)
 
-                .data<&assets::TerrainAsset::chunk_size_quads_x>("chunk_size_quads_x"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_x", "Chunk Quads X", "Cooked chunk size in terrain cells along X." })
-                .traits(MetaFlags::readonly_inspection)
-
-                .data<&assets::TerrainAsset::chunk_size_quads_z>("chunk_size_quads_z"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "chunk_size_quads_z", "Chunk Quads Z", "Cooked chunk size in terrain cells along Z." })
-                .traits(MetaFlags::readonly_inspection)
-
                 .data<&assets::TerrainAsset::chunk_count_x>("chunk_count_x"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "chunk_count_x", "Chunk Count X", "Number of chunk columns in the cooked terrain." })
                 .traits(MetaFlags::readonly_inspection)
@@ -726,7 +718,7 @@ namespace eeng {
                 .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::TerrainAsset::chunks>("chunks"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "chunks", "Chunks", "Cooked terrain chunk references." })
+                .custom<DataMetaInfo>(DataMetaInfo{ "chunks", "Chunks", "Cooked terrain chunk manifest entries." })
                 .traits(MetaFlags::no_inspection)
                 ;
             register_asset<assets::TerrainAsset>();
@@ -735,7 +727,7 @@ namespace eeng {
         // TerrainChunkAsset
         {
             entt::meta_factory<assets::TerrainChunkAsset>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.TerrainChunkAsset", .name = "TerrainChunkAsset", .tooltip = "Cooked terrain chunk with chunk-local render and collision data." })
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "assets.TerrainChunkAsset", .name = "TerrainChunkAsset", .tooltip = "Cooked terrain chunk collision payload for one terrain chunk." })
                 .traits(MetaFlags::readonly_inspection)
 
                 .data<&assets::TerrainChunkAsset::chunk_x>("chunk_x"_hs)
@@ -785,10 +777,6 @@ namespace eeng {
                 .data<&assets::TerrainChunkAsset::heights>("heights"_hs)
                 .custom<DataMetaInfo>(DataMetaInfo{ "heights", "Heights", "Chunk-local row-major height samples." })
                 .traits(MetaFlags::no_inspection)
-
-                .data<&assets::TerrainChunkAsset::render_model_ref>("render_model_ref"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "render_model_ref", "Render Model", "Chunk-local render mesh uploaded independently of the source terrain." })
-                .traits(MetaFlags::readonly_inspection)
                 ;
             register_asset<assets::TerrainChunkAsset>();
             serializers::register_terrainasset_serialization();

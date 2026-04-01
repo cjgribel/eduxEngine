@@ -39,9 +39,11 @@ namespace eeng::assets
      * - one cooked `TerrainChunkAsset` per chunk
      * - one chunk-local render `ModelDataAsset`
      * - one chunk-local `GpuModelAsset`
+     * - one generated batch per terrain chunk
      *
      * The cooker is intentionally deterministic with respect to output paths
-     * so that repeated re-cooks overwrite the same generated asset set.
+     * and generated ids so that repeated re-cooks overwrite the same generated
+     * asset and batch set.
      */
     class TerrainCooker
     {

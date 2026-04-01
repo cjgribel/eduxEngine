@@ -1,0 +1,162 @@
+{
+  "entities": [
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                0.5,
+                0.5,
+                0.5
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 4824527470402337645
+              },
+              "Type": "Heightfield"
+            }
+          ]
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 5732260787565585407,
+          "Name": "TerrainChunk(1, 0)",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 9860902080794595881
+          },
+          "Name": "TerrainChunkModel(1, 0)"
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Static"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            50.0,
+            0.0,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "World Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 5732260787565585407
+    }
+  ],
+  "header": {
+    "asset_closure": [
+      "46e044ab-354e-1dc6",
+      "88d8f632-7aac-1229",
+      "42f42a2c-4271-fb6d"
+    ],
+    "id": "7a8a7e8f-9139-666e",
+    "name": "terrain_TerrainRecipe_chunk_1_0"
+  }
+}

@@ -4,8 +4,10 @@
 #pragma once
 
 #include "AssetRef.hpp"
+#include "Guid.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -15,6 +17,7 @@ namespace eeng::assets
     struct ModelDataAsset;
     struct GpuModelAsset;
     struct TerrainChunkAsset;
+    using BatchId = Guid;
 
     // TerrainRecipeAsset
     // - Editor/tool-side source description for terrain cooking.
@@ -47,20 +50,35 @@ namespace eeng::assets
         float horizontal_scale_z = 1.0f;
         float height_scale = 1.0f;
 
-        // Number of terrain cells per cooked chunk in X/Z.
-        // World-space chunk width/depth is:
-        //   chunk_size_quads_x * sample_spacing_x
-        //   chunk_size_quads_z * sample_spacing_z
-        // The cooker should emit one extra border sample so neighboring chunks
-        // share their edge heights cleanly.
-        std::uint32_t chunk_size_quads_x = 64;
-        std::uint32_t chunk_size_quads_z = 64;
+        // Number of chunks the cooker should produce across the sampled
+        // terrain in X/Z. The cooker partitions the sampled grid across this
+        // resolution and keeps shared edge samples aligned between neighbors.
+        std::uint32_t chunk_count_x = 1;
+        std::uint32_t chunk_count_z = 1;
+    };
+
+    // TerrainChunkEntry
+    // - One entry in the terrain collection manifest.
+    // - Carries only collection/index information so tooling or future
+    //   residency systems can reason about the terrain without loading the
+    //   terrain chunk batch itself.
+    struct TerrainChunkEntry
+    {
+        std::int32_t chunk_x = 0;
+        std::int32_t chunk_z = 0;
+        AssetRef<TerrainChunkAsset> terrain_chunk_ref;
+        BatchId batch_id{};
+        std::string batch_name{};
+        glm::vec3 world_bounds_min{ 0.0f };
+        glm::vec3 world_bounds_max{ 0.0f };
     };
 
     // TerrainAsset
     // - Runtime-facing terrain manifest.
-    // - References only cooked chunk assets; it should not depend on the full
-    //   source terrain mesh at runtime.
+    // - Represents the terrain as a collection of cooked chunks.
+    // - Useful for editor tooling, metadata, and future residency logic.
+    // - It is not the thing that actually renders or collides at runtime; the
+    //   generated chunk batches are the true runtime end products.
     struct TerrainAsset
     {
         // Same terrain-space origin used during the cook.
@@ -75,15 +93,13 @@ namespace eeng::assets
         float cell_size_x = 1.0f;
         float cell_size_z = 1.0f;
 
-        // Chunk layout used by the cook.
-        std::uint32_t chunk_size_quads_x = 64;
-        std::uint32_t chunk_size_quads_z = 64;
         std::uint32_t chunk_count_x = 0;
         std::uint32_t chunk_count_z = 0;
 
-        // Runtime chunk table. Each entry should be a self-contained streaming
-        // unit with render data + Bullet heightfield data.
-        std::vector<AssetRef<TerrainChunkAsset>> chunks;
+        // Chunk collection table. Each entry maps terrain coordinates to the
+        // cooked chunk payload and the generated batch that owns the runtime
+        // terrain chunk entity.
+        std::vector<TerrainChunkEntry> chunks;
     };
 
     // TerrainChunkAsset
@@ -125,10 +141,6 @@ namespace eeng::assets
         // build `btHeightfieldTerrainShape`.
         std::vector<float> heights;
 
-        // Render mesh for just this chunk. This is the key GL residency split:
-        // loading one chunk should upload only this chunk's model, not the full
-        // artist-authored terrain source mesh.
-        AssetRef<GpuModelAsset> render_model_ref;
     };
 
     template<typename Visitor>
@@ -173,12 +185,14 @@ namespace eeng::assets
     template<typename Visitor>
     void visit_asset_refs(TerrainChunkAsset& chunk, Visitor&& visitor)
     {
-        visitor(chunk.render_model_ref);
+        (void)chunk;
+        (void)visitor;
     }
 
     template<typename Visitor>
     void visit_asset_refs(const TerrainChunkAsset& chunk, Visitor&& visitor)
     {
-        visitor(chunk.render_model_ref);
+        (void)chunk;
+        (void)visitor;
     }
 }

@@ -454,6 +454,38 @@ namespace eeng
         return bi.id;
     }
 
+    bool BatchRegistry::upsert_batch_record(BatchInfo info)
+    {
+        std::lock_guard lk(mtx_);
+        if (index_path_.empty())
+            return false;
+        if (!info.id.valid())
+            return false;
+
+        if (info.filename.empty())
+            info.filename = info.id.to_string() + ".json";
+        if (info.name.empty())
+            info.name = info.id.to_string();
+
+        auto it = batches_.find(info.id);
+        if (it == batches_.end())
+        {
+            info.state = BatchInfo::State::Unloaded;
+            info.last_result = TaskResult{};
+            info.live.clear();
+            batches_.emplace(info.id, std::move(info));
+            return true;
+        }
+
+        if (it->second.state != BatchInfo::State::Unloaded)
+            return false;
+
+        it->second.name = std::move(info.name);
+        it->second.filename = std::move(info.filename);
+        it->second.asset_closure_hdr = std::move(info.asset_closure_hdr);
+        return true;
+    }
+
     bool BatchRegistry::delete_batch(const BatchId& id, BatchInfo* out_info)
     {
         std::lock_guard lk(mtx_);

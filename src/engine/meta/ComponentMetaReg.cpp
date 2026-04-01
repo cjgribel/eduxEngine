@@ -11,7 +11,7 @@
 #include "ecs/TransformComponent.hpp"
 #include "ecs/HeaderComponent.hpp"
 #include "ecs/ModelComponent.hpp"
-#include "ecs/TerrainComponent.hpp"
+#include "ecs/TerrainRootComponent.hpp"
 #include "ecs/ParticleEmitterComponent.hpp"
 #include "ecs/AnimationGraphComponent.hpp"
 #include "ecs/ScriptComponent.hpp"
@@ -1204,29 +1204,17 @@ namespace eeng
             register_component<ecs::ModelComponent>();
         }
 
-        // --- TerrainComponent ------------------------------------------------
+        // --- TerrainRootComponent ------------------------------------------------
         {
-            entt::meta_factory<eeng::ecs::TerrainComponent>{}
-            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.TerrainComponent", .name = "TerrainComponent", .tooltip = "Terrain manifest reference for chunked terrain runtime systems." })
+            entt::meta_factory<eeng::ecs::TerrainRootComponent>{}
+            .custom<TypeMetaInfo>(TypeMetaInfo{ .id = "eeng.ecs.TerrainComponent", .name = "TerrainRootComponent", .tooltip = "Optional terrain-root reference to a cooked TerrainAsset collection." })
                 .traits(MetaFlags::none)
 
-                .data<&eeng::ecs::TerrainComponent::name>("name"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "name", "Name", "Entity name." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::TerrainComponent::enabled>("enabled"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "enabled", "Enabled", "Enable terrain chunk spawning for this terrain root." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::TerrainComponent::terrain_ref>("terrain_ref"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "terrain_ref", "Terrain", "Cooked TerrainAsset manifest to stream from." })
-                .traits(MetaFlags::none)
-
-                .data<&eeng::ecs::TerrainComponent::explicit_chunk_coord>("explicit_chunk_coord"_hs)
-                .custom<DataMetaInfo>(DataMetaInfo{ "explicit_chunk_coord", "Explicit Chunk", "Chunk coordinate to spawn for the terrain MVP." })
+                .data<&eeng::ecs::TerrainRootComponent::terrain_ref>("terrain_ref"_hs)
+                .custom<DataMetaInfo>(DataMetaInfo{ "terrain_ref", "Terrain", "Cooked TerrainAsset collection referenced by this terrain root." })
                 .traits(MetaFlags::none)
                 ;
-            register_component<ecs::TerrainComponent>();
+            register_component<ecs::TerrainRootComponent>();
         }
 
         // --- Script component ----------------------------------------------
