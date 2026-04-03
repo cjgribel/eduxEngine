@@ -1,0 +1,166 @@
+# Engine Architecture Orientation
+
+Short, slide-friendly notes for concepts added in this repo after the smaller course version.
+
+## Overall Architecture
+
+The repo can still be described as a layered, modular architecture, but in this larger version the layers are more explicit and more specialized than in the course version.
+
+- At a high level, there is a separation between engine core functionality, editor functionality, game/project-specific code, and asset/content pipelines.
+- The engine layer provides reusable runtime services such as ECS/world management, assets, rendering support, threading, events, serialization, and physics integration.
+- The editor layer builds on top of the engine rather than replacing it. It adds tools, GUI, inspection, undo/redo, prefab workflows, and edit/play switching.
+- The game or project layer then uses the engine through a controlled interface instead of directly depending on every subsystem.
+- Several systems are also data-driven: assets, prefabs, batches, animation graphs, and other authored data are loaded and interpreted by generic runtime code.
+- The architecture is modular in the sense that many responsibilities are split into focused subsystems or services, but those modules are coordinated through shared context objects, events, commands, and registries.
+- Compared with a simple strict layer stack, this is closer to a layered tool-and-runtime architecture: the editor depends on engine services, the runtime can run without most editor features, and play mode reuses the same foundation with a different world state.
+
+Suggested order: from foundational editor/runtime structure to more advanced runtime concerns.
+
+## 1. Engine Context Object
+
+- What it is: A shared access object that bundles the current world plus shared engine services into one interface (`EngineContext`, `EngineServices`, `WorldState`).
+- What it is for: Reduces long parameter lists, gives game/editor code one common entry point, and makes world switching easier.
+- Library / note: Custom repo design, not a third-party library. This kind of object is often custom; dependency-injection helpers such as `Boost.DI` can support similar service wiring.
+- Pattern: Context Object. Also resembles a Service Locator for engine subsystems.
+
+## 2. GUI Actions Layer
+
+- What it is: A thin layer between GUI widgets and engine/editor operations (`SceneActions`, `BatchActions`, `AssetActions`).
+- What it is for: Keeps UI code simple, centralizes validation/rules, and routes edits through commands instead of letting widgets mutate data directly.
+- Library / note: Built around Dear ImGui, but the actions layer itself is custom. Other established UI options include `Qt` and `Nuklear`.
+- Pattern: Facade or Application Service layer in front of lower-level editor/engine logic.
+
+## 3. Runtime Reflection
+
+- What it is: Type information available at runtime instead of only at compile time.
+- What it is for: Generic inspector UI, add/remove components by type, field editing, cloning, binding helpers, and reusable serialization support.
+- Library / note: `entt::meta`. C++ still has no standard runtime reflection system. Another established option is `RTTR`.
+- Pattern: Reflection / Type Metadata pattern.
+
+## 4. Serialization
+
+- What it is: Converting engine data to and from a stored representation, mainly JSON.
+- What it is for: Save/load to disk, prefab files, undo/redo snapshots, and world/batch snapshots used when entering play mode.
+- Library / note: `nlohmann::json`, together with repo-specific serializers and reflection helpers. Other established options include `cereal`, `Protocol Buffers`, `FlatBuffers`, and `yaml-cpp`.
+- Pattern: Serializer / Data Mapper style approach.
+
+## 5. Undoable Command Queue
+
+- What it is: Editor changes wrapped as command objects with `execute()`, `undo()`, and optional async `update()`.
+- What it is for: Consistent undo/redo, safer editor tooling, and one place to sequence long-running edits such as batch or asset operations.
+- Library / note: Implemented in the repo. If the editor is built with Qt, `QUndoStack` / Qt's Undo Framework is a well-established alternative.
+- Pattern: Command pattern.
+
+## 6. Custom Asset Storage
+
+- What it is: A custom runtime asset system with GUID lookup, typed handles, versioned handles, and type-erased storage (`Storage`, `ResourceManager`, `AssetIndex`).
+- What it is for: Separates disk files from loaded runtime objects, gives stable references, and supports loading/binding/unloading in a controlled way.
+- Library / note: Custom repo system, with some runtime-typed access supported through EnTT meta. Related reusable building blocks include the `EnTT` resource cache.
+- Pattern: Repository/Manager pattern, plus Handle pattern for safe references to loaded assets.
+
+## 7. Prefabs
+
+- What it is: Reusable serialized entity branches that can be saved to JSON and spawned again later.
+- What it is for: Repeated content, tool-generated setups, and faster level building. Spawning can remap GUIDs so each instance becomes unique.
+- Library / note: Built on the existing JSON/entity serialization path, not a separate prefab library. In ECS frameworks, `flecs` is a notable example with built-in prefab support.
+- Pattern: Prototype-like reuse pattern, where instances are created from saved template data.
+
+## 8. Edit / Play Modes
+
+- What it is: Two separate worlds: one for editing and one temporary runtime world for play/testing.
+- What it is for: Lets the game run without destroying the editor state. Exiting play throws away the play world and restores edit mode unchanged.
+- Library / note: Custom repo architecture. The play world is created from serialized snapshots of the loaded edit batches. This is usually an engine-specific system rather than a standalone library.
+- Pattern: State pattern at the application level, with snapshot/restore behavior.
+
+## 9. Threaded Execution
+
+- What it is: Multiple execution strategies: a thread pool for parallel work, a serial executor for ordered work, and a main-thread queue for thread-affine tasks.
+- What it is for: Improves responsiveness and scalability while still respecting constraints such as “some things must happen in order” or “some things must happen on the main thread”.
+- Library / note: Custom repo utilities built on top of standard C++ threading/futures. Other established options include `Taskflow` and `oneTBB`.
+- Pattern: Executor pattern, plus Producer-Consumer queues.
+
+## 10. Async Loading
+
+- What it is: Asset and batch loading started in the background and completed through futures, events, and main-thread handoff when needed.
+- What it is for: Keeps the editor responsive, avoids long stalls, and prepares the architecture for loading screens or streaming later.
+- Library / note: Uses the repo `ThreadPool`, `SerialExecutor`, `MainThreadQueue`, and `std::future`/`std::shared_future`. Similar infrastructure can also be built with `Taskflow` or `oneTBB`.
+- Pattern: Asynchronous Task / Future pattern, with event-driven completion notifications.
+
+## 11. Scripting / Lua (planned)
+
+- What it is: A future gameplay scripting layer where entities with `ScriptComponent` can run Lua-based behavior.
+- What it is for: Faster gameplay iteration, data-driven behaviors, and less need to recompile C++ for every gameplay change.
+- Library / note: Planned with `sol2` + Lua. The repo currently only has placeholders (`ScriptComponent`, `ScriptSystem`). Other established embedded scripting options include `AngelScript` and `Wren`.
+- Pattern: Component + embedded scripting runtime pattern.
+
+## More Topic Ideas
+
+## 12. Animation and Animation Graphs
+
+- What it is: Systems for moving models over time, often by blending clips through a graph of states and transitions.
+- What it is for: Turns static models into characters or mechanisms with reusable, controllable motion.
+- Library / note: Covered in Module 3. This repo includes animation graph assets/runtime work on top of that. A well-established animation runtime/toolchain option is `ozz-animation`.
+- Pattern: State Machine pattern is often used inside animation graphs.
+
+## 13. Events
+
+- What it is: A messaging mechanism where systems publish and react to events without being tightly coupled.
+- What it is for: Lets different engine parts communicate without direct dependencies everywhere.
+- Library / note: Covered in Module 4. This repo uses an `EventQueue` for engine/editor/runtime coordination. Other established options include `Boost.Signals2` and Qt signals/slots.
+- Pattern: Observer pattern, often implemented with queued event dispatch.
+
+## 14. Physics Layer
+
+- What it is: A subsystem for collision detection, rigid bodies, constraints, and physical simulation.
+- What it is for: Gives gameplay objects believable motion and interaction beyond simple manual transform updates.
+- Library / note: Example library in this repo: Bullet Physics. Other established choices include `Box2D`, `PhysX`, and `Jolt Physics`.
+- Pattern: Subsystem pattern.
+
+## 15. GUIDs and Reference Binding
+
+- What it is: Using globally unique IDs to identify entities, assets, batches, and references between them.
+- What it is for: Makes save/load, prefab spawning, undo/redo, and asset references more robust than raw pointers or local entity IDs.
+- Library / note: Custom repo infrastructure around `Guid` and binding helpers. This is usually custom, but many serialization/networking stacks also build around UUID libraries such as `Boost.UUID`.
+- Pattern: Identity Map / stable identity pattern.
+
+## 16. Batch / Scene Partitioning
+
+- What it is: Grouping entities and related assets into named batches that can be loaded, saved, and unloaded as units.
+- What it is for: Supports ownership, streaming, editor organization, and clearer boundaries for what content belongs together.
+- Library / note: Custom repo system through `BatchRegistry` and related editor commands. This is usually engine-specific rather than a standalone library feature.
+- Pattern: Partitioning / Aggregation pattern.
+
+## 17. Asset Import and Cooking
+
+- What it is: Turning source content into engine-ready runtime data, sometimes through an intermediate authored recipe.
+- What it is for: Separates external authoring formats from optimized runtime formats and keeps the runtime side simpler and more deterministic.
+- Library / note: Custom import pipeline, with external libraries where relevant such as model import tooling. Established examples include `Assimp` for asset import and the offline tools in `ozz-animation` for animation data conversion.
+- Pattern: Pipeline pattern.
+
+## 18. Main-Thread Boundaries
+
+- What it is: Explicit rules for which work may run in worker threads and which work must return to the main thread.
+- What it is for: Important for rendering APIs, some ECS mutations, GUI work, and other systems that are not safely parallel.
+- Library / note: Managed in the repo with `MainThreadQueue` and thread-pool handoff. This is commonly custom, though frameworks such as Qt also provide main-thread event-loop dispatch patterns.
+- Pattern: Thread confinement pattern.
+
+## 19. Data-Driven Content Generation
+
+- What it is: Building runtime objects from higher-level data descriptions instead of hand-coding every instance.
+- What it is for: Makes tools more powerful, supports reuse, and helps scale content creation through prefabs, rig builders, terrain recipes, and similar systems.
+- Library / note: Custom repo approach using JSON/data definitions and builder utilities. Depending on the pipeline, formats such as `Protocol Buffers`, `FlatBuffers`, or `yaml-cpp` may also be used for the driving data.
+- Pattern: Builder pattern, combined with data-driven design.
+
+## 20. Particle System
+
+- What it is: A subsystem for spawning, simulating, and rendering many lightweight visual elements such as smoke, sparks, fire, dust, or magic effects.
+- What it is for: Adds rich visual feedback that would be too expensive or awkward to model as normal scene objects. In this repo, the system is CPU-simulated and integrated with ECS, rendering, optional textures/atlases, and some collision/event handling.
+- Library / note: Custom repo system (`ParticleEmitterComponent`, `ParticleSystem`, `ParticleRenderSystem`). Established alternatives include `Effekseer` and `PopcornFX`.
+- Pattern: Data-oriented simulation system, often combined with object pooling / flyweight-style particles.
+
+## 21. Runtime Pipeline
+
+- What it is: An engine-owned definition of update/render order: which systems run, in what phases, and in what sequence.
+- What it is for: Makes dependencies between systems explicit, keeps frame execution deterministic, and creates one place where the engine can decide what “a frame” means in edit mode, play mode, or future runtime variants.
+- Library / note: In this repo, `RuntimePipeline` is a custom orchestration layer around engine systems. A notable ECS example with explicit phases/pipelines is `flecs`, which supports custom pipelines and phases.
+- Pattern: Pipeline pattern, or more specifically a scheduling/orchestration pattern for frame execution.
