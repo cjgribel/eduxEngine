@@ -714,13 +714,13 @@
             0.5,
             0.0,
             4.0,
-            2.0,
+            4.616373538970947,
             0.0,
             1.0
           ],
           "Position": [
             4.0,
-            2.0,
+            4.616373538970947,
             0.0
           ],
           "Rotation": [
@@ -748,7 +748,7 @@
             0.5,
             0.0,
             4.0,
-            2.0,
+            4.616373538970947,
             0.0,
             1.0
           ],
@@ -937,16 +937,1605 @@
         }
       },
       "entity_guid": 4832035644594987401
+    },
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 17674804106380555754,
+          "Name": "boxes",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "World Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 17674804106380555754
+    },
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 0
+              },
+              "Type": "Box"
+            }
+          ]
+        },
+        "eeng.ecs.CollisionFilterComponent": {
+          "Filter": {
+            "Layer": 1,
+            "Mask": 4294967295
+          }
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 7500615656720737074,
+          "Name": "box8",
+          "Parent Entity": {
+            "Guid": 17674804106380555754
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 7487928311624330621
+          },
+          "Name": ""
+        },
+        "eeng.ecs.PhysicsEventsComponent": {
+          "Emit Collisions": false,
+          "Emit Triggers": true
+        },
+        "eeng.ecs.PhysicsMaterialComponent": {
+          "Material": {
+            "Friction": 0.5,
+            "Restitution": 0.0
+          }
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            0.1666666716337204,
+            0.1666666716337204,
+            0.1666666716337204
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Dynamic"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.13453364372253418,
+            7.500256061553955,
+            0.0196990966796875,
+            1.0
+          ],
+          "Position": [
+            0.13453364372253418,
+            7.500256061553955,
+            0.0196990966796875
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "World Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.13453364372253418,
+            7.500256061553955,
+            0.0196990966796875,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 7500615656720737074
+    },
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 0
+              },
+              "Type": "Box"
+            }
+          ]
+        },
+        "eeng.ecs.CollisionFilterComponent": {
+          "Filter": {
+            "Layer": 1,
+            "Mask": 4294967295
+          }
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 5484657853384289734,
+          "Name": "box7",
+          "Parent Entity": {
+            "Guid": 17674804106380555754
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 7487928311624330621
+          },
+          "Name": ""
+        },
+        "eeng.ecs.PhysicsEventsComponent": {
+          "Emit Collisions": false,
+          "Emit Triggers": true
+        },
+        "eeng.ecs.PhysicsMaterialComponent": {
+          "Material": {
+            "Friction": 0.5,
+            "Restitution": 0.0
+          }
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            0.1666666716337204,
+            0.1666666716337204,
+            0.1666666716337204
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Dynamic"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            -1.4909605979919434,
+            7.5051751136779785,
+            0.6390307545661926,
+            1.0
+          ],
+          "Position": [
+            -1.4909605979919434,
+            7.5051751136779785,
+            0.6390307545661926
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "World Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            -1.4909605979919434,
+            7.5051751136779785,
+            0.6390307545661926,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 5484657853384289734
+    },
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 0
+              },
+              "Type": "Box"
+            }
+          ]
+        },
+        "eeng.ecs.CollisionFilterComponent": {
+          "Filter": {
+            "Layer": 1,
+            "Mask": 4294967295
+          }
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 5199897047478064499,
+          "Name": "box6",
+          "Parent Entity": {
+            "Guid": 17674804106380555754
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 7487928311624330621
+          },
+          "Name": ""
+        },
+        "eeng.ecs.PhysicsEventsComponent": {
+          "Emit Collisions": false,
+          "Emit Triggers": true
+        },
+        "eeng.ecs.PhysicsMaterialComponent": {
+          "Material": {
+            "Friction": 0.5,
+            "Restitution": 0.0
+          }
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            0.1666666716337204,
+            0.1666666716337204,
+            0.1666666716337204
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Dynamic"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.7219383716583252,
+            7.203800678253174,
+            1.1273787021636963,
+            1.0
+          ],
+          "Position": [
+            0.7219383716583252,
+            7.203800678253174,
+            1.1273787021636963
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "World Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.7219383716583252,
+            7.203800678253174,
+            1.1273787021636963,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 5199897047478064499
+    },
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 0
+              },
+              "Type": "Box"
+            }
+          ]
+        },
+        "eeng.ecs.CollisionFilterComponent": {
+          "Filter": {
+            "Layer": 1,
+            "Mask": 4294967295
+          }
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 17256397335138431705,
+          "Name": "box5",
+          "Parent Entity": {
+            "Guid": 17674804106380555754
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 7487928311624330621
+          },
+          "Name": ""
+        },
+        "eeng.ecs.PhysicsEventsComponent": {
+          "Emit Collisions": false,
+          "Emit Triggers": true
+        },
+        "eeng.ecs.PhysicsMaterialComponent": {
+          "Material": {
+            "Friction": 0.5,
+            "Restitution": 0.0
+          }
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            0.1666666716337204,
+            0.1666666716337204,
+            0.1666666716337204
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Dynamic"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            -0.7421727180480957,
+            7.224180698394775,
+            1.8607697486877441,
+            1.0
+          ],
+          "Position": [
+            -0.7421727180480957,
+            7.224180698394775,
+            1.8607697486877441
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "World Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            -0.7421727180480957,
+            7.224180698394775,
+            1.8607697486877441,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 17256397335138431705
+    },
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 0
+              },
+              "Type": "Box"
+            }
+          ]
+        },
+        "eeng.ecs.CollisionFilterComponent": {
+          "Filter": {
+            "Layer": 1,
+            "Mask": 4294967295
+          }
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 9279735862992752104,
+          "Name": "box4",
+          "Parent Entity": {
+            "Guid": 17674804106380555754
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 7487928311624330621
+          },
+          "Name": ""
+        },
+        "eeng.ecs.PhysicsEventsComponent": {
+          "Emit Collisions": false,
+          "Emit Triggers": true
+        },
+        "eeng.ecs.PhysicsMaterialComponent": {
+          "Material": {
+            "Friction": 0.5,
+            "Restitution": 0.0
+          }
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            0.1666666716337204,
+            0.1666666716337204,
+            0.1666666716337204
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Dynamic"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            -0.6265754699707031,
+            4.907612323760986,
+            1.3104581832885742,
+            1.0
+          ],
+          "Position": [
+            -0.6265754699707031,
+            4.907612323760986,
+            1.3104581832885742
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "World Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            -0.6265754699707031,
+            4.907612323760986,
+            1.3104581832885742,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 9279735862992752104
+    },
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 0
+              },
+              "Type": "Box"
+            }
+          ]
+        },
+        "eeng.ecs.CollisionFilterComponent": {
+          "Filter": {
+            "Layer": 1,
+            "Mask": 4294967295
+          }
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 12174462602669117640,
+          "Name": "box3",
+          "Parent Entity": {
+            "Guid": 17674804106380555754
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 7487928311624330621
+          },
+          "Name": ""
+        },
+        "eeng.ecs.PhysicsEventsComponent": {
+          "Emit Collisions": false,
+          "Emit Triggers": true
+        },
+        "eeng.ecs.PhysicsMaterialComponent": {
+          "Material": {
+            "Friction": 0.5,
+            "Restitution": 0.0
+          }
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            0.1666666716337204,
+            0.1666666716337204,
+            0.1666666716337204
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Dynamic"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.7219383716583252,
+            4.907612323760986,
+            1.647141456604004,
+            1.0
+          ],
+          "Position": [
+            0.7219383716583252,
+            4.907612323760986,
+            1.647141456604004
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "World Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.7219383716583252,
+            4.907612323760986,
+            1.647141456604004,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 12174462602669117640
+    },
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 0
+              },
+              "Type": "Box"
+            }
+          ]
+        },
+        "eeng.ecs.CollisionFilterComponent": {
+          "Filter": {
+            "Layer": 1,
+            "Mask": 4294967295
+          }
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 16266942118093228471,
+          "Name": "box2",
+          "Parent Entity": {
+            "Guid": 17674804106380555754
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 7487928311624330621
+          },
+          "Name": ""
+        },
+        "eeng.ecs.PhysicsEventsComponent": {
+          "Emit Collisions": false,
+          "Emit Triggers": true
+        },
+        "eeng.ecs.PhysicsMaterialComponent": {
+          "Material": {
+            "Friction": 0.5,
+            "Restitution": 0.0
+          }
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            0.1666666716337204,
+            0.1666666716337204,
+            0.1666666716337204
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Dynamic"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            -0.6265754699707031,
+            4.907612323760986,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            -0.6265754699707031,
+            4.907612323760986,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "World Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            -0.6265754699707031,
+            4.907612323760986,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 16266942118093228471
+    },
+    {
+      "components": {
+        "eeng.ecs.ColliderComponent": {
+          "Colliders": [
+            {
+              "Half Extents": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "Height": 1.0,
+              "Id": 1,
+              "Is Trigger": false,
+              "Local Position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Local Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "Mesh Ref": {
+                "Guid": 0
+              },
+              "Radius": 0.5,
+              "Submesh Index": -1,
+              "Terrain Chunk": {
+                "Guid": 0
+              },
+              "Type": "Box"
+            }
+          ]
+        },
+        "eeng.ecs.CollisionFilterComponent": {
+          "Filter": {
+            "Layer": 1,
+            "Mask": 4294967295
+          }
+        },
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 12336629552034016818,
+          "Name": "box1",
+          "Parent Entity": {
+            "Guid": 17674804106380555754
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 7487928311624330621
+          },
+          "Name": ""
+        },
+        "eeng.ecs.PhysicsEventsComponent": {
+          "Emit Collisions": false,
+          "Emit Triggers": true
+        },
+        "eeng.ecs.PhysicsMaterialComponent": {
+          "Material": {
+            "Friction": 0.5,
+            "Restitution": 0.0
+          }
+        },
+        "eeng.ecs.RigidBodyComponent": {
+          "Allow Sleep": true,
+          "Angular Damping": 0.0,
+          "Auto Inertia": true,
+          "Auto Mass": true,
+          "CCD Radius": 0.0,
+          "CCD Threshold": 0.0,
+          "Density": 1.0,
+          "Enable CCD": false,
+          "Gravity Scale": 1.0,
+          "Inertia": [
+            0.1666666716337204,
+            0.1666666716337204,
+            0.1666666716337204
+          ],
+          "Linear Damping": 0.0,
+          "Mass": 1.0,
+          "Motion": "Dynamic"
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.7219383716583252,
+            4.907612323760986,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            0.7219383716583252,
+            4.907612323760986,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "World Matrix": [
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0,
+            0.7219383716583252,
+            4.907612323760986,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 12336629552034016818
+    },
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 6929838248425273918,
+          "Name": "grass",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.ecs.ModelComponent": {
+          "Blend Clip Index": -1,
+          "Blend Clip Speed": 1.0,
+          "Blend Factor": 0.0,
+          "Blend Loop": true,
+          "Clip Index": -1,
+          "Clip Speed": 1.0,
+          "Loop": true,
+          "Model reference": {
+            "Guid": 16397913790756883852
+          },
+          "Name": ""
+        },
+        "eeng.ecs.TransformComponent": {
+          "Local Matrix": [
+            100.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            100.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            100.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "Scale": [
+            100.0,
+            100.0,
+            100.0
+          ],
+          "World Matrix": [
+            100.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            100.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            100.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "World Rotation Matrix": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "entity_guid": 6929838248425273918
     }
   ],
   "header": {
     "asset_closure": [
+      "00f7a446-5033-9bc3",
+      "04c24776-47a8-cb4f",
+      "04cb046e-eb0c-59fd",
+      "0b0edba7-7fb4-ce50",
+      "127ae783-d9ae-f04a",
+      "136095f1-858c-04e8",
+      "163fa169-524d-23ce",
+      "1a85c102-8410-cc00",
+      "1ba04b0e-b688-d00e",
+      "1d3e8a44-a0b1-6e6e",
+      "1f7963bd-dca6-1e9e",
+      "21043ac1-8d22-5a01",
+      "241795ba-0c45-401b",
+      "256484e7-e02b-da0f",
       "26eb916f-2fc5-682e",
       "28a561a0-386e-db46",
+      "31510804-c657-9081",
+      "32e89cea-e1ab-73fa",
+      "37b0a638-f825-1c56",
+      "38cfc23d-cabc-51d1",
+      "3a1af1cb-7abd-e05d",
+      "45a16038-b82e-b088",
+      "47e55edd-c924-a83f",
+      "4ceb37dd-0024-c36c",
+      "4e21a17f-b286-460c",
+      "541ac102-60ea-3227",
+      "56d8363f-ffb1-2ccd",
+      "5740e861-d006-0952",
+      "57969378-20dc-5069",
+      "58d3255b-2ae2-ecb6",
       "599a0fa6-dd3c-76df",
+      "5c51ab5f-7b86-1aa5",
+      "615ba358-11cc-1589",
+      "627f9313-f067-954a",
+      "66e7562f-62d5-0975",
       "67ea7720-6df5-6d7d",
+      "6851ba4d-b627-2020",
+      "6867ae2e-cb5f-2b5e",
+      "6bc3981f-da6f-d5ae",
+      "6f46d274-7941-5b3e",
       "71ee3a82-96c6-b7ac",
-      "b006edaa-ce3c-607e"
+      "739ab163-ec2c-56b5",
+      "74dc99b6-3394-3f7c",
+      "767b55a5-7474-657f",
+      "77662d2b-7863-c682",
+      "78e0cb56-a65a-6c03",
+      "79d29664-0ba9-437a",
+      "7d21d88f-f235-468e",
+      "81ccf934-7e1d-dd2d",
+      "8449ba5c-3fe7-1fe6",
+      "8aa014ee-759e-500b",
+      "8edc4883-5123-8a5c",
+      "8f3d72a9-0344-de04",
+      "9445be55-8f85-55a2",
+      "94af8097-674a-a293",
+      "94d52fdd-bc0b-c306",
+      "95034220-a0ae-5a3d",
+      "97341c3c-d5c8-fdb8",
+      "9b68461b-9a65-a921",
+      "9c3f72ef-1e07-c3fe",
+      "a161337e-9d54-31b5",
+      "a2bb6e1f-0272-51ca",
+      "a61b8c74-f99c-5a65",
+      "ac75ca36-c726-611d",
+      "ad04dc38-bec7-5f98",
+      "b006edaa-ce3c-607e",
+      "b078f00f-8605-d407",
+      "b07a1bb3-ec32-2b32",
+      "b2b4e63f-faaa-9215",
+      "baf8a818-4a56-8bf1",
+      "bf126cf9-db89-9f10",
+      "c00b6d53-abe0-024d",
+      "c663d4de-1acb-aa3f",
+      "c70c5867-ff61-b311",
+      "c7342e74-34d8-70e1",
+      "ca47e095-11fb-f12d",
+      "ccac6f1c-3699-c973",
+      "d2be13c1-3c66-f76c",
+      "d3628778-b89e-17d4",
+      "d4da5345-e14a-903a",
+      "d76594bf-b6bf-4060",
+      "d9daf1f5-2f32-a5ef",
+      "dd88a6ce-323a-a798",
+      "e39117b6-7b8b-0d8c",
+      "e74f951e-99ee-4feb",
+      "ebc1af06-faed-b4cb",
+      "ecb82e5c-300a-d1ad",
+      "ece9fc15-7256-7f88",
+      "ed1de115-0bc3-42b2",
+      "ed5e7f2d-6768-6ca1",
+      "edad47fe-fb70-ffc7",
+      "ef2d6c53-e8f3-d3b1",
+      "f55cec0d-620a-e70e",
+      "fad161bf-9c5f-a61c",
+      "fd917fed-3404-841b",
+      "fe2dbc17-e7e4-a8e5"
     ],
     "id": "abffa1db-3740-66e7",
     "name": "a"
