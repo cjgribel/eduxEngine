@@ -56,7 +56,7 @@
       "rigidbody_label_show_mass": false,
       "rigidbody_label_show_motion_type": true,
       "show_collider_labels": false,
-      "show_colliders": true,
+      "show_colliders": false,
       "show_constraint_6dof": false,
       "show_constraint_hinges": true,
       "show_constraint_points": false,
