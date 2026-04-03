@@ -30,14 +30,14 @@
               "Radius": 0.5,
               "Submesh Index": -1,
               "Terrain Chunk": {
-                "Guid": 4824527470402337645
+                "Guid": 8533167039018954379
               },
               "Type": "Heightfield"
             }
           ]
         },
         "eeng.ecs.HeaderComponent": {
-          "Guid": 5732260787565585407,
+          "Guid": 5934203555180691535,
           "Name": "TerrainChunk(1, 0)",
           "Parent Entity": {
             "Guid": 0
@@ -52,7 +52,7 @@
           "Clip Speed": 1.0,
           "Loop": true,
           "Model reference": {
-            "Guid": 9860902080794595881
+            "Guid": 12842802518772866920
           },
           "Name": "TerrainChunkModel(1, 0)"
         },
@@ -147,16 +147,16 @@
           ]
         }
       },
-      "entity_guid": 5732260787565585407
+      "entity_guid": 5934203555180691535
     }
   ],
   "header": {
     "asset_closure": [
-      "46e044ab-354e-1dc6",
-      "88d8f632-7aac-1229",
-      "42f42a2c-4271-fb6d"
+      "be68e136-d9a2-78a4",
+      "b23accd8-c3f2-df68",
+      "766be636-19cb-ee8b"
     ],
-    "id": "7a8a7e8f-9139-666e",
+    "id": "b0a99c1e-6dfc-469e",
     "name": "terrain_TerrainRecipe_chunk_1_0"
   }
 }

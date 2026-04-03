@@ -30,15 +30,15 @@
               "Radius": 0.5,
               "Submesh Index": -1,
               "Terrain Chunk": {
-                "Guid": 5311982928502594623
+                "Guid": 9829102727751851505
               },
               "Type": "Heightfield"
             }
           ]
         },
         "eeng.ecs.HeaderComponent": {
-          "Guid": 40249859464907710,
-          "Name": "TerrainChunk(0, 0)",
+          "Guid": 3701888148213102126,
+          "Name": "TerrainChunk(1, 1)",
           "Parent Entity": {
             "Guid": 0
           }
@@ -52,9 +52,9 @@
           "Clip Speed": 1.0,
           "Loop": true,
           "Model reference": {
-            "Guid": 563130956816640268
+            "Guid": 9313840414144455553
           },
-          "Name": "TerrainChunkModel(0, 0)"
+          "Name": "TerrainChunkModel(1, 1)"
         },
         "eeng.ecs.RigidBodyComponent": {
           "Allow Sleep": true,
@@ -95,9 +95,9 @@
             1.0
           ],
           "Position": [
+            50.0,
             0.0,
-            0.0,
-            0.0
+            50.0
           ],
           "Rotation": [
             0.0,
@@ -147,16 +147,16 @@
           ]
         }
       },
-      "entity_guid": 40249859464907710
+      "entity_guid": 3701888148213102126
     }
   ],
   "header": {
     "asset_closure": [
-      "5729a35d-5562-0b8a",
-      "07d0a49f-2314-e90c",
-      "49b7f454-5256-1c3f"
+      "2f563ec4-8c5d-cbcd",
+      "81416882-83c1-e381",
+      "8867fcda-a478-ddf1"
     ],
-    "id": "c9889457-a44e-7eaf",
-    "name": "terrain_TerrainRecipe_chunk_0_0"
+    "id": "cfa46327-78eb-90bf",
+    "name": "terrain_TerrainRecipe_chunk_1_1"
   }
 }

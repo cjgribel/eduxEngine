@@ -71,6 +71,10 @@ namespace eeng {
         std::filesystem::path       filename{};               // from index
         std::vector<Guid>           asset_closure_hdr;    // what header says (or recomputed)
         std::vector<ecs::EntityRef> live;                 // only while loaded
+        bool                        generated = false;
+        bool                        read_only = false;
+        Guid                        owner_guid{};
+        std::string                 generator_tag{};
 
         State       state{ State::Unloaded };
         TaskResult  last_result{};
@@ -224,9 +228,11 @@ namespace eeng {
         void process_dirty_batches(EngineContext& ctx);
 
         std::vector<const BatchInfo*> list() const;
+        bool try_get_batch_info(const BatchId& id, BatchInfo& out_info) const;
         bool try_get_loaded_batch_for_entity(const ecs::EntityRef& entity_ref, BatchId& out_id) const;
         bool try_get_batch_id_by_name(const std::string& name, BatchId& out_id) const;
         bool is_batch_loaded(const BatchId& id) const;
+        bool is_batch_read_only(const BatchId& id) const;
 
     private:
 

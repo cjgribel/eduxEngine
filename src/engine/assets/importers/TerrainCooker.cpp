@@ -486,7 +486,6 @@ namespace eeng::assets
 
             ecs::HeaderComponent header{};
             header.name = std::move(entity_name);
-            header.chunk_tag = "generated_terrain_chunk";
             header.guid = entity_guid;
             header.parent_entity = ecs::EntityRef{};
             registry->emplace<ecs::HeaderComponent>(entity, std::move(header));
@@ -971,7 +970,11 @@ namespace eeng::assets
                     .id = chunk_output.batch_id,
                     .name = chunk_output.batch_name,
                     .filename = batch_path.filename(),
-                    .asset_closure_hdr = chunk_output.asset_closure
+                    .asset_closure_hdr = chunk_output.asset_closure,
+                    .generated = true,
+                    .read_only = true,
+                    .owner_guid = recipe_guid,
+                    .generator_tag = "terrain"
                     }))
                 {
                     result.error_message = std::format(

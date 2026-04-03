@@ -474,6 +474,11 @@ namespace eeng::editor
         auto* br = cmd_ctx.batch_registry(*ctx_sp);
         if (!br)
             return CommandStatus::Done;
+        if (br->is_batch_read_only(batch_id))
+        {
+            EENG_LOG(ctx_sp.get(), "DeleteBatch blocked: generated/read-only batches must be removed via their owning tool workflow.");
+            return CommandStatus::Failed;
+        }
 
         BatchInfo info{};
         if (!br->delete_batch(batch_id, &info))
@@ -545,6 +550,11 @@ namespace eeng::editor
         if (!br->is_batch_loaded(target_batch))
         {
             // Policy: avoid orphaning entities by refusing to move into unloaded batches.
+            return CommandStatus::Failed;
+        }
+        if (br->is_batch_read_only(target_batch))
+        {
+            EENG_LOG(ctx_sp.get(), "AssignEntitiesToBatch blocked: generated/read-only batches are not editable targets.");
             return CommandStatus::Failed;
         }
 

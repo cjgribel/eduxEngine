@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "editor/EditorActions.hpp"
+#include "editor/CommandBatchHelpers.hpp"
 #include "editor/CommandQueue.hpp"
 #include "editor/GuiCommands.hpp"
 #include "editor/BatchCommands.hpp"
@@ -11,12 +12,14 @@
 #include "AssetMetaData.hpp"
 #include "assets/importers/TerrainCooker.hpp"
 #include "assets/types/AnimationGraphAsset.hpp"
+#include "assets/types/ModelAssets.hpp"
 #include "assets/types/TerrainAssets.hpp"
 #include "ecs/EntityManager.hpp"
 #include "meta/MetaAux.h"
 #include "LogMacros.h"
 #include <array>
 #include <cctype>
+#include <fstream>
 #include <memory>
 #include <unordered_set>
 
@@ -118,10 +121,111 @@ namespace eeng::editor
             }
             return candidate;
         }
+
+        std::deque<ecs::Entity> filter_out_read_only_entities(
+            EngineContext& ctx,
+            const std::deque<ecs::Entity>& selection,
+            const char* context_label)
+        {
+            std::deque<ecs::Entity> filtered{};
+            filtered.resize(0);
+
+            for (const auto& entity : selection)
+            {
+                if (!entity.has_id())
+                    continue;
+                if (editor::is_entity_in_read_only_batch(entity, ctx, context_label))
+                    continue;
+                filtered.push_back(entity);
+            }
+
+            if (filtered.empty() && !selection.empty())
+            {
+                EENG_LOG_WARN(&ctx, "%s ignored: selection only contains generated/read-only terrain content.", context_label);
+            }
+
+            return filtered;
+        }
+
+        bool reject_read_only_batch_target(
+            EngineContext& ctx,
+            const BatchId& batch_id,
+            const char* context_label)
+        {
+            if (!batch_id.valid())
+                return false;
+            if (!editor::is_batch_read_only(batch_id, ctx, context_label))
+                return false;
+
+            EENG_LOG_WARN(&ctx, "%s blocked: generated/read-only terrain batches are not editable targets.", context_label);
+            return true;
+        }
+
+        bool path_is_within(const std::filesystem::path& child, const std::filesystem::path& parent)
+        {
+            if (child.empty() || parent.empty())
+                return false;
+
+            const auto child_norm = child.lexically_normal();
+            const auto parent_norm = parent.lexically_normal();
+
+            auto parent_it = parent_norm.begin();
+            auto child_it = child_norm.begin();
+            for (; parent_it != parent_norm.end() && child_it != child_norm.end(); ++parent_it, ++child_it)
+            {
+                if (*parent_it != *child_it)
+                    return false;
+            }
+            return parent_it == parent_norm.end();
+        }
+
+        std::vector<BatchId> read_cooked_terrain_batch_ids(const std::filesystem::path& terrain_asset_path)
+        {
+            std::vector<BatchId> batch_ids{};
+
+            std::ifstream file(terrain_asset_path);
+            if (!file.is_open())
+                return batch_ids;
+
+            nlohmann::json j;
+            try
+            {
+                file >> j;
+            }
+            catch (...)
+            {
+                return batch_ids;
+            }
+
+            const auto chunks_it = j.find("chunks");
+            if (chunks_it == j.end() || !chunks_it->is_array())
+                return batch_ids;
+
+            for (const auto& elem : *chunks_it)
+            {
+                if (!elem.is_object() || !elem.contains("batch_id"))
+                    continue;
+
+                const auto& batch_json = elem["batch_id"];
+                if (!batch_json.is_object() || !batch_json.contains("guid"))
+                    continue;
+
+                const auto raw = batch_json["guid"].get<Guid::underlying_type>();
+                if (raw != 0)
+                    batch_ids.emplace_back(raw);
+            }
+
+            return batch_ids;
+        }
     }
 
     void SceneActions::create_entity(EngineContext& ctx, const ecs::Entity& parent_entity)
     {
+        if (parent_entity.has_id() && is_entity_in_read_only_batch(parent_entity, ctx, "CreateEntity"))
+        {
+            EENG_LOG_WARN(&ctx, "CreateEntity blocked: cannot create children under generated/read-only terrain content.");
+            return;
+        }
         if (!can_queue_action(ctx, "CreateEntity"))
             return;
 
@@ -139,7 +243,8 @@ namespace eeng::editor
 
     void SceneActions::delete_entities(EngineContext& ctx, const std::deque<ecs::Entity>& selection)
     {
-        if (selection.empty())
+        const auto mutable_selection = filter_out_read_only_entities(ctx, selection, "DeleteEntities");
+        if (mutable_selection.empty())
             return;
         if (!can_queue_action(ctx, "DeleteEntities"))
             return;
@@ -151,7 +256,7 @@ namespace eeng::editor
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
         auto roots = filter_out_descendants(
             em.scene_graph(),
-            selection);
+            mutable_selection);
 
         for (const auto& entity : roots)
         {
@@ -166,7 +271,8 @@ namespace eeng::editor
 
     void SceneActions::copy_entities(EngineContext& ctx, const std::deque<ecs::Entity>& selection)
     {
-        if (selection.empty())
+        const auto mutable_selection = filter_out_read_only_entities(ctx, selection, "CopyEntities");
+        if (mutable_selection.empty())
             return;
         if (!can_queue_action(ctx, "CopyEntities"))
             return;
@@ -178,7 +284,7 @@ namespace eeng::editor
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
         auto roots = filter_out_descendants(
             em.scene_graph(),
-            selection);
+            mutable_selection);
 
         for (const auto& entity : roots)
         {
@@ -193,7 +299,8 @@ namespace eeng::editor
 
     void SceneActions::parent_entities(EngineContext& ctx, const std::deque<ecs::Entity>& selection)
     {
-        if (selection.size() < 2)
+        const auto mutable_selection = filter_out_read_only_entities(ctx, selection, "ParentEntities");
+        if (mutable_selection.size() < 2)
             return;
         if (!can_queue_action(ctx, "ParentEntities"))
             return;
@@ -204,9 +311,14 @@ namespace eeng::editor
 
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
         auto& scenegraph = em.scene_graph();
-        const auto new_parent = selection.back();
+        const auto new_parent = mutable_selection.back();
+        if (is_entity_in_read_only_batch(new_parent, ctx, "ParentEntities"))
+        {
+            EENG_LOG_WARN(&ctx, "ParentEntities blocked: cannot parent under generated/read-only terrain content.");
+            return;
+        }
 
-        for (const auto& entity : selection)
+        for (const auto& entity : mutable_selection)
         {
             if (entity == new_parent)
                 continue;
@@ -225,7 +337,8 @@ namespace eeng::editor
 
     void SceneActions::unparent_entities(EngineContext& ctx, const std::deque<ecs::Entity>& selection)
     {
-        if (selection.empty())
+        const auto mutable_selection = filter_out_read_only_entities(ctx, selection, "UnparentEntities");
+        if (mutable_selection.empty())
             return;
         if (!can_queue_action(ctx, "UnparentEntities"))
             return;
@@ -237,7 +350,7 @@ namespace eeng::editor
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
         auto& scenegraph = em.scene_graph();
 
-        for (const auto& entity : selection)
+        for (const auto& entity : mutable_selection)
         {
             if (scenegraph.is_root(entity))
                 continue;
@@ -254,7 +367,8 @@ namespace eeng::editor
 
     void SceneActions::add_components(EngineContext& ctx, const std::deque<ecs::Entity>& selection, entt::id_type comp_id)
     {
-        if (selection.empty() || comp_id == entt::id_type{})
+        const auto mutable_selection = filter_out_read_only_entities(ctx, selection, "AddComponents");
+        if (mutable_selection.empty() || comp_id == entt::id_type{})
             return;
         if (!can_queue_action(ctx, "AddComponents"))
             return;
@@ -280,7 +394,7 @@ namespace eeng::editor
             append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.PhysicsEventsComponent"));
         }
 
-        for (const auto& entity : selection)
+        for (const auto& entity : mutable_selection)
         {
             if (!entity.has_id())
                 continue;
@@ -317,7 +431,8 @@ namespace eeng::editor
 
     void SceneActions::remove_components(EngineContext& ctx, const std::deque<ecs::Entity>& selection, entt::id_type comp_id)
     {
-        if (selection.empty() || comp_id == entt::id_type{})
+        const auto mutable_selection = filter_out_read_only_entities(ctx, selection, "RemoveComponents");
+        if (mutable_selection.empty() || comp_id == entt::id_type{})
             return;
         if (!can_queue_action(ctx, "RemoveComponents"))
             return;
@@ -342,7 +457,7 @@ namespace eeng::editor
             append_component_if_valid(bundle_ids, meta::resolve_by_type_id_string("eeng.ecs.PhysicsEventsComponent"));
         }
 
-        for (const auto& entity : selection)
+        for (const auto& entity : mutable_selection)
         {
             if (!entity.has_id())
                 continue;
@@ -385,6 +500,11 @@ namespace eeng::editor
     {
         if (branch_json.is_null())
             return;
+        if (parent_entity.has_id() && is_entity_in_read_only_batch(parent_entity, ctx, "SpawnEntityBranch"))
+        {
+            EENG_LOG_WARN(&ctx, "SpawnEntityBranch blocked: cannot spawn under generated/read-only terrain content.");
+            return;
+        }
         if (!can_queue_action(ctx, "SpawnEntityBranch"))
             return;
 
@@ -406,6 +526,11 @@ namespace eeng::editor
     {
         if (!root_entity.has_id())
             return;
+        if (is_entity_in_read_only_batch(root_entity, ctx, "BakeTransformBranch"))
+        {
+            EENG_LOG_WARN(&ctx, "BakeTransformBranch blocked: generated/read-only terrain content cannot be edited directly.");
+            return;
+        }
         if (!can_queue_action(ctx, "BakeTransformBranch"))
             return;
 
@@ -717,6 +842,138 @@ namespace eeng::editor
             ctx);
     }
 
+    /// @brief Clear cooked terrain batches and assets associated with a terrain recipe, and remove the cook output from disk, allowing for a fresh cook.
+    /// @param ctx The engine context.
+    /// @param recipe_guid The GUID of the terrain recipe.
+    void AssetActions::clear_cooked_terrain(
+        EngineContext& ctx,
+        const Guid& recipe_guid)
+    {
+        if (!recipe_guid.valid())
+        {
+            EENG_LOG_WARN(&ctx, "Clear cooked terrain skipped: invalid recipe guid.");
+            return;
+        }
+
+        auto& rm = static_cast<ResourceManager&>(*ctx.resource_manager);
+        const auto& assets_root = rm.assets_root();
+        if (assets_root.empty())
+        {
+            EENG_LOG_WARN(&ctx, "Clear cooked terrain skipped: assets root not set.");
+            return;
+        }
+
+        rm.queue_import_job(
+            [recipe_guid, assets_root](ResourceManager& rm, EngineContext& ctx) -> TaskResult
+            {
+                TaskResult res;
+                res.type = TaskResult::TaskType::Unimport;
+
+                auto* batch_registry = dynamic_cast<BatchRegistry*>(ctx.batch_registry.get());
+                if (!batch_registry || batch_registry->index_path().empty())
+                {
+                    res.add_result(recipe_guid, false, "Clear cooked terrain failed: valid BatchRegistry required.");
+                    return res;
+                }
+
+                const auto index_data = rm.get_index_data();
+                if (!index_data)
+                {
+                    res.add_result(recipe_guid, false, "Clear cooked terrain failed: asset index unavailable.");
+                    return res;
+                }
+
+                const auto recipe_it = index_data->by_guid.find(recipe_guid);
+                if (recipe_it == index_data->by_guid.end() || !recipe_it->second)
+                {
+                    res.add_result(recipe_guid, false, "Clear cooked terrain failed: recipe entry missing from asset index.");
+                    return res;
+                }
+
+                const std::string recipe_name = sanitize_asset_name(recipe_it->second->meta.name);
+                const std::filesystem::path cook_root = rm.assets_root() / "terrain" / recipe_name;
+                const std::filesystem::path terrain_asset_path = cook_root / "terrain.json";
+
+                std::unordered_set<BatchId> owned_batch_set{};
+                for (const BatchInfo* batch : batch_registry->list())
+                {
+                    if (!batch)
+                        continue;
+                    if (!batch->generated || !batch->read_only)
+                        continue;
+                    if (batch->owner_guid != recipe_guid)
+                        continue;
+                    if (batch->generator_tag != "terrain")
+                        continue;
+                    owned_batch_set.insert(batch->id);
+                }
+                for (const auto& batch_id : read_cooked_terrain_batch_ids(terrain_asset_path))
+                    owned_batch_set.insert(batch_id);
+
+                std::vector<BatchId> owned_batches(owned_batch_set.begin(), owned_batch_set.end());
+
+                for (const auto& batch_id : owned_batches)
+                {
+                    if (batch_registry->is_batch_loaded(batch_id))
+                    {
+                        const TaskResult unload_result = batch_registry->queue_unload(batch_id, ctx).get();
+                        if (!unload_result.success)
+                        {
+                            res.add_result(batch_id, false, "Clear cooked terrain failed: could not unload generated terrain batch.");
+                            return res;
+                        }
+                    }
+                }
+
+                // Unload any generated terrain assets still open in the editor
+                // before removing their cook folder from disk.
+                for (const auto& entry : index_data->entries)
+                {
+                    if (!path_is_within(entry.absolute_path, cook_root))
+                        continue;
+
+                    try
+                    {
+                        if (entry.meta.type_id == meta::get_meta_type_id_string<assets::TerrainAsset>())
+                            rm.unload_asset<assets::TerrainAsset>(entry.meta.guid, ctx);
+                        else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::TerrainChunkAsset>())
+                            rm.unload_asset<assets::TerrainChunkAsset>(entry.meta.guid, ctx);
+                        else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::ModelDataAsset>())
+                            rm.unload_asset<assets::ModelDataAsset>(entry.meta.guid, ctx);
+                        else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::GpuModelAsset>())
+                            rm.unload_asset<assets::GpuModelAsset>(entry.meta.guid, ctx);
+                    }
+                    catch (...)
+                    {
+                        // Keep cleanup best-effort here; scan below rebuilds the index.
+                    }
+                }
+
+                for (const auto& batch_id : owned_batches)
+                {
+                    if (!batch_registry->delete_batch(batch_id))
+                    {
+                        res.add_result(batch_id, false, "Clear cooked terrain failed: could not delete generated terrain batch.");
+                        return res;
+                    }
+                }
+                batch_registry->save_index();
+
+                std::error_code ec{};
+                std::filesystem::remove_all(cook_root, ec);
+                if (ec)
+                {
+                    res.add_result(recipe_guid, false, "Clear cooked terrain failed: could not remove cook folder.");
+                    return res;
+                }
+
+                rm.scan_assets_async(assets_root, ctx);
+                res.add_result(recipe_guid, true, "Cleared cooked terrain outputs.");
+                return res;
+            },
+            ctx);
+    }
+
     void AssetActions::unimport_assets(EngineContext& ctx, std::vector<Guid> roots)
     {
         if (roots.empty())
@@ -877,6 +1134,8 @@ namespace eeng::editor
     {
         if (!id.valid())
             return;
+        if (reject_read_only_batch_target(ctx, id, "DeleteBatch"))
+            return;
         if (!can_queue_action(ctx, "DeleteBatch"))
             return;
 
@@ -899,7 +1158,13 @@ namespace eeng::editor
     {
         if (!id.valid() || selection.empty())
             return;
+        if (reject_read_only_batch_target(ctx, id, "AssignEntitiesToBatch"))
+            return;
         if (!can_queue_action(ctx, "AssignEntitiesToBatch"))
+            return;
+
+        const auto mutable_selection = filter_out_read_only_entities(ctx, selection, "AssignEntitiesToBatch");
+        if (mutable_selection.empty())
             return;
 
         auto ctx_wptr = ctx.weak_from_this();
@@ -915,13 +1180,13 @@ namespace eeng::editor
         }
 
         std::vector<ecs::Entity> selection_snapshot;
-        selection_snapshot.reserve(selection.size());
+        selection_snapshot.reserve(mutable_selection.size());
 
         auto& em = static_cast<EntityManager&>(*ctx.entity_manager);
         auto& scenegraph = em.scene_graph();
         std::unordered_set<ecs::Entity> seen;
 
-        for (const auto& entity : selection)
+        for (const auto& entity : mutable_selection)
         {
             if (!entity.has_id() || !em.entity_valid(entity)) continue;
             if (!scenegraph.contains(entity)) continue;

@@ -366,7 +366,11 @@ namespace eeng
                     { "id", b.id.to_string() },
                     { "name", b.name },
                     { "asset_closure_hdr", closure_json },
-                    { "filename", b.filename.string() }
+                    { "filename", b.filename.string() },
+                    { "generated", b.generated },
+                    { "read_only", b.read_only },
+                    { "owner_guid", b.owner_guid.to_string() },
+                    { "generator_tag", b.generator_tag }
                     });
             }
         }
@@ -411,6 +415,15 @@ namespace eeng
             bi.id = Guid::from_string(b["id"].get<std::string>());
             bi.name = b.value("name", bi.id.to_string());
             bi.filename = b["filename"].get<std::string>();
+            bi.generated = b.value("generated", false);
+            bi.read_only = b.value("read_only", false);
+            if (b.contains("owner_guid"))
+            {
+                const auto owner_str = b["owner_guid"].get<std::string>();
+                if (!owner_str.empty())
+                    bi.owner_guid = Guid::from_string(owner_str);
+            }
+            bi.generator_tag = b.value("generator_tag", std::string{});
 
             if (b.contains("asset_closure_hdr"))
             {
@@ -483,6 +496,10 @@ namespace eeng
         it->second.name = std::move(info.name);
         it->second.filename = std::move(info.filename);
         it->second.asset_closure_hdr = std::move(info.asset_closure_hdr);
+        it->second.generated = info.generated;
+        it->second.read_only = info.read_only;
+        it->second.owner_guid = info.owner_guid;
+        it->second.generator_tag = std::move(info.generator_tag);
         return true;
     }
 
@@ -789,6 +806,14 @@ namespace eeng
                 return false;
             }
 
+            if (it->second.read_only)
+            {
+                // Generated/read-only batches are loadable residency units, not
+                // normal authored save targets. Treat save as a successful no-op
+                // so unload flows remain safe without rewriting generated data.
+                return true;
+            }
+
             snapshot = it->second; // shallow copy (id, name, filename, asset_closure_hdr, live)
         }
 
@@ -942,7 +967,7 @@ namespace eeng
         {
             std::lock_guard lk(mtx_);
             for (auto& [id, b] : batches_)
-                if (b.state == BatchInfo::State::Loaded)
+                if (b.state == BatchInfo::State::Loaded && !b.read_only)
                     ids.push_back(id);
         }
 
@@ -994,6 +1019,8 @@ namespace eeng
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
                         return emit_and_return(ecs::EntityRef{ Guid::invalid() }, (it != batches_.end()) ? &it->second : nullptr);      // require loaded batch
+                    if (it->second.read_only)
+                        return emit_and_return(ecs::EntityRef{ Guid::invalid() }, &it->second);
                     B = &it->second;
                 }
 
@@ -1059,6 +1086,8 @@ namespace eeng
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
                         return emit_and_return(false, (it != batches_.end()) ? &it->second : nullptr);
+                    if (it->second.read_only)
+                        return emit_and_return(false, &it->second);
                     B = &it->second;
 
                     // Remove from live list
@@ -1121,6 +1150,8 @@ namespace eeng
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
                         return emit_and_return(false, (it != batches_.end()) ? &it->second : nullptr);
+                    if (it->second.read_only)
+                        return emit_and_return(false, &it->second);
 
                     B = &it->second;
                     B->live.push_back(entity_ref);
@@ -1203,6 +1234,8 @@ namespace eeng
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
                         return emit_and_return(false, (it != batches_.end()) ? &it->second : nullptr);
+                    if (it->second.read_only)
+                        return emit_and_return(false, &it->second);
 
                     B = &it->second;
                     auto& live = B->live;
@@ -1420,6 +1453,20 @@ namespace eeng
         return out;
     }
 
+    bool BatchRegistry::try_get_batch_info(const BatchId& id, BatchInfo& out_info) const
+    {
+        if (!id.valid())
+            return false;
+
+        std::lock_guard lk(mtx_);
+        const auto it = batches_.find(id);
+        if (it == batches_.end())
+            return false;
+
+        out_info = it->second;
+        return true;
+    }
+
     bool BatchRegistry::try_get_loaded_batch_for_entity(const ecs::EntityRef& entity_ref, BatchId& out_id) const
     {
         if (!entity_ref.guid.valid())
@@ -1461,6 +1508,18 @@ namespace eeng
         if (it == batches_.end())
             return false;
         return it->second.state == BatchInfo::State::Loaded;
+    }
+
+    bool BatchRegistry::is_batch_read_only(const BatchId& id) const
+    {
+        if (!id.valid())
+            return false;
+
+        std::lock_guard lk(mtx_);
+        const auto it = batches_.find(id);
+        if (it == batches_.end())
+            return false;
+        return it->second.read_only;
     }
 
     void BatchRegistry::mark_closure_dirty(const BatchId& id)

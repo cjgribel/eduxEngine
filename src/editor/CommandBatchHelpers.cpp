@@ -10,6 +10,34 @@
 
 namespace eeng::editor
 {
+    namespace
+    {
+        /// @brief  Helper to get a pointer to the batch registry from the engine context, with logging.
+        /// @param ctx The engine context.
+        /// @param out_br The output batch registry pointer.
+        /// @param context_label A label for logging context.
+        /// @return True if the batch registry is available, false otherwise.
+        bool try_get_batch_registry(EngineContext& ctx, BatchRegistry*& out_br, const char* context_label)
+        {
+            out_br = ctx.batch_registry
+                ? static_cast<BatchRegistry*>(ctx.batch_registry.get())
+                : nullptr;
+            if (!out_br)
+            {
+                EENG_LOG(&ctx, "%s aborted: missing batch registry.", context_label);
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /// @brief  Resolve the batch and entity reference for an entity that is already loaded in a batch, if any.
+    /// @param entity The entity to resolve.
+    /// @param ctx The engine context.
+    /// @param out_batch The resolved batch ID.
+    /// @param out_entity_ref The resolved entity reference.
+    /// @param context_label A label for logging context.
+    /// @return True if the entity is loaded in a batch, false otherwise.
     bool resolve_loaded_batch_for_entity(
         ecs::Entity entity,
         EngineContext& ctx,
@@ -70,6 +98,11 @@ namespace eeng::editor
             context_label);
         if (!decision.ok)
             return false;
+        if (br && br->is_batch_read_only(decision.batch))
+        {
+            EENG_LOG(&ctx, "%s blocked: target batch is read-only.", context_label);
+            return false;
+        }
 
         out_batch = decision.batch;
         out_parent_ref = decision.parent_ref;
@@ -88,6 +121,12 @@ namespace eeng::editor
             return false;
 
         auto& br = static_cast<eeng::BatchRegistry&>(*ctx.batch_registry);
+        if (br.is_batch_read_only(batch))
+        {
+            EENG_LOG(&ctx, "%s blocked: target entity belongs to a read-only batch.", context_label);
+            return false;
+        }
+
         out_future = br.queue_destroy_entity(batch, entity_ref, ctx);
         return true;
     }
@@ -119,9 +158,47 @@ namespace eeng::editor
             EENG_LOG(&ctx, "%s failed: target batch is not loaded.", context_label);
             return false;
         }
+        if (br.is_batch_read_only(batch))
+        {
+            EENG_LOG(&ctx, "%s blocked: target batch is read-only.", context_label);
+            return false;
+        }
 
         out_future = br.queue_attach_entity(batch, entity_ref, ctx);
         return true;
+    }
+
+    bool is_entity_in_read_only_batch(
+        ecs::Entity entity,
+        EngineContext& ctx,
+        const char* context_label)
+    {
+        BatchId batch{};
+        ecs::EntityRef entity_ref{};
+        if (!resolve_loaded_batch_for_entity(entity, ctx, batch, entity_ref, context_label))
+            return false;
+
+        BatchRegistry* br = nullptr;
+        if (!try_get_batch_registry(ctx, br, context_label))
+            return false;
+        return br->is_batch_read_only(batch);
+    }
+
+    bool is_batch_read_only(
+        const BatchId& batch,
+        EngineContext& ctx,
+        const char* context_label)
+    {
+        BatchRegistry* br = nullptr;
+        if (!try_get_batch_registry(ctx, br, context_label))
+            return false;
+
+        if (!batch.valid())
+        {
+            EENG_LOG(&ctx, "%s aborted: invalid batch id.", context_label);
+            return false;
+        }
+        return br->is_batch_read_only(batch);
     }
 
     void sync_branch_batch_with_parent(

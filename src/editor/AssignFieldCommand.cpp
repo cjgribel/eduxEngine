@@ -6,6 +6,7 @@
 //
 
 #include "editor/AssignFieldCommand.hpp"
+#include "editor/CommandBatchHelpers.hpp"
 #include "editor/CommandContext.hpp"
 #include "editor/MetaFieldAssign.hpp"
 #include "meta/EntityMetaHelpers.hpp"
@@ -111,6 +112,25 @@ namespace
             return {};
 
         return collect_asset_guids_sorted(component_ctx->entity, *component_ctx->registry);
+    }
+
+    bool reject_read_only_component_target(
+        const std::optional<ComponentTargetContext>& component_ctx,
+        const eeng::editor::FieldTarget& target,
+        const char* context_label)
+    {
+        if (!component_ctx)
+            return false;
+
+        auto ctx_sp = lock_context(target.ctx);
+        if (!ctx_sp)
+            return true;
+
+        if (!eeng::editor::is_entity_in_read_only_batch(component_ctx->entity, *ctx_sp, context_label))
+            return false;
+
+        EENG_LOG(ctx_sp.get(), "%s blocked: generated/read-only batch content cannot be edited directly.", context_label);
+        return true;
     }
  
     // Emit a FieldChangedEvent to notify listeners of a field change.
@@ -244,6 +264,8 @@ namespace eeng::editor
     CommandStatus AssignFieldCommand::execute()
     {
         const auto component_ctx = resolve_component_target(edit.target);
+        if (reject_read_only_component_target(component_ctx, edit.target, "AssignFieldCommand"))
+            return CommandStatus::Failed;
         const auto asset_guids_before = collect_asset_guids_if_component_target(component_ctx);
 
         if (!assign_meta_field(edit.target, edit.meta_path, edit.new_value))
@@ -281,6 +303,8 @@ namespace eeng::editor
     CommandStatus AssignFieldCommand::undo()
     {
         const auto component_ctx = resolve_component_target(edit.target);
+        if (reject_read_only_component_target(component_ctx, edit.target, "AssignFieldCommand undo"))
+            return CommandStatus::Failed;
         const auto asset_guids_before = collect_asset_guids_if_component_target(component_ctx);
 
         if (!assign_meta_field(edit.target, edit.meta_path, edit.prev_value))

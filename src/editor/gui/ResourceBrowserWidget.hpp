@@ -729,6 +729,11 @@ namespace eeng::gui
                     {
                         editor::AssetActions::cook_terrain_recipe(ctx, entry.meta.guid);
                     }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Clear Cooked Terrain"))
+                    {
+                        editor::AssetActions::clear_cooked_terrain(ctx, entry.meta.guid);
+                    }
                 }
             }
             ImGui::EndChild();

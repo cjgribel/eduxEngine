@@ -96,6 +96,17 @@ namespace eeng::editor
             EngineContext& ctx,
             const Guid& recipe_guid);
 
+        /**
+         * @brief Remove all generated outputs owned by a terrain recipe.
+         *
+         * This clears cooked terrain assets and generated terrain chunk batches
+         * so the recipe can be re-cooked from a clean state. Like cooking, this
+         * is treated as a build/cleanup action rather than an undoable scene edit.
+         */
+        static void clear_cooked_terrain(
+            EngineContext& ctx,
+            const Guid& recipe_guid);
+
         /// @brief Queue an undoable unimport by GUID (serialized on RM strand).
         static void unimport_assets(
             EngineContext& ctx,

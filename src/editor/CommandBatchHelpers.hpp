@@ -44,6 +44,19 @@ namespace eeng::editor
         std::shared_future<bool>& out_future,
         const char* context_label);
 
+    // True when the entity belongs to a loaded batch that should not be
+    // mutated through normal editor commands.
+    bool is_entity_in_read_only_batch(
+        ecs::Entity entity,
+        EngineContext& ctx,
+        const char* context_label);
+
+    // True when the batch exists and is marked read-only in the batch index.
+    bool is_batch_read_only(
+        const BatchId& batch,
+        EngineContext& ctx,
+        const char* context_label);
+
     // Enforce "branch follows parent" on reparent operations.
     void sync_branch_batch_with_parent(
         ecs::Entity root_entity,
