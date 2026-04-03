@@ -147,7 +147,8 @@ namespace eeng
 
     void GuiManager::release()
     {
-
+        if (!g_imgui_ini_path.empty())
+            ImGui::SaveIniSettingsToDisk(g_imgui_ini_path.c_str());
     }
 
     void GuiManager::draw(EngineContext& ctx) const
@@ -780,11 +781,28 @@ namespace eeng
             std::string label = b->name.empty()
                 ? b->id.to_string()
                 : b->name + " (" + state_str + ")";
+            if (b->generated)
+                label += " [generated]";
+            if (b->read_only)
+                label += " [read-only]";
             label += "##" + std::to_string(i); // ensure unique ID
 
             ImGui::PushStyleColor(ImGuiCol_Text, state_color);
             bool selected = ImGui::Selectable(label.c_str(), selected_index == i);
             ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && (b->generated || b->read_only))
+            {
+                ImGui::BeginTooltip();
+                if (b->generated)
+                    ImGui::TextUnformatted("Generated content");
+                if (b->read_only)
+                    ImGui::TextUnformatted("Read-only batch: load/unload is allowed, editing is blocked.");
+                if (b->owner_guid.valid())
+                    ImGui::Text("Owner: %s", b->owner_guid.to_string().c_str());
+                if (!b->generator_tag.empty())
+                    ImGui::Text("Generator: %s", b->generator_tag.c_str());
+                ImGui::EndTooltip();
+            }
             if (selected)
             {
                 batch_selection.clear();
@@ -806,6 +824,12 @@ namespace eeng
             ImGui::Text("ID:   %s", b->id.to_string().c_str());
             ImGui::Text("Name: %s", b->name.c_str());
             ImGui::Text("File: %s", b->filename.string().c_str());
+            ImGui::Text("Generated: %s", b->generated ? "yes" : "no");
+            ImGui::Text("Read-only: %s", b->read_only ? "yes" : "no");
+            if (b->owner_guid.valid())
+                ImGui::Text("Owner GUID: %s", b->owner_guid.to_string().c_str());
+            if (!b->generator_tag.empty())
+                ImGui::Text("Generator: %s", b->generator_tag.c_str());
 
             const char* state_str = "";
             switch (b->state)
@@ -835,7 +859,8 @@ namespace eeng
             const bool can_assign = can_queue
                 && ctx.entity_manager
                 && selection_count > 0
-                && b->state == BatchInfo::State::Loaded;
+                && b->state == BatchInfo::State::Loaded
+                && !b->read_only;
 
             ImGui::TextUnformatted("Selection");
             ImGui::Text("Selected entities: %d", selection_count);
@@ -850,14 +875,16 @@ namespace eeng
                     entity_selection.get_all());
             }
             ImGui::EndDisabled();
+            if (!can_assign && b->read_only && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                ImGui::SetTooltip("Generated/read-only batches are residency units, not authoring targets.");
             ImGui::Separator();
 
             // Actions
             bool can_load = (b->state == BatchInfo::State::Unloaded ||
                 b->state == BatchInfo::State::Error);
             bool can_unload = (b->state == BatchInfo::State::Loaded);
-            bool can_save = (b->state == BatchInfo::State::Loaded);
-            bool can_delete = (b->state == BatchInfo::State::Unloaded);
+            bool can_save = (b->state == BatchInfo::State::Loaded) && !b->read_only;
+            bool can_delete = (b->state == BatchInfo::State::Unloaded) && !b->read_only;
 
             // -- Load selected batch --
             if (can_load)
@@ -905,6 +932,8 @@ namespace eeng
                 ImGui::BeginDisabled();
                 ImGui::Button("Save");
                 ImGui::EndDisabled();
+                if (b->read_only && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                    ImGui::SetTooltip("Generated/read-only batches are not saved through the batch UI.");
             }
 
             ImGui::SameLine();
@@ -920,6 +949,8 @@ namespace eeng
                 ImGui::BeginDisabled();
                 ImGui::Button("Delete");
                 ImGui::EndDisabled();
+                if (b->read_only && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                    ImGui::SetTooltip("Generated/read-only batches should be cleared through their owning tool workflow.");
             }
 
             ImGui::Separator();

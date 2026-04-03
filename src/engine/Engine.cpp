@@ -309,7 +309,13 @@ namespace eeng
                 // shutdown progress remain visible.
                 begin_frame();
                 if (ctx)
+                {
+                    // Keep the dockspace alive while draining shutdown work so
+                    // overlay windows don't get persisted as floating.
+                    if (ctx->gui_manager)
+                        ctx->gui_manager->draw(*ctx);
                     engine_overlay_.draw(*ctx);
+                }
                 end_frame();
                 SDL_GL_SwapWindow(window_);
                 SDL_Delay(1);
