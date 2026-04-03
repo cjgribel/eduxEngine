@@ -45,12 +45,10 @@ What we have now:
 
 ## Limitations
 - chunk load state is still manual; no streaming or smart residency logic yet
-- generated terrain chunk batches are not fully protected as read-only yet
-- generated/read-only batch metadata is still missing
-- command filtering for generated terrain chunk entities is still missing
 - material transfer from source terrain to cooked chunk render assets is still missing
 - generated terrain assets and batches are still somewhat noisy in the Resource Browser
 - `HeaderComponent.chunk_tag` is an old remnant and should not be treated as the long-term terrain metadata mechanism
+- some lower-level engine APIs can still mutate entities without going through editor command policy; terrain safety currently focuses on the editor-facing mutation paths
 
 ## Command Integrity
 Generated terrain batches can still be loadable through commands without threatening command queue integrity, but only if we keep the semantics strict.
@@ -69,17 +67,16 @@ Main risk:
 So the key distinction is:
 - loadable: yes
 - editable like authored content: no
+- cook / clear-cook pre-unload generated terrain batches off the RM strand before entering the RM job, to avoid BatchRegistry <-> ResourceManager deadlocks
 
 ## Near-Term Plan
 Immediate next steps:
-- add batch metadata for generated/read-only terrain chunk batches
-- add a `Clear Cooked Terrain` action on `TerrainRecipeAsset`
+- show generated/read-only state clearly in batch and hierarchy UI
+- review remaining editor mutation paths for generated terrain content
 
 Short follow-up items:
 - expose normal batch delete in the GUI
-- decide how generated terrain batches should appear in that GUI
 - review and clean up the `IBatchRegistry` / `BatchRegistry` split
-- add command filtering so generated terrain chunk entities cannot be edited as normal scene content
 - add material transfer from the source terrain submesh to cooked chunk render assets
 
 ## `IBatchRegistry` / `BatchRegistry`

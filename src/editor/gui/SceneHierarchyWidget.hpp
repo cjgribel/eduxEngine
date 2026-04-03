@@ -94,7 +94,21 @@ namespace eeng::gui
             if (name_hash_pos != std::string::npos)
                 entity_name.resize(name_hash_pos);
 
-            const std::string label = "[entity#" + std::to_string(entity.to_integral()) + "] " + entity_name;
+            const BatchInfo* entity_batch_info = nullptr;
+            const BatchKey entity_batch_key = resolve_batch_key(entity, entity_batch_info);
+
+            std::string label = "[entity#" + std::to_string(entity.to_integral()) + "] " + entity_name;
+            if (entity_batch_info)
+            {
+                if (entity_batch_info->generated)
+                    label += " [generated]";
+                if (entity_batch_info->read_only)
+                    label += " [read-only]";
+            }
+            else if (entity_batch_key.mixed)
+            {
+                label += " [mixed-batch]";
+            }
 
             bool is_selected = entity_selection.contains(entity);
             bool is_leaf = scenegraph.get_nbr_children(entity) == 0;
@@ -112,7 +126,26 @@ namespace eeng::gui
             intptr_t id_int = static_cast<intptr_t>(entity.to_integral());
             void* id_ptr = reinterpret_cast<void*>(id_int);
 
+            if (entity_batch_info && entity_batch_info->read_only)
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.82f, 0.78f, 0.52f, 1.0f));
+
             bool opened = ImGui::TreeNodeEx(id_ptr, flags, "%s", label.c_str());
+
+            if (entity_batch_info && entity_batch_info->read_only)
+                ImGui::PopStyleColor();
+
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && entity_batch_info)
+            {
+                if (entity_batch_info->generated || entity_batch_info->read_only)
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::TextUnformatted("Generated terrain content");
+                    if (entity_batch_info->read_only)
+                        ImGui::TextUnformatted("Read-only: load/unload is allowed, direct editing is blocked.");
+                    ImGui::Text("Batch: %s", entity_batch_info->name.c_str());
+                    ImGui::EndTooltip();
+                }
+            }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
             {
                 if (bool ctrl_pressed = ImGui::IsKeyDown(ImGuiKey_ModCtrl); ctrl_pressed)
@@ -233,6 +266,14 @@ namespace eeng::gui
                 label = "Batch: " + info->name;
             else
                 label = "Batch: " + key.id.to_string();
+
+            if (info)
+            {
+                if (info->generated)
+                    label += " [generated]";
+                if (info->read_only)
+                    label += " [read-only]";
+            }
 
             ImGui::Separator();
             ImGui::TextDisabled("%s", label.c_str());

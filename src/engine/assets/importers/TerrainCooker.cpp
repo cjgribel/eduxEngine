@@ -797,20 +797,17 @@ namespace eeng::assets
         const std::filesystem::path batches_root = batch_registry->index_path().parent_path();
         const std::vector<Guid> old_batch_ids = read_existing_chunk_batch_ids(terrain_asset_path);
 
-        // Re-cook is expected to be a normal workflow. Before we overwrite any
-        // generated terrain batches, unload the previously generated chunk
-        // batches for this recipe so their live entities and asset leases do
-        // not survive into the new cook output.
         for (const auto& old_batch_id : old_batch_ids)
         {
-            if (!old_batch_id.valid() || !batch_registry->is_batch_loaded(old_batch_id))
+            if (!old_batch_id.valid())
                 continue;
-
-            TaskResult unload_result = batch_registry->queue_unload(old_batch_id, ctx).get();
-            if (!unload_result.success)
+            if (batch_registry->is_batch_loaded(old_batch_id))
             {
+                // Batch unload must happen before entering this RM-strand cook.
+                // EditorActions performs that preflight explicitly to avoid a
+                // cross-strand deadlock between BatchRegistry and ResourceManager.
                 result.error_message = std::format(
-                    "Terrain cook failed: could not unload existing terrain chunk batch {}.",
+                    "Terrain cook failed: terrain chunk batch {} is still loaded. The caller must unload generated terrain batches before cooking.",
                     old_batch_id.to_string());
                 return result;
             }
@@ -992,14 +989,10 @@ namespace eeng::assets
 
             if (batch_registry->is_batch_loaded(old_batch_id))
             {
-                TaskResult unload_result = batch_registry->queue_unload(old_batch_id, ctx).get();
-                if (!unload_result.success)
-                {
-                    result.error_message = std::format(
-                        "Terrain cook failed: could not unload stale terrain chunk batch {}.",
-                        old_batch_id.to_string());
-                    return result;
-                }
+                result.error_message = std::format(
+                    "Terrain cook failed: stale terrain chunk batch {} is still loaded. The caller must unload generated terrain batches before cooking.",
+                    old_batch_id.to_string());
+                return result;
             }
 
             (void)batch_registry->delete_batch(old_batch_id);

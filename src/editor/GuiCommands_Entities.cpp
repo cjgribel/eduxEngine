@@ -38,6 +38,24 @@ namespace eeng::editor {
     namespace ecs = eeng::ecs;
     using ecs::Entity;
 
+    namespace
+    {
+        bool reject_read_only_entity(
+            EngineContext& ctx,
+            const Entity& entity,
+            const char* context_label,
+            const char* reason)
+        {
+            if (!entity.has_id())
+                return false;
+            if (!is_entity_in_read_only_batch(entity, ctx, context_label))
+                return false;
+
+            EENG_LOG(&ctx, "%s blocked: %s", context_label, reason);
+            return true;
+        }
+    }
+
     CreateEntityCommand::CreateEntityCommand(
         const Entity& parent_entity,
         EngineContextWeakPtr ctx) :
@@ -1386,6 +1404,15 @@ namespace eeng::editor {
         if (!ctx_sp)
             return CommandStatus::Done;
 
+        if (reject_read_only_entity(
+                *ctx_sp,
+                root_entity,
+                "BakeTransformBranch",
+                "generated/read-only terrain content cannot be edited directly."))
+        {
+            return CommandStatus::Failed;
+        }
+
         auto* em = cmd_ctx.entity_manager(*ctx_sp);
         if (!em)
             return CommandStatus::Done;
@@ -1524,6 +1551,15 @@ namespace eeng::editor {
         if (!ctx_sp)
             return CommandStatus::Done;
 
+        if (reject_read_only_entity(
+                *ctx_sp,
+                root_entity,
+                "BakeTransformBranch undo",
+                "generated/read-only terrain content cannot be edited directly."))
+        {
+            return CommandStatus::Failed;
+        }
+
         auto* em = cmd_ctx.entity_manager(*ctx_sp);
         if (!em)
             return CommandStatus::Done;
@@ -1573,6 +1609,23 @@ namespace eeng::editor {
         auto ctx_sp = cmd_ctx.lock();
         if (!ctx_sp)
             return CommandStatus::Done;
+
+        if (reject_read_only_entity(
+                *ctx_sp,
+                entity,
+                "ReparentEntityBranch",
+                "generated/read-only terrain content cannot be reparented."))
+        {
+            return CommandStatus::Failed;
+        }
+        if (reject_read_only_entity(
+                *ctx_sp,
+                new_parent_entity,
+                "ReparentEntityBranch",
+                "generated/read-only terrain content cannot be used as a new parent."))
+        {
+            return CommandStatus::Failed;
+        }
 
         auto* em = cmd_ctx.entity_manager(*ctx_sp);
         auto* br = cmd_ctx.batch_registry(*ctx_sp);
@@ -1663,6 +1716,14 @@ namespace eeng::editor {
         auto entity_opt = em->get_entity_from_guid(entity_guid);
         if (!entity_opt || !entity_opt->has_id())
             return CommandStatus::Done;
+        if (reject_read_only_entity(
+                *ctx_sp,
+                *entity_opt,
+                "ReparentEntityBranch undo",
+                "generated/read-only terrain content cannot be reparented."))
+        {
+            return CommandStatus::Failed;
+        }
         if (!scenegraph.contains(*entity_opt))
             return CommandStatus::Done;
 
@@ -1672,6 +1733,14 @@ namespace eeng::editor {
             auto parent_opt = em->get_entity_from_guid(prev_parent_guid);
             if (!parent_opt || !parent_opt->has_id())
                 return CommandStatus::Done;
+            if (reject_read_only_entity(
+                    *ctx_sp,
+                    *parent_opt,
+                    "ReparentEntityBranch undo",
+                    "generated/read-only terrain content cannot be used as a parent."))
+            {
+                return CommandStatus::Failed;
+            }
             if (!scenegraph.contains(*parent_opt))
                 return CommandStatus::Done;
             parent_current = *parent_opt;

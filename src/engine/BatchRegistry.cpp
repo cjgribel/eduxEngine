@@ -1289,6 +1289,8 @@ namespace eeng
                     auto it = batches_.find(id);
                     if (it == batches_.end() || it->second.state != BatchInfo::State::Loaded)
                         return emit_and_return(ecs::EntityRef{}, (it != batches_.end()) ? &it->second : nullptr); // require loaded batch
+                    if (it->second.read_only)
+                        return emit_and_return(ecs::EntityRef{}, &it->second);
                     B = &it->second;
                 }
 

@@ -15,6 +15,7 @@
 #include "assets/types/ModelAssets.hpp"
 #include "assets/types/TerrainAssets.hpp"
 #include "ecs/EntityManager.hpp"
+#include "ThreadPool.hpp"
 #include "meta/MetaAux.h"
 #include "LogMacros.h"
 #include <array>
@@ -216,6 +217,80 @@ namespace eeng::editor
             }
 
             return batch_ids;
+        }
+
+        std::vector<BatchId> collect_generated_terrain_batch_ids_for_recipe(
+            EngineContext& ctx,
+            const Guid& recipe_guid)
+        {
+            std::unordered_set<BatchId> batch_ids{};
+
+            auto* batch_registry = dynamic_cast<BatchRegistry*>(ctx.batch_registry.get());
+            auto* resource_manager = dynamic_cast<ResourceManager*>(ctx.resource_manager.get());
+            if (!batch_registry || !resource_manager)
+                return {};
+
+            for (const BatchInfo* batch : batch_registry->list())
+            {
+                if (!batch)
+                    continue;
+                if (!batch->generated)
+                    continue;
+                if (batch->owner_guid != recipe_guid)
+                    continue;
+                if (batch->generator_tag != "terrain")
+                    continue;
+                batch_ids.insert(batch->id);
+            }
+
+            const auto index_data = resource_manager->get_index_data();
+            if (index_data)
+            {
+                const auto recipe_it = index_data->by_guid.find(recipe_guid);
+                if (recipe_it != index_data->by_guid.end() && recipe_it->second)
+                {
+                    const std::string recipe_name = sanitize_asset_name(recipe_it->second->meta.name);
+                    const std::filesystem::path terrain_asset_path =
+                        resource_manager->assets_root() / "terrain" / recipe_name / "terrain.json";
+                    for (const auto& batch_id : read_cooked_terrain_batch_ids(terrain_asset_path))
+                        batch_ids.insert(batch_id);
+                }
+            }
+
+            return std::vector<BatchId>(batch_ids.begin(), batch_ids.end());
+        }
+
+        bool unload_generated_terrain_batches_for_recipe(
+            EngineContext& ctx,
+            const Guid& recipe_guid,
+            std::string& error_out)
+        {
+            // Important: this preflight must run outside the RM strand. Batch
+            // unload reaches back into ResourceManager to unbind/unload assets,
+            // so doing both from the same serialized RM job can deadlock.
+            auto* batch_registry = dynamic_cast<BatchRegistry*>(ctx.batch_registry.get());
+            if (!batch_registry)
+            {
+                error_out = "valid BatchRegistry required";
+                return false;
+            }
+
+            for (const auto& batch_id : collect_generated_terrain_batch_ids_for_recipe(ctx, recipe_guid))
+            {
+                if (!batch_id.valid() || !batch_registry->is_batch_loaded(batch_id))
+                    continue;
+
+                const TaskResult unload_result = batch_registry->queue_unload(batch_id, ctx).get();
+                if (!unload_result.success)
+                {
+                    error_out = std::format(
+                        "could not unload generated terrain batch {}",
+                        batch_id.to_string());
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 
@@ -815,31 +890,53 @@ namespace eeng::editor
             EENG_LOG_WARN(&ctx, "Terrain cook skipped: assets root not set.");
             return;
         }
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired() || !ctx.thread_pool)
+            return;
 
-        rm.queue_import_job(
-            [recipe_guid, assets_root](ResourceManager& rm, EngineContext& ctx) -> TaskResult
+        ctx.thread_pool->queue_task(
+            [ctx_wptr, recipe_guid, assets_root]() mutable
             {
-                TaskResult res;
-                res.type = TaskResult::TaskType::Import;
-                try
-                {
-                    const auto cook_result = assets::TerrainCooker::cook_recipe(rm, recipe_guid, ctx);
-                    if (!cook_result.success)
-                    {
-                        res.add_result(recipe_guid, false, cook_result.error_message);
-                        return res;
-                    }
+                auto ctx_sp = ctx_wptr.lock();
+                if (!ctx_sp)
+                    return;
 
-                    rm.scan_assets_async(assets_root, ctx);
-                    res.add_result(cook_result.terrain_guid, true, "Terrain cook ok");
-                }
-                catch (const std::exception& ex)
+                // Pre-unload generated terrain batches before entering the RM
+                // import job. This keeps cook safe even when a designer has
+                // the old generated terrain chunk batches loaded in the editor.
+                std::string unload_error;
+                if (!unload_generated_terrain_batches_for_recipe(*ctx_sp, recipe_guid, unload_error))
                 {
-                    res.add_result(recipe_guid, false, ex.what());
+                    EENG_LOG_WARN(ctx_sp.get(), "Terrain cook skipped: %s.", unload_error.c_str());
+                    return;
                 }
-                return res;
-            },
-            ctx);
+
+                auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+                rm.queue_import_job(
+                    [recipe_guid, assets_root](ResourceManager& rm, EngineContext& ctx) -> TaskResult
+                    {
+                        TaskResult res;
+                        res.type = TaskResult::TaskType::Import;
+                        try
+                        {
+                            const auto cook_result = assets::TerrainCooker::cook_recipe(rm, recipe_guid, ctx);
+                            if (!cook_result.success)
+                            {
+                                res.add_result(recipe_guid, false, cook_result.error_message);
+                                return res;
+                            }
+
+                            rm.scan_assets_async(assets_root, ctx);
+                            res.add_result(cook_result.terrain_guid, true, "Terrain cook ok");
+                        }
+                        catch (const std::exception& ex)
+                        {
+                            res.add_result(recipe_guid, false, ex.what());
+                        }
+                        return res;
+                    },
+                    *ctx_sp).get();
+            });
     }
 
     /// @brief Clear cooked terrain batches and assets associated with a terrain recipe, and remove the cook output from disk, allowing for a fresh cook.
@@ -863,115 +960,109 @@ namespace eeng::editor
             return;
         }
 
-        rm.queue_import_job(
-            [recipe_guid, assets_root](ResourceManager& rm, EngineContext& ctx) -> TaskResult
+        auto ctx_wptr = ctx.weak_from_this();
+        if (ctx_wptr.expired() || !ctx.thread_pool)
+            return;
+
+        ctx.thread_pool->queue_task(
+            [ctx_wptr, recipe_guid, assets_root]() mutable
             {
-                TaskResult res;
-                res.type = TaskResult::TaskType::Unimport;
+                auto ctx_sp = ctx_wptr.lock();
+                if (!ctx_sp)
+                    return;
 
-                auto* batch_registry = dynamic_cast<BatchRegistry*>(ctx.batch_registry.get());
-                if (!batch_registry || batch_registry->index_path().empty())
+                // Clear follows the same preflight as cook: unload generated
+                // terrain batches off the RM strand first, then remove the
+                // deterministic cooked outputs on the RM strand.
+                std::string unload_error;
+                if (!unload_generated_terrain_batches_for_recipe(*ctx_sp, recipe_guid, unload_error))
                 {
-                    res.add_result(recipe_guid, false, "Clear cooked terrain failed: valid BatchRegistry required.");
-                    return res;
+                    EENG_LOG_WARN(ctx_sp.get(), "Clear cooked terrain skipped: %s.", unload_error.c_str());
+                    return;
                 }
 
-                const auto index_data = rm.get_index_data();
-                if (!index_data)
-                {
-                    res.add_result(recipe_guid, false, "Clear cooked terrain failed: asset index unavailable.");
-                    return res;
-                }
-
-                const auto recipe_it = index_data->by_guid.find(recipe_guid);
-                if (recipe_it == index_data->by_guid.end() || !recipe_it->second)
-                {
-                    res.add_result(recipe_guid, false, "Clear cooked terrain failed: recipe entry missing from asset index.");
-                    return res;
-                }
-
-                const std::string recipe_name = sanitize_asset_name(recipe_it->second->meta.name);
-                const std::filesystem::path cook_root = rm.assets_root() / "terrain" / recipe_name;
-                const std::filesystem::path terrain_asset_path = cook_root / "terrain.json";
-
-                std::unordered_set<BatchId> owned_batch_set{};
-                for (const BatchInfo* batch : batch_registry->list())
-                {
-                    if (!batch)
-                        continue;
-                    if (!batch->generated || !batch->read_only)
-                        continue;
-                    if (batch->owner_guid != recipe_guid)
-                        continue;
-                    if (batch->generator_tag != "terrain")
-                        continue;
-                    owned_batch_set.insert(batch->id);
-                }
-                for (const auto& batch_id : read_cooked_terrain_batch_ids(terrain_asset_path))
-                    owned_batch_set.insert(batch_id);
-
-                std::vector<BatchId> owned_batches(owned_batch_set.begin(), owned_batch_set.end());
-
-                for (const auto& batch_id : owned_batches)
-                {
-                    if (batch_registry->is_batch_loaded(batch_id))
+                auto& rm = static_cast<ResourceManager&>(*ctx_sp->resource_manager);
+                rm.queue_import_job(
+                    [recipe_guid, assets_root](ResourceManager& rm, EngineContext& ctx) -> TaskResult
                     {
-                        const TaskResult unload_result = batch_registry->queue_unload(batch_id, ctx).get();
-                        if (!unload_result.success)
+                        TaskResult res;
+                        res.type = TaskResult::TaskType::Unimport;
+
+                        auto* batch_registry = dynamic_cast<BatchRegistry*>(ctx.batch_registry.get());
+                        if (!batch_registry || batch_registry->index_path().empty())
                         {
-                            res.add_result(batch_id, false, "Clear cooked terrain failed: could not unload generated terrain batch.");
+                            res.add_result(recipe_guid, false, "Clear cooked terrain failed: valid BatchRegistry required.");
                             return res;
                         }
-                    }
-                }
 
-                // Unload any generated terrain assets still open in the editor
-                // before removing their cook folder from disk.
-                for (const auto& entry : index_data->entries)
-                {
-                    if (!path_is_within(entry.absolute_path, cook_root))
-                        continue;
+                        const auto index_data = rm.get_index_data();
+                        if (!index_data)
+                        {
+                            res.add_result(recipe_guid, false, "Clear cooked terrain failed: asset index unavailable.");
+                            return res;
+                        }
 
-                    try
-                    {
-                        if (entry.meta.type_id == meta::get_meta_type_id_string<assets::TerrainAsset>())
-                            rm.unload_asset<assets::TerrainAsset>(entry.meta.guid, ctx);
-                        else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::TerrainChunkAsset>())
-                            rm.unload_asset<assets::TerrainChunkAsset>(entry.meta.guid, ctx);
-                        else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::ModelDataAsset>())
-                            rm.unload_asset<assets::ModelDataAsset>(entry.meta.guid, ctx);
-                        else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::GpuModelAsset>())
-                            rm.unload_asset<assets::GpuModelAsset>(entry.meta.guid, ctx);
-                    }
-                    catch (...)
-                    {
-                        // Keep cleanup best-effort here; scan below rebuilds the index.
-                    }
-                }
+                        const auto recipe_it = index_data->by_guid.find(recipe_guid);
+                        if (recipe_it == index_data->by_guid.end() || !recipe_it->second)
+                        {
+                            res.add_result(recipe_guid, false, "Clear cooked terrain failed: recipe entry missing from asset index.");
+                            return res;
+                        }
 
-                for (const auto& batch_id : owned_batches)
-                {
-                    if (!batch_registry->delete_batch(batch_id))
-                    {
-                        res.add_result(batch_id, false, "Clear cooked terrain failed: could not delete generated terrain batch.");
+                        const std::string recipe_name = sanitize_asset_name(recipe_it->second->meta.name);
+                        const std::filesystem::path cook_root = rm.assets_root() / "terrain" / recipe_name;
+
+                        const std::vector<BatchId> owned_batches =
+                            collect_generated_terrain_batch_ids_for_recipe(ctx, recipe_guid);
+
+                        // Unload any generated terrain assets still open in the editor
+                        // before removing their cook folder from disk.
+                        for (const auto& entry : index_data->entries)
+                        {
+                            if (!path_is_within(entry.absolute_path, cook_root))
+                                continue;
+
+                            try
+                            {
+                                if (entry.meta.type_id == meta::get_meta_type_id_string<assets::TerrainAsset>())
+                                    rm.unload_asset<assets::TerrainAsset>(entry.meta.guid, ctx);
+                                else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::TerrainChunkAsset>())
+                                    rm.unload_asset<assets::TerrainChunkAsset>(entry.meta.guid, ctx);
+                                else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::ModelDataAsset>())
+                                    rm.unload_asset<assets::ModelDataAsset>(entry.meta.guid, ctx);
+                                else if (entry.meta.type_id == meta::get_meta_type_id_string<assets::GpuModelAsset>())
+                                    rm.unload_asset<assets::GpuModelAsset>(entry.meta.guid, ctx);
+                            }
+                            catch (...)
+                            {
+                                // Keep cleanup best-effort here; scan below rebuilds the index.
+                            }
+                        }
+
+                        for (const auto& batch_id : owned_batches)
+                        {
+                            if (!batch_registry->delete_batch(batch_id))
+                            {
+                                res.add_result(batch_id, false, "Clear cooked terrain failed: could not delete generated terrain batch.");
+                                return res;
+                            }
+                        }
+                        batch_registry->save_index();
+
+                        std::error_code ec{};
+                        std::filesystem::remove_all(cook_root, ec);
+                        if (ec)
+                        {
+                            res.add_result(recipe_guid, false, "Clear cooked terrain failed: could not remove cook folder.");
+                            return res;
+                        }
+
+                        rm.scan_assets_async(assets_root, ctx);
+                        res.add_result(recipe_guid, true, "Cleared cooked terrain outputs.");
                         return res;
-                    }
-                }
-                batch_registry->save_index();
-
-                std::error_code ec{};
-                std::filesystem::remove_all(cook_root, ec);
-                if (ec)
-                {
-                    res.add_result(recipe_guid, false, "Clear cooked terrain failed: could not remove cook folder.");
-                    return res;
-                }
-
-                rm.scan_assets_async(assets_root, ctx);
-                res.add_result(recipe_guid, true, "Cleared cooked terrain outputs.");
-                return res;
-            },
-            ctx);
+                    },
+                    *ctx_sp).get();
+            });
     }
 
     void AssetActions::unimport_assets(EngineContext& ctx, std::vector<Guid> roots)

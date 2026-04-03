@@ -65,10 +65,10 @@ bool Game::init()
     if (ctx && ctx->project_config)
         assets_root = ctx->project_config->assets_root;
     const auto asset_path = [&](const std::string& relative)
-    {
-        // Normalize asset lookups through the project root.
-        return (assets_root / relative).string();
-    };
+        {
+            // Normalize asset lookups through the project root.
+            return (assets_root / relative).string();
+        };
 
     // Grass
     grassMesh = std::make_shared<eeng::RenderableMesh>();
@@ -340,14 +340,18 @@ void Game::render(
     // Begin rendering pass
     forwardRenderer->beginPass(matrices.P, matrices.V, pointlight.pos, pointlight.color, active_camera.position);
 
+#if 0
     // Grass
     forwardRenderer->renderMesh(grassMesh, grassWorldMatrix);
     grass_aabb = grassMesh->m_model_aabb.post_transform(grassWorldMatrix);
+#endif
 
+#if 0
     // Horse
     horseMesh->animate(3, time);
     forwardRenderer->renderMesh(horseMesh, horseWorldMatrix);
     horse_aabb = horseMesh->m_model_aabb.post_transform(horseWorldMatrix);
+#endif
 
 #ifdef AMY_PATH
     // Character, instance 1
@@ -461,8 +465,12 @@ void Game::render(
         shapeRenderer->push_AABB(character_aabb2.min, character_aabb2.max);
         shapeRenderer->push_AABB(character_aabb3.min, character_aabb3.max);
 #endif
+#if 0
         shapeRenderer->push_AABB(horse_aabb.min, horse_aabb.max);
+#endif
+#if 0
         shapeRenderer->push_AABB(grass_aabb.min, grass_aabb.max);
+#endif
         shapeRenderer->pop_states<ShapeRendering::Color4u>();
     }
 
@@ -503,10 +511,10 @@ void Game::renderUI()
 
     ImGui::Text("Drawcall count %i", drawcallCount);
     const auto add_tooltip = [](const char* text)
-    {
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-            ImGui::SetTooltip("%s", text);
-    };
+        {
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                ImGui::SetTooltip("%s", text);
+        };
 
     if (ImGui::ColorEdit3("Light color",
         glm::value_ptr(pointlight.color),
@@ -601,26 +609,26 @@ void Game::update_active_camera_state()
     auto& registry = ctx->entity_manager->registry();
 
     const auto copy_third_person = [&](const eeng::editor::ThirdPersonCameraComponent& camera)
-    {
-        active_camera.position = camera.position;
-        active_camera.forward = camera.forward;
-        active_camera.up = camera.up;
-        active_camera.model_to_view = camera.model_to_view;
-        active_camera.view_to_world = camera.view_to_world;
-        active_camera.near_plane = camera.near_plane;
-        active_camera.far_plane = camera.far_plane;
-    };
+        {
+            active_camera.position = camera.position;
+            active_camera.forward = camera.forward;
+            active_camera.up = camera.up;
+            active_camera.model_to_view = camera.model_to_view;
+            active_camera.view_to_world = camera.view_to_world;
+            active_camera.near_plane = camera.near_plane;
+            active_camera.far_plane = camera.far_plane;
+        };
 
     const auto copy_first_person = [&](const eeng::editor::FirstPersonCameraComponent& camera)
-    {
-        active_camera.position = camera.position;
-        active_camera.forward = camera.forward;
-        active_camera.up = camera.up;
-        active_camera.model_to_view = camera.model_to_view;
-        active_camera.view_to_world = camera.view_to_world;
-        active_camera.near_plane = camera.near_plane;
-        active_camera.far_plane = camera.far_plane;
-    };
+        {
+            active_camera.position = camera.position;
+            active_camera.forward = camera.forward;
+            active_camera.up = camera.up;
+            active_camera.model_to_view = camera.model_to_view;
+            active_camera.view_to_world = camera.view_to_world;
+            active_camera.near_plane = camera.near_plane;
+            active_camera.far_plane = camera.far_plane;
+        };
 
     // Prefer an active third-person camera if present.
     auto third_view = registry.view<eeng::editor::ThirdPersonCameraComponent>();
