@@ -12,6 +12,7 @@
 #include "ecs/EntityManager.hpp"
 #include "ecs/TransformComponent.hpp"
 #include "editor/AssignFieldCommand.hpp"
+#include "editor/CommandBatchHelpers.hpp"
 #include "editor/CommandQueue.hpp"
 #include "engineapi/SelectionManager.hpp"
 #include "glmcommon.hpp"
@@ -94,8 +95,22 @@ namespace
     ShapeRendering::Color4u resolve_handle_color(
         TransformGizmo::Handle handle,
         TransformGizmo::Handle hovered,
-        TransformGizmo::Handle active)
+        TransformGizmo::Handle active,
+        bool read_only)
     {
+        if (read_only)
+        {
+            // Read-only targets should still visualize the gizmo so selection
+            // and orientation remain clear, but the color should immediately
+            // communicate that manipulation is blocked. Blend the normal axis
+            // color toward amber instead of reusing the interactive highlight
+            // colors, which would imply the gizmo is editable.
+            const glm::vec3 base = axis_color_base(handle);
+            const glm::vec3 amber(0.95f, 0.72f, 0.22f);
+            const glm::vec3 blended = glm::mix(base, amber, 0.65f);
+            return to_color_u32(blended, 0.9f);
+        }
+
         // If any handle is active, dim the rest to reduce visual noise.
         if (active != TransformGizmo::Handle::None && handle != active)
             return ShapeRendering::Color4u::Gray;
@@ -662,6 +677,15 @@ namespace
 
         ctx.command_queue->add(std::make_unique<eeng::editor::AssignFieldCommand>(builder.build()));
     }
+
+    bool is_gizmo_target_read_only(
+        eeng::EngineContext& ctx,
+        const eeng::ecs::Entity& entity)
+    {
+        // Reuse the same generated/read-only batch policy as the editor
+        // command layer. The gizmo must not be a side door around that policy.
+        return eeng::editor::is_entity_in_read_only_batch(entity, ctx, "TransformGizmo");
+    }
 }
 
 namespace eeng::editor
@@ -720,6 +744,20 @@ namespace eeng::editor
             hovered_handle_ = Handle::None;
             active_handle_ = Handle::None;
             dragging_ = false;
+            return;
+        }
+
+        const bool target_read_only = is_gizmo_target_read_only(ctx, entity);
+        if (target_read_only)
+        {
+            // Generated/read-only entities are inspectable but not editable.
+            // Clear any transient gizmo interaction state so selection changes
+            // or mode toggles cannot continue a stale drag against protected
+            // content.
+            hovered_handle_ = Handle::None;
+            active_handle_ = Handle::None;
+            dragging_ = false;
+            was_mouse_down_ = ctx.input_manager->GetMouseState().leftButton;
             return;
         }
 
@@ -1294,6 +1332,10 @@ namespace eeng::editor
         if (!resolve_target(ctx, entity, tfm, parent_tfm))
             return;
 
+        const bool target_read_only = is_gizmo_target_read_only(ctx, entity);
+        const Handle render_hovered = target_read_only ? Handle::None : hovered_handle_;
+        const Handle render_active = target_read_only ? Handle::None : active_handle_;
+
         const glm::vec3 world_pos = extract_translation(tfm->world_matrix);
         const GizmoBasis basis = compute_gizmo_basis(*tfm, mode_, space_);
 
@@ -1325,7 +1367,7 @@ namespace eeng::editor
             {
                 const glm::vec3 axis_dir = safe_axis_dir_from_handle(handle, basis);
                 const glm::vec3 end = world_pos + axis_dir * axis_len;
-                const auto color = resolve_handle_color(handle, hovered_handle_, active_handle_);
+                const auto color = resolve_handle_color(handle, render_hovered, render_active, target_read_only);
 
                 renderer.push_states(depth, cull, color);
                 renderer.push_arrow(world_pos, end, arrow_desc);
@@ -1349,7 +1391,7 @@ namespace eeng::editor
                 const glm::vec3 points[4] = { p0, p1, p2, p3 };
 
                 const glm::vec3 n = glm::normalize(glm::cross(u, v));
-                const auto color = resolve_handle_color(handle, hovered_handle_, active_handle_);
+                const auto color = resolve_handle_color(handle, render_hovered, render_active, target_read_only);
 
                 renderer.push_states(depth, cull, color);
                 renderer.push_quad(points, n);
@@ -1375,7 +1417,7 @@ namespace eeng::editor
                 v = safe_normalize(v, glm::vec3(1.0f, 0.0f, 0.0f));
 
                 const glm::mat4 ring_transform = make_basis_matrix(u, v, axis_dir, world_pos, ring_radius);
-                const auto color = resolve_handle_color(handle, hovered_handle_, active_handle_);
+                const auto color = resolve_handle_color(handle, render_hovered, render_active, target_read_only);
 
                 renderer.push_states(depth, cull, color, ring_transform);
                 renderer.push_circle_ring<64>();
@@ -1391,7 +1433,7 @@ namespace eeng::editor
             {
                 const glm::vec3 axis_dir = safe_axis_dir_from_handle(handle, basis);
                 const glm::vec3 end = world_pos + axis_dir * axis_len;
-                const auto color = resolve_handle_color(handle, hovered_handle_, active_handle_);
+                const auto color = resolve_handle_color(handle, render_hovered, render_active, target_read_only);
 
                 renderer.push_states(depth, cull, color);
                 renderer.push_line(world_pos, end);
@@ -1413,7 +1455,7 @@ namespace eeng::editor
                     glm::translate(glm::mat4(1.0f), world_pos)
                     * glm::scale(glm::mat4(1.0f), glm::vec3(size));
 
-                const auto color = resolve_handle_color(Handle::ScaleUniform, hovered_handle_, active_handle_);
+                const auto color = resolve_handle_color(Handle::ScaleUniform, render_hovered, render_active, target_read_only);
                 renderer.push_states(depth, cull, color, cube_transform);
                 renderer.push_cube();
                 renderer.pop_states<ShapeRendering::DepthTest, ShapeRendering::BackfaceCull, ShapeRendering::Color4u, glm::mat4>();

@@ -108,3 +108,4 @@ Likely keep concrete/tooling-only in `BatchRegistry`:
 - Terrain chunks and terrain chunk batches should be as large as practical.
 - Bullet can handle multiple loaded heightfield chunk colliders at once; the limits are practical cost, not a one-heightfield restriction.
 - The current recommended workflow for terrain texturing is to author the desired tiling in mesh UVs, then have the terrain cooker preserve that UV density. Per-texture UV transforms can be added later, but they are not required for the terrain MVP.
+- Resource Browser note: the current tree color reflects an asset's own load state, while terrain cases can have unloaded package roots with loaded contained assets below them. That is technically correct but visually ambiguous. A better UI model is to keep text color for self state and add a separate contained-subtree activity badge or tooltip, rather than overloading one color to mean both self residency and contained asset activity.
