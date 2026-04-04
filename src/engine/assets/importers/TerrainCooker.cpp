@@ -187,6 +187,43 @@ namespace eeng::assets
             return std::nullopt;
         }
 
+        void append_asset_subtree_from_index(
+            const AssetIndexDataPtr& index_data,
+            const Guid& root_guid,
+            std::vector<Guid>& out_guids)
+        {
+            if (!index_data || !root_guid.valid())
+                return;
+
+            std::vector<Guid> stack{ root_guid };
+            std::set<Guid> seen{};
+
+            // Terrain chunk batches need an explicit, self-contained asset
+            // closure. ResourceManager batch loads do not recursively expand
+            // asset refs on their own, so we walk the indexed contained-assets
+            // tree here and add the full material/texture subtree up front.
+            while (!stack.empty())
+            {
+                const Guid current = stack.back();
+                stack.pop_back();
+
+                if (!current.valid() || !seen.insert(current).second)
+                    continue;
+
+                out_guids.push_back(current);
+
+                const auto entry_it = index_data->by_guid.find(current);
+                if (entry_it == index_data->by_guid.end() || !entry_it->second)
+                    continue;
+
+                for (const Guid& child : entry_it->second->meta.contained_assets)
+                {
+                    if (child.valid())
+                        stack.push_back(child);
+                }
+            }
+        }
+
         AssetMetaData make_meta(
             const Guid& guid,
             const Guid& parent_guid,
@@ -930,12 +967,19 @@ namespace eeng::assets
                     chunk_output.chunk_guid
                 };
                 if (source_submesh.material.guid.valid())
-                    chunk_output.asset_closure.push_back(source_submesh.material.guid);
+                {
+                    append_asset_subtree_from_index(
+                        index_data,
+                        source_submesh.material.guid,
+                        chunk_output.asset_closure);
+                }
                 if (!chunk_output.render_gpu_model.submeshes.empty()
                     && chunk_output.render_gpu_model.submeshes[0].material.guid.valid())
                 {
-                    chunk_output.asset_closure.push_back(
-                        chunk_output.render_gpu_model.submeshes[0].material.guid);
+                    append_asset_subtree_from_index(
+                        index_data,
+                        chunk_output.render_gpu_model.submeshes[0].material.guid,
+                        chunk_output.asset_closure);
                 }
                 std::sort(chunk_output.asset_closure.begin(), chunk_output.asset_closure.end());
                 chunk_output.asset_closure.erase(
