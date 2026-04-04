@@ -57,6 +57,12 @@ namespace eeng::assets
             std::uint32_t samples_x = 0;
             std::uint32_t samples_z = 0;
             std::vector<float> heights{};
+            // When the source terrain mesh has authored UVs, the cook samples
+            // and preserves them on the same regular grid as the heights.
+            // This keeps tiled/rotated/offset terrain texturing intact across
+            // chunk boundaries instead of regenerating per-chunk UVs.
+            std::vector<glm::vec2> texcoords{};
+            bool has_authored_texcoords = false;
         };
 
         // All generated runtime assets for one cooked terrain chunk.
@@ -370,6 +376,23 @@ namespace eeng::assets
             return out_u >= -eps && out_v >= -eps && out_w >= -eps;
         }
 
+        bool submesh_has_complete_texcoords(
+            const ModelDataAsset& model,
+            const SubMesh& submesh)
+        {
+            if (model.texcoords.empty())
+                return false;
+
+            for (std::uint32_t i = 0; i < submesh.nbr_indices; ++i)
+            {
+                const auto index = model.indices[submesh.base_index + i];
+                if (index >= model.texcoords.size())
+                    return false;
+            }
+
+            return true;
+        }
+
         HeightGrid rasterize_height_grid(
             const ModelDataAsset& model,
             const SubMesh& submesh,
@@ -396,6 +419,13 @@ namespace eeng::assets
             grid.heights.assign(
                 static_cast<std::size_t>(grid.samples_x) * static_cast<std::size_t>(grid.samples_z),
                 0.0f);
+            grid.has_authored_texcoords = submesh_has_complete_texcoords(model, submesh);
+            if (grid.has_authored_texcoords)
+            {
+                grid.texcoords.assign(
+                    static_cast<std::size_t>(grid.samples_x) * static_cast<std::size_t>(grid.samples_z),
+                    glm::vec2{ 0.0f, 0.0f });
+            }
 
             std::vector<bool> filled(grid.heights.size(), false);
 
@@ -412,6 +442,9 @@ namespace eeng::assets
                 const glm::vec3 a = scale_source_position(model.positions[ia], recipe);
                 const glm::vec3 b = scale_source_position(model.positions[ib], recipe);
                 const glm::vec3 c = scale_source_position(model.positions[ic], recipe);
+                const glm::vec2 ta = grid.has_authored_texcoords ? model.texcoords[ia] : glm::vec2{ 0.0f };
+                const glm::vec2 tb = grid.has_authored_texcoords ? model.texcoords[ib] : glm::vec2{ 0.0f };
+                const glm::vec2 tc = grid.has_authored_texcoords ? model.texcoords[ic] : glm::vec2{ 0.0f };
 
                 const glm::vec2 axz{ a.x, a.z };
                 const glm::vec2 bxz{ b.x, b.z };
@@ -447,6 +480,7 @@ namespace eeng::assets
                             continue;
 
                         const float height = u * a.y + v * b.y + w * c.y;
+                        const glm::vec2 texcoord = u * ta + v * tb + w * tc;
                         const std::size_t idx = sample_index(
                             grid.samples_x,
                             static_cast<std::uint32_t>(ix),
@@ -455,6 +489,8 @@ namespace eeng::assets
                         if (!filled[idx] || height > grid.heights[idx])
                         {
                             grid.heights[idx] = height;
+                            if (grid.has_authored_texcoords)
+                                grid.texcoords[idx] = texcoord;
                             filled[idx] = true;
                         }
                     }
@@ -498,6 +534,8 @@ namespace eeng::assets
                                     continue;
 
                                 grid.heights[idx] = grid.heights[neighbor_idx];
+                                if (grid.has_authored_texcoords)
+                                    grid.texcoords[idx] = grid.texcoords[neighbor_idx];
                                 filled[idx] = true;
                                 found = true;
                                 break;
@@ -655,6 +693,8 @@ namespace eeng::assets
                     const float px = static_cast<float>(x) * recipe.sample_spacing_x;
                     const float pz = static_cast<float>(z) * recipe.sample_spacing_z;
                     const float py = chunk.heights[sample_index(local_samples_x, x, z)];
+                    const std::uint32_t global_sample_x = start_quad_x + x;
+                    const std::uint32_t global_sample_z = start_quad_z + z;
 
                     const glm::vec3 normal = compute_heightfield_normal(
                         chunk.heights,
@@ -668,9 +708,26 @@ namespace eeng::assets
                     const glm::vec3 binormal = glm::normalize(glm::cross(normal, tangent));
 
                     model.positions.emplace_back(px, py, pz);
-                    model.texcoords.emplace_back(
-                        local_quads_x > 0 ? static_cast<float>(x) / static_cast<float>(local_quads_x) : 0.0f,
-                        local_quads_z > 0 ? static_cast<float>(z) / static_cast<float>(local_quads_z) : 0.0f);
+                    if (grid.has_authored_texcoords)
+                    {
+                        model.texcoords.push_back(grid.texcoords[sample_index(
+                            grid.samples_x,
+                            global_sample_x,
+                            global_sample_z)]);
+                    }
+                    else
+                    {
+                        // Fallback only when the source terrain had no usable
+                        // UVs. Use terrain-global planar UVs so chunks line up
+                        // continuously instead of each chunk resetting to 0..1.
+                        model.texcoords.emplace_back(
+                            (grid.samples_x > 1)
+                            ? static_cast<float>(global_sample_x) / static_cast<float>(grid.samples_x - 1u)
+                            : 0.0f,
+                            (grid.samples_z > 1)
+                            ? static_cast<float>(global_sample_z) / static_cast<float>(grid.samples_z - 1u)
+                            : 0.0f);
+                    }
                     model.normals.push_back(normal);
                     model.tangents.push_back(tangent);
                     model.binormals.push_back(binormal);
