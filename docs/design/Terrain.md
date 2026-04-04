@@ -26,8 +26,10 @@ Current terrain behavior should support:
 - manually load chunk batches through the existing batch UI
 - see loaded chunk render and collision in edit and play mode
 - re-cook deterministically without stale generated terrain artifacts lingering
+- clear cooked terrain artifacts deterministically
 - scale terrain at cook time
 - control chunking through chunk counts
+- preserve source terrain material and texture dependencies on cooked chunk render assets
 
 ## Current Shape
 What we have now:
@@ -39,6 +41,7 @@ What we have now:
   - one generated batch per chunk
 - `TerrainChunkAsset` is collision/bounds data only
 - render asset references live on the generated chunk entity, not in `TerrainChunkAsset`
+- cooked chunk render assets reuse the source terrain material/texture package instead of duplicating those assets per chunk
 - `TerrainAsset` stores chunk collection metadata, chunk payload refs, batch ids, and chunk bounds
 - `TerrainRootComponent` is minimal and does not drive chunk spawning
 - the old runtime-spawn terrain path is no longer the intended path
@@ -49,6 +52,9 @@ What we have now:
 - `HeaderComponent.chunk_tag` is an old remnant and should not be treated as the long-term terrain metadata mechanism
 - some lower-level engine APIs can still mutate entities without going through editor command policy; terrain safety currently focuses on the editor-facing mutation paths
 - terrain material transfer currently assumes the source terrain material follows the normal imported `MaterialAsset -> GpuMaterialAsset` child relationship
+- cooked terrain render assets currently depend on the source terrain import package remaining present, because materials/textures are shared rather than duplicated
+- terrain chunk UV generation is currently chunk-local and normalized to `0..1`, which breaks authored tiled UV density across cooked chunks
+- Assimp/Maya UV transform or placed-texture repeat settings are not part of the current terrain cook contract
 
 ## Command Integrity
 Generated terrain batches can still be loadable through commands without threatening command queue integrity, but only if we keep the semantics strict.
@@ -74,6 +80,8 @@ Immediate next steps:
 - expose normal batch delete in the GUI
 - improve generated terrain asset/batch grouping in the Resource Browser
 - continue reviewing lower-level mutation paths that bypass editor command policy
+- fix cooked terrain chunk UV generation so source tiling works across chunk boundaries
+- decide whether terrain should continue to rely on authored mesh UVs only, or whether material/texture UV transforms should become a first-class rendering feature
 
 ## `IBatchRegistry` / `BatchRegistry`
 Current direction:
@@ -99,3 +107,4 @@ Likely keep concrete/tooling-only in `BatchRegistry`:
 ## Notes
 - Terrain chunks and terrain chunk batches should be as large as practical.
 - Bullet can handle multiple loaded heightfield chunk colliders at once; the limits are practical cost, not a one-heightfield restriction.
+- The current recommended workflow for terrain texturing is to author the desired tiling in mesh UVs, then have the terrain cooker preserve that UV density. Per-texture UV transforms can be added later, but they are not required for the terrain MVP.
