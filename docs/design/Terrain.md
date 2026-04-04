@@ -45,10 +45,10 @@ What we have now:
 
 ## Limitations
 - chunk load state is still manual; no streaming or smart residency logic yet
-- material transfer from source terrain to cooked chunk render assets is still missing
 - generated terrain assets and batches are still somewhat noisy in the Resource Browser
 - `HeaderComponent.chunk_tag` is an old remnant and should not be treated as the long-term terrain metadata mechanism
 - some lower-level engine APIs can still mutate entities without going through editor command policy; terrain safety currently focuses on the editor-facing mutation paths
+- terrain material transfer currently assumes the source terrain material follows the normal imported `MaterialAsset -> GpuMaterialAsset` child relationship
 
 ## Command Integrity
 Generated terrain batches can still be loadable through commands without threatening command queue integrity, but only if we keep the semantics strict.
@@ -71,25 +71,23 @@ So the key distinction is:
 
 ## Near-Term Plan
 Immediate next steps:
-- show generated/read-only state clearly in batch and hierarchy UI
-- review remaining editor mutation paths for generated terrain content
-
-Short follow-up items:
 - expose normal batch delete in the GUI
-- review and clean up the `IBatchRegistry` / `BatchRegistry` split
-- add material transfer from the source terrain submesh to cooked chunk render assets
+- improve generated terrain asset/batch grouping in the Resource Browser
+- continue reviewing lower-level mutation paths that bypass editor command policy
 
 ## `IBatchRegistry` / `BatchRegistry`
 Current direction:
 - `IBatchRegistry` should hold runtime-facing residency operations
 - `BatchRegistry` should keep tooling/editor-oriented batch authoring operations
 
-Likely move into `IBatchRegistry`:
+Now on `IBatchRegistry`:
 - `queue_load(...)`
 - `queue_unload(...)`
 - `queue_unload_all_async(...)`
 - `is_batch_loaded(...)`
+- `is_batch_read_only(...)`
 - `try_get_loaded_batch_for_entity(...)`
+- `try_get_batch_id_by_name(...)`
 
 Likely keep concrete/tooling-only in `BatchRegistry`:
 - batch index loading/saving

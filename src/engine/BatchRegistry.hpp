@@ -208,9 +208,9 @@ namespace eeng {
 
 // Returns a future that completes when the full sequence is done.
         std::shared_future<TaskResult>
-            queue_load(const eeng::BatchId& id, EngineContext& ctx);
+            queue_load(const eeng::BatchId& id, EngineContext& ctx) override;
         std::shared_future<TaskResult>
-            queue_unload(const eeng::BatchId& id, EngineContext& ctx);
+            queue_unload(const eeng::BatchId& id, EngineContext& ctx) override;
 
         /// Recompute the asset closure for a loaded batch from its live entities,
         /// and adjust RM leases accordingly (load/bind new GUIDs, unbind/unload
@@ -229,10 +229,10 @@ namespace eeng {
 
         std::vector<const BatchInfo*> list() const;
         bool try_get_batch_info(const BatchId& id, BatchInfo& out_info) const;
-        bool try_get_loaded_batch_for_entity(const ecs::EntityRef& entity_ref, BatchId& out_id) const;
-        bool try_get_batch_id_by_name(const std::string& name, BatchId& out_id) const;
-        bool is_batch_loaded(const BatchId& id) const;
-        bool is_batch_read_only(const BatchId& id) const;
+        bool try_get_loaded_batch_for_entity(const ecs::EntityRef& entity_ref, BatchId& out_id) const override;
+        bool try_get_batch_id_by_name(const std::string& name, BatchId& out_id) const override;
+        bool is_batch_loaded(const BatchId& id) const override;
+        bool is_batch_read_only(const BatchId& id) const override;
 
     private:
 

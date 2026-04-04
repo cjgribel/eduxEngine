@@ -104,8 +104,9 @@ namespace eeng::assets
 
     // TerrainChunkAsset
     // - Runtime streaming unit for one terrain chunk.
-    // - Contains the cooked heightfield data Bullet needs plus a reference to a
-    //   chunk-local render model that can be uploaded to GL independently.
+    // - Contains only the cooked heightfield data Bullet needs plus chunk
+    //   bounds/origin metadata. Render assets live separately on the
+    //   generated chunk batch entity.
     struct TerrainChunkAsset
     {
         // Chunk coordinates in the terrain grid.

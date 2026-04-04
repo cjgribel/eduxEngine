@@ -807,19 +807,18 @@ namespace eeng
 
             if (ctx->batch_registry && !batch_names.empty())
             {
-                auto& br = static_cast<BatchRegistry&>(*ctx->batch_registry);
                 std::vector<std::shared_future<TaskResult>> futures;
                 futures.reserve(batch_names.size());
 
                 for (const auto& name : batch_names)
                 {
                     BatchId id{};
-                    if (!br.try_get_batch_id_by_name(name, id))
+                    if (!ctx->batch_registry->try_get_batch_id_by_name(name, id))
                     {
                         EENG_LOG_WARN(ctx, "Play mode: batch '%s' not found", name.c_str());
                         continue;
                     }
-                    futures.emplace_back(br.queue_load(id, *ctx));
+                    futures.emplace_back(ctx->batch_registry->queue_load(id, *ctx));
                 }
 
                 // Wait for all batch loads while pumping main-thread work to avoid deadlocks.

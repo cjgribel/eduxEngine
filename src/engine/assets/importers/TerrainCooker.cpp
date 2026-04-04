@@ -164,6 +164,29 @@ namespace eeng::assets
             return Guid{ hash };
         }
 
+        std::optional<Guid> first_child_guid_by_type(
+            const AssetIndexDataPtr& index_data,
+            const Guid& parent_guid,
+            std::string_view type_id)
+        {
+            if (!index_data || !parent_guid.valid())
+                return std::nullopt;
+
+            const auto parent_it = index_data->by_parent.find(parent_guid);
+            if (parent_it == index_data->by_parent.end())
+                return std::nullopt;
+
+            for (const auto* entry : parent_it->second)
+            {
+                if (!entry)
+                    continue;
+                if (entry->meta.type_id == type_id)
+                    return entry->meta.guid;
+            }
+
+            return std::nullopt;
+        }
+
         AssetMetaData make_meta(
             const Guid& guid,
             const Guid& parent_guid,
@@ -521,8 +544,10 @@ namespace eeng::assets
         }
 
         TerrainChunkCookOutput build_chunk_output(
+            const AssetIndexDataPtr& index_data,
             const HeightGrid& grid,
             const TerrainRecipeAsset& recipe,
+            const SubMesh& source_submesh,
             const ChunkAxisRange& range_x,
             const ChunkAxisRange& range_z,
             std::uint32_t chunk_x,
@@ -639,6 +664,9 @@ namespace eeng::assets
             submesh.nbr_indices = static_cast<std::uint32_t>(model.indices.size());
             submesh.base_vertex = 0;
             submesh.nbr_vertices = static_cast<std::uint32_t>(model.positions.size());
+            // Preserve the source terrain material on the generated chunk mesh
+            // so the cooked terrain renders like the authored source by default.
+            submesh.material = source_submesh.material;
             model.submeshes.push_back(submesh);
 
             auto& gpu_model = out.render_gpu_model;
@@ -646,6 +674,21 @@ namespace eeng::assets
             gpu_submesh.index_offset = 0;
             gpu_submesh.index_count = static_cast<std::uint32_t>(model.indices.size());
             gpu_submesh.base_vertex = 0;
+
+            // The imported material pipeline stores GpuMaterialAsset as a child
+            // of the source MaterialAsset. Terrain cooking reuses that pairing
+            // instead of generating duplicate material assets per chunk.
+            if (source_submesh.material.guid.valid())
+            {
+                if (const auto gpu_material_guid = first_child_guid_by_type(
+                    index_data,
+                    source_submesh.material.guid,
+                    meta::get_meta_type_id_string<GpuMaterialAsset>()))
+                {
+                    gpu_submesh.material = AssetRef<GpuMaterialAsset>{ *gpu_material_guid };
+                }
+            }
+
             gpu_model.submeshes.push_back(gpu_submesh);
             gpu_model.vertex_count = static_cast<std::uint32_t>(model.positions.size());
             gpu_model.index_count = static_cast<std::uint32_t>(model.indices.size());
@@ -846,8 +889,10 @@ namespace eeng::assets
             {
                 TerrainChunkCookOutput chunk_output =
                     build_chunk_output(
+                        index_data,
                         grid,
                         recipe,
+                        source_submesh,
                         chunk_ranges_x[chunk_x],
                         chunk_ranges_z[chunk_z],
                         chunk_x,
@@ -884,6 +929,18 @@ namespace eeng::assets
                     chunk_output.render_gpu_guid,
                     chunk_output.chunk_guid
                 };
+                if (source_submesh.material.guid.valid())
+                    chunk_output.asset_closure.push_back(source_submesh.material.guid);
+                if (!chunk_output.render_gpu_model.submeshes.empty()
+                    && chunk_output.render_gpu_model.submeshes[0].material.guid.valid())
+                {
+                    chunk_output.asset_closure.push_back(
+                        chunk_output.render_gpu_model.submeshes[0].material.guid);
+                }
+                std::sort(chunk_output.asset_closure.begin(), chunk_output.asset_closure.end());
+                chunk_output.asset_closure.erase(
+                    std::unique(chunk_output.asset_closure.begin(), chunk_output.asset_closure.end()),
+                    chunk_output.asset_closure.end());
 
                 const AssetMetaData render_model_meta = make_meta(
                     chunk_output.render_model_guid,

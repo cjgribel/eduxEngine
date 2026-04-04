@@ -22,17 +22,17 @@ namespace eeng::editor
         br.load_or_create_index(config.batches_root / "index.json");
 
         BatchId editor_id{};
-        if (br.try_get_batch_id_by_name(BatchRegistry::kEditorBatchName, editor_id))
+        if (ctx.batch_registry->try_get_batch_id_by_name(BatchRegistry::kEditorBatchName, editor_id))
         {
-            if (!br.is_batch_loaded(editor_id))
-                br.queue_load(editor_id, ctx);
+            if (!ctx.batch_registry->is_batch_loaded(editor_id))
+                ctx.batch_registry->queue_load(editor_id, ctx);
         }
 
         BatchId default_id{};
-        if (br.try_get_batch_id_by_name(BatchRegistry::kDefaultBatchName, default_id))
+        if (ctx.batch_registry->try_get_batch_id_by_name(BatchRegistry::kDefaultBatchName, default_id))
         {
-            if (!br.is_batch_loaded(default_id))
-                br.queue_load(default_id, ctx);
+            if (!ctx.batch_registry->is_batch_loaded(default_id))
+                ctx.batch_registry->queue_load(default_id, ctx);
         }
 
         ctx.resource_manager->scan_assets_async(config.imported_assets_root, ctx);
