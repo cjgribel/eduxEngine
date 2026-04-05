@@ -1,7 +1,7 @@
 # Terrain
 
 ## Purpose
-Terrain is now built around generated chunk batches.
+Terrain is built around generated chunk batches.
 
 The runtime end product is:
 - one generated batch per terrain chunk
