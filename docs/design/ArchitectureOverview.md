@@ -1,8 +1,8 @@
-# Engine Architecture Orientation
+# Architecture Overview
 
-Notes for concepts added after the smaller course version.
+Overview of the architecture of `eduxEngine`, with a recap of the baseline `eduEngine` architecture and a categorized summary of major concepts and systems.
 
-## Course Version: `eduEngine`
+## Baseline Version: `eduEngine`
 
 ### Overall Architecture
 
@@ -42,15 +42,15 @@ The repo can still be described as a layered, modular architecture, but in this 
 - The architecture is modular in the sense that many responsibilities are split into focused subsystems or services, but those modules are coordinated through shared context objects, events, commands, and registries.
 - Compared with a simple strict layer stack, this is closer to a layered tool-and-runtime architecture: the editor depends on engine services, the runtime can run without most editor features, and play mode reuses the same foundation with a different world state.
 
-A useful rule is:
+A useful distinction is:
 
 - Architectural topics define boundaries, ownership, lifetimes, communication paths, scheduling, or major data flow.
 - Feature topics mostly add capabilities within those boundaries.
 - Another way to say it: some things define the shape of the engine, while other things live inside that shape.
 
-## Architecture-Focused Topics
+## Topic Overview by Architectural Level
 
-This section is an overview/table of contents for the topics that are most useful when teaching game engine architecture itself, rather than teaching individual engine features.
+This section groups the topics by architectural level: architecture-level topics, supporting infrastructure/tooling infrastructure, and feature-level systems.
 
 ### Architecture-Level
 
