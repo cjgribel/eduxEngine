@@ -160,12 +160,13 @@ message(STATUS "STB fetched")
 # https://github.com/g-truc/glm
 #
 message(STATUS "Fetching GLM")
-# set(GLM_TEST_ENABLE OFF CACHE BOOL "" FORCE)
-# set(GLM_BUILD_LIBRARY OFF CACHE BOOL "" FORCE)
+set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLM_BUILD_INSTALL OFF CACHE BOOL "" FORCE)
+set(GLM_BUILD_LIBRARY OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
 	glm
 	GIT_REPOSITORY	https://github.com/g-truc/glm.git
-	GIT_TAG 	bf71a834948186f4097caa076cd2663c69a10e1e #refs/tags/1.0.1
+	GIT_TAG 	1.0.3 # Dec 31, 2025
 )
 FetchContent_MakeAvailable(glm)
 message(STATUS "GLM fetched and made available")

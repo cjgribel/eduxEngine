@@ -103,5 +103,6 @@ if(TARGET ZLIB::ZLIB)
 endif()
 
 target_compile_definitions(edux_engine PRIVATE
+    GLM_ENABLE_EXPERIMENTAL
     META_OUTPUT_DIR="${CMAKE_BINARY_DIR}/meta"
 )
