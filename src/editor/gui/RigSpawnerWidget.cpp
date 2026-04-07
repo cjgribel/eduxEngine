@@ -1,4 +1,4 @@
-// Created by Codex.
+// Created by Carl Johan Gribel 2026.
 // Licensed under the MIT License. See LICENSE file for details.
 
 #include "gui/RigSpawnerWidget.hpp"

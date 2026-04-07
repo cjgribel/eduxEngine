@@ -1,3 +1,6 @@
+// Created by Carl Johan Gribel 2025.
+// Licensed under the MIT License. See LICENSE file for details.
+
 #include <queue>
 #include <mutex>
 #include <condition_variable>
