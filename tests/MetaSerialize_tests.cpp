@@ -121,7 +121,48 @@ namespace
     class MockBatchRegistry : public eeng::IBatchRegistry
     {
     public:
+        std::shared_future<TaskResult> queue_load(
+            const BatchId&,
+            EngineContext&) override
+        {
+            return std::async(std::launch::deferred, []
+                {
+                    TaskResult result{};
+                    result.success = true;
+                    return result;
+                }).share();
+        }
+
+        std::shared_future<TaskResult> queue_unload(
+            const BatchId&,
+            EngineContext&) override
+        {
+            return std::async(std::launch::deferred, []
+                {
+                    TaskResult result{};
+                    result.success = true;
+                    return result;
+                }).share();
+        }
+
         std::shared_future<TaskResult> queue_unload_all_async(EngineContext& ctx) override { return std::async(std::launch::deferred, [] { return TaskResult{}; }).share(); }
+
+        bool is_batch_loaded(const BatchId&) const override { return false; }
+        bool is_batch_read_only(const BatchId&) const override { return false; }
+
+        bool try_get_loaded_batch_for_entity(
+            const ecs::EntityRef&,
+            BatchId&) const override
+        {
+            return false;
+        }
+
+        bool try_get_batch_id_by_name(
+            const std::string&,
+            BatchId&) const override
+        {
+            return false;
+        }
     };
 
     struct MockGuiManager : eeng::IGuiManager
