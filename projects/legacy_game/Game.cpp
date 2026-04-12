@@ -453,8 +453,10 @@ void Game::render(
         shapeRenderer->push_basis_basic(characterWorldMatrix2, 1.0f);
         shapeRenderer->push_basis_basic(characterWorldMatrix3, 1.0f);
 #endif
+#if 0
         shapeRenderer->push_basis_basic(grassWorldMatrix, 1.0f);
         shapeRenderer->push_basis_basic(horseWorldMatrix, 1.0f);
+#endif
     }
 
     // Draw AABBs
