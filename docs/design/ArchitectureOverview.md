@@ -63,16 +63,17 @@ This section groups the topics by architectural level: architecture-level topics
 - [1.4 Shared Services vs World State](#14-shared-services-vs-world-state)
 - [1.5 `IApp`: Application Host Boundary](#15-iapp-application-host-boundary)
 - [1.6 `IGameRuntime`: Game Runtime Boundary](#16-igameruntime-game-runtime-boundary)
-- [1.7 GUI Actions Layer](#17-gui-actions-layer)
-- [1.8 Custom Asset Storage](#18-custom-asset-storage)
-- [1.9 Edit / Play Modes](#19-edit--play-modes)
-- [1.10 Threaded Execution](#110-threaded-execution)
-- [1.11 Async Loading](#111-async-loading)
-- [1.12 Events](#112-events)
-- [1.13 GUIDs and Reference Binding](#113-guids-and-reference-binding)
-- [1.14 Batch / Scene Partitioning](#114-batch--scene-partitioning)
-- [1.15 Main-Thread Boundaries](#115-main-thread-boundaries)
-- [1.16 Runtime Pipeline](#116-runtime-pipeline)
+- [1.7 GUI Management Boundary](#17-gui-management-boundary)
+- [1.8 GUI Actions Layer](#18-gui-actions-layer)
+- [1.9 Custom Asset Storage](#19-custom-asset-storage)
+- [1.10 Edit / Play Modes](#110-edit--play-modes)
+- [1.11 Threaded Execution](#111-threaded-execution)
+- [1.12 Async Loading](#112-async-loading)
+- [1.13 Events](#113-events)
+- [1.14 GUIDs and Reference Binding](#114-guids-and-reference-binding)
+- [1.15 Batch / Scene Partitioning](#115-batch--scene-partitioning)
+- [1.16 Main-Thread Boundaries](#116-main-thread-boundaries)
+- [1.17 Runtime Pipeline](#117-runtime-pipeline)
 
 ### Supporting Infrastructure / Tooling Infrastructure
 
@@ -136,70 +137,77 @@ This section contains the topics that most directly define the shape of the engi
 - Library / note: Custom repo contract. This kind of plugin/runtime boundary is usually engine-defined.
 - Pattern: Plugin or Strategy boundary. It also has a Template Method flavor through `render_frame()` calling scene, overlay, and GUI phases in a fixed order.
 
-### 1.7 GUI Actions Layer
+### 1.7 GUI Management Boundary
+
+- What it is: A dedicated engine/editor GUI subsystem behind the `IGuiManager` interface and its concrete `GuiManager` implementation.
+- What it is for: Keeps GUI orchestration, window visibility, and draw sequencing cohesive in one place, instead of scattering UI lifecycle code across unrelated engine or editor systems.
+- Library / note: Built around Dear ImGui through `IGuiManager` / `GuiManager`. This is separate from the action layer: the GUI manager is responsible for drawing and organizing UI, while [1.8 GUI Actions Layer](#18-gui-actions-layer) provides the operations that widgets call.
+- Pattern: Subsystem boundary with interface-based decoupling. It also has a Facade flavor for the GUI subsystem as a whole.
+
+### 1.8 GUI Actions Layer
 
 - What it is: A thin layer between GUI widgets and engine/editor operations (`SceneActions`, `BatchActions`, `AssetActions`).
 - What it is for: Keeps UI code simple, centralizes validation/rules, and routes edits through commands instead of letting widgets mutate data directly.
-- Library / note: Built around Dear ImGui, but the actions layer itself is custom. Other established UI options include `Qt` and `Nuklear`.
+- Library / note: Built around Dear ImGui, but the actions layer itself is custom. It works alongside [1.7 GUI Management Boundary](#17-gui-management-boundary): widgets are owned and drawn by the GUI subsystem, while actions translate user intent into editor/engine operations. Other established UI options include `Qt` and `Nuklear`.
 - Pattern: Facade or Application Service layer in front of lower-level editor/engine logic.
 
-### 1.8 Custom Asset Storage
+### 1.9 Custom Asset Storage
 
 - What it is: A custom runtime asset management system with GUID lookup, typed handles, versioned handles, indexing, and type-erased storage (`Storage`, `ResourceManager`, `AssetIndex`).
 - What it is for: Manages engine-native assets after they exist in the project: tracking identity, lookup, lifetime, loading, binding, unloading, and stable references from gameplay/editor data.
 - Library / note: Custom repo system, with some runtime-typed access supported through EnTT meta. Related reusable building blocks include the `EnTT` resource cache. Source-file conversion into engine assets is a separate concern; see [2.5 Asset Import and Cooking](#25-asset-import-and-cooking).
 - Pattern: Repository/Manager pattern, plus Handle pattern for safe references to loaded assets.
 
-### 1.9 Edit / Play Modes
+### 1.10 Edit / Play Modes
 
 - What it is: Two separate worlds: one for editing and one temporary runtime world for play/testing.
 - What it is for: Lets the game run without destroying the editor state. Exiting play throws away the play world and restores edit mode unchanged.
 - Library / note: Custom repo architecture. The play world is created from serialized snapshots of the loaded edit batches. This is usually an engine-specific system rather than a standalone library. This topic builds directly on [1.1 World State](#11-world-state), [1.2 Entity Management / ECS Layer](#12-entity-management--ecs-layer), and [1.4 Shared Services vs World State](#14-shared-services-vs-world-state).
 - Pattern: State pattern at the application level, with snapshot/restore behavior.
 
-### 1.10 Threaded Execution
+### 1.11 Threaded Execution
 
 - What it is: Multiple execution strategies: a thread pool for parallel work, a serial executor for ordered work, and a main-thread queue for thread-affine tasks.
 - What it is for: Improves responsiveness and scalability while still respecting constraints such as “some things must happen in order” or “some things must happen on the main thread”.
 - Library / note: Custom repo utilities built on top of standard C++ threading/futures. Other established options include `Taskflow` and `oneTBB`.
 - Pattern: Executor pattern, plus Producer-Consumer queues.
 
-### 1.11 Async Loading
+### 1.12 Async Loading
 
 - What it is: Asset and batch loading started in the background and completed through futures, events, and main-thread handoff when needed.
 - What it is for: Keeps the editor responsive, avoids long stalls, and prepares the architecture for loading screens or streaming later.
 - Library / note: Uses the repo `ThreadPool`, `SerialExecutor`, `MainThreadQueue`, and `std::future`/`std::shared_future`. Similar infrastructure can also be built with `Taskflow` or `oneTBB`.
 - Pattern: Asynchronous Task / Future pattern, with event-driven completion notifications.
 
-### 1.12 Events
+### 1.13 Events
 
 - What it is: A messaging mechanism where systems publish and react to events without being tightly coupled.
 - What it is for: Lets different engine parts communicate without direct dependencies everywhere.
 - Library / note: Covered in Module 4. This repo uses an `EventQueue` for engine/editor/runtime coordination. Other established options include `Boost.Signals2` and Qt signals/slots.
 - Pattern: Observer pattern, often implemented with queued event dispatch.
 
-### 1.13 GUIDs and Reference Binding
+### 1.14 GUIDs and Reference Binding
 
 - What it is: Using globally unique IDs to identify entities, assets, batches, and references between them.
 - What it is for: Makes save/load, prefab spawning, undo/redo, and asset references more robust than raw pointers or local entity IDs.
 - Library / note: Custom repo infrastructure around `Guid`, `EntityRef`, and binding helpers. This is usually custom, but many serialization/networking stacks also build around UUID libraries such as `Boost.UUID`.
 - Pattern: Identity Map / stable identity pattern.
 
-### 1.14 Batch / Scene Partitioning
+### 1.15 Batch / Scene Partitioning
 
 - What it is: Grouping entities and related assets into named batches that can be loaded, saved, and unloaded as units.
 - What it is for: Supports ownership, streaming, editor organization, and clearer boundaries for what content belongs together.
 - Library / note: Custom repo system through `BatchRegistry` and related editor commands. This is usually engine-specific rather than a standalone library feature.
 - Pattern: Partitioning / Aggregation pattern.
 
-### 1.15 Main-Thread Boundaries
+### 1.16 Main-Thread Boundaries
 
 - What it is: Explicit rules for which work may run in worker threads and which work must return to the main thread.
 - What it is for: Important for rendering APIs, some ECS mutations, GUI work, and other systems that are not safely parallel.
 - Library / note: Managed in the repo with `MainThreadQueue` and thread-pool handoff. This is commonly custom, though frameworks such as Qt also provide main-thread event-loop dispatch patterns.
 - Pattern: Thread confinement pattern.
 
-### 1.16 Runtime Pipeline
+### 1.17 Runtime Pipeline
 
 - What it is: An engine-owned definition of update/render order: which systems run, in what phases, and in what sequence.
 - What it is for: Makes dependencies between systems explicit, keeps frame execution deterministic, and creates one place where the engine can decide what “a frame” means in edit mode, play mode, or future runtime variants.
