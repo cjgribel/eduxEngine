@@ -9,6 +9,8 @@ namespace eeng::editor
 {
     namespace
     {
+        // Resolve project-relative paths once during config load so runtime code
+        // can consume absolute or project-rooted content paths consistently.
         std::filesystem::path resolve_path(
             const std::filesystem::path& root,
             const std::filesystem::path& candidate)
@@ -16,6 +18,26 @@ namespace eeng::editor
             if (candidate.empty())
                 return root;
             return candidate.is_relative() ? (root / candidate) : candidate;
+        }
+
+        // Best-effort helper for optional string-array config fields. Invalid
+        // shapes are ignored so old project configs keep working.
+        std::vector<std::string> load_string_array(
+            const nlohmann::json& j,
+            const char* key)
+        {
+            std::vector<std::string> values;
+            const auto it = j.find(key);
+            if (it == j.end() || !it->is_array())
+                return values;
+
+            values.reserve(it->size());
+            for (const auto& item : *it)
+            {
+                if (item.is_string())
+                    values.push_back(item.get<std::string>());
+            }
+            return values;
         }
     }
 
@@ -47,6 +69,24 @@ namespace eeng::editor
         cfg.assets_root = resolve_path(cfg.project_root, assets_root);
         cfg.imported_assets_root = resolve_path(cfg.project_root, imported_assets_root);
         cfg.batches_root = resolve_path(cfg.project_root, batches_root);
+
+        // Stage 1 Warm Play defaults: use the project's batch index and boot the
+        // conventional default batch unless the project opts into something else.
+        cfg.strict_play.batch_index = cfg.batches_root / "index.json";
+        cfg.strict_play.startup_batches = { "default" };
+
+        if (const auto strict_it = j.find("strict_play");
+            strict_it != j.end() && strict_it->is_object())
+        {
+            const auto& strict = *strict_it;
+            cfg.strict_play.batch_index = resolve_path(
+                cfg.project_root,
+                strict.value("batch_index", cfg.strict_play.batch_index.string()));
+
+            auto startup_batches = load_string_array(strict, "startup_batches");
+            if (!startup_batches.empty())
+                cfg.strict_play.startup_batches = std::move(startup_batches);
+        }
 
         return cfg;
     }

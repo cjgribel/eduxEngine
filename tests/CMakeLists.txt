@@ -33,6 +33,7 @@ add_executable(tests
     EventQueue_tests.cpp
     TrailComponent_tests.cpp ../src/engine/ecs/TrailComponent.cpp
     MetaFieldAssign_tests.cpp ../src/editor/MetaFieldAssign.cpp
+    ProjectConfig_tests.cpp ../src/editor/ProjectConfig.cpp
     )
 
 target_link_libraries(tests PRIVATE gtest_main nlohmann_json::nlohmann_json glm::glm)

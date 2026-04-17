@@ -107,6 +107,7 @@ namespace eeng
         float min_frametime_ms = 0.0f; ///< Minimum frame duration in milliseconds (default 60 FPS)
         std::atomic<bool> shutdown_started_{ false };
         EngineMode mode_{ EngineMode::Edit };
+        PlayModePolicy active_play_policy_{ PlayModePolicy::Preview };
 
         std::shared_ptr<EngineContext> ctx;
         std::unique_ptr<IApp> app_;

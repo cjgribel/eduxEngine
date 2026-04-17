@@ -752,6 +752,7 @@ namespace eeng
         PlayModePolicy policy = app_
             ? app_->play_policy()
             : PlayModePolicy::Preview;
+        active_play_policy_ = policy;
 
         std::vector<BatchSnapshot> snapshots;
         if (policy == PlayModePolicy::Preview)
@@ -850,10 +851,23 @@ namespace eeng
         if (app_)
             app_->on_exit_play(*ctx);
 
+        if (active_play_policy_ == PlayModePolicy::Strict
+            && play_world_
+            && ctx->batch_registry)
+        {
+            auto unload_future = ctx->batch_registry->queue_unload_all_async(*ctx);
+            if (unload_future.valid()
+                && !pump_until_ready(*ctx, unload_future, "Play mode: batch unload wait timed out", 0))
+            {
+                EENG_LOG_WARN(ctx, "Play mode: batch unload wait timed out");
+            }
+        }
+
         ctx->bind(*services_, *edit_world_);
         ctx->world_owner = edit_world_;
         play_world_.reset();
         mode_ = EngineMode::Edit;
+        active_play_policy_ = PlayModePolicy::Preview;
         if (services_)
             services_->play_mode_active.store(false, std::memory_order_relaxed);
         EENG_LOG(ctx, "Play mode: exited");

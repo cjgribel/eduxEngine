@@ -66,21 +66,13 @@ namespace eeng::gui
                 ImGui::EndDisabled();
 
             const bool has_services = (ctx.services != nullptr);
-            int policy_choice = 0; // 0 = Game, 1 = Preview
+            int policy_choice = 0; // 0 = Runtime Default, 1 = Preview, 2 = Warm Play
             if (has_services
                 && ctx.services->play_mode_policy_override_enabled.load(std::memory_order_relaxed))
             {
                 const auto override_policy = ctx.services->play_mode_policy_override.load(
                     std::memory_order_relaxed);
-                policy_choice = (override_policy == PlayModePolicy::Preview) ? 1 : 0;
-                if (override_policy == PlayModePolicy::Strict)
-                {
-                    // Strict mode is disabled for now; clamp any override to Preview.
-                    policy_choice = 1;
-                    ctx.services->play_mode_policy_override.store(
-                        PlayModePolicy::Preview,
-                        std::memory_order_relaxed);
-                }
+                policy_choice = (override_policy == PlayModePolicy::Preview) ? 1 : 2;
             }
 
             ImGui::SameLine();
@@ -88,22 +80,33 @@ namespace eeng::gui
             ImGui::SameLine();
             ImGui::TextUnformatted("Policy:");
             ImGui::SameLine();
-            ImGui::SetNextItemWidth(110.0f);
+            ImGui::SetNextItemWidth(150.0f);
             if (!has_services)
                 ImGui::BeginDisabled();
-            if (ImGui::Combo("##PlayPolicy", &policy_choice, "Game\0Preview\0"))
+            // "Warm Play" maps to the current Strict implementation:
+            // a fresh play world + runtime-selected startup content, while the
+            // edit world stays resident in the background for fast return.
+            if (ImGui::Combo("##PlayPolicy", &policy_choice, "Runtime Default\0Preview\0Warm Play\0"))
             {
                 if (policy_choice == 0)
                 {
                     ctx.services->play_mode_policy_override_enabled.store(
                         false, std::memory_order_relaxed);
                 }
-                else
+                else if (policy_choice == 1)
                 {
                     ctx.services->play_mode_policy_override_enabled.store(
                         true, std::memory_order_relaxed);
                     ctx.services->play_mode_policy_override.store(
                         PlayModePolicy::Preview,
+                        std::memory_order_relaxed);
+                }
+                else
+                {
+                    ctx.services->play_mode_policy_override_enabled.store(
+                        true, std::memory_order_relaxed);
+                    ctx.services->play_mode_policy_override.store(
+                        PlayModePolicy::Strict,
                         std::memory_order_relaxed);
                 }
             }

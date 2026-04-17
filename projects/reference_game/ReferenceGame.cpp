@@ -125,19 +125,14 @@ namespace eeng::reference_game
 
     std::vector<std::string> ReferenceGame::preferred_startup_batches() const
     {
-        // In Strict mode, list preferred batch names to load at play start.
-        // These are resolved through the play world's BatchRegistry by the app.
+        // Fallback startup batch list when the project config does not provide one.
         return { std::string(BatchRegistry::kDefaultBatchName) };
     }
 
     void ReferenceGame::on_play_world_created(EngineContext& ctx)
     {
-        // Configure the fresh play world before loading batches (e.g., set the batch index path).
-        if (!ctx.batch_registry)
-            return;
-
-        auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
-        br.load_or_create_index("projects/reference_game/batches/index.json");
+        // Project-configured strict-play boot now owns the batch index path.
+        (void)ctx;
     }
 
     void ReferenceGame::on_enter_play(EngineContext& ctx)

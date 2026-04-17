@@ -4,6 +4,7 @@
 #pragma once
 
 #include "engineapi/IApp.hpp"
+#include "BatchRegistry.hpp"
 #include "editor/EditorRuntime.hpp"
 #include "editor/ProjectBootstrap.hpp"
 #include "editor/ProjectConfig.hpp"
@@ -197,11 +198,19 @@ namespace eeng::editor
 
         std::vector<std::string> play_startup_batches() const override
         {
+            if (ctx_ && ctx_->project_config && !ctx_->project_config->strict_play.startup_batches.empty())
+                return ctx_->project_config->strict_play.startup_batches;
+
             return runtime_ ? runtime_->preferred_startup_batches() : std::vector<std::string>{};
         }
 
         void on_play_world_created(EngineContext& ctx) override
         {
+            if (ctx.project_config && ctx.batch_registry)
+            {
+                auto& br = static_cast<BatchRegistry&>(*ctx.batch_registry);
+                br.load_or_create_index(ctx.project_config->strict_play.batch_index);
+            }
             if (runtime_)
                 runtime_->on_play_world_created(ctx);
         }
