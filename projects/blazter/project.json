@@ -1,0 +1,9 @@
+{
+  "assets_root": "../../assets",
+  "imported_assets_root": "imported_assets",
+  "batches_root": "batches",
+  "strict_play": {
+    "batch_index": "batches/index.json",
+    "startup_batches": ["blazter_boot"]
+  }
+}

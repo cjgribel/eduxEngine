@@ -1,0 +1,22 @@
+{
+  "batches": [
+    {
+      "asset_closure_hdr": [],
+      "filename": "f9a2bc11-63f0-4d01.json",
+      "id": "f9a2bc11-63f0-4d01",
+      "name": "editor"
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "a6c812d4-7b48-11f0.json",
+      "id": "a6c812d4-7b48-11f0",
+      "name": "default"
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "bb38f208-14a9-57c2.json",
+      "id": "bb38f208-14a9-57c2",
+      "name": "blazter_boot"
+    }
+  ]
+}

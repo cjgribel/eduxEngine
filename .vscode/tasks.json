@@ -130,6 +130,24 @@
             "problemMatcher": []
         },
         {
+            "label": "CMake Build Blazter (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Debug",
+                "--target",
+                "Blazter",
+                "--config",
+                "Debug"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "CMake Build All (Release)",
             "type": "shell",
             "command": "cmake",
@@ -188,6 +206,23 @@
                 "${workspaceFolder}/Release",
                 "--target",
                 "FluidSandbox",
+                "--config",
+                "Release"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "CMake Build Blazter (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/Release",
+                "--target",
+                "Blazter",
                 "--config",
                 "Release"
             ],

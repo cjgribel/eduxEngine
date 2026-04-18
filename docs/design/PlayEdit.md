@@ -213,6 +213,7 @@ The Stage 1 design should instead aim to remain valid when a future `ScriptedGam
 - [ ] Stage 1: add tests for Warm Play enter/exit ownership and asset-lifetime behavior.
 - [ ] Stage 2: add a richer play boot contract beyond startup batch names.
 - [ ] Stage 2: support runtime-owned post-load session boot work such as player spawn/session initialization.
+- [ ] Stage 2: restore parity between editor-hosted play and standalone `run_game<T>()` so project-config boot data can drive both paths.
 - [ ] Stage 3: add Cold Play entry behavior and a loading screen/state for play startup.
 
 ### Later
@@ -224,4 +225,5 @@ The Stage 1 design should instead aim to remain valid when a future `ScriptedGam
 - [x] Rename `Module1` to `projects/legacy_game` and update build files.
 - [ ] Add a runtime/plugin system to allow swapping game types in the editor (beyond data reload).
 - [ ] Audit global caches and runtime state for strict play reset (physics/script state, etc).
+- [ ] Add a standalone game-app bootstrap path that can load project config/content roots without depending on `EditorApp`.
 - [ ] Keep future Lua/script runtime integrated through runtime hooks, without making Warm/Cold Play depend on script state or script-defined ownership.

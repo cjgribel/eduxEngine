@@ -251,6 +251,7 @@ add_subdirectory(src/editor)
 add_subdirectory(projects/legacy_game)
 add_subdirectory(projects/reference_game)
 add_subdirectory(projects/fluid_sandbox)
+add_subdirectory(projects/blazter)
 
 # Set the startup project for Visual Studio
 if(CMAKE_GENERATOR MATCHES "Visual Studio")

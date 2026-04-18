@@ -1,13 +1,13 @@
 # Simple Platformer plan
 
-Phyics-based, multiplayer game where you run (or fly) around capturing
-monsters. 
+Sandboxy, Phyics-based, Run-and-Gun type of game where you run (or fly) around capturing
+monsters or annoying each other.
 The core is the fun of playing around with a jet-pack and a vaccum/gun inspired by Slime Rancher, and Luigi's Mansion.
-One wide, shared view similar to Fallguys.
+Should be multiplayer, either via one shared view [Fallguys] or split-screen (affects engine/pipeline).
 
 ## Simple animated characters
 
-- Jumps.
+- Basic graph with animation for running, jumping, flying etc.
 - Force based jet pack with particles
 
 ## Bidirectional vacuum/gun
