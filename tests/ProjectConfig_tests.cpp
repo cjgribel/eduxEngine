@@ -32,10 +32,10 @@ namespace
     };
 }
 
-TEST(ProjectConfig, LoadsStrictPlayDefaultsFromBatchRoot)
+TEST(ProjectConfig, RejectsMissingStrictPlay)
 {
     const auto config_path =
-        std::filesystem::temp_directory_path() / "edux_project_config_defaults.json";
+        std::filesystem::temp_directory_path() / "edux_project_config_missing_strict_play.json";
     ScopedTempFile temp_file(config_path);
 
     std::ofstream out(config_path);
@@ -48,12 +48,9 @@ TEST(ProjectConfig, LoadsStrictPlayDefaultsFromBatchRoot)
     out.close();
 
     const auto config = eeng::editor::ProjectConfig::load_from_file(config_path);
-    ASSERT_TRUE(config.has_value());
-
-    // Missing strict_play block should still produce a usable Warm Play config.
-    EXPECT_EQ(config->strict_play.batch_index, config->batches_root / "index.json");
-    ASSERT_EQ(config->strict_play.startup_batches.size(), 1u);
-    EXPECT_EQ(config->strict_play.startup_batches.front(), "default");
+    // Project-driven Warm Play is explicit: missing strict_play should reject
+    // the config rather than silently inventing boot behavior.
+    EXPECT_FALSE(config.has_value());
 }
 
 TEST(ProjectConfig, LoadsStrictPlayOverrides)

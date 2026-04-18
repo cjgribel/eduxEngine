@@ -20,24 +20,59 @@ namespace eeng::editor
             return candidate.is_relative() ? (root / candidate) : candidate;
         }
 
-        // Best-effort helper for optional string-array config fields. Invalid
-        // shapes are ignored so old project configs keep working.
-        std::vector<std::string> load_string_array(
+        // Required string-array helper for strict project config fields.
+        // Returning nullopt keeps config errors loud instead of papering over
+        // omissions with implicit defaults.
+        std::optional<std::vector<std::string>> load_required_string_array(
             const nlohmann::json& j,
             const char* key)
         {
             std::vector<std::string> values;
             const auto it = j.find(key);
             if (it == j.end() || !it->is_array())
-                return values;
+                return std::nullopt;
 
             values.reserve(it->size());
             for (const auto& item : *it)
             {
-                if (item.is_string())
-                    values.push_back(item.get<std::string>());
+                if (!item.is_string())
+                    return std::nullopt;
+                values.push_back(item.get<std::string>());
             }
+
+            if (values.empty())
+                return std::nullopt;
+
             return values;
+        }
+
+        std::optional<StrictPlayConfig> load_required_strict_play_config(
+            const std::filesystem::path& project_root,
+            const nlohmann::json& j)
+        {
+            const auto strict_it = j.find("strict_play");
+            if (strict_it == j.end() || !strict_it->is_object())
+                return std::nullopt;
+
+            const auto& strict = *strict_it;
+
+            const auto batch_index_it = strict.find("batch_index");
+            if (batch_index_it == strict.end() || !batch_index_it->is_string())
+                return std::nullopt;
+
+            const std::filesystem::path batch_index =
+                resolve_path(project_root, batch_index_it->get<std::string>());
+            if (batch_index.empty())
+                return std::nullopt;
+
+            auto startup_batches = load_required_string_array(strict, "startup_batches");
+            if (!startup_batches)
+                return std::nullopt;
+
+            return StrictPlayConfig{
+                .batch_index = std::move(batch_index),
+                .startup_batches = std::move(*startup_batches)
+            };
         }
     }
 
@@ -70,23 +105,12 @@ namespace eeng::editor
         cfg.imported_assets_root = resolve_path(cfg.project_root, imported_assets_root);
         cfg.batches_root = resolve_path(cfg.project_root, batches_root);
 
-        // Stage 1 Warm Play defaults: use the project's batch index and boot the
-        // conventional default batch unless the project opts into something else.
-        cfg.strict_play.batch_index = cfg.batches_root / "index.json";
-        cfg.strict_play.startup_batches = { "default" };
-
-        if (const auto strict_it = j.find("strict_play");
-            strict_it != j.end() && strict_it->is_object())
-        {
-            const auto& strict = *strict_it;
-            cfg.strict_play.batch_index = resolve_path(
-                cfg.project_root,
-                strict.value("batch_index", cfg.strict_play.batch_index.string()));
-
-            auto startup_batches = load_string_array(strict, "startup_batches");
-            if (!startup_batches.empty())
-                cfg.strict_play.startup_batches = std::move(startup_batches);
-        }
+        // Warm Play boot is now explicit project config. Missing or malformed
+        // strict_play data is treated as an invalid project config.
+        auto strict_play = load_required_strict_play_config(cfg.project_root, j);
+        if (!strict_play)
+            return std::nullopt;
+        cfg.strict_play = std::move(*strict_play);
 
         return cfg;
     }

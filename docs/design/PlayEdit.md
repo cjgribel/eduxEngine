@@ -135,7 +135,7 @@ Why:
 
 ### Runtime Preferences
 - `IGameRuntime::preferred_play_policy()` expresses the runtime default.
-- `IGameRuntime::preferred_startup_batches()` provides default Stage 1 Warm-Play startup batches.
+- `IGameRuntime::preferred_startup_batches()` is a temporary standalone fallback until `GameApp` loads project boot config too.
 
 ### Staged Plan
 
@@ -143,6 +143,7 @@ Why:
 - Keep Warm Play simple and useful.
 - Boot a fresh play world using runtime/project-configured startup batches.
 - Resolve the batch index and startup batch list from config rather than hardcoded runtime strings.
+- Treat missing or malformed Warm-Play boot config as a project error; do not silently invent defaults.
 - On exit, explicitly unload the play-owned batches/assets before destroying the play world.
 
 This stage is enough to make a new game target feel real rather than just an editor preview.
@@ -169,6 +170,7 @@ Cold Play option: unload edit batches during play to free memory and expose true
 - No asset borrowing from edit; play acquires its own leases.
 - Deterministic runtime loading order (suitable for loading screens).
 - Clear separation of asset lifetimes and side effects.
+- Project-driven Warm/Cold Play should fail loudly on missing boot config rather than fall back implicitly.
 
 ### Relationship To Scripting
 Warm/Cold Play boot and Lua gameplay scripting are related, but they should be treated as mostly orthogonal tracks.

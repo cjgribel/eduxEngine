@@ -91,7 +91,7 @@ namespace eeng::editor
                 }
                 else
                 {
-                    EENG_LOG_WARN(ctx_, "Project config not found: %s",
+                    EENG_LOG_WARN(ctx_, "Project config missing or invalid: %s",
                         config_path.string().c_str());
                 }
             }
@@ -198,7 +198,9 @@ namespace eeng::editor
 
         std::vector<std::string> play_startup_batches() const override
         {
-            if (ctx_ && ctx_->project_config && !ctx_->project_config->strict_play.startup_batches.empty())
+            // Editor-hosted Warm Play is project-driven: once the config has
+            // loaded successfully, startup batches come from it exclusively.
+            if (ctx_ && ctx_->project_config)
                 return ctx_->project_config->strict_play.startup_batches;
 
             return runtime_ ? runtime_->preferred_startup_batches() : std::vector<std::string>{};
