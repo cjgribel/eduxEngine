@@ -3,6 +3,7 @@
 #include "EngineContext.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "engineapi/IGameRuntime.hpp"
+#include <string_view>
 #include <memory>
 
 namespace eeng::blazter
@@ -28,9 +29,34 @@ namespace eeng::blazter
         void on_exit_play(EngineContext& ctx) override;
 
     private:
+        enum class SessionFlowState
+        {
+            BootLoading,
+            MainMenu,
+            SessionLoading,
+            Playing,
+        };
+
+        void reset_session_flow();
+        void transition_to(SessionFlowState next_state);
+        void update_flow(float deltaTime_s);
+        void update_boot_loading(float deltaTime_s);
+        void update_main_menu(float deltaTime_s);
+        void update_session_loading(float deltaTime_s);
+        void begin_session_start();
+        void finish_session_start();
+        std::string_view flow_state_label() const;
         void publish_overlay_view(int windowWidth, int windowHeight);
 
         std::shared_ptr<EngineContext> ctx_;
         eeng::ecs::RuntimePipeline runtime_pipeline_;
+        SessionFlowState flow_state_{ SessionFlowState::BootLoading };
+        float flow_state_elapsed_s_{ 0.0f };
+        float boot_load_progress_{ 0.0f };
+        float background_world_load_progress_{ 0.0f };
+        float session_load_progress_{ 0.0f };
+        int selected_player_count_{ 1 };
+        int active_player_count_{ 0 };
+        bool start_requested_{ false };
     };
 } // namespace eeng::blazter
