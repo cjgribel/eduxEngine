@@ -3,8 +3,12 @@
 #include "EngineContext.hpp"
 #include "ecs/RuntimePipeline.hpp"
 #include "engineapi/IGameRuntime.hpp"
+#include <span>
+#include <string>
 #include <string_view>
 #include <memory>
+#include <unordered_set>
+#include <vector>
 
 namespace eeng::blazter
 {
@@ -22,6 +26,7 @@ namespace eeng::blazter
         void render_overlay(const RenderContext& ctx) override;
         void render_gui(const RenderContext& ctx) override;
         void destroy() override;
+        bool get_editor_view(OverlayViewState& out) const override;
         PlayModePolicy preferred_play_policy() const override;
         std::vector<std::string> preferred_startup_batches() const override;
         void on_play_world_created(EngineContext& ctx) override;
@@ -43,20 +48,27 @@ namespace eeng::blazter
         void update_boot_loading(float deltaTime_s);
         void update_main_menu(float deltaTime_s);
         void update_session_loading(float deltaTime_s);
+        void queue_level_preload();
+        float level_preload_progress() const;
+        bool is_level_preload_ready() const;
         void begin_session_start();
         void finish_session_start();
         std::string_view flow_state_label() const;
-        void publish_overlay_view(int windowWidth, int windowHeight);
+        bool build_editor_view(OverlayViewState& out, glm::ivec2 window_size) const;
+        bool build_play_view(OverlayViewState& out, glm::ivec2 window_size) const;
+        bool build_view_for_mode(OverlayViewState& out, RenderMode mode, glm::ivec2 window_size) const;
+        void publish_overlay_view(RenderMode mode, int windowWidth, int windowHeight);
 
         std::shared_ptr<EngineContext> ctx_;
         eeng::ecs::RuntimePipeline runtime_pipeline_;
         SessionFlowState flow_state_{ SessionFlowState::BootLoading };
         float flow_state_elapsed_s_{ 0.0f };
         float boot_load_progress_{ 0.0f };
-        float background_world_load_progress_{ 0.0f };
         float session_load_progress_{ 0.0f };
         int selected_player_count_{ 1 };
         int active_player_count_{ 0 };
         bool start_requested_{ false };
+        glm::ivec2 last_window_size_{ 0, 0 };
+        std::unordered_set<std::string> queued_level_batches_;
     };
 } // namespace eeng::blazter

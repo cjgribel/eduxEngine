@@ -1,13 +1,86 @@
 #include "BlazterGame.hpp"
 
 #include "BatchRegistry.hpp"
+#include "editor/ecs/FirstPersonCameraComponent.hpp"
+#include "editor/ecs/ThirdPersonCameraComponent.hpp"
 #include "editor/OverlayRenderSettingsPersistence.hpp"
+#include "glmcommon.hpp"
 #include "imgui.h"
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 
 namespace eeng::blazter
 {
+    namespace
+    {
+        struct ActiveEditorCameraView
+        {
+            glm::mat4 view{ 1.0f };
+            glm::vec3 position{ 0.0f, 0.0f, 0.0f };
+            float near_plane = 1.0f;
+            float far_plane = 500.0f;
+        };
+
+        struct LevelDef
+        {
+            std::string_view id;
+            std::string_view display_name;
+            std::span<const std::string_view> preload_batches;
+        };
+
+        constexpr std::string_view kLevel01Batches[] = {
+            "level_01",
+            "terrain_TerrainRecipe_chunk_0_0",
+        };
+
+        constexpr LevelDef kLevel01{
+            "level_01",
+            "Level 01",
+            kLevel01Batches
+        };
+
+        constexpr const LevelDef& current_level_def()
+        {
+            return kLevel01;
+        }
+
+        bool try_get_active_editor_camera_view(
+            entt::registry& registry,
+            ActiveEditorCameraView& out_view)
+        {
+            auto third_view = registry.view<eeng::editor::ThirdPersonCameraComponent>();
+            for (auto entity : third_view)
+            {
+                const auto& camera = third_view.get<eeng::editor::ThirdPersonCameraComponent>(entity);
+                if (!camera.active)
+                    continue;
+
+                out_view.view = camera.model_to_view;
+                out_view.position = camera.position;
+                out_view.near_plane = camera.near_plane;
+                out_view.far_plane = camera.far_plane;
+                return true;
+            }
+
+            auto first_view = registry.view<eeng::editor::FirstPersonCameraComponent>();
+            for (auto entity : first_view)
+            {
+                const auto& camera = first_view.get<eeng::editor::FirstPersonCameraComponent>(entity);
+                if (!camera.active)
+                    continue;
+
+                out_view.view = camera.model_to_view;
+                out_view.position = camera.position;
+                out_view.near_plane = camera.near_plane;
+                out_view.far_plane = camera.far_plane;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
     BlazterGame::BlazterGame(std::shared_ptr<EngineContext> ctx)
         : ctx_(std::move(ctx))
     {
@@ -75,7 +148,11 @@ namespace eeng::blazter
         // Keep the old render hook minimal. If some systems still expect it,
         // use it for shared per-frame view publication rather than game logic.
         (void)time_s;
-        publish_overlay_view(windowWidth, windowHeight);
+        last_window_size_ = glm::ivec2(windowWidth, windowHeight);
+        const RenderMode mode = (ctx_ && ctx_->services && ctx_->services->play_mode_active.load(std::memory_order_relaxed))
+            ? RenderMode::Play
+            : RenderMode::Edit;
+        publish_overlay_view(mode, windowWidth, windowHeight);
     }
 
     void BlazterGame::render_scene(const RenderContext& ctx)
@@ -83,7 +160,38 @@ namespace eeng::blazter
         // Scene rendering belongs here once Blazter has a visual identity:
         // world draw calls, character and weapon effects, particle blasters,
         // decals, lighting tweaks, and any play/edit scene visualization.
-        (void)ctx;
+        last_window_size_ = glm::ivec2(ctx.window_width, ctx.window_height);
+        if (!ctx_ || !ctx_->entity_manager)
+            return;
+
+        OverlayViewState view{};
+        if (!build_view_for_mode(view, ctx.mode, last_window_size_))
+            return;
+
+        auto& registry = ctx_->entity_manager->registry();
+        const glm::mat4 proj_view = view.proj * view.view;
+        const glm::vec3 eye_pos = (ctx.mode == RenderMode::Play)
+            ? glm::vec3(0.0f, 10.0f, 18.0f)
+            : glm::vec3(0.0f, 8.0f, 12.0f);
+        const glm::vec3 light_pos = eye_pos + glm::vec3(12.0f, 18.0f, 8.0f);
+        const glm::vec3 light_color(1.0f, 0.98f, 0.92f);
+
+        runtime_pipeline_.render_entities(
+            registry,
+            *ctx_,
+            proj_view,
+            light_pos,
+            light_color,
+            eye_pos);
+
+        const glm::vec3 camera_right = glm::normalize(glm::vec3(view.view[0][0], view.view[1][0], view.view[2][0]));
+        const glm::vec3 camera_up = glm::normalize(glm::vec3(view.view[0][1], view.view[1][1], view.view[2][1]));
+        runtime_pipeline_.render_particles(
+            registry,
+            *ctx_,
+            proj_view,
+            camera_right,
+            camera_up);
     }
 
     void BlazterGame::render_overlay(const RenderContext& ctx)
@@ -91,7 +199,24 @@ namespace eeng::blazter
         // Use overlay rendering for debug lines, targeting reticles, helper
         // markers, and other camera-space overlays that should sit above the
         // scene without being part of the main world render.
-        publish_overlay_view(ctx.window_width, ctx.window_height);
+        last_window_size_ = glm::ivec2(ctx.window_width, ctx.window_height);
+        publish_overlay_view(ctx.mode, ctx.window_width, ctx.window_height);
+
+        if (!ctx_ || !ctx_->entity_manager || !ctx_->shape_renderer || !ctx_->overlay_view_state || !ctx_->overlay_view_state->valid)
+            return;
+
+        auto& registry = ctx_->entity_manager->registry();
+        const auto vp_p_v = ctx_->overlay_view_state->viewport * ctx_->overlay_view_state->proj * ctx_->overlay_view_state->view;
+        runtime_pipeline_.render_debug(
+            registry,
+            *ctx_,
+            *ctx_->shape_renderer,
+            vp_p_v,
+            ctx.window_height);
+        runtime_pipeline_.render_runtime_overlays(
+            registry,
+            *ctx_,
+            *ctx_->shape_renderer);
     }
 
     void BlazterGame::render_gui(const RenderContext& ctx)
@@ -118,22 +243,24 @@ namespace eeng::blazter
         {
             case SessionFlowState::BootLoading:
                 ImGui::TextWrapped(
-                    "Booting Blazter. This is where we can show a loading screen while "
-                    "menu essentials come online and heavy world content begins loading.");
+                    "Booting Blazter. This stage should stay brief and get us to a responsive "
+                    "menu quickly, rather than pretending the whole level is already loaded.");
                 ImGui::ProgressBar(boot_load_progress_, ImVec2(-FLT_MIN, 0.0f), "Boot");
-                ImGui::ProgressBar(background_world_load_progress_, ImVec2(-FLT_MIN, 0.0f), "Terrain");
                 break;
 
             case SessionFlowState::MainMenu:
                 ImGui::TextWrapped(
-                    "Main menu placeholder. The terrain continues loading in the background "
-                    "while the player chooses the local player count.");
+                    "Main menu placeholder. The predetermined start level is preloading in the "
+                    "background while the player chooses the local player count.");
+                ImGui::Text("Start level: %.*s",
+                    static_cast<int>(current_level_def().display_name.size()),
+                    current_level_def().display_name.data());
                 ImGui::SliderInt("Players", &selected_player_count_, 1, 4);
-                ImGui::ProgressBar(background_world_load_progress_, ImVec2(-FLT_MIN, 0.0f), "Terrain");
-                if (background_world_load_progress_ < 1.0f)
-                    ImGui::TextDisabled("Terrain still streaming in the background...");
+                ImGui::ProgressBar(level_preload_progress(), ImVec2(-FLT_MIN, 0.0f), "Level preload");
+                if (!is_level_preload_ready())
+                    ImGui::TextDisabled("Start level still preloading in the background...");
                 else
-                    ImGui::TextDisabled("Background world content is ready.");
+                    ImGui::TextDisabled("Start level content is ready.");
                 if (ImGui::Button("Start"))
                     start_requested_ = true;
                 break;
@@ -158,22 +285,9 @@ namespace eeng::blazter
         ImGui::End();
     }
 
-    void BlazterGame::publish_overlay_view(int windowWidth, int windowHeight)
+    bool BlazterGame::get_editor_view(OverlayViewState& out) const
     {
-        // For now this publishes a safe identity view so editor overlays and
-        // debug UI still have valid dimensions. Later this should publish the
-        // active gameplay/editor camera matrices used by Blazter.
-        if (!ctx_ || !ctx_->overlay_view_state)
-            return;
-        if (windowWidth <= 0 || windowHeight <= 0)
-            return;
-
-        auto& overlay = *ctx_->overlay_view_state;
-        overlay.view = glm::mat4(1.0f);
-        overlay.proj = glm::mat4(1.0f);
-        overlay.viewport = glm::mat4(1.0f);
-        overlay.window_size = glm::ivec2(windowWidth, windowHeight);
-        overlay.valid = true;
+        return build_editor_view(out, last_window_size_);
     }
 
     void BlazterGame::destroy()
@@ -240,11 +354,11 @@ namespace eeng::blazter
         flow_state_ = SessionFlowState::BootLoading;
         flow_state_elapsed_s_ = 0.0f;
         boot_load_progress_ = 0.0f;
-        background_world_load_progress_ = 0.0f;
         session_load_progress_ = 0.0f;
         selected_player_count_ = 1;
         active_player_count_ = 0;
         start_requested_ = false;
+        queued_level_batches_.clear();
     }
 
     void BlazterGame::transition_to(SessionFlowState next_state)
@@ -282,10 +396,7 @@ namespace eeng::blazter
 
     void BlazterGame::update_boot_loading(float deltaTime_s)
     {
-        boot_load_progress_ = std::min(1.0f, boot_load_progress_ + std::max(0.0f, deltaTime_s) * 1.35f);
-        background_world_load_progress_ = std::min(
-            1.0f,
-            background_world_load_progress_ + std::max(0.0f, deltaTime_s) * 0.35f);
+        boot_load_progress_ = std::min(1.0f, boot_load_progress_ + std::max(0.0f, deltaTime_s) * 4.0f);
 
         if (boot_load_progress_ >= 1.0f)
             transition_to(SessionFlowState::MainMenu);
@@ -293,9 +404,8 @@ namespace eeng::blazter
 
     void BlazterGame::update_main_menu(float deltaTime_s)
     {
-        background_world_load_progress_ = std::min(
-            1.0f,
-            background_world_load_progress_ + std::max(0.0f, deltaTime_s) * 0.20f);
+        (void)deltaTime_s;
+        queue_level_preload();
 
         if (start_requested_)
             begin_session_start();
@@ -303,22 +413,70 @@ namespace eeng::blazter
 
     void BlazterGame::update_session_loading(float deltaTime_s)
     {
-        const float target_progress = std::max(background_world_load_progress_, session_load_progress_);
-        background_world_load_progress_ = std::min(
-            1.0f,
-            background_world_load_progress_ + std::max(0.0f, deltaTime_s) * 0.65f);
-        session_load_progress_ = std::min(
-            1.0f,
-            std::max(target_progress, session_load_progress_ + std::max(0.0f, deltaTime_s) * 0.90f));
+        (void)deltaTime_s;
+        queue_level_preload();
+        session_load_progress_ = level_preload_progress();
 
-        if (session_load_progress_ >= 1.0f && background_world_load_progress_ >= 1.0f)
+        if (is_level_preload_ready())
             finish_session_start();
+    }
+
+    void BlazterGame::queue_level_preload()
+    {
+        if (!ctx_ || !ctx_->batch_registry)
+            return;
+
+        for (const auto batch_name : current_level_def().preload_batches)
+        {
+            BatchId id{};
+            if (!ctx_->batch_registry->try_get_batch_id_by_name(std::string(batch_name), id))
+                continue;
+            if (ctx_->batch_registry->is_batch_loaded(id))
+            {
+                queued_level_batches_.erase(std::string(batch_name));
+                continue;
+            }
+            // Queue each residency request once while the batch is pending. Re-submitting
+            // every frame can flood the batch strand with duplicate loads and make both
+            // preload and play-exit appear to hang.
+            if (!queued_level_batches_.insert(std::string(batch_name)).second)
+                continue;
+            ctx_->batch_registry->queue_load(id, *ctx_);
+        }
+    }
+
+    float BlazterGame::level_preload_progress() const
+    {
+        if (!ctx_ || !ctx_->batch_registry || current_level_def().preload_batches.empty())
+            return 1.0f;
+
+        std::size_t loaded_count = 0;
+        std::size_t known_count = 0;
+        for (const auto batch_name : current_level_def().preload_batches)
+        {
+            BatchId id{};
+            if (!ctx_->batch_registry->try_get_batch_id_by_name(std::string(batch_name), id))
+                continue;
+            ++known_count;
+            if (ctx_->batch_registry->is_batch_loaded(id))
+                ++loaded_count;
+        }
+
+        if (known_count == 0)
+            return 0.0f;
+        return static_cast<float>(loaded_count) / static_cast<float>(known_count);
+    }
+
+    bool BlazterGame::is_level_preload_ready() const
+    {
+        return level_preload_progress() >= 1.0f;
     }
 
     void BlazterGame::begin_session_start()
     {
         start_requested_ = false;
-        session_load_progress_ = std::max(session_load_progress_, background_world_load_progress_ * 0.5f);
+        queue_level_preload();
+        session_load_progress_ = level_preload_progress();
         transition_to(SessionFlowState::SessionLoading);
     }
 
@@ -347,5 +505,83 @@ namespace eeng::blazter
                 return "Playing";
         }
         return "Unknown";
+    }
+
+    bool BlazterGame::build_editor_view(OverlayViewState& out, glm::ivec2 window_size) const
+    {
+        if (!ctx_ || !ctx_->entity_manager)
+            return false;
+        if (window_size.x <= 0 || window_size.y <= 0)
+            return false;
+
+        ActiveEditorCameraView camera_view{};
+        if (!try_get_active_editor_camera_view(ctx_->entity_manager->registry(), camera_view))
+            return false;
+
+        const float aspect_ratio = static_cast<float>(window_size.x) / static_cast<float>(window_size.y);
+        out.view = camera_view.view;
+        out.proj = glm::perspective(
+            glm::radians(60.0f),
+            aspect_ratio,
+            camera_view.near_plane,
+            camera_view.far_plane);
+        out.viewport = glm_aux::create_viewport_matrix(
+            0.0f,
+            0.0f,
+            static_cast<float>(window_size.x),
+            static_cast<float>(window_size.y),
+            0.0f,
+            1.0f);
+        out.window_size = window_size;
+        out.valid = true;
+        return true;
+    }
+
+    bool BlazterGame::build_play_view(OverlayViewState& out, glm::ivec2 window_size) const
+    {
+        if (window_size.x <= 0 || window_size.y <= 0)
+            return false;
+
+        const glm::vec3 eye(0.0f, 10.0f, 18.0f);
+        const glm::vec3 target(0.0f, 0.0f, 0.0f);
+        const glm::vec3 up(0.0f, 1.0f, 0.0f);
+        const float aspect_ratio = static_cast<float>(window_size.x) / static_cast<float>(window_size.y);
+
+        out.view = glm::lookAt(eye, target, up);
+        out.proj = glm::perspective(
+            glm::radians(60.0f),
+            aspect_ratio,
+            0.1f,
+            500.0f);
+        out.viewport = glm_aux::create_viewport_matrix(
+            0.0f,
+            0.0f,
+            static_cast<float>(window_size.x),
+            static_cast<float>(window_size.y),
+            0.0f,
+            1.0f);
+        out.window_size = window_size;
+        out.valid = true;
+        return true;
+    }
+
+    bool BlazterGame::build_view_for_mode(
+        OverlayViewState& out,
+        RenderMode mode,
+        glm::ivec2 window_size) const
+    {
+        if (mode == RenderMode::Edit && build_editor_view(out, window_size))
+            return true;
+        return build_play_view(out, window_size);
+    }
+
+    void BlazterGame::publish_overlay_view(RenderMode mode, int windowWidth, int windowHeight)
+    {
+        if (!ctx_ || !ctx_->overlay_view_state)
+            return;
+
+        auto& overlay = *ctx_->overlay_view_state;
+        if (!build_view_for_mode(overlay, mode, glm::ivec2(windowWidth, windowHeight)))
+            overlay.valid = false;
     }
 } // namespace eeng::blazter
