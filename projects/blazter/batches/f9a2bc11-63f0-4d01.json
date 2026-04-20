@@ -1,0 +1,193 @@
+{
+  "entities": [
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 6257371305523537653,
+          "Name": "Transform Gizmo",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.editor.TransformGizmoComponent": {
+          "Enabled": true,
+          "Mode": "Translate",
+          "Settings": {
+            "Allow Uniform Scale": true,
+            "Angular Snap (deg)": 15.0,
+            "Axis Length": 1.0,
+            "Axis Radius": 0.029999999329447746,
+            "Draw On Top": true,
+            "Linear Snap": 1.0,
+            "Min Scale": 0.0010000000474974513,
+            "Plane Offset": 0.10000000149011612,
+            "Plane Size": 0.25,
+            "Rotate Radius": 1.0,
+            "Rotate Thickness": 0.05999999865889549,
+            "Scale Box Size": 0.11999999731779099,
+            "Scale Snap": 0.10000000149011612,
+            "Screen Size": 90.0,
+            "Uniform Scale Size": 0.18000000715255737
+          },
+          "Space": "Local"
+        }
+      },
+      "entity_guid": 6257371305523537653
+    },
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 17338347437408540722,
+          "Name": "Third Person Camera",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.editor.ThirdPersonCameraComponent": {
+          "Active": true,
+          "Controller Look Speed": 2.5,
+          "Distance": 24.375,
+          "Far Plane": 500.0,
+          "Forward": [
+            0.855191171169281,
+            -0.4641713500022888,
+            0.23063626885414124
+          ],
+          "Look At": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Model To View": [
+            -0.2603866457939148,
+            0.44815951585769653,
+            -0.855191171169281,
+            0.0,
+            0.0,
+            0.8857455253601074,
+            0.4641713500022888,
+            0.0,
+            0.9655044674873352,
+            0.12086401879787445,
+            -0.23063626885414124,
+            0.0,
+            -0.0,
+            -7.152557373046875e-07,
+            -24.375,
+            1.0
+          ],
+          "Mouse Sensitivity": 0.004999999888241291,
+          "Move Speed": 6.0,
+          "Near Plane": 1.0,
+          "Pitch": -0.48269885778427124,
+          "Position": [
+            -20.84528350830078,
+            11.314176559448242,
+            -5.621758937835693
+          ],
+          "Target": {
+            "Guid": 0
+          },
+          "Target Offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "View To World": [
+            -0.26038658618927,
+            -7.450578820566989e-09,
+            0.9655042886734009,
+            -0.0,
+            0.448159396648407,
+            0.8857452869415283,
+            0.12086398899555206,
+            0.0,
+            -0.8551911115646362,
+            0.46417126059532166,
+            -0.23063625395298004,
+            0.0,
+            -20.84528160095215,
+            11.314175605773926,
+            -5.621757984161377,
+            1.0
+          ],
+          "Yaw": -1.834218978881836
+        }
+      },
+      "entity_guid": 17338347437408540722
+    },
+    {
+      "components": {
+        "eeng.ecs.HeaderComponent": {
+          "Guid": 4568626040818322990,
+          "Name": "First Person Camera",
+          "Parent Entity": {
+            "Guid": 0
+          }
+        },
+        "eeng.editor.FirstPersonCameraComponent": {
+          "Active": false,
+          "Controller Look Speed": 2.5,
+          "Far Plane": 500.0,
+          "Forward": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "Model To View": [
+            1.0,
+            0.0,
+            -0.0,
+            0.0,
+            -0.0,
+            1.0,
+            -0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -0.0,
+            -1.7999999523162842,
+            -5.0,
+            1.0
+          ],
+          "Mouse Sensitivity": 0.004999999888241291,
+          "Move Speed": 6.0,
+          "Near Plane": 1.0,
+          "Pitch": 0.0,
+          "Position": [
+            0.0,
+            1.7999999523162842,
+            5.0
+          ],
+          "View To World": [
+            1.0,
+            -0.0,
+            0.0,
+            -0.0,
+            -0.0,
+            1.0,
+            -0.0,
+            0.0,
+            0.0,
+            -0.0,
+            1.0,
+            -0.0,
+            0.0,
+            1.7999999523162842,
+            5.0,
+            1.0
+          ],
+          "Yaw": 0.0
+        }
+      },
+      "entity_guid": 4568626040818322990
+    }
+  ],
+  "header": {
+    "asset_closure": [],
+    "id": "f9a2bc11-63f0-4d01",
+    "name": "editor"
+  }
+}

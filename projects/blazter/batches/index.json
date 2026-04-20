@@ -1,22 +1,124 @@
 {
   "batches": [
     {
+      "asset_closure_hdr": [
+        "01319b03-d160-5efa",
+        "44b7cc38-f888-eac3",
+        "4c98dcd7-f505-7c67",
+        "5b36cb9a-63df-3c68",
+        "5b9ffbfc-d981-cf85",
+        "8d63fa38-224f-3dcd",
+        "8d8361fe-cf68-51c5",
+        "aaf23c0d-21a3-4691",
+        "bf18a060-c7df-58e1"
+      ],
+      "filename": "db36e60f-be5e-a8a8.json",
+      "generated": true,
+      "generator_tag": "terrain",
+      "id": "db36e60f-be5e-a8a8",
+      "name": "terrain_TerrainRecipe_chunk_1_1",
+      "owner_guid": "db55da94-6d92-04a8",
+      "read_only": true
+    },
+    {
       "asset_closure_hdr": [],
       "filename": "f9a2bc11-63f0-4d01.json",
+      "generated": false,
+      "generator_tag": "",
       "id": "f9a2bc11-63f0-4d01",
-      "name": "editor"
+      "name": "editor",
+      "owner_guid": "00000000-0000-0000",
+      "read_only": false
+    },
+    {
+      "asset_closure_hdr": [
+        "01319b03-d160-5efa",
+        "44b7cc38-f888-eac3",
+        "4c98dcd7-f505-7c67",
+        "56fb941f-ac1a-2e49",
+        "5b36cb9a-63df-3c68",
+        "5b9ffbfc-d981-cf85",
+        "9fdc7312-22d6-4b31",
+        "bf18a060-c7df-58e1",
+        "c2d48e61-153f-4650"
+      ],
+      "filename": "ca2e5e59-c128-24a9.json",
+      "generated": true,
+      "generator_tag": "terrain",
+      "id": "ca2e5e59-c128-24a9",
+      "name": "terrain_TerrainRecipe_chunk_0_1",
+      "owner_guid": "db55da94-6d92-04a8",
+      "read_only": true
     },
     {
       "asset_closure_hdr": [],
       "filename": "a6c812d4-7b48-11f0.json",
+      "generated": false,
+      "generator_tag": "",
       "id": "a6c812d4-7b48-11f0",
-      "name": "default"
+      "name": "default",
+      "owner_guid": "00000000-0000-0000",
+      "read_only": false
     },
     {
       "asset_closure_hdr": [],
       "filename": "bb38f208-14a9-57c2.json",
+      "generated": false,
+      "generator_tag": "",
       "id": "bb38f208-14a9-57c2",
-      "name": "blazter_boot"
+      "name": "blazter_boot",
+      "owner_guid": "00000000-0000-0000",
+      "read_only": false
+    },
+    {
+      "asset_closure_hdr": [
+        "01319b03-d160-5efa",
+        "030246cf-e7a0-aa5b",
+        "44b7cc38-f888-eac3",
+        "4c98dcd7-f505-7c67",
+        "5b36cb9a-63df-3c68",
+        "5b9ffbfc-d981-cf85",
+        "b19dba71-2e22-9b62",
+        "bf18a060-c7df-58e1",
+        "f551c433-05fa-0e79"
+      ],
+      "filename": "fa31ad18-c94d-f2c9.json",
+      "generated": true,
+      "generator_tag": "terrain",
+      "id": "fa31ad18-c94d-f2c9",
+      "name": "terrain_TerrainRecipe_chunk_1_0",
+      "owner_guid": "db55da94-6d92-04a8",
+      "read_only": true
+    },
+    {
+      "asset_closure_hdr": [
+        "01319b03-d160-5efa",
+        "0b770328-120e-fb9b",
+        "26a6164a-0bf2-bcbe",
+        "423232de-3c7e-5b3d",
+        "44b7cc38-f888-eac3",
+        "4c98dcd7-f505-7c67",
+        "5b36cb9a-63df-3c68",
+        "5b9ffbfc-d981-cf85",
+        "bf18a060-c7df-58e1"
+      ],
+      "filename": "ab339750-b638-da88.json",
+      "generated": true,
+      "generator_tag": "terrain",
+      "id": "ab339750-b638-da88",
+      "name": "terrain_TerrainRecipe_chunk_0_0",
+      "owner_guid": "db55da94-6d92-04a8",
+      "read_only": true
+    },
+    {
+      "asset_closure_hdr": [],
+      "filename": "a1846c72-69eb-6277.json",
+      "generated": false,
+      "generator_tag": "",
+      "id": "a1846c72-69eb-6277",
+      "name": "level_01",
+      "owner_guid": "00000000-0000-0000",
+      "read_only": false
     }
   ]
 }

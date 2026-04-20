@@ -1,0 +1,10 @@
+{
+    "Contained Assets": [
+        10188261901042925005,
+        6572664570154794088
+    ],
+    "Guid": 10197101728326242757,
+    "Name": "chunk_1_1_gpu",
+    "Parent Guid": 12317973957908317841,
+    "Type ID": "assets.GpuModelAsset"
+}

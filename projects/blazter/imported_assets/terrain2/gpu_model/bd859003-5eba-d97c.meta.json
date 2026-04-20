@@ -1,0 +1,10 @@
+{
+    "Contained Assets": [
+        6796090473985936706,
+        6572664570154794088
+    ],
+    "Guid": 13656479789219502460,
+    "Name": "terrain2_GpuModel",
+    "Parent Guid": 6796090473985936706,
+    "Type ID": "assets.GpuModelAsset"
+}

@@ -1,0 +1,99 @@
+{
+    "cell_size_x": 1.0,
+    "cell_size_z": 1.0,
+    "chunk_count_x": 2,
+    "chunk_count_z": 2,
+    "chunks": [
+        {
+            "batch_id": {
+                "guid": 12336370177208277640
+            },
+            "batch_name": "terrain_TerrainRecipe_chunk_0_0",
+            "chunk_x": 0,
+            "chunk_z": 0,
+            "terrain_chunk_ref": {
+                "guid": 826132527282322331
+            },
+            "world_bounds_max": [
+                50.0,
+                12.128691673278809,
+                50.0
+            ],
+            "world_bounds_min": [
+                0.0,
+                1.3932150602340698,
+                0.0
+            ]
+        },
+        {
+            "batch_id": {
+                "guid": 18028381105308955337
+            },
+            "batch_name": "terrain_TerrainRecipe_chunk_1_0",
+            "chunk_x": 1,
+            "chunk_z": 0,
+            "terrain_chunk_ref": {
+                "guid": 17677125735828557433
+            },
+            "world_bounds_max": [
+                100.0,
+                10.265158653259277,
+                50.0
+            ],
+            "world_bounds_min": [
+                50.0,
+                1.0375597476959229,
+                0.0
+            ]
+        },
+        {
+            "batch_id": {
+                "guid": 14568685584175867049
+            },
+            "batch_name": "terrain_TerrainRecipe_chunk_0_1",
+            "chunk_x": 0,
+            "chunk_z": 1,
+            "terrain_chunk_ref": {
+                "guid": 14039002486040118864
+            },
+            "world_bounds_max": [
+                50.0,
+                7.1356201171875,
+                100.0
+            ],
+            "world_bounds_min": [
+                0.0,
+                1.416850209236145,
+                50.0
+            ]
+        },
+        {
+            "batch_id": {
+                "guid": 15796065698341365928
+            },
+            "batch_name": "terrain_TerrainRecipe_chunk_1_1",
+            "chunk_x": 1,
+            "chunk_z": 1,
+            "terrain_chunk_ref": {
+                "guid": 12317973957908317841
+            },
+            "world_bounds_max": [
+                100.0,
+                10.886735916137695,
+                100.0
+            ],
+            "world_bounds_min": [
+                50.0,
+                1.369081735610962,
+                50.0
+            ]
+        }
+    ],
+    "total_samples_x": 101,
+    "total_samples_z": 101,
+    "world_origin": [
+        0.0,
+        0.0,
+        0.0
+    ]
+}

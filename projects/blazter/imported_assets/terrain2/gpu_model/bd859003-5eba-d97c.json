@@ -1,0 +1,25 @@
+{
+    "IBO": 0,
+    "Index Count": 0,
+    "Load State": "Uninitialized",
+    "Model Reference": {
+        "Guid": 6796090473985936706
+    },
+    "SubMeshes": [
+        {
+            "Base Vertex": 0,
+            "Index Count": 60000,
+            "Index Offset": 0,
+            "Material": {
+                "Guid": 6572664570154794088
+            }
+        }
+    ],
+    "VAO": 0,
+    "VAO Positions": 0,
+    "VBO Binormals": 0,
+    "VBO Bones": 0,
+    "VBO Normals": 0,
+    "VBO for texture coordinates": 0,
+    "Vertex Count": 0
+}

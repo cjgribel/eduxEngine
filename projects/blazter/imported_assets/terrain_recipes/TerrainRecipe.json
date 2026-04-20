@@ -1,0 +1,18 @@
+{
+    "chunk_count_x": 2,
+    "chunk_count_z": 2,
+    "height_scale": 1.0,
+    "horizontal_scale_x": 10.0,
+    "horizontal_scale_z": 10.0,
+    "sample_spacing_x": 1.0,
+    "sample_spacing_z": 1.0,
+    "source_model_ref": {
+        "guid": 6796090473985936706
+    },
+    "source_submesh_index": -1,
+    "world_origin": [
+        0.0,
+        0.0,
+        0.0
+    ]
+}

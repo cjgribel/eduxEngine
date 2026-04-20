@@ -1,0 +1,9 @@
+{
+    "Contained Assets": [
+        86020308596711162
+    ],
+    "Guid": 5519404163429399655,
+    "Name": "terrain2_GpuTexture1",
+    "Parent Guid": 86020308596711162,
+    "Type ID": "assets.GpuTextureAsset"
+}
