@@ -1,27 +1,18 @@
 #include "BlazterGame.hpp"
 
 #include "BatchRegistry.hpp"
-#include "editor/ecs/FirstPersonCameraComponent.hpp"
-#include "editor/ecs/ThirdPersonCameraComponent.hpp"
 #include "editor/OverlayRenderSettingsPersistence.hpp"
 #include "glmcommon.hpp"
 #include "imgui.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
+#include <cmath>
 
 namespace eeng::blazter
 {
     namespace
     {
-        struct ActiveEditorCameraView
-        {
-            glm::mat4 view{ 1.0f };
-            glm::vec3 position{ 0.0f, 0.0f, 0.0f };
-            float near_plane = 1.0f;
-            float far_plane = 500.0f;
-        };
-
         struct LevelDef
         {
             std::string_view id;
@@ -32,6 +23,9 @@ namespace eeng::blazter
         constexpr std::string_view kLevel01Batches[] = {
             "level_01",
             "terrain_TerrainRecipe_chunk_0_0",
+            "terrain_TerrainRecipe_chunk_1_0",
+            "terrain_TerrainRecipe_chunk_0_1",
+            "terrain_TerrainRecipe_chunk_1_1",
         };
 
         constexpr LevelDef kLevel01{
@@ -43,41 +37,6 @@ namespace eeng::blazter
         constexpr const LevelDef& current_level_def()
         {
             return kLevel01;
-        }
-
-        bool try_get_active_editor_camera_view(
-            entt::registry& registry,
-            ActiveEditorCameraView& out_view)
-        {
-            auto third_view = registry.view<eeng::editor::ThirdPersonCameraComponent>();
-            for (auto entity : third_view)
-            {
-                const auto& camera = third_view.get<eeng::editor::ThirdPersonCameraComponent>(entity);
-                if (!camera.active)
-                    continue;
-
-                out_view.view = camera.model_to_view;
-                out_view.position = camera.position;
-                out_view.near_plane = camera.near_plane;
-                out_view.far_plane = camera.far_plane;
-                return true;
-            }
-
-            auto first_view = registry.view<eeng::editor::FirstPersonCameraComponent>();
-            for (auto entity : first_view)
-            {
-                const auto& camera = first_view.get<eeng::editor::FirstPersonCameraComponent>(entity);
-                if (!camera.active)
-                    continue;
-
-                out_view.view = camera.model_to_view;
-                out_view.position = camera.position;
-                out_view.near_plane = camera.near_plane;
-                out_view.far_plane = camera.far_plane;
-                return true;
-            }
-
-            return false;
         }
     }
 
@@ -91,10 +50,11 @@ namespace eeng::blazter
 
     bool BlazterGame::init()
     {
-        // Runtime-wide setup belongs here: initialize pipelines, register
+        // Runtime-wide setup: initialize pipelines, register
         // render/debug settings, and hook shared engine services that both
         // edit and play modes should use.
         reset_session_flow();
+        reset_game_camera();
         if (ctx_)
         {
             runtime_pipeline_.init(*ctx_);
@@ -149,10 +109,8 @@ namespace eeng::blazter
         // use it for shared per-frame view publication rather than game logic.
         (void)time_s;
         last_window_size_ = glm::ivec2(windowWidth, windowHeight);
-        const RenderMode mode = (ctx_ && ctx_->services && ctx_->services->play_mode_active.load(std::memory_order_relaxed))
-            ? RenderMode::Play
-            : RenderMode::Edit;
-        publish_overlay_view(mode, windowWidth, windowHeight);
+        if (ctx_ && ctx_->services && ctx_->services->play_mode_active.load(std::memory_order_relaxed))
+            publish_play_overlay_view(windowWidth, windowHeight);
     }
 
     void BlazterGame::render_scene(const RenderContext& ctx)
@@ -170,9 +128,8 @@ namespace eeng::blazter
 
         auto& registry = ctx_->entity_manager->registry();
         const glm::mat4 proj_view = view.proj * view.view;
-        const glm::vec3 eye_pos = (ctx.mode == RenderMode::Play)
-            ? glm::vec3(0.0f, 10.0f, 18.0f)
-            : glm::vec3(0.0f, 8.0f, 12.0f);
+        const glm::mat4 view_to_world = glm::inverse(view.view);
+        const glm::vec3 eye_pos = glm::vec3(view_to_world[3]);
         const glm::vec3 light_pos = eye_pos + glm::vec3(12.0f, 18.0f, 8.0f);
         const glm::vec3 light_color(1.0f, 0.98f, 0.92f);
 
@@ -184,8 +141,8 @@ namespace eeng::blazter
             light_color,
             eye_pos);
 
-        const glm::vec3 camera_right = glm::normalize(glm::vec3(view.view[0][0], view.view[1][0], view.view[2][0]));
-        const glm::vec3 camera_up = glm::normalize(glm::vec3(view.view[0][1], view.view[1][1], view.view[2][1]));
+        const glm::vec3 camera_right = glm::normalize(glm::vec3(view_to_world[0]));
+        const glm::vec3 camera_up = glm::normalize(glm::vec3(view_to_world[1]));
         runtime_pipeline_.render_particles(
             registry,
             *ctx_,
@@ -200,7 +157,8 @@ namespace eeng::blazter
         // markers, and other camera-space overlays that should sit above the
         // scene without being part of the main world render.
         last_window_size_ = glm::ivec2(ctx.window_width, ctx.window_height);
-        publish_overlay_view(ctx.mode, ctx.window_width, ctx.window_height);
+        if (ctx.mode == RenderMode::Play)
+            publish_play_overlay_view(ctx.window_width, ctx.window_height);
 
         if (!ctx_ || !ctx_->entity_manager || !ctx_->shape_renderer || !ctx_->overlay_view_state || !ctx_->overlay_view_state->valid)
             return;
@@ -235,6 +193,8 @@ namespace eeng::blazter
         ImGui::Text("State: %.*s",
             static_cast<int>(flow_state_label().size()),
             flow_state_label().data());
+        ImGui::Text("Policy: %s",
+            active_play_policy() == PlayModePolicy::Preview ? "Preview" : "Warm Play");
         ImGui::Text("Selected players: %d", selected_player_count_);
         ImGui::Text("Active players: %d", active_player_count_);
         ImGui::Separator();
@@ -274,20 +234,24 @@ namespace eeng::blazter
                 break;
 
             case SessionFlowState::Playing:
-                ImGui::TextWrapped(
-                    "Gameplay placeholder. The menu flow has handed off to a live session.");
+                if (should_run_game_boot())
+                {
+                    ImGui::TextWrapped(
+                        "Gameplay placeholder. The menu flow has handed off to a live session.");
+                }
+                else
+                {
+                    ImGui::TextWrapped(
+                        "Preview policy: game boot is bypassed and the snapshot-authored world "
+                        "is played directly.");
+                }
                 ImGui::Text("Shared camera active for %d player(s).", active_player_count_);
-                if (ImGui::Button("Return To Menu"))
+                if (should_run_game_boot() && ImGui::Button("Return To Menu"))
                     transition_to(SessionFlowState::MainMenu);
                 break;
         }
 
         ImGui::End();
-    }
-
-    bool BlazterGame::get_editor_view(OverlayViewState& out) const
-    {
-        return build_editor_view(out, last_window_size_);
     }
 
     void BlazterGame::destroy()
@@ -337,7 +301,24 @@ namespace eeng::blazter
         // ammo/health/session state, arm default weapons, bind cameras, and
         // kick off any scripted or data-driven mission flow.
         (void)ctx;
-        reset_session_flow();
+        reset_game_camera();
+        if (should_run_game_boot())
+        {
+            reset_session_flow();
+        }
+        else
+        {
+            // Preview is intentionally direct: use the snapshot-authored world
+            // immediately rather than re-running menu or level boot behavior.
+            flow_state_ = SessionFlowState::Playing;
+            flow_state_elapsed_s_ = 0.0f;
+            boot_load_progress_ = 1.0f;
+            session_load_progress_ = 1.0f;
+            selected_player_count_ = 1;
+            active_player_count_ = 1;
+            start_requested_ = false;
+            queued_level_batches_.clear();
+        }
     }
 
     void BlazterGame::on_exit_play(EngineContext& ctx)
@@ -359,6 +340,26 @@ namespace eeng::blazter
         active_player_count_ = 0;
         start_requested_ = false;
         queued_level_batches_.clear();
+    }
+
+    void BlazterGame::reset_game_camera()
+    {
+        // Temporary game-owned camera. Later this should become a proper
+        // gameplay camera rig driven by player/session state rather than a
+        // fixed vantage point.
+        game_camera_ = GameCamera{};
+    }
+
+    PlayModePolicy BlazterGame::active_play_policy() const
+    {
+        if (ctx_ && ctx_->services)
+            return ctx_->services->active_play_mode_policy.load(std::memory_order_relaxed);
+        return PlayModePolicy::Preview;
+    }
+
+    bool BlazterGame::should_run_game_boot() const
+    {
+        return active_play_policy() != PlayModePolicy::Preview;
     }
 
     void BlazterGame::transition_to(SessionFlowState next_state)
@@ -405,6 +406,8 @@ namespace eeng::blazter
     void BlazterGame::update_main_menu(float deltaTime_s)
     {
         (void)deltaTime_s;
+        if (!should_run_game_boot())
+            return;
         queue_level_preload();
 
         if (start_requested_)
@@ -414,6 +417,8 @@ namespace eeng::blazter
     void BlazterGame::update_session_loading(float deltaTime_s)
     {
         (void)deltaTime_s;
+        if (!should_run_game_boot())
+            return;
         queue_level_preload();
         session_load_progress_ = level_preload_progress();
 
@@ -507,52 +512,27 @@ namespace eeng::blazter
         return "Unknown";
     }
 
-    bool BlazterGame::build_editor_view(OverlayViewState& out, glm::ivec2 window_size) const
-    {
-        if (!ctx_ || !ctx_->entity_manager)
-            return false;
-        if (window_size.x <= 0 || window_size.y <= 0)
-            return false;
-
-        ActiveEditorCameraView camera_view{};
-        if (!try_get_active_editor_camera_view(ctx_->entity_manager->registry(), camera_view))
-            return false;
-
-        const float aspect_ratio = static_cast<float>(window_size.x) / static_cast<float>(window_size.y);
-        out.view = camera_view.view;
-        out.proj = glm::perspective(
-            glm::radians(60.0f),
-            aspect_ratio,
-            camera_view.near_plane,
-            camera_view.far_plane);
-        out.viewport = glm_aux::create_viewport_matrix(
-            0.0f,
-            0.0f,
-            static_cast<float>(window_size.x),
-            static_cast<float>(window_size.y),
-            0.0f,
-            1.0f);
-        out.window_size = window_size;
-        out.valid = true;
-        return true;
-    }
-
     bool BlazterGame::build_play_view(OverlayViewState& out, glm::ivec2 window_size) const
     {
         if (window_size.x <= 0 || window_size.y <= 0)
             return false;
 
-        const glm::vec3 eye(0.0f, 10.0f, 18.0f);
-        const glm::vec3 target(0.0f, 0.0f, 0.0f);
+        const glm::vec3 forward{
+            std::cos(game_camera_.pitch) * std::cos(game_camera_.yaw),
+            std::sin(game_camera_.pitch),
+            std::cos(game_camera_.pitch) * std::sin(game_camera_.yaw)
+        };
+        const glm::vec3 eye = game_camera_.position;
+        const glm::vec3 target = eye + glm::normalize(forward);
         const glm::vec3 up(0.0f, 1.0f, 0.0f);
         const float aspect_ratio = static_cast<float>(window_size.x) / static_cast<float>(window_size.y);
 
         out.view = glm::lookAt(eye, target, up);
         out.proj = glm::perspective(
-            glm::radians(60.0f),
+            glm::radians(game_camera_.fov_y_degrees),
             aspect_ratio,
-            0.1f,
-            500.0f);
+            game_camera_.near_plane,
+            game_camera_.far_plane);
         out.viewport = glm_aux::create_viewport_matrix(
             0.0f,
             0.0f,
@@ -570,18 +550,27 @@ namespace eeng::blazter
         RenderMode mode,
         glm::ivec2 window_size) const
     {
-        if (mode == RenderMode::Edit && build_editor_view(out, window_size))
-            return true;
+        if (mode == RenderMode::Edit)
+        {
+            if (ctx_ && ctx_->overlay_view_state && ctx_->overlay_view_state->valid)
+            {
+                // In Edit mode, prefer the last known overlay view state 
+                // Later, EditorApp should own this state and persist it across sessions 
+                // rather than relying on the runtime to hold it (CameraViewFlow.md).
+                out = *ctx_->overlay_view_state;
+                return true;
+            }
+        }
         return build_play_view(out, window_size);
     }
 
-    void BlazterGame::publish_overlay_view(RenderMode mode, int windowWidth, int windowHeight)
+    void BlazterGame::publish_play_overlay_view(int windowWidth, int windowHeight)
     {
         if (!ctx_ || !ctx_->overlay_view_state)
             return;
 
         auto& overlay = *ctx_->overlay_view_state;
-        if (!build_view_for_mode(overlay, mode, glm::ivec2(windowWidth, windowHeight)))
+        if (!build_play_view(overlay, glm::ivec2(windowWidth, windowHeight)))
             overlay.valid = false;
     }
 } // namespace eeng::blazter

@@ -146,7 +146,10 @@ namespace eeng
             services_ = ctx->services_owner;
             edit_world_ = ctx->world_owner;
             if (services_)
+            {
                 services_->play_mode_active.store(false, std::memory_order_relaxed);
+                services_->active_play_mode_policy.store(PlayModePolicy::Preview, std::memory_order_relaxed);
+            }
         }
     }
 
@@ -834,7 +837,10 @@ namespace eeng
         // Finalize and notify.
         mode_ = EngineMode::Play;
         if (services_)
+        {
             services_->play_mode_active.store(true, std::memory_order_relaxed);
+            services_->active_play_mode_policy.store(policy, std::memory_order_relaxed);
+        }
         if (app_)
             app_->on_enter_play(*ctx);
         EENG_LOG(ctx, "Play mode: entered");
@@ -869,7 +875,10 @@ namespace eeng
         mode_ = EngineMode::Edit;
         active_play_policy_ = PlayModePolicy::Preview;
         if (services_)
+        {
             services_->play_mode_active.store(false, std::memory_order_relaxed);
+            services_->active_play_mode_policy.store(PlayModePolicy::Preview, std::memory_order_relaxed);
+        }
         EENG_LOG(ctx, "Play mode: exited");
     }
 

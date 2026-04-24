@@ -217,6 +217,9 @@ namespace eeng
         std::shared_ptr<ILogManager>            log_manager;
         std::shared_ptr<std::atomic<bool>>      shutdown_requested;
         std::atomic<bool>                       play_mode_active{ false };
+        // Effective policy of the currently active play session. Runtime code can
+        // branch on this explicitly instead of inferring behavior from side effects.
+        std::atomic<PlayModePolicy>             active_play_mode_policy{ PlayModePolicy::Preview };
         std::atomic<bool>                       play_mode_policy_override_enabled{ false };
         std::atomic<PlayModePolicy>             play_mode_policy_override{ PlayModePolicy::Preview };
         // Shared stats snapshot for editor UI (updated by runtime systems).

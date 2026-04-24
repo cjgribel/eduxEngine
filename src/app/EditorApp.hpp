@@ -6,6 +6,7 @@
 #include "engineapi/IApp.hpp"
 #include "BatchRegistry.hpp"
 #include "editor/EditorRuntime.hpp"
+#include "editor/EditorCameraView.hpp"
 #include "editor/ProjectBootstrap.hpp"
 #include "editor/ProjectConfig.hpp"
 #include "EngineContext.hpp"
@@ -130,7 +131,12 @@ namespace eeng::editor
                 runtime_->update_edit(time_s, deltaTime_s);
 
             OverlayViewState view{};
-            if (runtime_ && runtime_->get_editor_view(view)
+            if (ctx_ && editor::build_active_editor_overlay_view(*ctx_, last_window_size_, view)
+                && view.window_size.x > 0 && view.window_size.y > 0)
+            {
+                editor_.update(*ctx_, view.view, view.proj, view.viewport, view.window_size);
+            }
+            else if (runtime_ && runtime_->get_editor_view(view)
                 && view.window_size.x > 0 && view.window_size.y > 0)
             {
                 editor_.update(*ctx_, view.view, view.proj, view.viewport, view.window_size);
@@ -150,6 +156,21 @@ namespace eeng::editor
 
         void render_edit(float time_s, int windowWidth, int windowHeight) override
         {
+            if (ctx_ && ctx_->overlay_view_state)
+            {
+                OverlayViewState view{};
+                if (editor::build_active_editor_overlay_view(*ctx_, glm::ivec2(windowWidth, windowHeight), view)
+                    || (runtime_ && runtime_->get_editor_view(view)
+                        && view.window_size.x > 0 && view.window_size.y > 0))
+                {
+                    *ctx_->overlay_view_state = view;
+                }
+                else
+                {
+                    ctx_->overlay_view_state->valid = false;
+                }
+            }
+
             if (runtime_)
             {
                 RenderContext render_ctx{

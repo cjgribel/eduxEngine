@@ -9,6 +9,7 @@ Play/Edit is implemented as two distinct worlds that share engine services. Edit
 ### Mode Definitions
 - **Edit Mode**: The editor is authoritative. Commands, selection, and editor-only systems operate on the edit world.
 - **Play Mode (Preview)**: The game runtime is authoritative. Editor batch entities are excluded, and the play world is ephemeral.
+- **Runtime Rule**: The effective play policy must be visible to runtime code as explicit state. Preview should bypass game-owned boot/menu flow; Warm/Cold Play should run it.
 
 ### World Ownership and Persistence
 - `EngineServices` are shared across modes (resource manager, event queue, command queue, etc).

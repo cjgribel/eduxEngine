@@ -170,6 +170,60 @@ If we want to improve this incrementally rather than redesigning it all at once:
 3. Let `render_scene()` consume that shared camera snapshot instead of having every runtime rediscover it.
 4. Keep `OverlayViewState` only if we still need a separate tool-facing wrapper; otherwise replace it with `CameraView`.
 
+## Later: Debug Render Passes
+
+One related idea that looks promising, but is not urgent enough to do right now, is to formalize debug/overlay rendering as explicit passes rather than one shared shape queue plus one shared overlay view.
+
+Suggested direction:
+
+- keep `ShapeRenderer` as the low-level line/point/solid batcher
+- add a small `DebugRenderView` type that is explicit about the view being flushed
+- add named debug render passes, each with:
+  - one `DebugRenderView`
+  - one shape queue
+  - optional per-pass settings
+- let editor-owned code publish edit views
+- let game/runtime code publish play views
+- let the engine flush passes explicitly in order
+
+Example pass names:
+
+- `editor_overlay`
+- `play_overlay`
+- later `split_left_overlay`
+- later `split_right_overlay`
+
+This is motivated less by `ShapeRenderer::render(proj_view)` itself and more by the hidden policy around who owns the matrices that are passed into that flush.
+
+What we would gain:
+
+- clearer ownership of edit-view vs play-view debug rendering
+- less need for game targets to know editor camera details
+- a cleaner path to multiple simultaneous views such as split screen
+- easier debugging when overlays are wrong, because the target pass/view is explicit
+- better separation between low-level drawing and higher-level camera/view policy
+
+Tradeoffs:
+
+- more concepts to carry around (`DebugRenderView`, pass ids, routing/flushing)
+- more plumbing for systems that currently just push into one shared queue
+- migration cost for existing gizmo/debug producers
+- some risk of overdesign if the engine stayed single-view forever
+
+Why defer it:
+
+- the current architecture can be improved meaningfully first by clarifying shared camera/view ownership
+- the engine does not need multi-view debug rendering immediately
+- the pass-based model is more valuable once split-screen or additional runtime/editor views become real product needs
+
+So the likely longer-term target is:
+
+- `ShapeRenderer` stays simple
+- camera/view ownership becomes explicit
+- debug rendering moves toward explicit passes/views rather than one global implicit overlay flush
+
+If split screen becomes active work, this idea should move up in priority.
+
 ## Short Version
 
 The current system is workable, but not clean:

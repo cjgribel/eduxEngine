@@ -4,6 +4,6 @@
   "batches_root": "batches",
   "strict_play": {
     "batch_index": "batches/index.json",
-    "startup_batches": ["blazter_boot", "level_01"]
+    "startup_batches": ["blazter_boot"]
   }
 }
