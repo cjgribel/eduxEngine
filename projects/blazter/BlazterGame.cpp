@@ -105,12 +105,11 @@ namespace eeng::blazter
 
     void BlazterGame::render(float time_s, int windowWidth, int windowHeight)
     {
-        // Keep the old render hook minimal. If some systems still expect it,
-        // use it for shared per-frame view publication rather than game logic.
+        // Legacy render hook kept only for compatibility with older callers.
+        // Camera selection is now explicit in RenderContext.camera_view.
         (void)time_s;
-        last_window_size_ = glm::ivec2(windowWidth, windowHeight);
-        if (ctx_ && ctx_->services && ctx_->services->play_mode_active.load(std::memory_order_relaxed))
-            publish_play_overlay_view(windowWidth, windowHeight);
+        (void)windowWidth;
+        (void)windowHeight;
     }
 
     void BlazterGame::render_scene(const RenderContext& ctx)
@@ -118,18 +117,14 @@ namespace eeng::blazter
         // Scene rendering belongs here once Blazter has a visual identity:
         // world draw calls, character and weapon effects, particle blasters,
         // decals, lighting tweaks, and any play/edit scene visualization.
-        last_window_size_ = glm::ivec2(ctx.window_width, ctx.window_height);
         if (!ctx_ || !ctx_->entity_manager)
             return;
-
-        OverlayViewState view{};
-        if (!build_view_for_mode(view, ctx.mode, last_window_size_))
+        if (!ctx.camera_view.valid)
             return;
 
         auto& registry = ctx_->entity_manager->registry();
-        const glm::mat4 proj_view = view.proj * view.view;
-        const glm::mat4 view_to_world = glm::inverse(view.view);
-        const glm::vec3 eye_pos = glm::vec3(view_to_world[3]);
+        const glm::mat4 proj_view = ctx.camera_view.view_proj;
+        const glm::vec3 eye_pos = ctx.camera_view.position;
         const glm::vec3 light_pos = eye_pos + glm::vec3(12.0f, 18.0f, 8.0f);
         const glm::vec3 light_color(1.0f, 0.98f, 0.92f);
 
@@ -141,14 +136,12 @@ namespace eeng::blazter
             light_color,
             eye_pos);
 
-        const glm::vec3 camera_right = glm::normalize(glm::vec3(view_to_world[0]));
-        const glm::vec3 camera_up = glm::normalize(glm::vec3(view_to_world[1]));
         runtime_pipeline_.render_particles(
             registry,
             *ctx_,
             proj_view,
-            camera_right,
-            camera_up);
+            ctx.camera_view.right,
+            ctx.camera_view.up);
     }
 
     void BlazterGame::render_overlay(const RenderContext& ctx)
@@ -156,15 +149,11 @@ namespace eeng::blazter
         // Use overlay rendering for debug lines, targeting reticles, helper
         // markers, and other camera-space overlays that should sit above the
         // scene without being part of the main world render.
-        last_window_size_ = glm::ivec2(ctx.window_width, ctx.window_height);
-        if (ctx.mode == RenderMode::Play)
-            publish_play_overlay_view(ctx.window_width, ctx.window_height);
-
-        if (!ctx_ || !ctx_->entity_manager || !ctx_->shape_renderer || !ctx_->overlay_view_state || !ctx_->overlay_view_state->valid)
+        if (!ctx_ || !ctx_->entity_manager || !ctx_->shape_renderer || !ctx.camera_view.valid)
             return;
 
         auto& registry = ctx_->entity_manager->registry();
-        const auto vp_p_v = ctx_->overlay_view_state->viewport * ctx_->overlay_view_state->proj * ctx_->overlay_view_state->view;
+        const auto vp_p_v = ctx.camera_view.viewport * ctx.camera_view.view_proj;
         runtime_pipeline_.render_debug(
             registry,
             *ctx_,
@@ -512,7 +501,7 @@ namespace eeng::blazter
         return "Unknown";
     }
 
-    bool BlazterGame::build_play_view(OverlayViewState& out, glm::ivec2 window_size) const
+    bool BlazterGame::build_play_camera_view(CameraView& out, glm::ivec2 window_size) const
     {
         if (window_size.x <= 0 || window_size.y <= 0)
             return false;
@@ -540,37 +529,11 @@ namespace eeng::blazter
             static_cast<float>(window_size.y),
             0.0f,
             1.0f);
+        out.near_plane = game_camera_.near_plane;
+        out.far_plane = game_camera_.far_plane;
         out.window_size = window_size;
         out.valid = true;
+        finalize_camera_view(out);
         return true;
-    }
-
-    bool BlazterGame::build_view_for_mode(
-        OverlayViewState& out,
-        RenderMode mode,
-        glm::ivec2 window_size) const
-    {
-        if (mode == RenderMode::Edit)
-        {
-            if (ctx_ && ctx_->overlay_view_state && ctx_->overlay_view_state->valid)
-            {
-                // In Edit mode, prefer the last known overlay view state 
-                // Later, EditorApp should own this state and persist it across sessions 
-                // rather than relying on the runtime to hold it (CameraViewFlow.md).
-                out = *ctx_->overlay_view_state;
-                return true;
-            }
-        }
-        return build_play_view(out, window_size);
-    }
-
-    void BlazterGame::publish_play_overlay_view(int windowWidth, int windowHeight)
-    {
-        if (!ctx_ || !ctx_->overlay_view_state)
-            return;
-
-        auto& overlay = *ctx_->overlay_view_state;
-        if (!build_play_view(overlay, glm::ivec2(windowWidth, windowHeight)))
-            overlay.valid = false;
     }
 } // namespace eeng::blazter

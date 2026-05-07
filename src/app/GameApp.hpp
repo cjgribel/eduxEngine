@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "EngineContext.hpp"
 #include "engineapi/IApp.hpp"
 #include "engineapi/IGameRuntime.hpp"
 #include "engineapi/RenderContext.hpp"
@@ -70,12 +71,11 @@ namespace eeng
         {
             if (!runtime_)
                 return;
-            RenderContext render_ctx{
+            RenderContext render_ctx = build_render_context(
                 time_s,
                 windowWidth,
                 windowHeight,
-                RenderMode::Edit
-            };
+                RenderMode::Edit);
             runtime_->render_frame(render_ctx);
         }
 
@@ -83,12 +83,11 @@ namespace eeng
         {
             if (!runtime_)
                 return;
-            RenderContext render_ctx{
+            RenderContext render_ctx = build_render_context(
                 time_s,
                 windowWidth,
                 windowHeight,
-                RenderMode::Play
-            };
+                RenderMode::Play);
             runtime_->render_frame(render_ctx);
         }
 
@@ -121,6 +120,36 @@ namespace eeng
         }
 
     private:
+        RenderContext build_render_context(
+            float time_s,
+            int windowWidth,
+            int windowHeight,
+            RenderMode mode) const
+        {
+            RenderContext render_ctx{
+                time_s,
+                windowWidth,
+                windowHeight,
+                mode
+            };
+
+            CameraView camera_view{};
+            if (runtime_ && runtime_->build_play_camera_view(camera_view, glm::ivec2(windowWidth, windowHeight)))
+            {
+                render_ctx.camera_view = camera_view;
+                // Keep legacy overlay consumers alive while scene rendering
+                // moves over to the explicit CameraView contract.
+                if (ctx_ && ctx_->overlay_view_state)
+                    copy_camera_view_to_overlay_view(camera_view, *ctx_->overlay_view_state);
+            }
+            else if (ctx_ && ctx_->overlay_view_state)
+            {
+                ctx_->overlay_view_state->valid = false;
+            }
+
+            return render_ctx;
+        }
+
         std::shared_ptr<EngineContext> ctx_;
         std::unique_ptr<TRuntime> runtime_;
     };

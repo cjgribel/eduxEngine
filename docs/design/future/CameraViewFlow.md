@@ -2,6 +2,17 @@
 
 This note documents how camera transforms currently move through the engine/editor/runtime boundary, why that works, and why it is still more fragmented than we probably want long term.
 
+## Status
+
+The first cleanup step from this note is now in place:
+
+- [RenderContext.hpp](/Users/ag1498/GitHub/eduxEngine/src/engine/engineapi/RenderContext.hpp) carries an explicit [CameraView.hpp](/Users/ag1498/GitHub/eduxEngine/src/engine/engineapi/CameraView.hpp)
+- [EditorApp.hpp](/Users/ag1498/GitHub/eduxEngine/src/app/EditorApp.hpp) chooses the active camera view for editor-hosted rendering
+- [GameApp.hpp](/Users/ag1498/GitHub/eduxEngine/src/app/GameApp.hpp) stays editor-free and only asks the runtime for a gameplay camera
+- [IGameRuntime.hpp](/Users/ag1498/GitHub/eduxEngine/src/engine/engineapi/IGameRuntime.hpp) now exposes `build_play_camera_view(...)` for game-owned play cameras
+
+`OverlayViewState` still exists as a bridge for debug rendering, picking, and gizmos. So the architecture is cleaner than before, but not yet at the final “one view type everywhere” end state.
+
 ## Current Flow
 
 ### 1. Editor cameras live in ECS

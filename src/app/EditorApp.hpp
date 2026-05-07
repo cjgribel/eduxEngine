@@ -130,13 +130,8 @@ namespace eeng::editor
             if (runtime_)
                 runtime_->update_edit(time_s, deltaTime_s);
 
-            OverlayViewState view{};
-            if (ctx_ && editor::build_active_editor_overlay_view(*ctx_, last_window_size_, view)
-                && view.window_size.x > 0 && view.window_size.y > 0)
-            {
-                editor_.update(*ctx_, view.view, view.proj, view.viewport, view.window_size);
-            }
-            else if (runtime_ && runtime_->get_editor_view(view)
+            CameraView view{};
+            if (build_editor_camera_view(last_window_size_, view)
                 && view.window_size.x > 0 && view.window_size.y > 0)
             {
                 editor_.update(*ctx_, view.view, view.proj, view.viewport, view.window_size);
@@ -156,29 +151,13 @@ namespace eeng::editor
 
         void render_edit(float time_s, int windowWidth, int windowHeight) override
         {
-            if (ctx_ && ctx_->overlay_view_state)
-            {
-                OverlayViewState view{};
-                if (editor::build_active_editor_overlay_view(*ctx_, glm::ivec2(windowWidth, windowHeight), view)
-                    || (runtime_ && runtime_->get_editor_view(view)
-                        && view.window_size.x > 0 && view.window_size.y > 0))
-                {
-                    *ctx_->overlay_view_state = view;
-                }
-                else
-                {
-                    ctx_->overlay_view_state->valid = false;
-                }
-            }
-
             if (runtime_)
             {
-                RenderContext render_ctx{
+                RenderContext render_ctx = build_render_context(
                     time_s,
                     windowWidth,
                     windowHeight,
-                    eeng::RenderMode::Edit
-                };
+                    eeng::RenderMode::Edit);
                 runtime_->render_frame(render_ctx);
             }
             if (ctx_ && ctx_->gui_manager)
@@ -191,12 +170,11 @@ namespace eeng::editor
         {
             if (runtime_)
             {
-                RenderContext render_ctx{
+                RenderContext render_ctx = build_render_context(
                     time_s,
                     windowWidth,
                     windowHeight,
-                    eeng::RenderMode::Play
-                };
+                    eeng::RenderMode::Play);
                 runtime_->render_frame(render_ctx);
             }
             if (ctx_ && ctx_->gui_manager)
@@ -251,6 +229,68 @@ namespace eeng::editor
         }
 
     private:
+        bool build_editor_camera_view(glm::ivec2 window_size, CameraView& out_view) const
+        {
+            return ctx_ && editor::build_active_editor_camera_view(*ctx_, window_size, out_view);
+        }
+
+        bool build_runtime_play_camera_view(glm::ivec2 window_size, CameraView& out_view) const
+        {
+            // Game runtimes only provide gameplay-owned camera views. Editor-owned
+            // camera policy stays in EditorApp so standalone GameApp stays clean.
+            return runtime_ && runtime_->build_play_camera_view(out_view, window_size);
+        }
+
+        bool choose_camera_view(RenderMode mode, glm::ivec2 window_size, CameraView& out_view) const
+        {
+            if (mode == RenderMode::Edit)
+                return build_editor_camera_view(window_size, out_view);
+
+            const PlayModePolicy policy = (ctx_ && ctx_->services)
+                ? ctx_->services->active_play_mode_policy.load(std::memory_order_relaxed)
+                : PlayModePolicy::Preview;
+
+            // Preview keeps using the editor camera so the snapshot-authored world
+            // stays aligned with what the user was editing. Warm/Cold Play prefer
+            // the runtime-owned play camera but can still fall back to the editor
+            // camera for development if the runtime has not defined one yet.
+            if (policy == PlayModePolicy::Preview)
+                return build_editor_camera_view(window_size, out_view);
+
+            return build_runtime_play_camera_view(window_size, out_view)
+                || build_editor_camera_view(window_size, out_view);
+        }
+
+        RenderContext build_render_context(
+            float time_s,
+            int windowWidth,
+            int windowHeight,
+            RenderMode mode) const
+        {
+            RenderContext render_ctx{
+                time_s,
+                windowWidth,
+                windowHeight,
+                mode
+            };
+
+            CameraView camera_view{};
+            if (choose_camera_view(mode, glm::ivec2(windowWidth, windowHeight), camera_view))
+            {
+                render_ctx.camera_view = camera_view;
+                // Keep legacy overlay consumers alive while scene rendering
+                // moves over to the explicit CameraView contract.
+                if (ctx_ && ctx_->overlay_view_state)
+                    copy_camera_view_to_overlay_view(camera_view, *ctx_->overlay_view_state);
+            }
+            else if (ctx_ && ctx_->overlay_view_state)
+            {
+                ctx_->overlay_view_state->valid = false;
+            }
+
+            return render_ctx;
+        }
+
         std::shared_ptr<EngineContext> ctx_;
         std::unique_ptr<TRuntime> runtime_;
         std::filesystem::path project_config_path_;

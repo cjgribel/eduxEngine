@@ -6,7 +6,7 @@
 #include "EngineContext.hpp"
 #include "editor/ecs/FirstPersonCameraComponent.hpp"
 #include "editor/ecs/ThirdPersonCameraComponent.hpp"
-#include "engineapi/OverlayViewState.hpp"
+#include "engineapi/CameraView.hpp"
 #include "glmcommon.hpp"
 
 #include <entt/entt.hpp>
@@ -57,10 +57,10 @@ namespace eeng::editor
         return false;
     }
 
-    inline bool build_active_editor_overlay_view(
+    inline bool build_active_editor_camera_view(
         EngineContext& ctx,
         glm::ivec2 window_size,
-        OverlayViewState& out_view)
+        CameraView& out_view)
     {
         if (!ctx.entity_manager)
             return false;
@@ -86,7 +86,24 @@ namespace eeng::editor
             0.0f,
             1.0f);
         out_view.window_size = window_size;
+        out_view.near_plane = camera_view.near_plane;
+        out_view.far_plane = camera_view.far_plane;
         out_view.valid = true;
+        finalize_camera_view(out_view);
+        return true;
+    }
+
+    // Transitional wrapper while overlay/gizmo/picking code still consumes the
+    // older OverlayViewState type.
+    inline bool build_active_editor_overlay_view(
+        EngineContext& ctx,
+        glm::ivec2 window_size,
+        OverlayViewState& out_view)
+    {
+        CameraView camera_view{};
+        if (!build_active_editor_camera_view(ctx, window_size, camera_view))
+            return false;
+        copy_camera_view_to_overlay_view(camera_view, out_view);
         return true;
     }
 } // namespace eeng::editor

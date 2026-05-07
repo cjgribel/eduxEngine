@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "engineapi/CameraView.hpp"
 #include "engineapi/OverlayViewState.hpp"
 #include "engineapi/PlayModePolicy.hpp"
 #include "engineapi/RenderContext.hpp"
@@ -115,7 +116,15 @@ namespace eeng
         {
         }
 
-        /// @brief Provide the current editor view state (for gizmos/picking).
+        /// @brief Build a game-owned play camera view for the current window.
+        virtual bool build_play_camera_view(CameraView&, glm::ivec2) const
+        {
+            return false;
+        }
+
+        /// @brief Legacy editor-hosted fallback for tool view export.
+        ///
+        /// New code should prefer explicit CameraView handoff through RenderContext.
         virtual bool get_editor_view(OverlayViewState&) const
         {
             return false;

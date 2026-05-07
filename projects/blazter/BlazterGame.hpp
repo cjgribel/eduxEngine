@@ -27,6 +27,7 @@ namespace eeng::blazter
         void render_overlay(const RenderContext& ctx) override;
         void render_gui(const RenderContext& ctx) override;
         void destroy() override;
+        bool build_play_camera_view(CameraView& out_view, glm::ivec2 window_size) const override;
         PlayModePolicy preferred_play_policy() const override;
         std::vector<std::string> preferred_startup_batches() const override;
         void on_play_world_created(EngineContext& ctx) override;
@@ -57,9 +58,6 @@ namespace eeng::blazter
         void begin_session_start();
         void finish_session_start();
         std::string_view flow_state_label() const;
-        bool build_play_view(OverlayViewState& out, glm::ivec2 window_size) const;
-        bool build_view_for_mode(OverlayViewState& out, RenderMode mode, glm::ivec2 window_size) const;
-        void publish_play_overlay_view(int windowWidth, int windowHeight);
 
         struct GameCamera
         {
@@ -80,7 +78,6 @@ namespace eeng::blazter
         int selected_player_count_{ 1 };
         int active_player_count_{ 0 };
         bool start_requested_{ false };
-        glm::ivec2 last_window_size_{ 0, 0 };
         std::unordered_set<std::string> queued_level_batches_;
         GameCamera game_camera_{};
     };

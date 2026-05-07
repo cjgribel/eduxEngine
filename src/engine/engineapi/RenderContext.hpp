@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "engineapi/CameraView.hpp"
+
 #include <cstdint>
 
 namespace eeng
@@ -19,5 +21,7 @@ namespace eeng
         int window_width = 0;
         int window_height = 0;
         RenderMode mode = RenderMode::Edit;
+        // Explicit active render view chosen by the hosting app for this call.
+        CameraView camera_view{};
     };
 }
