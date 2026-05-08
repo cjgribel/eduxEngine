@@ -52,6 +52,7 @@ namespace eeng::blazter
         PlayModePolicy active_play_policy() const;
         bool should_run_game_boot() const;
         void reset_game_camera();
+        void update_game_camera(float deltaTime_s);
         void queue_level_preload();
         float level_preload_progress() const;
         bool is_level_preload_ready() const;
@@ -61,9 +62,14 @@ namespace eeng::blazter
 
         struct GameCamera
         {
-            glm::vec3 position{ 0.0f, 7.5f, 22.0f };
-            float yaw = -1.5707963f;
+            glm::vec3 pivot{ 0.0f, 1.5f, 0.0f };
+            float distance = 22.0f;
+            float yaw = 0.0f;
             float pitch = -0.28f;
+            float mouse_sensitivity = 0.005f;
+            float keyboard_look_speed = 2.5f;
+            float zoom_speed = 12.0f;
+            glm::ivec2 mouse_prev{ -1, -1 };
             float near_plane = 0.1f;
             float far_plane = 500.0f;
             float fov_y_degrees = 60.0f;

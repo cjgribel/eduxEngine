@@ -2,6 +2,7 @@
 
 #include "BatchRegistry.hpp"
 #include "editor/OverlayRenderSettingsPersistence.hpp"
+#include "engineapi/IInputManager.hpp"
 #include "glmcommon.hpp"
 #include "imgui.h"
 #include <glm/glm.hpp>
@@ -99,6 +100,7 @@ namespace eeng::blazter
         // systems that should advance during Warm/Cold Play.
         (void)time_s;
         update_flow(deltaTime_s);
+        update_game_camera(deltaTime_s);
         if (ctx_)
             runtime_pipeline_.update_play(*ctx_, deltaTime_s);
     }
@@ -334,9 +336,49 @@ namespace eeng::blazter
     void BlazterGame::reset_game_camera()
     {
         // Temporary game-owned camera. Later this should become a proper
-        // gameplay camera rig driven by player/session state rather than a
-        // fixed vantage point.
+        // gameplay camera rig driven by player/session state.
         game_camera_ = GameCamera{};
+    }
+
+    void BlazterGame::update_game_camera(float deltaTime_s)
+    {
+        if (!ctx_ || !ctx_->input_manager)
+            return;
+
+        auto& camera = game_camera_;
+        const auto& input = *ctx_->input_manager;
+        const auto mouse = input.GetMouseState();
+        const glm::ivec2 mouse_xy{ mouse.x, mouse.y };
+        glm::ivec2 mouse_delta{ 0, 0 };
+
+        if ((mouse.leftButton || mouse.rightButton) && camera.mouse_prev.x >= 0)
+            mouse_delta = camera.mouse_prev - mouse_xy;
+        camera.mouse_prev = mouse_xy;
+
+        camera.yaw += static_cast<float>(mouse_delta.x) * camera.mouse_sensitivity;
+        camera.pitch += static_cast<float>(mouse_delta.y) * camera.mouse_sensitivity;
+
+        using Key = IInputManager::Key;
+        const float yaw_axis =
+            (input.IsKeyPressed(Key::Right) ? 1.0f : 0.0f)
+            + (input.IsKeyPressed(Key::Left) ? -1.0f : 0.0f);
+        const float pitch_axis =
+            (input.IsKeyPressed(Key::Up) ? -1.0f : 0.0f)
+            + (input.IsKeyPressed(Key::Down) ? 1.0f : 0.0f);
+        const float zoom_axis =
+            (input.IsKeyPressed(Key::S) ? 1.0f : 0.0f)
+            + (input.IsKeyPressed(Key::W) ? -1.0f : 0.0f);
+
+        const float dt = std::max(0.0f, deltaTime_s);
+        camera.yaw += yaw_axis * camera.keyboard_look_speed * dt;
+        camera.pitch += pitch_axis * camera.keyboard_look_speed * dt;
+        camera.distance += zoom_axis * camera.zoom_speed * dt;
+
+        if (mouse.scroll_y != 0.0f)
+            camera.distance -= mouse.scroll_y * 1.5f;
+
+        camera.pitch = glm::clamp(camera.pitch, -glm::radians(80.0f), glm::radians(35.0f));
+        camera.distance = glm::clamp(camera.distance, 3.0f, 80.0f);
     }
 
     PlayModePolicy BlazterGame::active_play_policy() const
@@ -506,13 +548,11 @@ namespace eeng::blazter
         if (window_size.x <= 0 || window_size.y <= 0)
             return false;
 
-        const glm::vec3 forward{
-            std::cos(game_camera_.pitch) * std::cos(game_camera_.yaw),
-            std::sin(game_camera_.pitch),
-            std::cos(game_camera_.pitch) * std::sin(game_camera_.yaw)
-        };
-        const glm::vec3 eye = game_camera_.position;
-        const glm::vec3 target = eye + glm::normalize(forward);
+        const glm::vec3 orbit_offset = glm::vec3(
+            glm_aux::R(game_camera_.yaw, game_camera_.pitch)
+            * glm::vec4(0.0f, 0.0f, game_camera_.distance, 1.0f));
+        const glm::vec3 eye = game_camera_.pivot + orbit_offset;
+        const glm::vec3 target = game_camera_.pivot;
         const glm::vec3 up(0.0f, 1.0f, 0.0f);
         const float aspect_ratio = static_cast<float>(window_size.x) / static_cast<float>(window_size.y);
 
