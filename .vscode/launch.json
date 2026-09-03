@@ -1,6 +1,43 @@
 {
     "version": "0.2.0",
     "configurations": [
+        // === CMAKE TOOLS LAUNCH ===
+        {
+            "name": "CMake Tools: Launch Active Target (Windows)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        },
+        {
+            "name": "CMake Tools: Launch Active Target (Unix)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ],
+                "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+                "MIMode": "lldb"
+            }
+        },
         // === DEBUG LAUNCH ===
         {
             "name": "Launch LegacyGame (Debug) (Windows)",

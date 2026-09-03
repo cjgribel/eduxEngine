@@ -11,7 +11,8 @@
                 "${workspaceFolder}",
                 "-B",
                 "${workspaceFolder}/Debug",
-                "-DCMAKE_BUILD_TYPE=Debug"
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
             ]
         },
         {
@@ -23,7 +24,8 @@
                 "${workspaceFolder}",
                 "-B",
                 "${workspaceFolder}/Release",
-                "-DCMAKE_BUILD_TYPE=Release"
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
             ]
         },
         {
@@ -37,7 +39,8 @@
                 "${workspaceFolder}",
                 "-B",
                 "${workspaceFolder}/Debug",
-                "-DCMAKE_BUILD_TYPE=Debug"
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
             ]
         },
         {
@@ -51,7 +54,8 @@
                 "${workspaceFolder}",
                 "-B",
                 "${workspaceFolder}/Release",
-                "-DCMAKE_BUILD_TYPE=Release"
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
             ]
         },
         // === BUILD TASKS ===
@@ -69,11 +73,18 @@
                 "kind": "build",
                 "isDefault": true
             },
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": []
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
+            }
         },
         {
             "label": "CMake Build LegacyGame (Debug)",
@@ -87,11 +98,18 @@
                 "--config",
                 "Debug"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": []
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
+            }
         },
         {
             "label": "CMake Build ReferenceGame (Debug)",
@@ -105,11 +123,18 @@
                 "--config",
                 "Debug"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": []
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
+            }
         },
         {
             "label": "CMake Build FluidSandbox (Debug)",
@@ -123,11 +148,18 @@
                 "--config",
                 "Debug"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": []
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
+            }
         },
         {
             "label": "CMake Build Blazter (Debug)",
@@ -141,11 +173,18 @@
                 "--config",
                 "Debug"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": []
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
+            }
         },
         {
             "label": "CMake Build All (Release)",
@@ -158,9 +197,17 @@
                 "Release" // Only needed for multi-config generators
             ],
             "group": "build",
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
             }
         },
         {
@@ -175,9 +222,17 @@
                 "--config",
                 "Release"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
             }
         },
         {
@@ -192,9 +247,17 @@
                 "--config",
                 "Release"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
             }
         },
         {
@@ -209,9 +272,17 @@
                 "--config",
                 "Release"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
             }
         },
         {
@@ -226,9 +297,17 @@
                 "--config",
                 "Release"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
             }
         },
         {
@@ -243,11 +322,18 @@
                 "--config",
                 "Debug"
             ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "absolute"
+                ]
+            },
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": []
+                "panel": "shared",
+                "revealProblems": "onProblem",
+                "clear": true
+            }
         },
         // === TEST TASKS ===
         {

@@ -1,4 +1,7 @@
 {
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/Debug/compile_commands.json",
+    "cmake.buildBeforeRun": true,
+    "cmake.useCMakePresets": "auto",
     "files.associations": {
         "map": "cpp",
         "set": "cpp",
