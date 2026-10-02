@@ -31,6 +31,7 @@
             "label": "CMake Configure (Debug) (Ninja)",
             "command": "cmake",
             "args": [
+                //"--fresh", // fresh config, e.g. after major macOS updates
                 "-G",
                 "Ninja",
                 "-S",
@@ -38,13 +39,15 @@
                 "-B",
                 "${workspaceFolder}/Debug",
                 "-DCMAKE_BUILD_TYPE=Debug"
-            ]
+            ],
+            "problemMatcher": []
         },
         {
             "type": "shell",
             "label": "CMake Configure (Release) (Ninja)",
             "command": "cmake",
             "args": [
+                //"--fresh", // fresh config, e.g. after major macOS updates
                 "-G",
                 "Ninja",
                 "-S",
@@ -52,7 +55,8 @@
                 "-B",
                 "${workspaceFolder}/Release",
                 "-DCMAKE_BUILD_TYPE=Release"
-            ]
+            ],
+            "problemMatcher": []
         },
         // === BUILD TASKS ===
         {
