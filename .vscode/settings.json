@@ -1,4 +1,6 @@
 {
+    // Set to false when adopting the CMake Tools workflow explored in experimental_workflow.
+    "cmake.languageServerOnlyMode": true,
     "files.associations": {
         "map": "cpp",
         "set": "cpp",
